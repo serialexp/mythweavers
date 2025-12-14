@@ -1,7 +1,7 @@
 import { Component, createMemo, createSignal } from 'solid-js'
-import { SceneEditor } from '@writer/ui'
+import { SceneEditor } from '@mythweavers/ui'
 import type { Paragraph } from '@story/shared'
-import type { EditorScene, EditorCharacter } from '@writer/ui'
+import type { EditorScene, EditorCharacter } from '@mythweavers/ui'
 import { messagesStore } from '../stores/messagesStore'
 import { charactersStore } from '../stores/charactersStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -14,7 +14,7 @@ interface SceneEditorWrapperProps {
 }
 
 /**
- * Wrapper component that connects the @writer/editor SceneEditor
+ * Wrapper component that connects the @mythweavers/ui SceneEditor
  * to the Story app's stores and state management
  *
  * Displays paragraphs for a SINGLE message

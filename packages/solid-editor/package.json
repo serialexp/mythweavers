@@ -1,0 +1,28 @@
+{
+  "name": "@writer/solid-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./model": {
+      "import": "./dist/model/index.js",
+      "types": "./dist/model/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.9"
+  }
+}

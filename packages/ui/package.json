@@ -1,7 +1,7 @@
 {
-  "name": "@writer/ui",
+  "name": "@mythweavers/ui",
   "version": "1.0.0",
-  "description": "Design system and component library for Writer and Story apps",
+  "description": "Design system and component library for MythWeavers apps",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

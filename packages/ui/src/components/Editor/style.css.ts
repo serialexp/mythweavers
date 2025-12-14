@@ -3,7 +3,7 @@ import { tokens } from '../../theme/tokens.css'
 
 /**
  * Basic Editor Styles
- * Using design tokens from @writer/ui for theme support
+ * Using design tokens from @mythweavers/ui for theme support
  */
 
 export const editor = style({

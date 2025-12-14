@@ -2,16 +2,26 @@
 
 A from-scratch rich text editor built on SolidJS's fine-grained reactivity, inspired by ProseMirror's architecture but adapted to SolidJS idioms.
 
-## Status: Research Phase
+## Status: Phase 1 - Document Model Complete
 
 ### Prerequisites
-- [ ] Clone ProseMirror source for reference
+- [x] Clone ProseMirror source for reference (`/home/bart/Projects/prosemirror`)
   - `prosemirror-model` - Document model, schema, nodes, marks
   - `prosemirror-state` - Editor state, selection, transactions
   - `prosemirror-transform` - Document transformations, steps
   - `prosemirror-view` - DOM rendering, input handling
 - [ ] Study how ProseMirror handles contenteditable quirks
 - [ ] Understand the transaction/step model
+
+### Document Model - DONE
+Package: `packages/solid-editor`
+- [x] Schema, NodeType, MarkType
+- [x] Node, TextNode classes
+- [x] Fragment class
+- [x] Mark class
+- [x] ResolvedPos, NodeRange classes
+- [x] Test builder utility (like prosemirror-test-builder)
+- [x] 43 tests passing (ported from prosemirror-model)
 
 ---
 
@@ -66,11 +76,11 @@ A from-scratch rich text editor built on SolidJS's fine-grained reactivity, insp
 ## Implementation Phases
 
 ### Phase 1: Minimal Viable Editor
-- [ ] Basic document model (doc > paragraph > text)
+- [x] Basic document model (doc > paragraph > text)
 - [ ] Text input handling
 - [ ] Cursor movement
 - [ ] Basic selection
-- [ ] Bold/italic marks
+- [x] Bold/italic marks (in model, not view yet)
 
 ### Phase 2: Core Editing
 - [ ] Copy/paste (plain text)
@@ -164,4 +174,29 @@ Things ProseMirror handles that we'll need to copy:
 
 ## Notes
 
-_Add notes here as you explore ProseMirror source..._
+### 2024-12-14: Document Model Ported
+
+Ported the core document model from prosemirror-model to `packages/solid-editor`:
+
+**What we built:**
+- `Schema` - defines node types and mark types
+- `NodeType` / `MarkType` - type descriptors
+- `Node` / `TextNode` - actual document nodes
+- `Fragment` - list of child nodes
+- `Mark` - formatting marks (bold, italic, etc.)
+
+**Simplifications made:**
+- Skipped full content expression parsing (the complex regex-based validator)
+- Using simpler content validation for now
+- No DOM parsing/serialization yet (from_dom.ts, to_dom.ts)
+- No ResolvedPos yet (needed for sophisticated position handling)
+
+**Test builder pattern works great:**
+```typescript
+const myDoc = doc(p("Hello ", em("world"), "!"));
+```
+
+**Next steps:**
+1. Add ResolvedPos for position resolution
+2. Add transforms (steps) for document modifications
+3. Build the view layer with SolidJS components

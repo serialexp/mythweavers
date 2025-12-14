@@ -1,5 +1,5 @@
 {
-  "name": "story",
+  "name": "@mythweavers/story-editor",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -45,7 +45,7 @@
     "@paralleldrive/cuid2": "^2.2.2",
     "@solidjs/router": "^0.15.3",
     "@story/shared": "workspace:^",
-    "@writer/ui": "workspace:^",
+    "@mythweavers/ui": "workspace:^",
     "@writer/shared": "workspace:^",
     "d3-delaunay": "^6.0.4",
     "diff": "^8.0.2",

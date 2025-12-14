@@ -61,7 +61,7 @@ We've built a design system in `/packages/ui` using:
 - **Starlight** (light/sci-fi): Light backgrounds, blue primary, red secondary
 - Global styles scoped to theme containers (won't affect non-themed UI)
 - Design tokens via `createThemeContract`
-- Separate theme export (`@writer/ui/theme`) for build-time usage without SolidJS
+- Separate theme export (`@mythweavers/ui/theme`) for build-time usage without SolidJS
 
 ---
 
@@ -69,13 +69,13 @@ We've built a design system in `/packages/ui` using:
 
 ```typescript
 // Full package with all components
-import { Button, Modal, ProseMirrorEditor } from '@writer/ui'
+import { Button, Modal, ProseMirrorEditor } from '@mythweavers/ui'
 
 // Theme-only (safe for build-time/vanilla-extract)
-import { tokens, chronicleTheme, starlightTheme } from '@writer/ui/theme'
+import { tokens, chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
 
 // Styles
-import '@writer/ui/styles'
+import '@mythweavers/ui/styles'
 ```
 
 ---
