@@ -1,5 +1,5 @@
-import { Button } from './Button'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Button } from './Button'
 
 // Simple icon components for demo
 const PlusIcon = () => (
@@ -53,42 +53,84 @@ export default (props: { Hst: any }) => {
 
       <Hst.Variant title="With Icons">
         <ThemeComparison>
-          <Button><SaveIcon /> Save</Button>
-          <Button variant="secondary"><SettingsIcon /> Settings</Button>
-          <Button variant="ghost"><PlusIcon /> Add Item</Button>
-          <Button variant="danger"><TrashIcon /> Delete</Button>
+          <Button>
+            <SaveIcon /> Save
+          </Button>
+          <Button variant="secondary">
+            <SettingsIcon /> Settings
+          </Button>
+          <Button variant="ghost">
+            <PlusIcon /> Add Item
+          </Button>
+          <Button variant="danger">
+            <TrashIcon /> Delete
+          </Button>
         </ThemeComparison>
       </Hst.Variant>
 
       <Hst.Variant title="Icon Only">
         <ThemeComparison>
-          <Button iconOnly aria-label="Add"><PlusIcon /></Button>
-          <Button iconOnly variant="secondary" aria-label="Settings"><SettingsIcon /></Button>
-          <Button iconOnly variant="ghost" aria-label="Save"><SaveIcon /></Button>
-          <Button iconOnly variant="danger" aria-label="Delete"><TrashIcon /></Button>
+          <Button iconOnly aria-label="Add">
+            <PlusIcon />
+          </Button>
+          <Button iconOnly variant="secondary" aria-label="Settings">
+            <SettingsIcon />
+          </Button>
+          <Button iconOnly variant="ghost" aria-label="Save">
+            <SaveIcon />
+          </Button>
+          <Button iconOnly variant="danger" aria-label="Delete">
+            <TrashIcon />
+          </Button>
         </ThemeComparison>
       </Hst.Variant>
 
       <Hst.Variant title="Icon Only (All Sizes)">
         <ThemeComparison>
-          <Button iconOnly size="sm" aria-label="Small"><PlusIcon /></Button>
-          <Button iconOnly size="md" aria-label="Medium"><PlusIcon /></Button>
-          <Button iconOnly size="lg" aria-label="Large"><PlusIcon /></Button>
+          <Button iconOnly size="sm" aria-label="Small">
+            <PlusIcon />
+          </Button>
+          <Button iconOnly size="md" aria-label="Medium">
+            <PlusIcon />
+          </Button>
+          <Button iconOnly size="lg" aria-label="Large">
+            <PlusIcon />
+          </Button>
         </ThemeComparison>
       </Hst.Variant>
 
       <Hst.Variant title="Disabled">
         <ThemeComparison>
           <Button disabled>Primary Disabled</Button>
-          <Button variant="secondary" disabled>Secondary Disabled</Button>
-          <Button variant="ghost" disabled>Ghost Disabled</Button>
-          <Button iconOnly disabled aria-label="Disabled"><PlusIcon /></Button>
+          <Button variant="secondary" disabled>
+            Secondary Disabled
+          </Button>
+          <Button variant="ghost" disabled>
+            Ghost Disabled
+          </Button>
+          <Button iconOnly disabled aria-label="Disabled">
+            <PlusIcon />
+          </Button>
         </ThemeComparison>
       </Hst.Variant>
 
       <Hst.Variant title="Full Width">
         <ThemeComparison>
           <Button fullWidth>Full Width Button</Button>
+        </ThemeComparison>
+      </Hst.Variant>
+
+      <Hst.Variant title="Wide Buttons (Gradient Test)">
+        <ThemeComparison>
+          <div style={{ display: 'flex', 'flex-direction': 'column', gap: '12px', width: '400px' }}>
+            <Button fullWidth>Wide Button - Hover to see spinning gradient</Button>
+            <Button fullWidth variant="secondary">
+              Wide Secondary Button
+            </Button>
+            <Button fullWidth variant="danger">
+              Wide Danger Button
+            </Button>
+          </div>
         </ThemeComparison>
       </Hst.Variant>
     </Hst.Story>

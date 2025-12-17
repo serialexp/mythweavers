@@ -1,10 +1,10 @@
-import { style, keyframes } from '@vanilla-extract/css'
-import { recipe, type RecipeVariants } from '@vanilla-extract/recipes'
+import { keyframes, style } from '@vanilla-extract/css'
+import { type RecipeVariants, recipe } from '@vanilla-extract/recipes'
 import { tokens } from '../../theme/tokens.css'
 
 const spinGradient = keyframes({
-  '0%': { transform: 'rotate(0deg)' },
-  '100%': { transform: 'rotate(360deg)' },
+  '0%': { transform: 'translate(-50%, -50%) rotate(0deg)' },
+  '100%': { transform: 'translate(-50%, -50%) rotate(360deg)' },
 })
 
 const base = style({
@@ -23,6 +23,9 @@ const base = style({
   userSelect: 'none',
   overflow: 'hidden',
   isolation: 'isolate',
+  // Fallback background prevents white flash when ::before transitions
+  // between gradient and solid (browsers can't interpolate these smoothly)
+  backgroundColor: tokens.color.accent.primary,
 
   ':disabled': {
     opacity: 0.5,
@@ -35,12 +38,19 @@ const base = style({
   },
 
   // Spinning gradient layer - starts as solid color, becomes gradient on hover
+  // Uses aspect-ratio: 1 to create a square based on width, ensuring
+  // the gradient covers the button at all rotation angles (even for wide buttons)
   '::before': {
     content: '""',
     position: 'absolute',
-    inset: '-100%',
+    aspectRatio: '1',
+    width: 'max(300%, 200px)',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
     background: tokens.color.accent.primary,
-    transition: `background ${tokens.duration.normal} ${tokens.easing.default}`,
+    // Fast transition OUT so gradient disappears before rotation animation stops
+    transition: 'background 50ms ease-out',
     zIndex: -2,
   },
 
@@ -65,10 +75,22 @@ const base = style({
         ${tokens.color.accent.secondaryHover},
         ${tokens.color.accent.primary}
       )`,
+      // Slower transition IN for smooth gradient appearance
+      transition: `background ${tokens.duration.normal} ${tokens.easing.default}`,
       animation: `${spinGradient} 3s linear infinite`,
     },
     '&:active:not(:disabled)::before': {
       animation: `${spinGradient} 1s linear infinite`,
+    },
+  },
+})
+
+// Separate style for ghost + pressed (compound variants don't work reliably)
+// Match the specificity of the hover selector: .class:hover:not(:disabled)
+export const pressedGhostStyle = style({
+  selectors: {
+    '&&:not(:disabled), &&:hover:not(:disabled)': {
+      backgroundColor: tokens.color.surface.selected,
     },
   },
 })
@@ -84,6 +106,9 @@ export const button = recipe({
           '&:hover:not(:disabled)::after': {
             backgroundColor: tokens.color.accent.primaryHover,
           },
+          '&:active:not(:disabled)': {
+            transform: 'scale(0.97)',
+          },
           '&:active:not(:disabled)::after': {
             backgroundColor: tokens.color.accent.primaryActive,
           },
@@ -91,6 +116,7 @@ export const button = recipe({
       },
       secondary: {
         color: tokens.color.text.primary,
+        backgroundColor: tokens.color.border.default,
         selectors: {
           '&::after': {
             backgroundColor: tokens.color.surface.default,
@@ -112,6 +138,9 @@ export const button = recipe({
           '&:hover:not(:disabled)::after': {
             backgroundColor: tokens.color.surface.hover,
             borderColor: tokens.color.border.strong,
+          },
+          '&:active:not(:disabled)': {
+            transform: 'scale(0.97)',
           },
           '&:active:not(:disabled)::after': {
             backgroundColor: tokens.color.surface.active,
@@ -135,12 +164,14 @@ export const button = recipe({
             backgroundColor: tokens.color.surface.hover,
           },
           '&:active:not(:disabled)': {
-            backgroundColor: tokens.color.surface.active,
+            backgroundColor: tokens.color.surface.selected,
+            transform: 'scale(0.95)',
           },
         },
       },
       danger: {
         color: tokens.color.text.inverse,
+        backgroundColor: tokens.color.semantic.error,
         selectors: {
           '&::after': {
             backgroundColor: tokens.color.semantic.error,
@@ -158,6 +189,9 @@ export const button = recipe({
           },
           '&:hover:not(:disabled)::after': {
             filter: 'brightness(1.1)',
+          },
+          '&:active:not(:disabled)': {
+            transform: 'scale(0.97)',
           },
           '&:active:not(:disabled)::after': {
             filter: 'brightness(0.95)',
@@ -197,6 +231,13 @@ export const button = recipe({
     iconOnly: {
       true: {},
     },
+
+    // Manually controlled pressed state (for use with preventDefault scenarios)
+    pressed: {
+      true: {
+        transform: 'scale(0.95)',
+      },
+    },
   },
 
   compoundVariants: [
@@ -223,6 +264,37 @@ export const button = recipe({
         width: '48px',
         paddingLeft: 0,
         paddingRight: 0,
+      },
+    },
+    // Pressed state background colors per variant (ghost handled separately in Button.tsx)
+    {
+      variants: { pressed: true, variant: 'secondary' },
+      style: {
+        selectors: {
+          '&::after': {
+            backgroundColor: tokens.color.surface.selected,
+          },
+        },
+      },
+    },
+    {
+      variants: { pressed: true, variant: 'primary' },
+      style: {
+        selectors: {
+          '&::after': {
+            backgroundColor: tokens.color.accent.primaryActive,
+          },
+        },
+      },
+    },
+    {
+      variants: { pressed: true, variant: 'danger' },
+      style: {
+        selectors: {
+          '&::after': {
+            filter: 'brightness(0.9)',
+          },
+        },
       },
     },
   ],
