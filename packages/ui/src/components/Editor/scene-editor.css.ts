@@ -1,4 +1,4 @@
-import { style, globalStyle, keyframes } from '@vanilla-extract/css'
+import { globalStyle, keyframes, style } from '@vanilla-extract/css'
 import { tokens } from '../../theme/tokens.css'
 
 /**
@@ -34,8 +34,9 @@ globalStyle(`${sceneEditor} .ProseMirror p`, {
   paddingLeft: tokens.space['2'],
   minHeight: '1.6em',
   position: 'relative',
-  borderLeft: `3px solid transparent`,
-  transition: `all ${tokens.duration.normal} ${tokens.easing.default}, border-left-width ${tokens.duration.fast} ${tokens.easing.default}, box-shadow ${tokens.duration.fast} ${tokens.easing.default}`,
+  borderLeft: '3px solid transparent',
+  // Only transition specific properties to avoid flashing on reactive updates
+  transition: `background-color ${tokens.duration.normal} ${tokens.easing.default}, border-left-color ${tokens.duration.normal} ${tokens.easing.default}, border-left-width ${tokens.duration.fast} ${tokens.easing.default}, box-shadow ${tokens.duration.fast} ${tokens.easing.default}`,
 })
 
 // Paragraph hover (non-active)
@@ -320,7 +321,7 @@ globalStyle(`${inlineMenu} button.active`, {
 })
 
 // Translation marks
-globalStyle(`.translation-mark`, {
+globalStyle('.translation-mark', {
   backgroundColor: tokens.color.semantic.warningSubtle,
   borderBottom: `1px dotted ${tokens.color.semantic.warning}`,
   cursor: 'help',
@@ -337,4 +338,126 @@ globalStyle(`${sceneEditor} .ProseMirror p:empty::before`, {
 // Focus styles
 globalStyle(`${sceneEditor} .ProseMirror:focus`, {
   boxShadow: `0 0 0 2px color-mix(in srgb, ${tokens.color.accent.primary} 15%, transparent)`,
+})
+
+// ====================================
+// Solid-Editor Styles
+// ====================================
+
+// Solid-editor base styles
+globalStyle(`${sceneEditor} .solid-editor`, {
+  outline: 'none',
+  padding: 0,
+  margin: 0,
+})
+
+// Solid-editor paragraph styles
+globalStyle(`${sceneEditor} .solid-editor p, ${sceneEditor} .solid-editor .solid-editor-paragraph`, {
+  margin: 0,
+  padding: `${tokens.space['2']} 0`,
+  paddingLeft: tokens.space['2'],
+  minHeight: '1.6em',
+  position: 'relative',
+  borderLeft: '3px solid transparent',
+  // Only transition specific properties to avoid flashing on reactive updates
+  transition: `background-color ${tokens.duration.normal} ${tokens.easing.default}, border-left-color ${tokens.duration.normal} ${tokens.easing.default}, border-left-width ${tokens.duration.fast} ${tokens.easing.default}, box-shadow ${tokens.duration.fast} ${tokens.easing.default}`,
+})
+
+// Paragraph hover
+globalStyle(`${sceneEditor} .solid-editor p:hover, ${sceneEditor} .solid-editor .solid-editor-paragraph:hover`, {
+  backgroundColor: tokens.color.surface.hover,
+})
+
+// Active paragraph in solid-editor
+globalStyle(
+  `${sceneEditor} .solid-editor p.active-paragraph, ${sceneEditor} .solid-editor .solid-editor-paragraph.active-paragraph`,
+  {
+    borderLeftColor: `${tokens.color.accent.primary} !important`,
+    backgroundColor: `${tokens.color.surface.selected} !important`,
+    borderLeftWidth: '4px !important',
+    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tokens.color.accent.primary} 20%, transparent), 0 0 0 1px color-mix(in srgb, ${tokens.color.accent.primary} 10%, transparent) !important`,
+  },
+)
+
+// Solid-editor paragraph states
+globalStyle(
+  `${sceneEditor} .solid-editor p[data-state="draft"], ${sceneEditor} .solid-editor .solid-editor-paragraph[data-state="draft"]`,
+  {
+    borderLeftColor: tokens.color.semantic.warning,
+  },
+)
+
+globalStyle(
+  `${sceneEditor} .solid-editor p[data-state="revise"], ${sceneEditor} .solid-editor .solid-editor-paragraph[data-state="revise"]`,
+  {
+    borderLeftColor: tokens.color.semantic.error,
+  },
+)
+
+globalStyle(
+  `${sceneEditor} .solid-editor p[data-state="ai"], ${sceneEditor} .solid-editor .solid-editor-paragraph[data-state="ai"]`,
+  {
+    borderLeftColor: tokens.color.accent.secondary,
+  },
+)
+
+globalStyle(
+  `${sceneEditor} .solid-editor p[data-state="final"], ${sceneEditor} .solid-editor .solid-editor-paragraph[data-state="final"]`,
+  {
+    borderLeftColor: tokens.color.semantic.success,
+  },
+)
+
+globalStyle(
+  `${sceneEditor} .solid-editor p[data-state="sdt"], ${sceneEditor} .solid-editor .solid-editor-paragraph[data-state="sdt"]`,
+  {
+    borderLeftColor: tokens.color.semantic.info,
+  },
+)
+
+// Solid-editor focus styles
+globalStyle(`${sceneEditor} .solid-editor:focus`, {
+  boxShadow: `0 0 0 2px color-mix(in srgb, ${tokens.color.accent.primary} 15%, transparent)`,
+})
+
+// Solid-editor placeholder
+globalStyle(`${sceneEditor} .solid-editor-placeholder`, {
+  color: tokens.color.text.muted,
+  fontStyle: 'italic',
+  // Match paragraph padding: borderLeft (3px) + paddingLeft (space['2'])
+  paddingLeft: `calc(3px + ${tokens.space['2']})`,
+  paddingTop: tokens.space['2'],
+})
+
+// Solid-editor mark styles
+globalStyle(`${sceneEditor} .solid-editor strong`, {
+  fontWeight: tokens.font.weight.bold,
+})
+
+globalStyle(`${sceneEditor} .solid-editor em`, {
+  fontStyle: 'italic',
+})
+
+globalStyle(`${sceneEditor} .solid-editor .translation-mark, ${sceneEditor} .solid-editor abbr.translation-mark`, {
+  backgroundColor: tokens.color.semantic.warningSubtle,
+  borderBottom: `1px dotted ${tokens.color.semantic.warning}`,
+  cursor: 'help',
+  textDecoration: 'none',
+})
+
+// Prevent text selection highlight inside mentions
+globalStyle(`${sceneEditor} .solid-editor-mention`, {
+  userSelect: 'none',
+})
+
+globalStyle(`${sceneEditor} .solid-editor-mention *`, {
+  userSelect: 'none',
+})
+
+globalStyle(`${sceneEditor} .solid-editor-mention::selection`, {
+  background: 'transparent',
+})
+
+globalStyle(`${sceneEditor} .solid-editor-mention *::selection`, {
+  background: 'transparent',
 })
