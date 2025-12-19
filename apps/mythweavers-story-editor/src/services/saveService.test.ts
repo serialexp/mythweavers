@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../utils/apiClient', () => ({
   apiClient: {
@@ -41,7 +41,7 @@ describe('SaveService queue merge behaviour', () => {
   let service: SaveService
   let processSpy: ReturnType<typeof vi.spyOn>
 
-  const getQueue = () => ((service as unknown as { state: { queue: any[] } }).state.queue)
+  const getQueue = () => (service as unknown as { state: { queue: any[] } }).state.queue
 
   beforeEach(() => {
     service = new SaveService()

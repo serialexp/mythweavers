@@ -5,7 +5,7 @@ export const GlobalStatusIndicator: Component = () => {
   const getOperationLabel = () => {
     const operation = globalOperationStore.operation
     if (!operation) return ''
-    
+
     switch (operation.type) {
       case 'bulk-summarize':
         return 'Generating summaries'

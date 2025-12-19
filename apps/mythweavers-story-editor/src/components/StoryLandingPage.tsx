@@ -1,17 +1,40 @@
-import { Component, Show, createSignal, onMount, createMemo } from 'solid-js'
-import { storyManager, StoryMetadata } from '../utils/storyManager'
-import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
-import { postMyStories, postMyStoriesByStoryIdCalendars, getCalendarsPresets } from '../client/config'
-import { currentStoryStore } from '../stores/currentStoryStore'
-import { messagesStore } from '../stores/messagesStore'
+import {
+  Button,
+  Card,
+  CardBody,
+  Dropdown,
+  DropdownDivider,
+  DropdownItem,
+  IconButton,
+  NavBar,
+  NavBarActions,
+  NavBarBrand,
+  NavBarNav,
+  NavLink,
+  Spinner,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  Text,
+  useTheme,
+} from '@mythweavers/ui'
+import { useNavigate } from '@solidjs/router'
+import { Component, Show, createMemo, createSignal, onMount } from 'solid-js'
+import { authStore } from '../stores/authStore'
+import { getCalendarsPresets, postMyStories, postMyStoriesByStoryIdCalendars } from '../client/config'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
-import { nodeStore } from '../stores/nodeStore'
+import { currentStoryStore } from '../stores/currentStoryStore'
 import { mapsStore } from '../stores/mapsStore'
-import { StoryList, StoryListItem } from './StoryList'
-import { NewStoryForm } from './NewStoryForm'
+import { messagesStore } from '../stores/messagesStore'
+import { nodeStore } from '../stores/nodeStore'
+import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
-import styles from './StoryLandingPage.module.css'
+import { StoryMetadata, storyManager } from '../utils/storyManager'
+import { NewStoryForm } from './NewStoryForm'
+import { StoryList, StoryListItem } from './StoryList'
+import * as styles from './StoryLandingPage.css'
 
 interface StoryLandingPageProps {
   onSelectStory: (storyId: string) => void
@@ -28,13 +51,13 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
 
   // Combined stories list
   const combinedStories = createMemo((): StoryListItem[] => {
-    const serverStoryIds = new Set(serverStories().map(s => s.id))
+    const serverStoryIds = new Set(serverStories().map((s) => s.id))
     const fingerprints = localFingerprints()
-    
+
     // Process local stories, filtering out duplicates
     const localStoriesProcessed: StoryListItem[] = localStories()
-      .filter(story => !serverStoryIds.has(story.id))
-      .map(story => ({
+      .filter((story) => !serverStoryIds.has(story.id))
+      .map((story) => ({
         id: story.id,
         name: story.name,
         savedAt: story.savedAt,
@@ -44,15 +67,15 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         chapterCount: story.chapterCount || 0,
         storySetting: story.storySetting,
         type: (story.storageMode || 'local') as 'local' | 'server',
-        isCurrentStory: false // No current story on landing page
+        isCurrentStory: false, // No current story on landing page
       }))
-    
+
     // Process server stories with fingerprint comparison
-    const serverStoriesProcessed: StoryListItem[] = serverStories().map(story => {
+    const serverStoriesProcessed: StoryListItem[] = serverStories().map((story) => {
       const localFingerprint = fingerprints.get(story.id)
       // Only show button if we actually have a local fingerprint (meaning local version exists)
       const hasLocalDifferences = !!localFingerprint
-      
+
       return {
         id: story.id,
         name: story.name,
@@ -66,29 +89,33 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         isCurrentStory: false,
         fingerprint: story.fingerprint,
         localFingerprint,
-        hasLocalDifferences
+        hasLocalDifferences,
       }
     })
-    
+
     // Combine and sort by date (newest first)
-    return [...localStoriesProcessed, ...serverStoriesProcessed]
-      .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime())
+    return [...localStoriesProcessed, ...serverStoriesProcessed].sort(
+      (a, b) => b.savedAt.getTime() - a.savedAt.getTime(),
+    )
   })
 
   const loadStories = async () => {
     setLoading(true)
-    
+
     // Check server availability
     console.log('[LandingPage] Checking server availability...')
     const available = await storyManager.isServerAvailable()
     console.log('[LandingPage] Server available:', available)
     setServerAvailable(available)
-    
+
     // Load local stories
     const stories = await storyManager.getSavedStories()
-    console.log('[LandingPage] Local stories from index:', stories.map(s => ({ id: s.id, name: s.name })))
+    console.log(
+      '[LandingPage] Local stories from index:',
+      stories.map((s) => ({ id: s.id, name: s.name })),
+    )
     setLocalStories(stories)
-    
+
     // Load server stories if available
     if (available) {
       try {
@@ -96,7 +123,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         const serverStoriesList = await storyManager.getServerStories()
         console.log('[LandingPage] Server stories loaded:', serverStoriesList)
         setServerStories(serverStoriesList)
-        
+
         // Compute local fingerprints for server stories that have local versions
         const newFingerprints = new Map<string, string>()
         for (const serverStory of serverStoriesList) {
@@ -104,11 +131,15 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
             // Check if we have a local version
             const localStory = await storyManager.loadStory(serverStory.id)
             if (localStory) {
-              console.log(`[LandingPage] Local story loaded:`, localStory)
-              console.log(`[LandingPage] Local story ${serverStory.name} has ${localStory.messages?.length || 0} messages`)
-              console.log(`[LandingPage] First message:`, localStory.messages?.[0])
+              console.log('[LandingPage] Local story loaded:', localStory)
+              console.log(
+                `[LandingPage] Local story ${serverStory.name} has ${localStory.messages?.length || 0} messages`,
+              )
+              console.log('[LandingPage] First message:', localStory.messages?.[0])
               const localFingerprint = generateStoryFingerprint(localStory.messages)
-              console.log(`[LandingPage] Story ${serverStory.name}: server=${serverStory.fingerprint.substring(0,6)}, local=${localFingerprint}`)
+              console.log(
+                `[LandingPage] Story ${serverStory.name}: server=${serverStory.fingerprint.substring(0, 6)}, local=${localFingerprint}`,
+              )
               newFingerprints.set(serverStory.id, localFingerprint)
             } else {
               console.log(`[LandingPage] No local version found for ${serverStory.name}`)
@@ -120,7 +151,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         console.error('Failed to load server stories:', error)
       }
     }
-    
+
     setLoading(false)
   }
 
@@ -144,7 +175,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           body: {
             name: trimmedName,
             summary: '',
-          }
+          },
         })
 
         if (!result.data) {
@@ -159,16 +190,17 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           try {
             // Fetch the preset configuration
             const presetsResponse = await getCalendarsPresets()
-            const preset = presetsResponse.data?.presets?.find(p => p.id === calendarPresetId)
+            const presets = (presetsResponse.data?.presets || []) as { id: string; name: string }[]
+            const preset = presets.find((p) => p.id === calendarPresetId)
 
             if (preset) {
               await postMyStoriesByStoryIdCalendars({
                 path: { storyId: newStory.id },
                 body: {
                   name: preset.name,
-                  config: preset,
+                  config: preset as any,
                   setAsDefault: true,
-                }
+                },
               })
             }
           } catch (error) {
@@ -226,10 +258,10 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     try {
       if (type === 'server') {
         await storyManager.deleteFromServer(storyId)
-        setServerStories(prev => prev.filter(s => s.id !== storyId))
+        setServerStories((prev) => prev.filter((s) => s.id !== storyId))
       } else {
         await storyManager.deleteStory(storyId)
-        setLocalStories(prev => prev.filter(s => s.id !== storyId))
+        setLocalStories((prev) => prev.filter((s) => s.id !== storyId))
       }
     } catch (error) {
       console.error('Failed to delete story:', error)
@@ -251,12 +283,12 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           storySetting: data.storySetting || '',
           person: data.person || 'third',
           tense: data.tense || 'past',
-          globalScript: data.globalScript
+          globalScript: data.globalScript,
         })
-        
+
         // Update local story to mark it as server-synced
         await storyManager.updateStoryMetadata(storyId, { storageMode: 'server' })
-        
+
         // Reload stories
         const serverStoriesList = await apiClient.getStories()
         setServerStories(serverStoriesList)
@@ -271,52 +303,120 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     }
   }
 
+  const navigate = useNavigate()
+  const { resolvedTheme, setTheme } = useTheme()
+
+  const toggleTheme = () => {
+    setTheme(resolvedTheme() === 'starlight' ? 'chronicle' : 'starlight')
+  }
+
+  const isDark = () => resolvedTheme() === 'chronicle'
+
+  const handleLogout = () => {
+    authStore.logout()
+    navigate('/login')
+  }
+
   return (
-    <div class={styles.container}>
-      <div class={styles.header}>
-        <h1>Story Writer</h1>
-        <p>Create a new story or load an existing one</p>
-      </div>
+    <div class={styles.pageWrapper}>
+      <NavBar variant="elevated" style={{ 'flex-shrink': '0' }}>
+        <NavBarBrand href="/">
+          <img src="/mythweavers.png" alt="MythWeavers" style={{ height: '32px', 'margin-right': '8px' }} />
+          MythWeavers
+        </NavBarBrand>
 
-      <div class={styles.content}>
-        <div class={styles.tabs}>
-          <button
-            class={`${styles.tab} ${activeTab() === 'new' ? styles.activeTab : ''}`}
-            onClick={() => setActiveTab('new')}
-          >
-            New Story
-          </button>
-          <button
-            class={`${styles.tab} ${activeTab() === 'load' ? styles.activeTab : ''}`}
-            onClick={() => setActiveTab('load')}
-          >
-            Load Story ({combinedStories().length})
-          </button>
-        </div>
+        <NavBarNav>
+          <NavLink href="/">Stories</NavLink>
+        </NavBarNav>
 
-        <div class={styles.tabContent}>
-          <Show when={activeTab() === 'new'}>
-            <div class={styles.newStorySection}>
-              <h2>Create New Story</h2>
-              <NewStoryForm
-                serverAvailable={serverAvailable()}
-                onCreateStory={handleCreateStory}
-              />
-            </div>
+        <NavBarActions>
+          <Show
+            when={authStore.user && !authStore.isOfflineMode}
+            fallback={
+              <Show when={authStore.isOfflineMode}>
+                <Button variant="ghost" size="sm" disabled>
+                  Offline Mode
+                </Button>
+              </Show>
+            }
+          >
+            <Dropdown alignRight trigger={<Button variant="ghost">{authStore.user?.username || 'User'}</Button>}>
+              <DropdownItem onClick={() => navigate('/settings')}>Settings</DropdownItem>
+              <DropdownDivider />
+              <DropdownItem danger onClick={handleLogout}>
+                Logout
+              </DropdownItem>
+            </Dropdown>
           </Show>
 
-          <Show when={activeTab() === 'load'}>
-            <div class={styles.loadStorySection}>
-              <Show 
-                when={!loading()} 
-                fallback={<div class={styles.loading}>Loading stories...</div>}
+          <IconButton
+            variant="ghost"
+            onClick={toggleTheme}
+            aria-label={isDark() ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark() ? '☀️' : '🌙'}
+          </IconButton>
+        </NavBarActions>
+      </NavBar>
+
+      <div class={styles.contentArea}>
+        <Card
+        style={{
+          width: '100%',
+          'max-width': '800px',
+          flex: '1',
+          display: 'flex',
+          'flex-direction': 'column',
+          'min-height': '0',
+          overflow: 'hidden',
+        }}
+      >
+        <Tabs
+          activeTab={activeTab()}
+          onTabChange={(id) => setActiveTab(id as 'new' | 'load')}
+          style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
+        >
+          <TabList style={{ 'flex-shrink': '0' }}>
+            <Tab id="new">New Story</Tab>
+            <Tab id="load">Load Story ({combinedStories().length})</Tab>
+          </TabList>
+
+          <TabPanel id="new" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
+            <CardBody>
+              <NewStoryForm serverAvailable={serverAvailable()} onCreateStory={handleCreateStory} />
+            </CardBody>
+          </TabPanel>
+
+          <TabPanel id="load" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
+            <CardBody>
+              <Show
+                when={!loading()}
+                fallback={
+                  <div
+                    style={{
+                      display: 'flex',
+                      'align-items': 'center',
+                      'justify-content': 'center',
+                      gap: '0.5rem',
+                      padding: '2rem',
+                    }}
+                  >
+                    <Spinner size="sm" />
+                    <Text as="span" color="secondary">Loading stories...</Text>
+                  </div>
+                }
               >
-                <Show 
+                <Show
                   when={combinedStories().length > 0}
                   fallback={
-                    <div class={styles.noStories}>
+                    <Text
+                      size="lg"
+                      color="secondary"
+                      align="center"
+                      style={{ padding: '3rem' }}
+                    >
                       No saved stories found. Create a new story to get started!
-                    </div>
+                    </Text>
                   }
                 >
                   <StoryList
@@ -331,9 +431,10 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
                   />
                 </Show>
               </Show>
-            </div>
-          </Show>
-        </div>
+            </CardBody>
+          </TabPanel>
+        </Tabs>
+      </Card>
       </div>
     </div>
   )

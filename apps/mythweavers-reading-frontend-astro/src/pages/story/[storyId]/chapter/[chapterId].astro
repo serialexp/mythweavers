@@ -1,0 +1,59 @@
+---
+import '../../../../styles/global.css'
+import { ChapterPage } from '../../../../components/pages/ChapterPage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { storiesApi, authApi, type ChapterContent, type User } from '../../../../lib/api'
+
+const { storyId, chapterId } = Astro.params
+
+// Read theme from cookie for SSR
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+// Get user session from backend (pass cookie for SSR)
+let user: User | null = null
+try {
+  const cookieHeader = Astro.request.headers.get('cookie') || ''
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated && session.user) {
+    user = session.user
+  }
+} catch {
+  // Not authenticated
+}
+
+// Fetch chapter content
+let chapter: ChapterContent | null = null
+let error: string | null = null
+
+try {
+  if (storyId && chapterId) {
+    const result = await storiesApi.getChapter(storyId, chapterId)
+    chapter = result.chapter
+  }
+} catch (e) {
+  console.error('Error fetching chapter:', e)
+  error = 'Failed to load chapter'
+}
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{chapter?.name || 'Chapter'} - MythWeavers</title>
+    <meta name="description" content={chapter ? `Reading ${chapter.name}` : 'Chapter on MythWeavers'} />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <ChapterPage
+      client:load
+      initialTheme={initialTheme}
+      user={user}
+      chapter={chapter}
+      storyId={storyId!}
+      error={error}
+    />
+  </body>
+</html>

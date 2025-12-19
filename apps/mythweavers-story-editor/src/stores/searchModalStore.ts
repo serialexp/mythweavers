@@ -152,13 +152,10 @@ export const searchModalStore = {
       const existing = prev.find((r) => r.messageId === messageId)
       if (existing) {
         return prev.map((r) =>
-          r.messageId === messageId
-            ? { ...r, sectionsReplaced: [...r.sectionsReplaced, section] }
-            : r
+          r.messageId === messageId ? { ...r, sectionsReplaced: [...r.sectionsReplaced, section] } : r,
         )
-      } else {
-        return [...prev, { messageId, sectionsReplaced: [section] }]
       }
+      return [...prev, { messageId, sectionsReplaced: [section] }]
     })
   },
 
@@ -170,5 +167,5 @@ export const searchModalStore = {
     setCompletedReplacements([])
     setRequireAllTermsState(false)
     // Keep section preferences - they should persist
-  }
+  },
 }

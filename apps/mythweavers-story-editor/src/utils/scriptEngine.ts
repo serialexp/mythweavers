@@ -1,9 +1,9 @@
 import ejs from 'ejs'
-import { produce, enableMapSet } from 'immer'
+import { enableMapSet, produce } from 'immer'
+import { calendarStore } from '../stores/calendarStore'
+import { scriptDataStore } from '../stores/scriptDataStore'
 import { Message, Node } from '../types/core'
 import { getMessagesInStoryOrder } from './nodeTraversal'
-import { scriptDataStore } from '../stores/scriptDataStore'
-import { calendarStore } from '../stores/calendarStore'
 
 // Enable support for Maps and Sets in Immer
 enableMapSet()
@@ -34,7 +34,7 @@ export function executeScript(
   script: string,
   data: ScriptData,
   functions: ScriptFunctions = {},
-  allowFunctionReturn: boolean = false
+  allowFunctionReturn = false,
 ): ScriptResult {
   try {
     // Wrap the script in a function if it's not already
@@ -51,7 +51,7 @@ export function executeScript(
     const newData = produce(data, (draft: ScriptData) => {
       // Create wrapped functions that work with Immer drafts
       const wrappedFunctions: ScriptFunctions = {}
-      Object.keys(functions).forEach(key => {
+      Object.keys(functions).forEach((key) => {
         wrappedFunctions[key] = (...args: any[]) => {
           // If the first argument looks like our draft data, pass it through
           // Otherwise, pass the original function with all arguments
@@ -72,7 +72,7 @@ export function executeScript(
           if (result.data && typeof result.data === 'object') {
             // Replace all properties in draft with result.data
             // First remove all existing keys
-            Object.keys(draft).forEach(key => delete draft[key])
+            Object.keys(draft).forEach((key) => delete draft[key])
             // Then add all keys from result.data
             Object.entries(result.data).forEach(([key, value]) => {
               draft[key] = value
@@ -83,7 +83,9 @@ export function executeScript(
         } else if (!allowFunctionReturn && result && typeof result === 'object' && result !== draft) {
           // For message scripts: if they return a different object, warn them
           // This catches cases where someone creates a new object instead of mutating
-          console.warn('Message scripts should mutate data directly, not return new objects. The returned object will be ignored.')
+          console.warn(
+            'Message scripts should mutate data directly, not return new objects. The returned object will be ignored.',
+          )
         }
         // If script returned draft, undefined, or nothing - that's fine!
         // Immer will use the mutations made to draft
@@ -117,7 +119,7 @@ export function executeScriptsUpToMessage(
   messages: Message[],
   targetMessageId: string,
   nodes: Node[],
-  globalScript?: string
+  globalScript?: string,
 ): ScriptData {
   let data: ScriptData = {}
   let functions: ScriptFunctions = {}
@@ -152,7 +154,7 @@ export function executeScriptsUpToMessage(
     // Check if we've moved to a new node - update currentTime if needed
     if (message.nodeId && message.nodeId !== currentNodeId) {
       currentNodeId = message.nodeId
-      const currentNode = nodes.find(n => n.id === currentNodeId)
+      const currentNode = nodes.find((n) => n.id === currentNodeId)
 
       // Handle storyTime for the new node
       if (currentNode?.storyTime != null) {
@@ -199,7 +201,7 @@ export function getTemplatePreview(
   messageId: string,
   nodes: Node[],
   globalScript?: string,
-  forceRefresh: boolean = false
+  forceRefresh = false,
 ): { result: string; data: ScriptData; error?: string } {
   try {
     let data: ScriptData
@@ -223,10 +225,8 @@ export function getTemplatePreview(
     // These use the current story's calendar for calculations
     const dataWithUtils: ScriptData = {
       ...data,
-      calculateAge: (birthdate: number, currentTime: number) =>
-        calendarStore.calculateAge(birthdate, currentTime),
-      formatAge: (birthdate: number, currentTime: number) =>
-        calendarStore.formatAge(birthdate, currentTime)
+      calculateAge: (birthdate: number, currentTime: number) => calendarStore.calculateAge(birthdate, currentTime),
+      formatAge: (birthdate: number, currentTime: number) => calendarStore.formatAge(birthdate, currentTime),
     }
 
     // Try to evaluate the template and capture detailed errors
@@ -262,21 +262,19 @@ export function getTemplatePreview(
       return {
         result: template,
         data: dataWithUtils,
-        error: errorMessage
+        error: errorMessage,
       }
     }
   } catch (error) {
     return {
       result: template,
       data: {
-        calculateAge: (birthdate: number, currentTime: number) =>
-          calendarStore.calculateAge(birthdate, currentTime),
-        formatAge: (birthdate: number, currentTime: number) =>
-          calendarStore.formatAge(birthdate, currentTime),
+        calculateAge: (birthdate: number, currentTime: number) => calendarStore.calculateAge(birthdate, currentTime),
+        formatAge: (birthdate: number, currentTime: number) => calendarStore.formatAge(birthdate, currentTime),
         characters: {},
-        contextItems: {}
+        contextItems: {},
       },
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     }
   }
 }

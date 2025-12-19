@@ -1,6 +1,6 @@
-import { Component, createSignal, Show, onMount, onCleanup } from 'solid-js'
-import { BsEraser, BsChevronDown } from 'solid-icons/bs'
-import styles from './RegenerateButton.module.css'
+import { Button } from '@mythweavers/ui'
+import { BsCheck, BsChevronDown, BsEraser } from 'solid-icons/bs'
+import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 
 interface RegenerateButtonProps {
   onRegenerate: (maxTokens: number) => void | Promise<void>
@@ -23,11 +23,11 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
   const handleSelect = async (tokens: number, e?: MouseEvent) => {
     e?.stopPropagation()
     if (isRegenerating() || props.disabled) return
-    
+
     setIsRegenerating(true)
     setSelectedTokens(tokens)
     setShowPopover(false)
-    
+
     try {
       await props.onRegenerate(tokens)
     } finally {
@@ -50,8 +50,14 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
   })
 
   return (
-    <div class={styles.regenerateButton} ref={containerRef}>
-      <button
+    <div
+      ref={containerRef}
+      style={{
+        display: 'flex',
+        position: 'relative',
+      }}
+    >
+      <Button
         onClick={async (e) => {
           e.stopPropagation()
           if (!props.disabled && !isRegenerating()) {
@@ -64,31 +70,78 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
           }
         }}
         disabled={props.disabled || isRegenerating()}
-        class={styles.mainButton}
         title="Regenerate the last response with current input"
+        style={{
+          'border-radius': '5px 0 0 5px',
+          'border-right': '1px solid rgba(255, 255, 255, 0.2)',
+          display: 'flex',
+          'align-items': 'center',
+          gap: '5px',
+          background: 'var(--warning-color)',
+          color: 'white',
+        }}
       >
         <BsEraser /> Regenerate
-      </button>
-      <button
+      </Button>
+      <Button
         onClick={() => setShowPopover(!showPopover())}
         disabled={props.disabled || isRegenerating()}
-        class={styles.dropdownButton}
         title="Select response length"
+        style={{
+          'border-radius': '0 5px 5px 0',
+          padding: '0.5rem 0.75rem',
+          background: 'var(--warning-color)',
+          color: 'white',
+        }}
       >
         <BsChevronDown />
-      </button>
-      
+      </Button>
+
       <Show when={showPopover()}>
-        <div class={styles.popover}>
-          {tokenOptions.map(option => (
-            <button
-              class={`${styles.tokenOption} ${selectedTokens() === option.value ? styles.selected : ''}`}
-              onClick={(e) => handleSelect(option.value, e)}
-            >
-              <div class={styles.optionLabel}>{option.label}</div>
-              <div class={styles.optionDescription}>{option.description}</div>
-            </button>
-          ))}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 8px)',
+            right: '0',
+            background: 'var(--bg-secondary)',
+            'border-radius': '8px',
+            'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
+            padding: '8px',
+            'min-width': '200px',
+            'z-index': '1000',
+            border: '1px solid var(--border-color)',
+          }}
+        >
+          <For each={tokenOptions}>
+            {(option) => (
+              <button
+                style={{
+                  display: 'flex',
+                  'align-items': 'center',
+                  gap: '0.5rem',
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: selectedTokens() === option.value ? 'var(--primary-color)' : 'none',
+                  color: selectedTokens() === option.value ? 'white' : 'var(--text-primary)',
+                  'text-align': 'left',
+                  cursor: 'pointer',
+                  'border-radius': '4px',
+                }}
+                onClick={(e) => handleSelect(option.value, e)}
+              >
+                <div style={{ flex: '1' }}>
+                  <div style={{ 'font-size': '14px', 'font-weight': '500', 'margin-bottom': '2px' }}>
+                    {option.label}
+                  </div>
+                  <div style={{ 'font-size': '12px', opacity: '0.7' }}>{option.description}</div>
+                </div>
+                <Show when={selectedTokens() === option.value}>
+                  <BsCheck size={16} />
+                </Show>
+              </button>
+            )}
+          </For>
         </div>
       </Show>
     </div>

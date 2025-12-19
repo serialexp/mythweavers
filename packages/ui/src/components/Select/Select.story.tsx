@@ -1,5 +1,5 @@
-import { Select } from './Select'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Select } from './Select'
 
 const fruitOptions = [
   { value: 'apple', label: 'Apple' },

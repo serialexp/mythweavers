@@ -1,6 +1,6 @@
-import { toggleMark } from "prosemirror-commands";
-import { contentSchema } from "../schema";
-import { EditorState, Transaction } from "prosemirror-state";
+import { toggleMark } from 'prosemirror-commands'
+import { EditorState, Transaction } from 'prosemirror-state'
+import { contentSchema } from '../schema'
 
 /**
  * Toggle translation mark on selected text
@@ -14,36 +14,36 @@ import { EditorState, Transaction } from "prosemirror-state";
  */
 export function toggleTranslationMark(
   options: {
-    from: string;
-    to: string;
-    translatedText?: string; // Optional: pre-translated text to add to the mark
+    from: string
+    to: string
+    translatedText?: string // Optional: pre-translated text to add to the mark
   },
   state: EditorState,
   dispatch: (tr: Transaction) => void,
 ) {
-  const translationMarkType = contentSchema.marks.translation;
-  const { from, to } = state.selection;
-  const hasMark = state.doc.rangeHasMark(from, to, translationMarkType);
+  const translationMarkType = contentSchema.marks.translation
+  const { from, to } = state.selection
+  const hasMark = state.doc.rangeHasMark(from, to, translationMarkType)
 
   if (hasMark) {
     // Remove the mark
-    return toggleMark(translationMarkType)(state, dispatch);
+    return toggleMark(translationMarkType)(state, dispatch)
   }
 
   // Add the mark with language pair and optional translation
   const attrs = {
-    title: options.translatedText || "", // Empty if translation not provided yet
+    title: options.translatedText || '', // Empty if translation not provided yet
     from: options.from,
-    to: options.to
-  };
+    to: options.to,
+  }
 
-  return toggleMark(translationMarkType, attrs)(state, dispatch);
+  return toggleMark(translationMarkType, attrs)(state, dispatch)
 }
 
 /**
  * Helper to get selected text for translation
  */
 export function getSelectedTextForTranslation(state: EditorState): string {
-  const { from, to } = state.selection;
-  return state.doc.textBetween(from, to, " ");
+  const { from, to } = state.selection
+  return state.doc.textBetween(from, to, ' ')
 }

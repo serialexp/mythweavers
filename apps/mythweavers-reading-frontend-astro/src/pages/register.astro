@@ -1,0 +1,34 @@
+---
+import '../styles/global.css'
+import { RegisterPage } from '../components/pages/RegisterPage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { authApi } from '../lib/api'
+
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+// Check if already logged in via backend session (pass cookie for SSR)
+try {
+  const cookieHeader = Astro.request.headers.get('cookie') || ''
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated) {
+    return Astro.redirect('/')
+  }
+} catch {
+  // Not authenticated, continue to register page
+}
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create Account - MythWeavers</title>
+    <meta name="description" content="Create a new MythWeavers account" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <RegisterPage client:load initialTheme={initialTheme} />
+  </body>
+</html>

@@ -1,5 +1,5 @@
-import { Badge } from './Badge'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Badge } from './Badge'
 
 const CheckIcon = () => (
   <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -42,9 +42,15 @@ export default (props: { Hst: any }) => {
 
       <Hst.Variant title="With Icons">
         <ThemeComparison>
-          <Badge variant="success" icon={<CheckIcon />}>Completed</Badge>
-          <Badge variant="warning" icon={<AlertIcon />}>Pending</Badge>
-          <Badge variant="error" icon={<AlertIcon />}>Failed</Badge>
+          <Badge variant="success" icon={<CheckIcon />}>
+            Completed
+          </Badge>
+          <Badge variant="warning" icon={<AlertIcon />}>
+            Pending
+          </Badge>
+          <Badge variant="error" icon={<AlertIcon />}>
+            Failed
+          </Badge>
         </ThemeComparison>
       </Hst.Variant>
 

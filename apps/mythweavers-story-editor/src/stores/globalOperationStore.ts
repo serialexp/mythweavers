@@ -1,6 +1,11 @@
 import { createStore } from 'solid-js/store'
 
-export type GlobalOperationType = 'bulk-summarize' | 'migrate-instructions' | 'remove-user-messages' | 'cleanup-think-tags' | null
+export type GlobalOperationType =
+  | 'bulk-summarize'
+  | 'migrate-instructions'
+  | 'remove-user-messages'
+  | 'cleanup-think-tags'
+  | null
 
 export interface GlobalOperation {
   type: GlobalOperationType
@@ -12,7 +17,7 @@ export interface GlobalOperation {
 const [globalOperationState, setGlobalOperationState] = createStore<{
   operation: GlobalOperation | null
 }>({
-  operation: null
+  operation: null,
 })
 
 export const globalOperationStore = {
@@ -25,7 +30,7 @@ export const globalOperationStore = {
       type,
       current: 0,
       total,
-      message
+      message,
     })
   },
 
@@ -44,5 +49,5 @@ export const globalOperationStore = {
 
   isOperationInProgress() {
     return globalOperationState.operation !== null
-  }
+  },
 }

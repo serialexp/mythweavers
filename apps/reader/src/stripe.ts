@@ -1,2 +1,0 @@
-export const publishableKey =
-  "pk_test_51KXPP7AFRUE2r3Ayd4w3FcmvFQpa6HArb7eIXogoxPVIkYt2ADWU3SFT32gm7LG48Huy7tx55y5i4Xv1yYrwOohQ00oX8zICwd";

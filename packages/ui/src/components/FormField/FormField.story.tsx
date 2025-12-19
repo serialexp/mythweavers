@@ -1,8 +1,8 @@
-import { FormField } from './FormField'
-import { Input } from '../Input'
-import { Textarea } from '../Textarea'
-import { Select } from '../Select'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Input } from '../Input'
+import { Select } from '../Select'
+import { Textarea } from '../Textarea'
+import { FormField } from './FormField'
 
 const countryOptions = [
   { value: 'us', label: 'United States' },

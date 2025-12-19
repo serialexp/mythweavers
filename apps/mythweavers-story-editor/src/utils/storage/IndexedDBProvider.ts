@@ -1,9 +1,9 @@
-import { StorageProvider, StorageConfig } from './types'
+import { StorageConfig, StorageProvider } from './types'
 
 export class IndexedDBProvider implements StorageProvider {
   private dbName: string
   private version: number
-  private storeName: string = 'keyValueStore'
+  private storeName = 'keyValueStore'
   private db: IDBDatabase | null = null
 
   constructor(config: StorageConfig) {
@@ -28,7 +28,7 @@ export class IndexedDBProvider implements StorageProvider {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
-        
+
         // Create object store if it doesn't exist
         if (!db.objectStoreNames.contains(this.storeName)) {
           db.createObjectStore(this.storeName)
@@ -39,7 +39,7 @@ export class IndexedDBProvider implements StorageProvider {
 
   async get<T>(key: string): Promise<T | null> {
     const db = await this.openDB()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([this.storeName], 'readonly')
       const store = transaction.objectStore(this.storeName)
@@ -118,7 +118,7 @@ export class IndexedDBProvider implements StorageProvider {
       const request = store.getAllKeys()
 
       request.onsuccess = () => {
-        resolve(request.result.map(key => String(key)))
+        resolve(request.result.map((key) => String(key)))
       }
 
       request.onerror = () => {
@@ -143,7 +143,7 @@ export class IndexedDBProvider implements StorageProvider {
 
       keys.forEach((key, index) => {
         const request = store.get(key)
-        
+
         request.onsuccess = () => {
           results[index] = request.result || null
           completed++
@@ -169,7 +169,7 @@ export class IndexedDBProvider implements StorageProvider {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([this.storeName], 'readwrite')
       const store = transaction.objectStore(this.storeName)
-      
+
       transaction.oncomplete = () => {
         resolve()
       }

@@ -1,9 +1,8 @@
 import { createStore } from 'solid-js/store'
+import { saveService } from '../services/saveService'
 import { CurrentStory } from '../types/store'
 import { generateMessageId } from '../utils/id'
 import { websocketManager } from '../utils/websocket'
-import { saveService } from '../services/saveService'
-
 
 // Initialize from URL hash only
 const getInitialStory = (): CurrentStory | null => {
@@ -19,29 +18,62 @@ interface StoryStateWrapper {
 }
 
 const [storyState, setStoryState] = createStore<StoryStateWrapper>({
-  story: initialState
+  story: initialState,
 })
-
 
 export const currentStoryStore = {
   // Getters
-  get isInitialized() { return storyState.story !== null },
-  get id() { return storyState.story?.id || '' },
-  get name() { return storyState.story?.name || '' },
-  get isPlaceholderName() { return storyState.story?.isPlaceholderName || false },
-  get lastAutoSaveAt() { return storyState.story?.lastAutoSaveAt },
-  get storageMode() { return storyState.story?.storageMode || 'local' },
-  get person() { return storyState.story?.person || 'third' },
-  get tense() { return storyState.story?.tense || 'past' },
-  get storySetting() { return storyState.story?.storySetting || '' },
-  get lastKnownUpdatedAt() { return storyState.story?.lastKnownUpdatedAt },
-  get globalScript() { return storyState.story?.globalScript },
-  get branchChoices() { return storyState.story?.branchChoices || {} },
-  get timelineStartTime() { return storyState.story?.timelineStartTime },
-  get timelineEndTime() { return storyState.story?.timelineEndTime },
-  get timelineGranularity() { return storyState.story?.timelineGranularity || 'hour' },
-  get provider() { return storyState.story?.provider },
-  get model() { return storyState.story?.model },
+  get isInitialized() {
+    return storyState.story !== null
+  },
+  get id() {
+    return storyState.story?.id || ''
+  },
+  get name() {
+    return storyState.story?.name || ''
+  },
+  get isPlaceholderName() {
+    return storyState.story?.isPlaceholderName || false
+  },
+  get lastAutoSaveAt() {
+    return storyState.story?.lastAutoSaveAt
+  },
+  get storageMode() {
+    return storyState.story?.storageMode || 'local'
+  },
+  get person() {
+    return storyState.story?.person || 'third'
+  },
+  get tense() {
+    return storyState.story?.tense || 'past'
+  },
+  get storySetting() {
+    return storyState.story?.storySetting || ''
+  },
+  get lastKnownUpdatedAt() {
+    return storyState.story?.lastKnownUpdatedAt
+  },
+  get globalScript() {
+    return storyState.story?.globalScript
+  },
+  get branchChoices() {
+    return storyState.story?.branchChoices || {}
+  },
+  get timelineStartTime() {
+    return storyState.story?.timelineStartTime
+  },
+  get timelineEndTime() {
+    return storyState.story?.timelineEndTime
+  },
+  get timelineGranularity() {
+    return storyState.story?.timelineGranularity || 'hour'
+  },
+  get provider() {
+    return storyState.story?.provider
+  },
+  get model() {
+    return storyState.story?.model
+  },
 
   // Actions
   setName: (name: string, isPlaceholder = false) => {
@@ -49,39 +81,39 @@ export const currentStoryStore = {
     setStoryState('story', 'name', name)
     setStoryState('story', 'isPlaceholderName', isPlaceholder)
   },
-  
+
   setLastKnownUpdatedAt: (updatedAt: string | undefined) => {
     if (!storyState.story) return
     setStoryState('story', 'lastKnownUpdatedAt', updatedAt)
     // saveService will call this when it gets a response from the server
   },
-  
+
   setStorageMode: (mode: 'server' | 'local') => {
     if (!storyState.story) return
     setStoryState('story', 'storageMode', mode)
   },
-  
+
   setPerson: (person: 'first' | 'second' | 'third') => {
     if (!storyState.story) return
     setStoryState('story', 'person', person)
     // Save through saveService (handles local vs server)
     saveService.saveStorySettings(storyState.story.id, { person })
   },
-  
+
   setTense: (tense: 'present' | 'past') => {
     if (!storyState.story) return
     setStoryState('story', 'tense', tense)
     // Save through saveService (handles local vs server)
     saveService.saveStorySettings(storyState.story.id, { tense })
   },
-  
+
   setStorySetting: (setting: string) => {
     if (!storyState.story) return
     setStoryState('story', 'storySetting', setting)
     // Save through saveService (handles local vs server)
     saveService.saveStorySettings(storyState.story.id, { storySetting: setting })
   },
-  
+
   setGlobalScript: (script: string | undefined) => {
     if (!storyState.story) return
     setStoryState('story', 'globalScript', script)
@@ -159,7 +191,7 @@ export const currentStoryStore = {
     if (!storyState.story) return
     setStoryState('story', 'lastAutoSaveAt', new Date())
   },
-  
+
   // Start a new story
   newStory: (storageMode: 'server' | 'local' = 'local', provider?: string, model?: string | null) => {
     const id = generateMessageId()
@@ -178,7 +210,7 @@ export const currentStoryStore = {
       timelineEndTime: undefined,
       timelineGranularity: 'hour',
       provider: provider || 'ollama',
-      model: model || null
+      model: model || null,
     })
 
     // Connect WebSocket for real-time sync (only if server exists)
@@ -191,7 +223,7 @@ export const currentStoryStore = {
       mapsStore.clearMaps()
     })
   },
-  
+
   // Load existing story with optional story-specific settings
   loadStory: (
     id: string,
@@ -205,7 +237,7 @@ export const currentStoryStore = {
     timelineEndTime?: number | null,
     timelineGranularity?: 'hour' | 'day',
     provider?: string,
-    model?: string | null
+    model?: string | null,
   ) => {
     setStoryState('story', {
       id,
@@ -222,19 +254,19 @@ export const currentStoryStore = {
       timelineEndTime: timelineEndTime ?? undefined,
       timelineGranularity: timelineGranularity || 'hour',
       provider: provider,
-      model: model
+      model: model,
     })
-    
+
     // Connect WebSocket for real-time sync (only if server exists)
     if (storageMode === 'server') {
       websocketManager.connect(id)
     }
-    
+
     // Initialize maps for this story
     import('../stores/mapsStore').then(({ mapsStore }) => {
       mapsStore.initializeMaps(storageMode === 'server' ? id : undefined)
     })
-    
+
     // Initialize landmark states for this story
     if (id) {
       import('../stores/landmarkStatesStore').then(({ landmarkStatesStore }) => {
@@ -248,16 +280,16 @@ export const currentStoryStore = {
       })
     }
   },
-  
+
   // Clear the current story
   clearStory: () => {
     // Disconnect WebSocket if connected
     websocketManager.disconnect()
     setStoryState('story', null)
-    
+
     // Clear landmark states
     import('../stores/landmarkStatesStore').then(({ landmarkStatesStore }) => {
       landmarkStatesStore.clearStates()
     })
-  }
+  },
 }

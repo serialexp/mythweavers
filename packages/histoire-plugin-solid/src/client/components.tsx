@@ -1,5 +1,5 @@
 import type { Story, Variant } from '@histoire/shared'
-import { createContext, useContext, type ParentComponent, Show, onMount, createSignal } from 'solid-js'
+import { type ParentComponent, Show, createContext, createSignal, onMount, useContext } from 'solid-js'
 
 // Context for passing story/variant data from the Vue wrapper
 interface HstContextValue {
@@ -37,14 +37,10 @@ export const MountStoryWithContext: ParentComponent<{
   const ctx: MountContextValue = {
     story: props.story,
     variantIndex,
-    incrementVariantIndex: () => setVariantIndex(i => i + 1),
+    incrementVariantIndex: () => setVariantIndex((i) => i + 1),
   }
 
-  return (
-    <MountContext.Provider value={ctx}>
-      {props.children}
-    </MountContext.Provider>
-  )
+  return <MountContext.Provider value={ctx}>{props.children}</MountContext.Provider>
 }
 
 export const MountVariant: ParentComponent<{
@@ -121,9 +117,5 @@ export const RenderVariant: ParentComponent<{
     }
   })
 
-  return (
-    <Show when={isCurrentVariant()}>
-      {props.children}
-    </Show>
-  )
+  return <Show when={isCurrentVariant()}>{props.children}</Show>
 }

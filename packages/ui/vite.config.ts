@@ -1,13 +1,10 @@
+import { resolve } from 'node:path'
+import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
-import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
-import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [
-    vanillaExtractPlugin(),
-    solid(),
-  ],
+  plugins: [vanillaExtractPlugin(), solid({ ssr: true })],
   build: {
     lib: {
       entry: {

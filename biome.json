@@ -1,14 +1,90 @@
 {
-  "$schema": "node_modules/@biomejs/biome/configuration_schema.json",
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "ignore": [
+      "node_modules",
+      "dist",
+      ".vinxi",
+      ".output",
+      "*.gen.ts",
+      "*.d.ts",
+      "packages/ui/dist",
+      "apps/*/dist",
+      "**/generated/**",
+      "**/prisma/src/generated/**",
+      "**/*.module.css",
+      "**/*.bundle.js",
+      "apps/writer-legacy-frontend",
+      "apps/writer-legacy-backend",
+      "apps/mcp-server-legacy",
+      "apps/reader-legacy"
+    ]
+  },
+  "css": {
+    "parser": {
+      "cssModules": true
+    }
+  },
   "formatter": {
+    "enabled": true,
     "indentStyle": "space",
-    "indentWidth": 2
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "organizeImports": {
+    "enabled": true
   },
   "linter": {
+    "enabled": true,
     "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "warn",
+        "noUnusedVariables": "warn",
+        "useJsxKeyInIterable": "off",
+        "noConstantCondition": "off",
+        "noConstructorReturn": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useImportType": "off",
+        "useNodejsImportProtocol": "off",
+        "useConst": "off",
+        "noParameterAssign": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noArrayIndexKey": "off",
+        "noAssignInExpressions": "off",
+        "noImplicitAnyLet": "off"
+      },
+      "security": {
+        "noGlobalEval": "off",
+        "noDangerouslySetInnerHtml": "off"
+      },
+      "complexity": {
+        "noForEach": "off",
+        "noBannedTypes": "off",
+        "noStaticOnlyClass": "off"
+      },
       "a11y": {
-        "useKeyWithClickEvents": "off"
+        "recommended": false
       }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
     }
   }
 }

@@ -51,27 +51,27 @@ class OllamaClientWrapper {
       // Convert to Ollama chat format
       const chatOptions = {
         model: options.model,
-        messages: options.messages.map(msg => ({
+        messages: options.messages.map((msg) => ({
           role: msg.role,
-          content: msg.content
+          content: msg.content,
         })),
         stream: options.stream,
         options: {
           temperature: 0.9,
           repeat_penalty: 1.3,
           repeat_last_n: 256,
-          ...options.options
-        }
+          ...options.options,
+        },
       }
 
       const response = await this.ollama.chat(chatOptions as any)
-      
+
       for await (const part of response) {
         yield {
           response: part.message?.content || '',
           done: part.done,
           eval_count: part.eval_count,
-          prompt_eval_count: part.prompt_eval_count
+          prompt_eval_count: part.prompt_eval_count,
         }
       }
     } else {
@@ -84,19 +84,19 @@ class OllamaClientWrapper {
           temperature: 0.9,
           repeat_penalty: 1.3,
           repeat_last_n: 256,
-          ...options.options
-        }
+          ...options.options,
+        },
       }
 
       const response = await this.ollama.generate(generateOptions as any)
-      
+
       for await (const part of response) {
         yield {
           response: part.response,
           done: part.done,
           eval_count: part.eval_count,
           prompt_eval_count: part.prompt_eval_count,
-          context: part.context
+          context: part.context,
         }
       }
     }
@@ -109,6 +109,6 @@ export const createOllamaClient = (): OllamaClientWrapper => {
   const proxyHost = `${window.location.origin}/ollama`
   console.log('Using proxy host:', proxyHost)
   const ollama = new Ollama({ host: proxyHost })
-  
+
   return new OllamaClientWrapper(ollama)
 }

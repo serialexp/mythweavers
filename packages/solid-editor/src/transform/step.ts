@@ -1,8 +1,7 @@
-import { Node, Slice, ReplaceError, Schema } from "../model";
-import { StepMap, Mappable } from "./map";
+import { Node, ReplaceError, Schema, Slice } from '../model'
+import { Mappable, StepMap } from './map'
 
-const stepsByID: { [id: string]: { fromJSON(schema: Schema, json: unknown): Step } } =
-  Object.create(null);
+const stepsByID: { [id: string]: { fromJSON(schema: Schema, json: unknown): Step } } = Object.create(null)
 
 /**
  * A step object represents an atomic change. It generally applies
@@ -21,7 +20,7 @@ export abstract class Step {
    * applied to this document, or indicates success by containing a
    * transformed document.
    */
-  abstract apply(doc: Node): StepResult;
+  abstract apply(doc: Node): StepResult
 
   /**
    * Get the step map that represents the changes made by this step,
@@ -29,21 +28,21 @@ export abstract class Step {
    * and the new document.
    */
   getMap(): StepMap {
-    return StepMap.empty;
+    return StepMap.empty
   }
 
   /**
    * Create an inverted version of this step. Needs the document as it
    * was before the step as argument.
    */
-  abstract invert(doc: Node): Step;
+  abstract invert(doc: Node): Step
 
   /**
    * Map this step through a mappable thing, returning either a
    * version of that step with its positions adjusted, or `null` if
    * the step was entirely deleted by the mapping.
    */
-  abstract map(mapping: Mappable): Step | null;
+  abstract map(mapping: Mappable): Step | null
 
   /**
    * Try to merge this step with another one, to be applied directly
@@ -51,7 +50,7 @@ export abstract class Step {
    * steps can't be merged.
    */
   merge(_other: Step): Step | null {
-    return null;
+    return null
   }
 
   /**
@@ -59,18 +58,17 @@ export abstract class Step {
    * defining this for a custom subclass, make sure the result object
    * includes the step type's JSON id under the `stepType` property.
    */
-  abstract toJSON(): { stepType: string; [key: string]: unknown };
+  abstract toJSON(): { stepType: string; [key: string]: unknown }
 
   /**
    * Deserialize a step from its JSON representation. Will call
    * through to the step class' own implementation of this method.
    */
   static fromJSON(schema: Schema, json: { stepType?: string }): Step {
-    if (!json || !json.stepType)
-      throw new RangeError("Invalid input for Step.fromJSON");
-    const type = stepsByID[json.stepType];
-    if (!type) throw new RangeError(`No step type ${json.stepType} defined`);
-    return type.fromJSON(schema, json);
+    if (!json || !json.stepType) throw new RangeError('Invalid input for Step.fromJSON')
+    const type = stepsByID[json.stepType]
+    if (!type) throw new RangeError(`No step type ${json.stepType} defined`)
+    return type.fromJSON(schema, json)
   }
 
   /**
@@ -78,15 +76,11 @@ export abstract class Step {
    * ID to attach to its JSON representation. Use this method to
    * register an ID for your step classes.
    */
-  static jsonID<T extends { fromJSON(schema: Schema, json: unknown): Step }>(
-    id: string,
-    stepClass: T
-  ): T {
-    if (id in stepsByID)
-      throw new RangeError("Duplicate use of step JSON ID " + id);
-    stepsByID[id] = stepClass;
-    (stepClass as unknown as { prototype: { jsonID: string } }).prototype.jsonID = id;
-    return stepClass;
+  static jsonID<T extends { fromJSON(schema: Schema, json: unknown): Step }>(id: string, stepClass: T): T {
+    if (id in stepsByID) throw new RangeError(`Duplicate use of step JSON ID ${id}`)
+    stepsByID[id] = stepClass
+    ;(stepClass as unknown as { prototype: { jsonID: string } }).prototype.jsonID = id
+    return stepClass
   }
 }
 
@@ -100,17 +94,17 @@ export class StepResult {
     /** The transformed document, if successful. */
     readonly doc: Node | null,
     /** The failure message, if unsuccessful. */
-    readonly failed: string | null
+    readonly failed: string | null,
   ) {}
 
   /** Create a successful step result. */
   static ok(doc: Node): StepResult {
-    return new StepResult(doc, null);
+    return new StepResult(doc, null)
   }
 
   /** Create a failed step result. */
   static fail(message: string): StepResult {
-    return new StepResult(null, message);
+    return new StepResult(null, message)
   }
 
   /**
@@ -120,12 +114,12 @@ export class StepResult {
    */
   static fromReplace(doc: Node, from: number, to: number, slice: Slice): StepResult {
     try {
-      return StepResult.ok(doc.replace(from, to, slice));
+      return StepResult.ok(doc.replace(from, to, slice))
     } catch (e) {
       if (e instanceof ReplaceError || e instanceof RangeError) {
-        return StepResult.fail((e as Error).message);
+        return StepResult.fail((e as Error).message)
       }
-      throw e;
+      throw e
     }
   }
 }

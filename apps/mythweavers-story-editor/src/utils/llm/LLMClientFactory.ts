@@ -1,33 +1,28 @@
-import { LLMClient, LLMProvider, LLMGenerateOptions, LLMGenerateResponse, convertToTokenUsage } from '../../types/llm'
-import { OllamaLLMClient } from './OllamaLLMClient'
-import { AnthropicLLMClient } from './AnthropicLLMClient'
-import { OpenRouterLLMClient } from './OpenRouterLLMClient'
-import { OpenAILLMClient } from './OpenAILLMClient'
 import { llmActivityStore } from '../../stores/llmActivityStore'
-import { generateMessageId } from '../id'
 import type { TokenUsage } from '../../types/core'
+import { LLMClient, LLMGenerateOptions, LLMGenerateResponse, LLMProvider, convertToTokenUsage } from '../../types/llm'
+import { generateMessageId } from '../id'
+import { AnthropicLLMClient } from './AnthropicLLMClient'
+import { OllamaLLMClient } from './OllamaLLMClient'
+import { OpenAILLMClient } from './OpenAILLMClient'
+import { OpenRouterLLMClient } from './OpenRouterLLMClient'
 
 interface LlmMetadata {
-  callType?: string;
+  callType?: string
 }
 
 type UsageAccumulator = LLMGenerateResponse['usage'] | undefined
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
 
-const mergeUsage = (
-  current: UsageAccumulator,
-  next: LLMGenerateResponse['usage'] | undefined,
-): UsageAccumulator => {
+const mergeUsage = (current: UsageAccumulator, next: LLMGenerateResponse['usage'] | undefined): UsageAccumulator => {
   if (!next) {
     return current
   }
   if (!current) {
     return {
       ...next,
-      cache_creation: next.cache_creation
-        ? { ...next.cache_creation }
-        : undefined,
+      cache_creation: next.cache_creation ? { ...next.cache_creation } : undefined,
     }
   }
   const cacheCreation: Record<string, number> = {}
@@ -46,10 +41,8 @@ const mergeUsage = (
     prompt_tokens: (current.prompt_tokens ?? 0) + (next.prompt_tokens ?? 0),
     completion_tokens: (current.completion_tokens ?? 0) + (next.completion_tokens ?? 0),
     total_tokens: (current.total_tokens ?? 0) + (next.total_tokens ?? 0),
-    cache_creation_input_tokens:
-      (current.cache_creation_input_tokens ?? 0) + (next.cache_creation_input_tokens ?? 0),
-    cache_read_input_tokens:
-      (current.cache_read_input_tokens ?? 0) + (next.cache_read_input_tokens ?? 0),
+    cache_creation_input_tokens: (current.cache_creation_input_tokens ?? 0) + (next.cache_creation_input_tokens ?? 0),
+    cache_read_input_tokens: (current.cache_read_input_tokens ?? 0) + (next.cache_read_input_tokens ?? 0),
   }
 
   if (Object.keys(cacheCreation).length > 0) {
@@ -60,7 +53,10 @@ const mergeUsage = (
 }
 
 class LoggedLLMClient implements LLMClient {
-  constructor(private readonly inner: LLMClient, private readonly provider: LLMProvider) {}
+  constructor(
+    private readonly inner: LLMClient,
+    private readonly provider: LLMProvider,
+  ) {}
 
   getProvider(): string {
     return this.inner.getProvider()
@@ -99,15 +95,11 @@ class LoggedLLMClient implements LLMClient {
       const rawUsage = aggregatedUsage
         ? {
             ...aggregatedUsage,
-            cache_creation: aggregatedUsage.cache_creation
-              ? { ...aggregatedUsage.cache_creation }
-              : undefined,
+            cache_creation: aggregatedUsage.cache_creation ? { ...aggregatedUsage.cache_creation } : undefined,
           }
         : undefined
 
-      const usage: TokenUsage | undefined = aggregatedUsage
-        ? convertToTokenUsage(aggregatedUsage)
-        : undefined
+      const usage: TokenUsage | undefined = aggregatedUsage ? convertToTokenUsage(aggregatedUsage) : undefined
 
       llmActivityStore.log({
         id,
@@ -128,24 +120,24 @@ class LoggedLLMClient implements LLMClient {
 
 export class LLMClientFactory {
   private static clients: Map<LLMProvider, LLMClient> = new Map()
-  
+
   static getClient(provider: string): LLMClient {
     // Validate provider
     const validProvider = provider as LLMProvider
     if (!['ollama', 'anthropic', 'openrouter', 'openai'].includes(provider)) {
       console.warn(`Unknown provider "${provider}", defaulting to ollama`)
-      return this.getClient('ollama')
+      return LLMClientFactory.getClient('ollama')
     }
-    
+
     // Return cached client if exists
-    const existingClient = this.clients.get(validProvider)
+    const existingClient = LLMClientFactory.clients.get(validProvider)
     if (existingClient) {
       return existingClient
     }
-    
+
     // Create new client
     let client: LLMClient
-    
+
     switch (validProvider) {
       case 'ollama':
         client = new OllamaLLMClient()
@@ -164,13 +156,13 @@ export class LLMClientFactory {
         client = new OllamaLLMClient()
     }
     const loggedClient = new LoggedLLMClient(client, validProvider)
-    
+
     // Cache the client
-    this.clients.set(validProvider, loggedClient)
+    LLMClientFactory.clients.set(validProvider, loggedClient)
     return loggedClient
   }
-  
+
   static clearCache() {
-    this.clients.clear()
+    LLMClientFactory.clients.clear()
   }
 }

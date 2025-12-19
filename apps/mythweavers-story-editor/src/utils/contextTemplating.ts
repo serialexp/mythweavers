@@ -1,8 +1,8 @@
-import { Character, ContextItem, Message, Node } from '../types/core'
-import { executeScriptsUpToMessage, evaluateTemplate, ScriptData } from './scriptEngine'
 import { scriptDataStore } from '../stores/scriptDataStore'
-import { calculateAge, formatAge } from './coruscantCalendar'
+import { Character, ContextItem, Message, Node } from '../types/core'
 import { getCharacterDisplayName } from './character'
+import { calculateAge, formatAge } from './coruscantCalendar'
+import { ScriptData, evaluateTemplate, executeScriptsUpToMessage } from './scriptEngine'
 
 /**
  * Filter characters to only those active in the given chapter node
@@ -17,7 +17,7 @@ function filterActiveCharacters(characters: Character[], chapterNode: Node | und
   }
 
   const activeIds = new Set(chapterNode.activeCharacterIds)
-  return characters.filter(char => activeIds.has(char.id))
+  return characters.filter((char) => activeIds.has(char.id))
 }
 
 /**
@@ -26,11 +26,11 @@ function filterActiveCharacters(characters: Character[], chapterNode: Node | und
 function filterActiveContextItems(contextItems: ContextItem[], chapterNode: Node | undefined): ContextItem[] {
   if (!chapterNode || chapterNode.type !== 'chapter') {
     // Still include global items even if no chapter is selected
-    return contextItems.filter(item => item.isGlobal)
+    return contextItems.filter((item) => item.isGlobal)
   }
 
   const activeIds = new Set(chapterNode.activeContextItemIds || [])
-  return contextItems.filter(item => item.isGlobal || activeIds.has(item.id))
+  return contextItems.filter((item) => item.isGlobal || activeIds.has(item.id))
 }
 
 /**
@@ -51,7 +51,7 @@ export function evaluateCharacterTemplates(
   messageId: string,
   nodes: Node[],
   globalScript?: string,
-  forceRefresh: boolean = false
+  forceRefresh = false,
 ): Character[] {
   // Try to get cached data first
   let data = scriptDataStore.getCumulativeDataAtMessage(messageId, forceRefresh)
@@ -65,20 +65,22 @@ export function evaluateCharacterTemplates(
   const dataWithUtils: ScriptData = {
     ...data,
     calculateAge,
-    formatAge
+    formatAge,
   }
 
-  return characters.map(char => {
+  return characters.map((char) => {
     try {
       const evaluatedFirstName = evaluateTemplate(char.firstName, dataWithUtils)
       const evaluatedLastName = char.lastName ? evaluateTemplate(char.lastName, dataWithUtils) : null
-      const evaluatedDescription = char.description ? cleanupNewlines(evaluateTemplate(char.description, dataWithUtils)) : null
+      const evaluatedDescription = char.description
+        ? cleanupNewlines(evaluateTemplate(char.description, dataWithUtils))
+        : null
 
       return {
         ...char,
         firstName: evaluatedFirstName,
         lastName: evaluatedLastName,
-        description: evaluatedDescription
+        description: evaluatedDescription,
       }
     } catch (error) {
       // Add context about which character failed
@@ -98,7 +100,7 @@ export function evaluateContextItemTemplates(
   messageId: string,
   nodes: Node[],
   globalScript?: string,
-  forceRefresh: boolean = false
+  forceRefresh = false,
 ): ContextItem[] {
   // Try to get cached data first
   let data = scriptDataStore.getCumulativeDataAtMessage(messageId, forceRefresh)
@@ -112,15 +114,15 @@ export function evaluateContextItemTemplates(
   const dataWithUtils: ScriptData = {
     ...data,
     calculateAge,
-    formatAge
+    formatAge,
   }
 
-  return contextItems.map(item => {
+  return contextItems.map((item) => {
     try {
       return {
         ...item,
         name: evaluateTemplate(item.name, dataWithUtils),
-        description: cleanupNewlines(evaluateTemplate(item.description, dataWithUtils))
+        description: cleanupNewlines(evaluateTemplate(item.description, dataWithUtils)),
       }
     } catch (error) {
       // Add context about which context item failed
@@ -141,7 +143,7 @@ export function getTemplatedCharacterContext(
   nodes: Node[],
   chapterNode: Node | undefined,
   globalScript?: string,
-  forceRefresh: boolean = false
+  forceRefresh = false,
 ): string {
   if (characters.length === 0) return ''
 
@@ -149,10 +151,19 @@ export function getTemplatedCharacterContext(
   const activeCharacters = filterActiveCharacters(characters, chapterNode)
   if (activeCharacters.length === 0) return ''
 
-  const evaluatedCharacters = evaluateCharacterTemplates(activeCharacters, messages, messageId, nodes, globalScript, forceRefresh)
+  const evaluatedCharacters = evaluateCharacterTemplates(
+    activeCharacters,
+    messages,
+    messageId,
+    nodes,
+    globalScript,
+    forceRefresh,
+  )
 
   const characterList = evaluatedCharacters
-    .map(char => `${getCharacterDisplayName(char)}${char.isMainCharacter ? ' (protagonist)' : ''}: ${char.description}`)
+    .map(
+      (char) => `${getCharacterDisplayName(char)}${char.isMainCharacter ? ' (protagonist)' : ''}: ${char.description}`,
+    )
     .join('\n')
 
   return `Known characters in this story:\n${characterList}\n\n`
@@ -169,21 +180,14 @@ export function getTemplatedActiveCharacters(
   nodes: Node[],
   chapterNode: Node | undefined,
   globalScript?: string,
-  forceRefresh: boolean = false,
+  forceRefresh = false,
 ): Character[] {
-  const activeCharacters = filterActiveCharacters(characters, chapterNode);
+  const activeCharacters = filterActiveCharacters(characters, chapterNode)
   if (activeCharacters.length === 0) {
-    return [];
+    return []
   }
 
-  return evaluateCharacterTemplates(
-    activeCharacters,
-    messages,
-    messageId,
-    nodes,
-    globalScript,
-    forceRefresh,
-  );
+  return evaluateCharacterTemplates(activeCharacters, messages, messageId, nodes, globalScript, forceRefresh)
 }
 
 /**
@@ -197,17 +201,22 @@ export function getTemplatedContextItems(
   nodes: Node[],
   chapterNode: Node | undefined,
   globalScript?: string,
-  forceRefresh: boolean = false
+  forceRefresh = false,
 ): string {
   // Filter to only active context items in this chapter (or global items)
   const activeItems = filterActiveContextItems(contextItems, chapterNode)
   if (activeItems.length === 0) return ''
 
-  const evaluatedItems = evaluateContextItemTemplates(activeItems, messages, messageId, nodes, globalScript, forceRefresh)
+  const evaluatedItems = evaluateContextItemTemplates(
+    activeItems,
+    messages,
+    messageId,
+    nodes,
+    globalScript,
+    forceRefresh,
+  )
 
-  const contextList = evaluatedItems
-    .map(item => `${item.name}: ${item.description}`)
-    .join('\n')
+  const contextList = evaluatedItems.map((item) => `${item.name}: ${item.description}`).join('\n')
 
   return `World/Setting Context:\n${contextList}\n\n`
 }

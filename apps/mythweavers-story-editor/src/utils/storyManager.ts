@@ -1,11 +1,10 @@
-import { Message, Character } from '../types/core'
-import { apiClient, ApiStoryMetadata } from './apiClient'
-import { getHealth, getMyStories, postMyStories, getMyStoriesById, deleteMyStoriesById, patchMyStoriesById } from '../client/config'
+import { deleteMyStoriesById, getHealth, getMyStories, patchMyStoriesById } from '../client/config'
+import { Character, Message } from '../types/core'
 import { SavedStory, StoryMetadata } from '../types/store'
-import { storage } from './storage'
-import { generateMessageId } from './id'
+import { ApiStoryMetadata, apiClient } from './apiClient'
 import { getErrorMessage, getErrorName, getErrorStack, isError } from './errorHandling'
-import { saveService } from '../services/saveService'
+import { generateMessageId } from './id'
+import { storage } from './storage'
 
 // Re-export for backward compatibility
 export type { SavedStory, StoryMetadata }
@@ -19,10 +18,10 @@ export const storyManager = {
     try {
       const index = await storage.get<StoryMetadata[]>(STORY_INDEX_KEY)
       if (!index) return []
-      
-      return index.map(story => ({
+
+      return index.map((story) => ({
         ...story,
-        savedAt: new Date(story.savedAt)
+        savedAt: new Date(story.savedAt),
       }))
     } catch {
       return []
@@ -30,29 +29,38 @@ export const storyManager = {
   },
 
   // Save current story state
-  saveStory: async (name: string, messages: Message[], characters: Character[], input: string, storySetting: string, storageMode: 'server' | 'local' = 'local', person: 'first' | 'second' | 'third' = 'second', tense: 'present' | 'past' = 'present'): Promise<string> => {
+  saveStory: async (
+    name: string,
+    messages: Message[],
+    characters: Character[],
+    input: string,
+    storySetting: string,
+    storageMode: 'server' | 'local' = 'local',
+    person: 'first' | 'second' | 'third' = 'second',
+    tense: 'present' | 'past' = 'present',
+  ): Promise<string> => {
     const id = generateMessageId()
-    
+
     const storyData: SavedStory = {
       id,
       name,
       savedAt: new Date(),
-      messages: messages.map(msg => ({
+      messages: messages.map((msg) => ({
         ...msg,
-        isSummarizing: false // Don't save temporary state
+        isSummarizing: false, // Don't save temporary state
       })),
       characters,
       input,
       storySetting,
       storageMode,
       person,
-      tense
+      tense,
     }
-    
+
     try {
       // Save the full story data to its own key
       await storage.set(`${STORY_PREFIX}${id}`, storyData)
-      
+
       // Update the index with metadata only
       const index = await storyManager.getSavedStories()
       const metadata: StoryMetadata = {
@@ -63,9 +71,9 @@ export const storyManager = {
         characterCount: characters.length,
         chapterCount: 0, // New stories start with no chapters
         storySetting,
-        storageMode
+        storageMode,
       }
-      
+
       index.push(metadata)
       await storage.set(STORY_INDEX_KEY, index)
       return id
@@ -74,7 +82,7 @@ export const storyManager = {
       try {
         await storage.remove(`${STORY_PREFIX}${id}`)
       } catch {}
-      
+
       console.error('Failed to save story:', error)
       // Return empty string to indicate failure without breaking the UI
       return ''
@@ -86,8 +94,8 @@ export const storyManager = {
     try {
       // Check if story exists in index
       const index = await storyManager.getSavedStories()
-      const existingStory = index.find(s => s.id === id)
-      
+      const existingStory = index.find((s) => s.id === id)
+
       if (!existingStory) {
         // If story doesn't exist in index, add it
         const metadata: StoryMetadata = {
@@ -98,12 +106,12 @@ export const storyManager = {
           characterCount: storyData.characters ? storyData.characters.length : 0,
           chapterCount: storyData.chapters ? storyData.chapters.length : 0,
           storySetting: storyData.storySetting,
-          storageMode: storyData.storageMode || 'local'
+          storageMode: storyData.storageMode || 'local',
         }
         index.push(metadata)
       } else {
         // Update existing metadata
-        const storyIndex = index.findIndex(s => s.id === id)
+        const storyIndex = index.findIndex((s) => s.id === id)
         index[storyIndex] = {
           ...existingStory,
           name: storyData.name,
@@ -112,18 +120,18 @@ export const storyManager = {
           characterCount: storyData.characters ? storyData.characters.length : 0,
           chapterCount: storyData.chapters ? storyData.chapters.length : 0,
           storySetting: storyData.storySetting,
-          storageMode: storyData.storageMode || 'local'
+          storageMode: storyData.storageMode || 'local',
         }
       }
-      
+
       // Save the full story data
       console.log('[storyManager.updateLocalStory] Saving story data to IndexedDB...')
       await storage.set(`${STORY_PREFIX}${id}`, storyData)
-      
+
       // Update the index
       console.log('[storyManager.updateLocalStory] Updating story index...')
       await storage.set(STORY_INDEX_KEY, index)
-      
+
       console.log('[storyManager.updateLocalStory] Successfully updated story')
       return true
     } catch (error) {
@@ -135,7 +143,7 @@ export const storyManager = {
         errorType: isError(error) ? error.constructor.name : 'Unknown',
         isDOMException: error instanceof DOMException,
         storyId: id,
-        hasChapters: storyData.chapters ? storyData.chapters.length : 0
+        hasChapters: storyData.chapters ? storyData.chapters.length : 0,
       })
       return false
     }
@@ -149,15 +157,15 @@ export const storyManager = {
         console.error(`Story with id ${id} not found in storage`)
         return null
       }
-      
+
       // Convert timestamps back to Date objects
       return {
         ...story,
         savedAt: new Date(story.savedAt),
-        messages: story.messages.map(msg => ({
+        messages: story.messages.map((msg) => ({
           ...msg,
-          timestamp: new Date(msg.timestamp)
-        }))
+          timestamp: new Date(msg.timestamp),
+        })),
       }
     } catch (error) {
       console.error(`Failed to load story ${id}:`, error)
@@ -170,10 +178,10 @@ export const storyManager = {
     try {
       // Remove the story data
       await storage.remove(`${STORY_PREFIX}${id}`)
-      
+
       // Update the index
       const index = await storyManager.getSavedStories()
-      const filteredIndex = index.filter(s => s.id !== id)
+      const filteredIndex = index.filter((s) => s.id !== id)
       await storage.set(STORY_INDEX_KEY, filteredIndex)
       return true
     } catch {
@@ -189,32 +197,30 @@ export const storyManager = {
         // (can't use saveService since story isn't loaded)
         await patchMyStoriesById({
           path: { id },
-          body: { name: newName }
+          body: { name: newName },
         })
         return true
-      } else {
-        // For local stories, update local storage
-        const story = await storage.get<SavedStory>(`${STORY_PREFIX}${id}`)
-        if (!story) return false
-        
-        story.name = newName
-        await storage.set(`${STORY_PREFIX}${id}`, story)
-        
-        // Update the index
-        const index = await storyManager.getSavedStories()
-        const storyIndex = index.findIndex(s => s.id === id)
-        if (storyIndex === -1) return false
-        
-        index[storyIndex].name = newName
-        await storage.set(STORY_INDEX_KEY, index)
-        return true
       }
+      // For local stories, update local storage
+      const story = await storage.get<SavedStory>(`${STORY_PREFIX}${id}`)
+      if (!story) return false
+
+      story.name = newName
+      await storage.set(`${STORY_PREFIX}${id}`, story)
+
+      // Update the index
+      const index = await storyManager.getSavedStories()
+      const storyIndex = index.findIndex((s) => s.id === id)
+      if (storyIndex === -1) return false
+
+      index[storyIndex].name = newName
+      await storage.set(STORY_INDEX_KEY, index)
+      return true
     } catch (error) {
       console.error('Failed to rename story:', error)
       return false
     }
   },
-
 
   // Sync methods for backend integration
   syncToServer: async (id: string): Promise<string | null> => {
@@ -223,7 +229,7 @@ export const storyManager = {
       if (!story) return null
 
       const contextItems = story.contextItems || []
-      
+
       // Create new story on server
       const apiStory = await apiClient.createStory({
         name: story.name,
@@ -234,14 +240,14 @@ export const storyManager = {
         storySetting: story.storySetting,
         person: story.person,
         tense: story.tense,
-        globalScript: story.globalScript
+        globalScript: story.globalScript,
       })
-      
+
       // Update local story with sync timestamp
       // Note: We no longer sync local to server
       story.syncedAt = new Date()
       await storage.set(`${STORY_PREFIX}${id}`, story)
-      
+
       return apiStory.id
     } catch (error) {
       console.error('Failed to sync story to server:', error)
@@ -252,16 +258,16 @@ export const storyManager = {
   syncFromServer: async (serverId: string): Promise<string | null> => {
     try {
       const apiStory = await apiClient.getStory(serverId)
-      
+
       // Create local story from server data
       const localId = generateMessageId()
       const storyData: SavedStory = {
         id: localId,
         name: apiStory.name,
         savedAt: new Date(apiStory.savedAt),
-        messages: apiStory.messages.map(msg => ({
+        messages: apiStory.messages.map((msg) => ({
           ...msg,
-          timestamp: new Date(msg.timestamp)
+          timestamp: new Date(msg.timestamp),
         })),
         characters: apiStory.characters,
         contextItems: apiStory.contextItems,
@@ -273,12 +279,12 @@ export const storyManager = {
         globalScript: apiStory.globalScript,
         // serverId removed - server stories use server ID as primary ID,
         syncedAt: new Date(),
-        storageMode: 'server'
+        storageMode: 'server',
       }
-      
+
       // Save to storage
       await storage.set(`${STORY_PREFIX}${localId}`, storyData)
-      
+
       // Update index
       const index = await storyManager.getSavedStories()
       const metadata: StoryMetadata = {
@@ -288,12 +294,12 @@ export const storyManager = {
         messageCount: apiStory.messages.length,
         characterCount: apiStory.characters.length,
         storySetting: apiStory.storySetting,
-        storageMode: 'server'
+        storageMode: 'server',
       }
-      
+
       index.push(metadata)
       await storage.set(STORY_INDEX_KEY, index)
-      
+
       return localId
     } catch (error) {
       console.error('Failed to sync story from server:', error)
@@ -307,16 +313,16 @@ export const storyManager = {
       if (!result.data) return []
 
       // Convert unified backend format to expected format
-      return result.data.stories.map(story => ({
+      return result.data.stories.map((story) => ({
         id: story.id,
         name: story.name,
-        savedAt: new Date(story.updatedAt),
+        savedAt: story.updatedAt,
         updatedAt: story.updatedAt,
-        messageCount: story.messageCount ?? 0,
-        characterCount: story.characterCount ?? 0,
-        chapterCount: story.chapterCount ?? 0,
+        messageCount: story.messageCount,
+        characterCount: story.characterCount,
+        chapterCount: story.chapterCount,
         storySetting: story.summary || '',
-        fingerprint: undefined // TODO: add if needed
+        fingerprint: undefined,
       }))
     } catch (error) {
       console.error('Failed to fetch server stories:', error)
@@ -351,29 +357,29 @@ export const storyManager = {
         const estimate = await navigator.storage.estimate()
         const usedKB = Math.ceil((estimate.usage || 0) / 1024)
         const totalKB = Math.ceil((estimate.quota || 0) / 1024)
-        
+
         // Get story count
         const index = await storyManager.getSavedStories()
         const storyCount = index.length
-        
-        return { 
-          usedKB, 
+
+        return {
+          usedKB,
           totalKB,
           storyCount,
-          totalSizeKB: usedKB // For compatibility
+          totalSizeKB: usedKB, // For compatibility
         }
       }
     } catch (error) {
       console.error('Failed to get storage info:', error)
     }
-    
+
     // Fallback for older browsers
     const index = await storyManager.getSavedStories()
-    return { 
-      usedKB: 0, 
+    return {
+      usedKB: 0,
       totalKB: 0,
       storyCount: index.length,
-      totalSizeKB: 0
+      totalSizeKB: 0,
     }
   },
 
@@ -390,7 +396,7 @@ export const storyManager = {
   migrateStories: async (): Promise<void> => {
     try {
       const stories = await storyManager.getSavedStories()
-      
+
       for (const metadata of stories) {
         const story = await storyManager.loadStory(metadata.id)
         if (story && (!story.person || !story.tense)) {
@@ -398,7 +404,7 @@ export const storyManager = {
           story.person = story.person || 'second'
           story.tense = story.tense || 'present'
           story.storySetting = story.storySetting || ''
-          
+
           // Save the updated story
           await storage.set(`${STORY_PREFIX}${story.id}`, story)
         }
@@ -412,14 +418,14 @@ export const storyManager = {
   updateStoryMetadata: async (id: string, updates: Partial<StoryMetadata>): Promise<boolean> => {
     try {
       // Update in index
-      const index = await storage.get<StoryMetadata[]>(STORY_INDEX_KEY) || []
-      const storyIndex = index.findIndex(s => s.id === id)
-      
+      const index = (await storage.get<StoryMetadata[]>(STORY_INDEX_KEY)) || []
+      const storyIndex = index.findIndex((s) => s.id === id)
+
       if (storyIndex >= 0) {
         index[storyIndex] = { ...index[storyIndex], ...updates }
         await storage.set(STORY_INDEX_KEY, index)
       }
-      
+
       // Update in story data
       const story = await storyManager.loadStory(id)
       if (story) {
@@ -427,11 +433,11 @@ export const storyManager = {
         await storage.set(`${STORY_PREFIX}${id}`, story)
         return true
       }
-      
+
       return false
     } catch (error) {
       console.error('Failed to update story metadata:', error)
       return false
     }
-  }
+  },
 }

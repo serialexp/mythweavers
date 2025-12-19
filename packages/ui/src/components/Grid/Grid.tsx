@@ -1,7 +1,19 @@
 import { JSX, splitProps } from 'solid-js'
-import { grid, gridItem, type GridVariants, type GridItemVariants } from './Grid.css'
+import { grid, gridItem } from './Grid.css'
 
-export interface GridProps extends GridVariants {
+export interface GridProps {
+  /** Number of columns */
+  cols?: 1 | 2 | 3 | 4 | 5 | 6 | 12 | 'auto'
+  /** Number of rows */
+  rows?: 1 | 2 | 3 | 4 | 5 | 6 | 'auto'
+  /** Gap between items */
+  gap?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+  /** Vertical alignment */
+  align?: 'start' | 'center' | 'end' | 'stretch'
+  /** Horizontal alignment */
+  justify?: 'start' | 'center' | 'end' | 'stretch'
+  /** Grid auto flow */
+  flow?: 'row' | 'col' | 'dense' | 'rowDense' | 'colDense'
   /** Grid content */
   children?: JSX.Element
   /** Additional class */
@@ -30,7 +42,11 @@ export const Grid = (props: GridProps) => {
   )
 }
 
-export interface GridItemProps extends GridItemVariants {
+export interface GridItemProps {
+  /** Column span */
+  colSpan?: 1 | 2 | 3 | 4 | 5 | 6 | 'full'
+  /** Row span */
+  rowSpan?: 1 | 2 | 3 | 4 | 5 | 6 | 'full'
   /** Item content */
   children?: JSX.Element
   /** Additional class */

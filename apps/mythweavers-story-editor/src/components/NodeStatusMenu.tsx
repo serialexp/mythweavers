@@ -1,7 +1,7 @@
+import { BsChevronRight, BsFlag } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createSignal } from 'solid-js'
-import { BsChevronRight } from 'solid-icons/bs'
 import { ChapterStatus } from '../types/core'
-import styles from './NodeStatusMenu.module.css'
+import * as styles from './NodeStatusMenu.css'
 
 export interface StatusOption {
   value: ChapterStatus | null
@@ -14,7 +14,7 @@ export const STATUS_OPTIONS: StatusOption[] = [
   { value: 'draft', label: 'Draft', color: '#94a3b8' },
   { value: 'needs_work', label: 'Needs Work', color: '#f97316' },
   { value: 'review', label: 'Ready for Review', color: '#3b82f6' },
-  { value: 'done', label: 'Done', color: '#22c55e' }
+  { value: 'done', label: 'Done', color: '#22c55e' },
 ]
 
 interface NodeStatusMenuProps {
@@ -32,17 +32,13 @@ export const NodeStatusMenu: Component<NodeStatusMenuProps> = (props) => {
   const [isOpen, setIsOpen] = createSignal(false)
 
   const labelPrefix = () => props.labelPrefix ?? 'Status'
-  const placement = () => props.placement ?? 'left'
 
   const notifyLayoutChange = () => {
     if (!props.onLayoutChange) return
-    // Call immediately to catch current state
     props.onLayoutChange?.()
-    // Then call again after DOM updates
     if (typeof window !== 'undefined') {
       requestAnimationFrame(() => {
         props.onLayoutChange?.()
-        // One more time after any CSS transitions
         setTimeout(() => props.onLayoutChange?.(), 100)
       })
     }
@@ -50,7 +46,7 @@ export const NodeStatusMenu: Component<NodeStatusMenuProps> = (props) => {
 
   const selectedOption = () => {
     const current = props.currentStatus ?? null
-    return STATUS_OPTIONS.find(option => option.value === current) ?? STATUS_OPTIONS[0]
+    return STATUS_OPTIONS.find((option) => option.value === current) ?? STATUS_OPTIONS[0]
   }
 
   createEffect(() => {
@@ -66,9 +62,7 @@ export const NodeStatusMenu: Component<NodeStatusMenuProps> = (props) => {
     e.stopPropagation()
     const newState = !isOpen()
     setIsOpen(newState)
-    // Notify parent of open state change
     props.onOpenChange?.(newState)
-    // Let notifyLayoutChange handle the timing
     notifyLayoutChange()
   }
 
@@ -81,45 +75,35 @@ export const NodeStatusMenu: Component<NodeStatusMenuProps> = (props) => {
     notifyLayoutChange()
   }
 
-  const indicatorStyle = (option: StatusOption) => {
-    if (option.color) {
-      return { 'background-color': option.color }
-    }
-    return {
-      'background-color': 'transparent',
-      border: '1px solid var(--border-color)'
-    }
-  }
-
   return (
     <div class={styles.container} onClick={(e) => e.stopPropagation()}>
       <button
-        class={`${styles.trigger} ${isOpen() ? styles.triggerActive : ''}`}
+        class={`${styles.triggerButton} ${isOpen() ? styles.triggerButtonOpen : ''}`}
         onClick={handleToggle}
         type="button"
       >
-        <span>
-          {labelPrefix()}: {selectedOption().label}
+        <span class={styles.triggerContent}>
+          <BsFlag />
+          <span>
+            {labelPrefix()}: {selectedOption().label}
+          </span>
         </span>
-        <BsChevronRight class={`${styles.caret} ${isOpen() ? styles.caretOpen : ''}`} />
+        <BsChevronRight class={`${styles.chevron} ${isOpen() ? styles.chevronOpen : ''}`} />
       </button>
       <Show when={isOpen()}>
-        <div
-          class={`${styles.menu} ${placement() === 'right' ? styles.menuRight : styles.menuLeft}`}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div class={styles.dropdown} onClick={(e) => e.stopPropagation()}>
           <For each={STATUS_OPTIONS}>
             {(option) => {
-              const isSelected = (props.currentStatus ?? null) === option.value
+              const isSelected = () => (props.currentStatus ?? null) === option.value
               return (
                 <button
                   type="button"
-                  class={`${styles.option} ${isSelected ? styles.optionSelected : ''}`}
+                  class={`${styles.optionButton} ${isSelected() ? styles.optionButtonSelected : ''}`}
                   onClick={(e) => handleSelect(option, e)}
                 >
                   <span
-                    class={styles.indicator}
-                    style={indicatorStyle(option)}
+                    class={`${styles.statusIndicator} ${!option.color ? styles.statusIndicatorEmpty : ''}`}
+                    style={option.color ? { 'background-color': option.color } : undefined}
                   />
                   <span>{option.label}</span>
                 </button>

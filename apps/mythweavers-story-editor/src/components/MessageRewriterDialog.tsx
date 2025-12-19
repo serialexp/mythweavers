@@ -1,7 +1,7 @@
 import { Show, createEffect, createSignal } from 'solid-js'
-import { MessageRewriter } from './MessageRewriter'
-import { rewriteDialogStore } from '../stores/rewriteDialogStore'
 import { messagesStore } from '../stores/messagesStore'
+import { rewriteDialogStore } from '../stores/rewriteDialogStore'
+import { MessageRewriter } from './MessageRewriter'
 
 export function MessageRewriterDialog() {
   const [preselectedId, setPreselectedId] = createSignal<string | null>(null)
@@ -17,7 +17,7 @@ export function MessageRewriterDialog() {
   return (
     <Show when={rewriteDialogStore.isOpen}>
       <MessageRewriter
-        messages={messagesStore.messages.filter(m => m.role === 'assistant' && !m.isQuery)}
+        messages={messagesStore.messages.filter((m) => m.role === 'assistant' && !m.isQuery)}
         preselectedMessageId={preselectedId()}
         onClose={() => rewriteDialogStore.hide()}
       />

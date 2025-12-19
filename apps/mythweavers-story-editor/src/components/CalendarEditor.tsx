@@ -1,8 +1,8 @@
-import { Component, createSignal, Index, Show } from 'solid-js'
+import { CalendarConfig, CalendarSubdivision } from '@mythweavers/shared'
+import { Button, Card, CardBody, FormField, IconButton, Input, Select, Stack } from '@mythweavers/ui'
 import { BsPlus, BsTrash } from 'solid-icons/bs'
-import { CalendarConfig, CalendarSubdivision } from '@story/shared'
+import { Component, Index, Show, createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
-import styles from './CalendarEditor.module.css'
 
 // Helper component to render subdivisions recursively
 interface SubdivisionEditorProps {
@@ -13,61 +13,112 @@ interface SubdivisionEditorProps {
   onAddNested: (path: number[]) => void
 }
 
+const subdivisionStyles = {
+  item: {
+    display: 'flex',
+    gap: '0.75rem',
+    'align-items': 'flex-start',
+    padding: '1rem',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border-color)',
+    'border-radius': '6px',
+  },
+  fields: {
+    flex: '1',
+    display: 'grid',
+    'grid-template-columns': 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '0.75rem',
+  },
+  fieldFull: {
+    'grid-column': '1 / -1',
+    display: 'flex',
+    'flex-direction': 'column' as const,
+    gap: '0.5rem',
+  },
+  toggle: {
+    display: 'flex',
+    'align-items': 'center',
+    gap: '0.5rem',
+  },
+  customGrid: {
+    display: 'grid',
+    'grid-template-columns': 'repeat(auto-fill, minmax(80px, 1fr))',
+    gap: '0.5rem',
+  },
+  customField: {
+    display: 'flex',
+    'flex-direction': 'column' as const,
+    gap: '0.25rem',
+  },
+  customLabel: {
+    'font-size': '0.75rem',
+    'font-weight': '500',
+    color: 'var(--text-secondary)',
+    'text-align': 'center' as const,
+  },
+  hint: {
+    'font-size': '0.75rem',
+    color: 'var(--text-muted)',
+    'margin-top': '-0.25rem',
+  },
+  nestedList: {
+    'margin-left': '1.5rem',
+    'padding-left': '1rem',
+    'border-left': '2px solid var(--border-color)',
+    display: 'flex',
+    'flex-direction': 'column' as const,
+    gap: '1rem',
+  },
+}
+
 const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
   const sub = () => props.subdivision
 
   return (
-    <div class={styles.subdivisionItem}>
-      <div class={styles.subdivisionFields}>
+    <div style={subdivisionStyles.item}>
+      <div style={subdivisionStyles.fields}>
         {/* ID, Name, Plural, Count fields */}
-        <div class={styles.subdivisionField}>
-          <label class={styles.subdivisionLabel}>ID</label>
-          <input
+        <FormField label="ID">
+          <Input
             type="text"
-            class={styles.subdivisionInput}
             value={sub().id}
             onInput={(e) => props.onUpdate(props.path, 'id', e.target.value)}
             placeholder="quarter"
           />
-        </div>
-        <div class={styles.subdivisionField}>
-          <label class={styles.subdivisionLabel}>Name</label>
-          <input
+        </FormField>
+        <FormField label="Name">
+          <Input
             type="text"
-            class={styles.subdivisionInput}
             value={sub().name}
             onInput={(e) => props.onUpdate(props.path, 'name', e.target.value)}
             placeholder="Quarter"
           />
-        </div>
-        <div class={styles.subdivisionField}>
-          <label class={styles.subdivisionLabel}>Plural</label>
-          <input
+        </FormField>
+        <FormField label="Plural">
+          <Input
             type="text"
-            class={styles.subdivisionInput}
             value={sub().pluralName}
             onInput={(e) => props.onUpdate(props.path, 'pluralName', e.target.value)}
             placeholder="Quarters"
           />
-        </div>
-        <div class={styles.subdivisionField}>
-          <label class={styles.subdivisionLabel}>Count</label>
-          <input
+        </FormField>
+        <FormField label="Count">
+          <Input
             type="number"
-            class={styles.subdivisionInput}
             value={sub().count}
-            onInput={(e) => props.onUpdate(props.path, 'count', parseInt(e.target.value) || 1)}
+            onInput={(e) => props.onUpdate(props.path, 'count', Number.parseInt(e.target.value) || 1)}
             min={1}
             placeholder="4"
           />
-        </div>
+        </FormField>
 
-        {/* Days per Unit section - abbreviated for now, will expand */}
-        <div class={styles.subdivisionFieldFull}>
-          <div class={styles.subdivisionToggle}>
-            <label class={styles.subdivisionLabel}>Days per Unit</label>
-            <select
-              class={styles.subdivisionSelect}
+        {/* Days per Unit section */}
+        <div style={subdivisionStyles.fieldFull}>
+          <div style={subdivisionStyles.toggle}>
+            <span style={{ 'font-size': '0.75rem', 'font-weight': '500', color: 'var(--text-secondary)' }}>
+              Days per Unit
+            </span>
+            <Select
               value={sub().daysPerUnit ? 'custom' : 'fixed'}
               onChange={(e) => {
                 if (e.target.value === 'fixed') {
@@ -82,25 +133,25 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
                   props.onUpdate(props.path, 'daysPerUnitFixed', undefined)
                 }
               }}
-            >
-              <option value="fixed">Same for all</option>
-              <option value="custom">Custom per unit</option>
-            </select>
+              options={[
+                { value: 'fixed', label: 'Same for all' },
+                { value: 'custom', label: 'Custom per unit' },
+              ]}
+            />
           </div>
 
           {sub().daysPerUnit ? (
-            <div class={styles.customDaysGrid}>
+            <div style={subdivisionStyles.customGrid}>
               <Index each={sub().daysPerUnit}>
                 {(days, daysIndex) => (
-                  <div class={styles.customDayField}>
-                    <label class={styles.customDayLabel}>{daysIndex + 1}</label>
-                    <input
+                  <div style={subdivisionStyles.customField}>
+                    <label style={subdivisionStyles.customLabel}>{daysIndex + 1}</label>
+                    <Input
                       type="number"
-                      class={styles.customDayInput}
                       value={days()}
                       onInput={(e) => {
                         const newDays = [...(sub().daysPerUnit || [])]
-                        newDays[daysIndex] = parseInt(e.target.value) || 1
+                        newDays[daysIndex] = Number.parseInt(e.target.value) || 1
                         props.onUpdate(props.path, 'daysPerUnit', newDays)
                       }}
                       min={1}
@@ -111,12 +162,11 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
               </Index>
             </div>
           ) : (
-            <input
+            <Input
               type="number"
-              class={styles.subdivisionInput}
               value={sub().daysPerUnitFixed || ''}
               onInput={(e) => {
-                const val = parseInt(e.target.value) || undefined
+                const val = Number.parseInt(e.target.value) || undefined
                 props.onUpdate(props.path, 'daysPerUnitFixed', val || undefined)
               }}
               min={1}
@@ -125,12 +175,13 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
           )}
         </div>
 
-        {/* Unit Labels section - abbreviated */}
-        <div class={styles.subdivisionFieldFull}>
-          <div class={styles.subdivisionToggle}>
-            <label class={styles.subdivisionLabel}>Unit Labels</label>
-            <select
-              class={styles.subdivisionSelect}
+        {/* Unit Labels section */}
+        <div style={subdivisionStyles.fieldFull}>
+          <div style={subdivisionStyles.toggle}>
+            <span style={{ 'font-size': '0.75rem', 'font-weight': '500', color: 'var(--text-secondary)' }}>
+              Unit Labels
+            </span>
+            <Select
               value={sub().useCustomLabels === false ? 'auto' : 'custom'}
               onChange={(e) => {
                 if (e.target.value === 'auto') {
@@ -150,30 +201,31 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
                   }
                 }
               }}
-            >
-              <option value="auto">Auto-numbered</option>
-              <option value="custom">Custom names</option>
-            </select>
+              options={[
+                { value: 'auto', label: 'Auto-numbered' },
+                { value: 'custom', label: 'Custom names' },
+              ]}
+            />
           </div>
 
-          <div class={styles.subdivisionField}>
-            <label class={styles.subdivisionLabel}>Label Format</label>
-            <input
+          <FormField label="Label Format" hint={'Template for auto-numbering. Use {n} for the number.'}>
+            <Input
               type="text"
-              class={styles.subdivisionInput}
               value={sub().labelFormat || ''}
               onInput={(e) => props.onUpdate(props.path, 'labelFormat', e.target.value || undefined)}
               placeholder={`${sub().name} {n}`}
             />
-            <div class={styles.hint}>
-              Template for auto-numbering. Use {'{n}'} for the number. Used as fallback for empty custom labels.
-            </div>
-          </div>
+          </FormField>
 
           {sub().useCustomLabels !== false && (
             <>
               {sub().labels && (
-                <div class={styles.customLabelsGrid}>
+                <div
+                  style={{
+                    ...subdivisionStyles.customGrid,
+                    'grid-template-columns': 'repeat(auto-fill, minmax(120px, 1fr))',
+                  }}
+                >
                   <Index each={sub().labels}>
                     {(label, labelIndex) => {
                       const autoLabel = () => {
@@ -182,11 +234,10 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
                       }
 
                       return (
-                        <div class={styles.customLabelField}>
-                          <label class={styles.customDayLabel}>{labelIndex + 1}</label>
-                          <input
+                        <div style={subdivisionStyles.customField}>
+                          <label style={subdivisionStyles.customLabel}>{labelIndex + 1}</label>
+                          <Input
                             type="text"
-                            class={styles.customDayInput}
                             value={label()}
                             onInput={(e) => {
                               const newLabels = [...(sub().labels || [])]
@@ -201,32 +252,32 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
                   </Index>
                 </div>
               )}
-              <div class={styles.hint}>
+              <div style={subdivisionStyles.hint}>
                 Custom names for each unit. Leave empty to use the label format above.
               </div>
             </>
           )}
           {sub().useCustomLabels === false && (
-            <div class={styles.hint}>
-              All units will use the label format.
-            </div>
+            <div style={subdivisionStyles.hint}>All units will use the label format.</div>
           )}
         </div>
 
         {/* Nested subdivisions */}
         <Show when={sub().subdivisions && sub().subdivisions!.length > 0}>
-          <div class={styles.subdivisionFieldFull}>
-            <div class={styles.nestedSubdivisionsHeader}>
-              <label class={styles.subdivisionLabel}>Nested Subdivisions</label>
-              <button
-                class={styles.addNestedButton}
-                onClick={() => props.onAddNested(props.path)}
-                type="button"
-              >
+          <div style={subdivisionStyles.fieldFull}>
+            <Stack
+              direction="horizontal"
+              gap="sm"
+              style={{ 'justify-content': 'space-between', 'align-items': 'center', 'margin-bottom': '0.5rem' }}
+            >
+              <span style={{ 'font-size': '0.75rem', 'font-weight': '500', color: 'var(--text-secondary)' }}>
+                Nested Subdivisions
+              </span>
+              <Button variant="primary" size="sm" onClick={() => props.onAddNested(props.path)}>
                 <BsPlus /> Add Nested
-              </button>
-            </div>
-            <div class={styles.nestedSubdivisionsList}>
+              </Button>
+            </Stack>
+            <div style={subdivisionStyles.nestedList}>
               <Index each={sub().subdivisions!}>
                 {(nestedSub, nestedIndex) => (
                   <SubdivisionEditor
@@ -243,26 +294,17 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
         </Show>
 
         <Show when={!sub().subdivisions || sub().subdivisions!.length === 0}>
-          <div class={styles.subdivisionFieldFull}>
-            <button
-              class={styles.addNestedButton}
-              onClick={() => props.onAddNested(props.path)}
-              type="button"
-            >
+          <div style={subdivisionStyles.fieldFull}>
+            <Button variant="primary" size="sm" onClick={() => props.onAddNested(props.path)}>
               <BsPlus /> Add Nested Subdivision
-            </button>
+            </Button>
           </div>
         </Show>
       </div>
 
-      <button
-        class={styles.removeButton}
-        onClick={() => props.onRemove(props.path)}
-        title="Remove subdivision"
-        type="button"
-      >
+      <IconButton variant="danger" onClick={() => props.onRemove(props.path)} aria-label="Remove subdivision">
         <BsTrash />
-      </button>
+      </IconButton>
     </div>
   )
 }
@@ -285,7 +327,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
 
   // Use createStore for fine-grained reactivity
   const [subdivisions, setSubdivisions] = createStore<CalendarSubdivision[]>(
-    props.initialConfig?.subdivisions ? JSON.parse(JSON.stringify(props.initialConfig.subdivisions)) : []
+    props.initialConfig?.subdivisions ? JSON.parse(JSON.stringify(props.initialConfig.subdivisions)) : [],
   )
 
   const addSubdivision = () => {
@@ -294,7 +336,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       name: '',
       pluralName: '',
       count: 1,
-      daysPerUnitFixed: undefined
+      daysPerUnitFixed: undefined,
     }
     setSubdivisions(subdivisions.length, newSub)
   }
@@ -302,7 +344,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
   const removeSubdivision = (path: number[]) => {
     if (path.length === 1) {
       // Top-level subdivision
-      setSubdivisions(produce(subs => subs.splice(path[0], 1)))
+      setSubdivisions(produce((subs) => subs.splice(path[0], 1)))
     } else {
       // Nested subdivision - build proper store path to parent's subdivisions array
       const parentStorePath: any[] = [path[0]]
@@ -312,9 +354,12 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       parentStorePath.push('subdivisions')
 
       // @ts-ignore - Dynamic path access for nested subdivision removal
-      setSubdivisions(...parentStorePath, produce((subs: CalendarSubdivision[]) => {
-        subs.splice(path[path.length - 1], 1)
-      }))
+      setSubdivisions(
+        ...parentStorePath,
+        produce((subs: CalendarSubdivision[]) => {
+          subs.splice(path[path.length - 1], 1)
+        }),
+      )
     }
   }
 
@@ -324,7 +369,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       name: '',
       pluralName: '',
       count: 1,
-      daysPerUnitFixed: undefined
+      daysPerUnitFixed: undefined,
     }
 
     // Build proper store path to parent's subdivisions array
@@ -335,11 +380,14 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
     parentStorePath.push('subdivisions')
 
     // @ts-ignore - Dynamic path access for nested subdivision addition
-    setSubdivisions(...parentStorePath, produce((subs: CalendarSubdivision[] | undefined) => {
-      const arr = subs || []
-      arr.push(newSub)
-      return arr
-    }))
+    setSubdivisions(
+      ...parentStorePath,
+      produce((subs: CalendarSubdivision[] | undefined) => {
+        const arr = subs || []
+        arr.push(newSub)
+        return arr
+      }),
+    )
   }
 
   const updateSubdivision = (path: number[], field: keyof CalendarSubdivision, value: any) => {
@@ -373,31 +421,34 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       const newCount = value as number
 
       // @ts-ignore - Dynamic path access for nested subdivision updates
-      setSubdivisions(...storePath, produce((s: CalendarSubdivision) => {
-        s.count = newCount
+      setSubdivisions(
+        ...storePath,
+        produce((s: CalendarSubdivision) => {
+          s.count = newCount
 
-        // Resize daysPerUnit array if it exists
-        if (s.daysPerUnit) {
-          const currentLength = s.daysPerUnit.length
-          if (newCount > currentLength) {
-            const defaultValue = s.daysPerUnitFixed || 30
-            s.daysPerUnit = [...s.daysPerUnit, ...Array(newCount - currentLength).fill(defaultValue)]
-          } else if (newCount < currentLength) {
-            s.daysPerUnit = s.daysPerUnit.slice(0, newCount)
+          // Resize daysPerUnit array if it exists
+          if (s.daysPerUnit) {
+            const currentLength = s.daysPerUnit.length
+            if (newCount > currentLength) {
+              const defaultValue = s.daysPerUnitFixed || 30
+              s.daysPerUnit = [...s.daysPerUnit, ...Array(newCount - currentLength).fill(defaultValue)]
+            } else if (newCount < currentLength) {
+              s.daysPerUnit = s.daysPerUnit.slice(0, newCount)
+            }
           }
-        }
 
-        // Resize labels array if it exists
-        if (s.labels) {
-          const currentLength = s.labels.length
-          if (newCount > currentLength) {
-            const newLabels = Array(newCount - currentLength).fill('')
-            s.labels = [...s.labels, ...newLabels]
-          } else if (newCount < currentLength) {
-            s.labels = s.labels.slice(0, newCount)
+          // Resize labels array if it exists
+          if (s.labels) {
+            const currentLength = s.labels.length
+            if (newCount > currentLength) {
+              const newLabels = Array(newCount - currentLength).fill('')
+              s.labels = [...s.labels, ...newLabels]
+            } else if (newCount < currentLength) {
+              s.labels = s.labels.slice(0, newCount)
+            }
           }
-        }
-      }))
+        }),
+      )
     } else {
       // Simple field update
       // @ts-ignore - Dynamic path access for nested subdivision updates
@@ -437,7 +488,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
     const minutesPerYear = minutesPerDay * daysPerYear()
 
     // Only include subdivisions that have both id and name
-    const validSubdivisions = subdivisions.filter(s => s.id && s.name)
+    const validSubdivisions = subdivisions.filter((s) => s.id && s.name)
 
     const config: CalendarConfig = {
       id: id().trim(),
@@ -452,163 +503,190 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       eras: {
         positive: positiveEra().trim() || 'CE',
         negative: negativeEra().trim() || 'BCE',
-        zeroLabel: null
+        zeroLabel: null,
       },
       display: {
         defaultFormat: props.initialConfig?.display.defaultFormat || 'Day {dayOfYear}, Year {year} {era}',
         shortFormat: props.initialConfig?.display.shortFormat || 'Day {dayOfYear}, Year {year}',
         includeTimeByDefault: props.initialConfig?.display.includeTimeByDefault ?? false,
-        hourFormat: props.initialConfig?.display.hourFormat || '24'
-      }
+        hourFormat: props.initialConfig?.display.hourFormat || '24',
+      },
     }
 
     props.onSave(config)
   }
 
   return (
-    <div class={styles.editor}>
-      <h3 class={styles.title}>Calendar Configuration</h3>
+    <Stack gap="lg">
+      <h3 style={{ margin: '0', 'font-size': '1.125rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+        Calendar Configuration
+      </h3>
 
-      <div class={styles.section}>
-        <h4 class={styles.sectionTitle}>Basic Information</h4>
+      <Card>
+        <CardBody>
+          <Stack gap="md">
+            <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+              Basic Information
+            </h4>
 
-        <div class={styles.formGroup}>
-          <label class={styles.label}>Calendar ID <span class={styles.required}>*</span></label>
-          <input
-            type="text"
-            class={styles.input}
-            value={id()}
-            onInput={(e) => setId(e.target.value)}
-            placeholder="my-calendar"
-          />
-          <div class={styles.hint}>Unique identifier (lowercase, hyphens, no spaces)</div>
-        </div>
+            <FormField
+              label={
+                <>
+                  Calendar ID <span style={{ color: 'var(--danger-color)' }}>*</span>
+                </>
+              }
+              hint="Unique identifier (lowercase, hyphens, no spaces)"
+            >
+              <Input type="text" value={id()} onInput={(e) => setId(e.target.value)} placeholder="my-calendar" />
+            </FormField>
 
-        <div class={styles.formGroup}>
-          <label class={styles.label}>Name <span class={styles.required}>*</span></label>
-          <input
-            type="text"
-            class={styles.input}
-            value={name()}
-            onInput={(e) => setName(e.target.value)}
-            placeholder="My Calendar System"
-          />
-        </div>
-
-        <div class={styles.formGroup}>
-          <label class={styles.label}>Description</label>
-          <textarea
-            class={styles.textarea}
-            value={description()}
-            onInput={(e) => setDescription(e.target.value)}
-            placeholder="A brief description of this calendar system..."
-            rows={3}
-          />
-        </div>
-      </div>
-
-      <div class={styles.section}>
-        <h4 class={styles.sectionTitle}>Time Units</h4>
-
-        <div class={styles.formRow}>
-          <div class={styles.formGroup}>
-            <label class={styles.label}>Days per Year</label>
-            <input
-              type="number"
-              class={styles.input}
-              value={daysPerYear()}
-              onInput={(e) => setDaysPerYear(parseInt(e.target.value) || 365)}
-              min={1}
-            />
-          </div>
-
-          <div class={styles.formGroup}>
-            <label class={styles.label}>Hours per Day</label>
-            <input
-              type="number"
-              class={styles.input}
-              value={hoursPerDay()}
-              onInput={(e) => setHoursPerDay(parseInt(e.target.value) || 24)}
-              min={1}
-            />
-          </div>
-
-          <div class={styles.formGroup}>
-            <label class={styles.label}>Minutes per Hour</label>
-            <input
-              type="number"
-              class={styles.input}
-              value={minutesPerHour()}
-              onInput={(e) => setMinutesPerHour(parseInt(e.target.value) || 60)}
-              min={1}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div class={styles.section}>
-        <h4 class={styles.sectionTitle}>Era Labels</h4>
-
-        <div class={styles.formRow}>
-          <div class={styles.formGroup}>
-            <label class={styles.label}>Positive Era Label</label>
-            <input
-              type="text"
-              class={styles.input}
-              value={positiveEra()}
-              onInput={(e) => setPositiveEra(e.target.value)}
-              placeholder="CE, AD, ABY, etc."
-            />
-          </div>
-
-          <div class={styles.formGroup}>
-            <label class={styles.label}>Negative Era Label</label>
-            <input
-              type="text"
-              class={styles.input}
-              value={negativeEra()}
-              onInput={(e) => setNegativeEra(e.target.value)}
-              placeholder="BCE, BC, BBY, etc."
-            />
-          </div>
-        </div>
-        <div class={styles.hint}>Used for years before/after year 0 (e.g., "22 BBY")</div>
-      </div>
-
-      <div class={styles.section}>
-        <div class={styles.sectionHeader}>
-          <h4 class={styles.sectionTitle}>Subdivisions (Optional)</h4>
-          <button class={styles.addButton} onClick={addSubdivision} type="button">
-            <BsPlus /> Add Subdivision
-          </button>
-        </div>
-        <div class={styles.hint}>
-          Define how the year is divided (e.g., 4 quarters of 92 days each, 12 months, etc.)
-        </div>
-
-        <div class={styles.subdivisionList}>
-          <Index each={subdivisions}>
-            {(sub, index) => (
-              <SubdivisionEditor
-                subdivision={sub()}
-                path={[index]}
-                onUpdate={updateSubdivision}
-                onRemove={removeSubdivision}
-                onAddNested={addNestedSubdivision}
+            <FormField
+              label={
+                <>
+                  Name <span style={{ color: 'var(--danger-color)' }}>*</span>
+                </>
+              }
+            >
+              <Input
+                type="text"
+                value={name()}
+                onInput={(e) => setName(e.target.value)}
+                placeholder="My Calendar System"
               />
-            )}
-          </Index>
-        </div>
-      </div>
+            </FormField>
 
-      <div class={styles.actions}>
-        <button class={styles.cancelButton} onClick={props.onCancel}>
+            <FormField label="Description">
+              <Input
+                type="text"
+                value={description()}
+                onInput={(e) => setDescription(e.target.value)}
+                placeholder="A brief description of this calendar system..."
+              />
+            </FormField>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody>
+          <Stack gap="md">
+            <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+              Time Units
+            </h4>
+
+            <Stack direction="horizontal" gap="md" style={{ 'flex-wrap': 'wrap' }}>
+              <FormField label="Days per Year" style={{ flex: '1', 'min-width': '150px' }}>
+                <Input
+                  type="number"
+                  value={daysPerYear()}
+                  onInput={(e) => setDaysPerYear(Number.parseInt(e.target.value) || 365)}
+                  min={1}
+                />
+              </FormField>
+
+              <FormField label="Hours per Day" style={{ flex: '1', 'min-width': '150px' }}>
+                <Input
+                  type="number"
+                  value={hoursPerDay()}
+                  onInput={(e) => setHoursPerDay(Number.parseInt(e.target.value) || 24)}
+                  min={1}
+                />
+              </FormField>
+
+              <FormField label="Minutes per Hour" style={{ flex: '1', 'min-width': '150px' }}>
+                <Input
+                  type="number"
+                  value={minutesPerHour()}
+                  onInput={(e) => setMinutesPerHour(Number.parseInt(e.target.value) || 60)}
+                  min={1}
+                />
+              </FormField>
+            </Stack>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody>
+          <Stack gap="md">
+            <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+              Era Labels
+            </h4>
+
+            <Stack direction="horizontal" gap="md" style={{ 'flex-wrap': 'wrap' }}>
+              <FormField label="Positive Era Label" style={{ flex: '1', 'min-width': '150px' }}>
+                <Input
+                  type="text"
+                  value={positiveEra()}
+                  onInput={(e) => setPositiveEra(e.target.value)}
+                  placeholder="CE, AD, ABY, etc."
+                />
+              </FormField>
+
+              <FormField label="Negative Era Label" style={{ flex: '1', 'min-width': '150px' }}>
+                <Input
+                  type="text"
+                  value={negativeEra()}
+                  onInput={(e) => setNegativeEra(e.target.value)}
+                  placeholder="BCE, BC, BBY, etc."
+                />
+              </FormField>
+            </Stack>
+            <div style={{ 'font-size': '0.75rem', color: 'var(--text-muted)' }}>
+              Used for years before/after year 0 (e.g., "22 BBY")
+            </div>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody>
+          <Stack gap="md">
+            <Stack
+              direction="horizontal"
+              gap="sm"
+              style={{ 'justify-content': 'space-between', 'align-items': 'center' }}
+            >
+              <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+                Subdivisions (Optional)
+              </h4>
+              <Button variant="primary" size="sm" onClick={addSubdivision}>
+                <BsPlus /> Add Subdivision
+              </Button>
+            </Stack>
+            <div style={{ 'font-size': '0.75rem', color: 'var(--text-muted)' }}>
+              Define how the year is divided (e.g., 4 quarters of 92 days each, 12 months, etc.)
+            </div>
+
+            <Stack gap="md">
+              <Index each={subdivisions}>
+                {(sub, index) => (
+                  <SubdivisionEditor
+                    subdivision={sub()}
+                    path={[index]}
+                    onUpdate={updateSubdivision}
+                    onRemove={removeSubdivision}
+                    onAddNested={addNestedSubdivision}
+                  />
+                )}
+              </Index>
+            </Stack>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      <Stack
+        direction="horizontal"
+        gap="md"
+        style={{ 'justify-content': 'flex-end', 'padding-top': '1rem', 'border-top': '1px solid var(--border-color)' }}
+      >
+        <Button variant="secondary" onClick={props.onCancel}>
           Cancel
-        </button>
-        <button class={styles.saveButton} onClick={handleSave}>
+        </Button>
+        <Button variant="primary" onClick={handleSave}>
           Save Calendar
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Stack>
+    </Stack>
   )
 }

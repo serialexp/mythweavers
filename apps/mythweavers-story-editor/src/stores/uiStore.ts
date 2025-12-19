@@ -6,8 +6,8 @@ interface UIState {
   cutMessageIds: Set<string>
   targetingMode: {
     active: boolean
-    branchMessageId: string | null  // The branch message being edited
-    optionId: string | null  // The option being targeted
+    branchMessageId: string | null // The branch message being edited
+    optionId: string | null // The option being targeted
   }
   summaryView: SummaryViewMode
 }
@@ -17,9 +17,9 @@ const [uiState, setUIState] = createStore<UIState>({
   targetingMode: {
     active: false,
     branchMessageId: null,
-    optionId: null
+    optionId: null,
   },
-  summaryView: 'auto'
+  summaryView: 'auto',
 })
 
 export const uiStore = {
@@ -88,7 +88,7 @@ export const uiStore = {
     setUIState('targetingMode', {
       active: true,
       branchMessageId,
-      optionId
+      optionId,
     })
   },
 
@@ -96,7 +96,7 @@ export const uiStore = {
     setUIState('targetingMode', {
       active: false,
       branchMessageId: null,
-      optionId: null
+      optionId: null,
     })
   },
 
@@ -110,5 +110,5 @@ export const uiStore = {
 
   setSummaryView(mode: SummaryViewMode) {
     setUIState('summaryView', mode)
-  }
+  },
 }

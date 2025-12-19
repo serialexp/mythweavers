@@ -1,27 +1,22 @@
-import { createEffect, onCleanup } from "solid-js"
-import { EditorState, TextSelection } from "prosemirror-state"
-import { EditorView } from "prosemirror-view"
-import { undo, redo, history } from "prosemirror-history"
-import { keymap } from "prosemirror-keymap"
-import { toggleMark } from "prosemirror-commands"
-import { inputRules, emDash, smartQuotes, ellipsis } from "prosemirror-inputrules"
-import shortUUID from "short-uuid"
-import type { Paragraph } from "@story/shared"
+import type { Paragraph } from '@mythweavers/shared'
+import { toggleMark } from 'prosemirror-commands'
+import { history, redo, undo } from 'prosemirror-history'
+import { ellipsis, emDash, inputRules, smartQuotes } from 'prosemirror-inputrules'
+import { keymap } from 'prosemirror-keymap'
+import { EditorState, TextSelection } from 'prosemirror-state'
+import { EditorView } from 'prosemirror-view'
+import shortUUID from 'short-uuid'
+import { createEffect, onCleanup } from 'solid-js'
 
-import { contentSchema } from "../schema"
-import { sceneEditor, editorContainer } from "../scene-editor.css"
-import { createInlineMenuPlugin, type InlineMenuConfig } from "../plugins/inline-menu"
-import { assignIdPlugin } from "../plugins/assign-id"
-import { createSuggestionsPlugin } from "../plugins/suggestions"
-import { createParagraphActionsPlugin } from "../plugins/paragraph-actions"
-import { createParagraphStatePlugin } from "../plugins/paragraph-state"
-import { createActiveParagraphPlugin } from "../plugins/active-paragraph"
-import {
-  paragraphsToDoc,
-  docToParagraphs,
-  getParagraphIdAtPos,
-  getParagraphRange,
-} from "../utils/paragraph-conversion"
+import { createActiveParagraphPlugin } from '../prosemirror-plugins/active-paragraph'
+import { assignIdPlugin } from '../prosemirror-plugins/assign-id'
+import { type InlineMenuConfig, createInlineMenuPlugin } from '../prosemirror-plugins/inline-menu'
+import { createParagraphActionsPlugin } from '../prosemirror-plugins/paragraph-actions'
+import { createParagraphStatePlugin } from '../prosemirror-plugins/paragraph-state'
+import { createSuggestionsPlugin } from '../prosemirror-plugins/suggestions'
+import { editorContainer, sceneEditor } from '../scene-editor.css'
+import { contentSchema } from '../schema'
+import { docToParagraphs, getParagraphIdAtPos, getParagraphRange, paragraphsToDoc } from '../utils/paragraph-conversion'
 
 const italic = toggleMark(contentSchema.marks.em)
 
@@ -96,7 +91,7 @@ export function ProseMirrorEditor(props: ProseMirrorEditorProps) {
 
     // Initialize view if it doesn't exist
     if (!view) {
-      const editorNode = document.createElement("div")
+      const editorNode = document.createElement('div')
       editorNode.className = `${sceneEditor} ${editorContainer}`
       containerRef.appendChild(editorNode)
 
@@ -108,9 +103,9 @@ export function ProseMirrorEditor(props: ProseMirrorEditorProps) {
         plugins: [
           history(),
           keymap({
-            "Mod-z": undo,
-            "Mod-y": redo,
-            "Mod-i": italic,
+            'Mod-z': undo,
+            'Mod-y': redo,
+            'Mod-i': italic,
             Enter: (state, dispatch) => {
               if (!dispatch) return false
 
@@ -134,54 +129,46 @@ export function ProseMirrorEditor(props: ProseMirrorEditorProps) {
               const newParagraphId = shortUUID.generate()
               const tr = state.tr
 
-              if (textAfter === "") {
+              if (textAfter === '') {
                 // Insert new empty paragraph after current one
-                const newParagraph = state.schema.nodes.paragraph.create(
-                  { id: newParagraphId },
-                  []
-                )
+                const newParagraph = state.schema.nodes.paragraph.create({ id: newParagraphId }, [])
                 tr.insert(paragraphRange.to, newParagraph)
                 tr.setSelection(TextSelection.create(tr.doc, paragraphRange.to + 1))
               } else {
                 // Split the paragraph
                 const beforeParagraph = state.schema.nodes.paragraph.create(
                   currentParagraphNode.attrs,
-                  textBefore ? [state.schema.text(textBefore)] : []
+                  textBefore ? [state.schema.text(textBefore)] : [],
                 )
                 const afterParagraph = state.schema.nodes.paragraph.create(
                   { id: newParagraphId },
-                  textAfter ? [state.schema.text(textAfter)] : []
+                  textAfter ? [state.schema.text(textAfter)] : [],
                 )
-                tr.replaceWith(paragraphRange.from, paragraphRange.to, [
-                  beforeParagraph,
-                  afterParagraph,
-                ])
-                tr.setSelection(
-                  TextSelection.create(tr.doc, paragraphRange.from + beforeParagraph.nodeSize + 1)
-                )
+                tr.replaceWith(paragraphRange.from, paragraphRange.to, [beforeParagraph, afterParagraph])
+                tr.setSelection(TextSelection.create(tr.doc, paragraphRange.from + beforeParagraph.nodeSize + 1))
               }
 
               dispatch(tr)
               return true
             },
-            "Control-Enter": () => {
+            'Control-Enter': () => {
               const selection = view?.state.selection
               if (selection && view) {
                 const paragraphId = getParagraphIdAtPos(view.state.doc, selection.from)
                 if (paragraphId && props.onParagraphCreate) {
                   props.onParagraphCreate(
                     {
-                      body: "",
-                      state: "draft",
+                      body: '',
+                      state: 'draft',
                       comments: [],
                     },
-                    paragraphId
+                    paragraphId,
                   )
                 }
               }
               return true
             },
-            "Control-Backspace": () => {
+            'Control-Backspace': () => {
               const selection = view?.state.selection
               if (selection && view) {
                 const paragraphId = getParagraphIdAtPos(view.state.doc, selection.from)
@@ -204,9 +191,7 @@ export function ProseMirrorEditor(props: ProseMirrorEditorProps) {
                 if (paragraph && paragraph.type.name === 'paragraph') {
                   const paragraphStart = $pos.before()
                   const paragraphEnd = paragraphStart + paragraph.nodeSize
-                  isFullParagraphSelected =
-                    $from.pos <= paragraphStart + 1 &&
-                    $to.pos >= paragraphEnd - 1
+                  isFullParagraphSelected = $from.pos <= paragraphStart + 1 && $to.pos >= paragraphEnd - 1
                 }
               }
 
@@ -235,7 +220,7 @@ export function ProseMirrorEditor(props: ProseMirrorEditorProps) {
                 if (!paragraphNode) return false
 
                 // If empty paragraph, delete it
-                if (paragraphNode.textContent === "") {
+                if (paragraphNode.textContent === '') {
                   const tr = state.tr
                   tr.delete(paragraphRange.from, paragraphRange.to)
                   dispatch(tr)
@@ -257,7 +242,7 @@ export function ProseMirrorEditor(props: ProseMirrorEditorProps) {
             },
             (paragraphId: string) => {
               props.onSuggestionReject?.(paragraphId)
-            }
+            },
           ),
           createParagraphActionsPlugin({
             onMoveUp: (id) => props.onParagraphAction?.moveUp(id),
@@ -289,10 +274,7 @@ export function ProseMirrorEditor(props: ProseMirrorEditorProps) {
           if (transaction.docChanged) {
             isInternalUpdate = true
 
-            const { paragraphs: newParagraphs, changedIds } = docToParagraphs(
-              newState.doc,
-              props.paragraphs
-            )
+            const { paragraphs: newParagraphs, changedIds } = docToParagraphs(newState.doc, props.paragraphs)
 
             props.onParagraphsChange(newParagraphs, changedIds)
 

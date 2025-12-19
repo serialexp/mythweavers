@@ -1,5 +1,5 @@
-import { Component, Show } from 'solid-js'
-import styles from './ConflictResolutionDialog.module.css'
+import { Button, Card, CardBody, Modal, Stack } from '@mythweavers/ui'
+import { Component } from 'solid-js'
 
 interface ConflictResolutionDialogProps {
   isOpen: boolean
@@ -13,53 +13,51 @@ export const ConflictResolutionDialog: Component<ConflictResolutionDialogProps> 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Unknown'
     const date = new Date(dateString)
-    if (isNaN(date.getTime())) return 'Invalid Date'
+    if (Number.isNaN(date.getTime())) return 'Invalid Date'
     return date.toLocaleString()
   }
 
   return (
-    <Show when={props.isOpen}>
-      <div class={styles.overlay} onClick={props.onCancel}>
-        <div class={styles.dialog} onClick={(e) => e.stopPropagation()}>
-          <h2 class={styles.title}>Version Conflict Detected</h2>
-          
-          <div class={styles.content}>
-            <p class={styles.message}>
-              The story on the server has been updated more recently than your local version.
-            </p>
-            
-            <div class={styles.timestamps}>
-              <div class={styles.timestamp}>
-                <span class={styles.label}>Server version:</span>
-                <span class={styles.date}>{formatDate(props.serverUpdatedAt)}</span>
-              </div>
-              <div class={styles.timestamp}>
-                <span class={styles.label}>Your version:</span>
-                <span class={styles.date}>{formatDate(props.clientUpdatedAt)}</span>
-              </div>
-            </div>
-            
-            <p class={styles.warning}>
-              Do you want to overwrite the server version with your changes?
-            </p>
-          </div>
-          
-          <div class={styles.actions}>
-            <button 
-              class={styles.cancelButton}
-              onClick={props.onCancel}
-            >
-              Cancel
-            </button>
-            <button 
-              class={styles.forceButton}
-              onClick={props.onForce}
-            >
-              Force Save
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
+    <Modal
+      open={props.isOpen}
+      onClose={props.onCancel}
+      title="Version Conflict Detected"
+      size="md"
+      footer={
+        <Stack direction="horizontal" gap="sm" justify="end">
+          <Button variant="secondary" onClick={props.onCancel}>
+            Cancel
+          </Button>
+          <Button onClick={props.onForce}>Force Save</Button>
+        </Stack>
+      }
+    >
+      <Stack direction="vertical" gap="md">
+        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+          The story on the server has been updated more recently than your local version.
+        </p>
+
+        <Card variant="flat">
+          <CardBody padding="sm" gap="sm">
+            <Stack direction="horizontal" justify="between">
+              <span style={{ 'font-weight': '500', color: 'var(--text-secondary)' }}>Server version:</span>
+              <span style={{ color: 'var(--text-primary)', 'font-family': 'monospace', 'font-size': '0.9rem' }}>
+                {formatDate(props.serverUpdatedAt)}
+              </span>
+            </Stack>
+            <Stack direction="horizontal" justify="between">
+              <span style={{ 'font-weight': '500', color: 'var(--text-secondary)' }}>Your version:</span>
+              <span style={{ color: 'var(--text-primary)', 'font-family': 'monospace', 'font-size': '0.9rem' }}>
+                {formatDate(props.clientUpdatedAt)}
+              </span>
+            </Stack>
+          </CardBody>
+        </Card>
+
+        <p style={{ margin: 0, color: 'var(--warning-color)', 'font-weight': '500' }}>
+          Do you want to overwrite the server version with your changes?
+        </p>
+      </Stack>
+    </Modal>
   )
 }

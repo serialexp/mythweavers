@@ -1,4 +1,4 @@
-import { recipe, type RecipeVariants } from '@vanilla-extract/recipes'
+import { type RecipeVariants, recipe } from '@vanilla-extract/recipes'
 import { tokens } from '../../theme/tokens.css'
 
 export const divider = recipe({
@@ -49,14 +49,32 @@ export const divider = recipe({
 
   compoundVariants: [
     // Horizontal spacing
-    { variants: { orientation: 'horizontal', spacing: 'sm' }, style: { marginTop: tokens.space['2'], marginBottom: tokens.space['2'] } },
-    { variants: { orientation: 'horizontal', spacing: 'md' }, style: { marginTop: tokens.space['4'], marginBottom: tokens.space['4'] } },
-    { variants: { orientation: 'horizontal', spacing: 'lg' }, style: { marginTop: tokens.space['6'], marginBottom: tokens.space['6'] } },
+    {
+      variants: { orientation: 'horizontal', spacing: 'sm' },
+      style: { marginTop: tokens.space['2'], marginBottom: tokens.space['2'] },
+    },
+    {
+      variants: { orientation: 'horizontal', spacing: 'md' },
+      style: { marginTop: tokens.space['4'], marginBottom: tokens.space['4'] },
+    },
+    {
+      variants: { orientation: 'horizontal', spacing: 'lg' },
+      style: { marginTop: tokens.space['6'], marginBottom: tokens.space['6'] },
+    },
 
     // Vertical spacing
-    { variants: { orientation: 'vertical', spacing: 'sm' }, style: { marginLeft: tokens.space['2'], marginRight: tokens.space['2'] } },
-    { variants: { orientation: 'vertical', spacing: 'md' }, style: { marginLeft: tokens.space['4'], marginRight: tokens.space['4'] } },
-    { variants: { orientation: 'vertical', spacing: 'lg' }, style: { marginLeft: tokens.space['6'], marginRight: tokens.space['6'] } },
+    {
+      variants: { orientation: 'vertical', spacing: 'sm' },
+      style: { marginLeft: tokens.space['2'], marginRight: tokens.space['2'] },
+    },
+    {
+      variants: { orientation: 'vertical', spacing: 'md' },
+      style: { marginLeft: tokens.space['4'], marginRight: tokens.space['4'] },
+    },
+    {
+      variants: { orientation: 'vertical', spacing: 'lg' },
+      style: { marginLeft: tokens.space['6'], marginRight: tokens.space['6'] },
+    },
 
     // Dashed horizontal
     {

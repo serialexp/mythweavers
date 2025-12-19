@@ -1,5 +1,5 @@
-import { style, keyframes } from '@vanilla-extract/css'
-import { recipe, type RecipeVariants } from '@vanilla-extract/recipes'
+import { keyframes, style } from '@vanilla-extract/css'
+import { type RecipeVariants, recipe } from '@vanilla-extract/recipes'
 import { tokens } from '../../theme/tokens.css'
 
 const slideIn = keyframes({
@@ -7,21 +7,60 @@ const slideIn = keyframes({
   '100%': { transform: 'translateX(0)', opacity: 1 },
 })
 
-const slideOut = keyframes({
+const _slideOut = keyframes({
   '0%': { transform: 'translateX(0)', opacity: 1 },
   '100%': { transform: 'translateX(100%)', opacity: 0 },
 })
 
-export const container = style({
+export const containerBase = style({
   position: 'fixed',
-  bottom: tokens.space['4'],
-  right: tokens.space['4'],
   display: 'flex',
   flexDirection: 'column',
   gap: tokens.space['2'],
   zIndex: tokens.zIndex.tooltip,
   pointerEvents: 'none',
 })
+
+export const container = recipe({
+  base: [containerBase],
+
+  variants: {
+    position: {
+      'top-right': {
+        top: tokens.space['4'],
+        right: tokens.space['4'],
+      },
+      'top-left': {
+        top: tokens.space['4'],
+        left: tokens.space['4'],
+      },
+      'bottom-right': {
+        bottom: tokens.space['4'],
+        right: tokens.space['4'],
+      },
+      'bottom-left': {
+        bottom: tokens.space['4'],
+        left: tokens.space['4'],
+      },
+      'top-center': {
+        top: tokens.space['4'],
+        left: '50%',
+        transform: 'translateX(-50%)',
+      },
+      'bottom-center': {
+        bottom: tokens.space['4'],
+        left: '50%',
+        transform: 'translateX(-50%)',
+      },
+    },
+  },
+
+  defaultVariants: {
+    position: 'bottom-right',
+  },
+})
+
+export type ContainerVariants = RecipeVariants<typeof container>
 
 export const toast = recipe({
   base: {

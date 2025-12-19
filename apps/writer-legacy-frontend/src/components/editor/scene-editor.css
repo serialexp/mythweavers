@@ -1,0 +1,248 @@
+/* Scene Editor Styles */
+.scene-editor {
+  position: relative;
+}
+
+.scene-editor .ProseMirror {
+  outline: none;
+  padding: 0;
+  margin: 0;
+}
+
+.scene-editor .ProseMirror p {
+  margin: 0;
+  /* Remove margin for continuous status line */
+  padding: 8px 0;
+  min-height: 1.6em;
+  position: relative;
+  border-left: 3px solid transparent;
+  padding-left: 8px;
+  transition: all 0.2s ease, border-left-width 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hover styles - but not for active paragraphs */
+.scene-editor .ProseMirror p:hover:not(.active-paragraph) {
+  background-color: #f9fafb;
+  /* Only change background on hover, preserve state border colors */
+}
+
+/* Active paragraph styles - highest priority */
+.scene-editor .ProseMirror p.active-paragraph {
+  border-left-color: #3b82f6 !important;
+  /* Override state colors */
+  background-color: #eff6ff !important;
+  /* Light blue background */
+  border-left-width: 4px !important;
+  /* Thicker than default 3px */
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2), /* Inner border */ 0 0 0 1px rgba(59, 130, 246, 0.1) !important;
+  /* Outer glow */
+  /* More prominent highlighting for active paragraph */
+}
+
+/* Ensure active paragraph styles override hover even when both are applied */
+.scene-editor .ProseMirror p.active-paragraph:hover {
+  border-left-color: #3b82f6 !important;
+  background-color: #eff6ff !important;
+  border-left-width: 4px !important;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 0 1px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Paragraph state indicators */
+.scene-editor .ProseMirror p[data-state="draft"] {
+  border-left-color: #eab308;
+}
+
+.scene-editor .ProseMirror p[data-state="revise"] {
+  border-left-color: #ef4444;
+}
+
+.scene-editor .ProseMirror p[data-state="ai"] {
+  border-left-color: #a855f7;
+}
+
+.scene-editor .ProseMirror p[data-state="final"] {
+  border-left-color: #22c55e;
+}
+
+.scene-editor .ProseMirror p[data-state="sdt"] {
+  border-left-color: #3b82f6;
+}
+
+/* Paragraph Actions Menu */
+.paragraph-actions-menu {
+  font-size: 12px;
+  min-width: 480px;
+  /* Make wider to fit all buttons */
+}
+
+.paragraph-actions-menu .btn {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 14px;
+  /* Larger icons/text */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.paragraph-actions-menu .btn svg {
+  color: currentColor;
+  flex-shrink: 0;
+}
+
+/* Suggestion Widget */
+.suggestion-widget {
+  font-size: 13px;
+  max-height: 80vh;
+  overflow-y: auto;
+  /* Additional styles for better appearance */
+  backdrop-filter: blur(8px);
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%) translateY(-50%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0) translateY(-50%);
+    opacity: 1;
+  }
+}
+
+.suggestion-widget .suggestion-content {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.suggestion-widget .suggestion-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.suggestion-widget .suggestion-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.suggestion-widget .suggestion-content::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Diff styling */
+.suggestion-widget .diff-delete {
+  background-color: #fecaca;
+  color: #b91c1c;
+  text-decoration: line-through;
+  padding: 1px 2px;
+  border-radius: 2px;
+  margin: 0 1px;
+}
+
+.suggestion-widget .diff-insert {
+  background-color: #bbf7d0;
+  color: #166534;
+  padding: 1px 2px;
+  border-radius: 2px;
+  margin: 0 1px;
+}
+
+.suggestion-widget .diff-equal {
+  /* Normal text, no special styling */
+}
+
+/* Legend indicators */
+.suggestion-widget .diff-delete-inline {
+  color: #b91c1c;
+  font-size: 8px;
+  vertical-align: middle;
+}
+
+.suggestion-widget .diff-insert-inline {
+  color: #166534;
+  font-size: 8px;
+  vertical-align: middle;
+}
+
+.suggestion-widget .btn {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+/* Loading animation styles */
+.suggestion-widget .animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ensure suggestions appear above everything else */
+.suggestion-widget {
+  z-index: 9999 !important;
+}
+
+/* Inline Menu Styles */
+.inline-menu {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  gap: 2px;
+  z-index: 15;
+}
+
+.inline-menu button {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.inline-menu button:hover {
+  background-color: #f3f4f6;
+}
+
+.inline-menu button.active {
+  background-color: #3b82f6;
+  color: white;
+}
+
+/* Translation marks */
+.translation-mark {
+  background-color: #fef3c7;
+  border-bottom: 1px dotted #f59e0b;
+  cursor: help;
+}
+
+/* Empty paragraph placeholder */
+.scene-editor .ProseMirror p:empty::before {
+  content: "Type here...";
+  color: #9ca3af;
+  pointer-events: none;
+  font-style: italic;
+}
+
+/* Focus styles */
+.scene-editor .ProseMirror:focus {
+  box-shadow: 0 0 0 2px #3b82f624;
+}

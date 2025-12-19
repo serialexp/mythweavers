@@ -1,5 +1,5 @@
-import { Container } from './Container'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Container } from './Container'
 
 const ContentBox = () => (
   <div

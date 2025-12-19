@@ -1,9 +1,9 @@
-import { createSignal, For, Show } from 'solid-js'
-import { searchModalStore, SearchResult, SearchSnippet, ReplacePreview } from '../stores/searchModalStore'
+import { Alert, Badge, Button, Card, CardBody, Input, Modal, Spinner, Stack } from '@mythweavers/ui'
+import { For, Show, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { ReplacePreview, SearchResult, SearchSnippet, searchModalStore } from '../stores/searchModalStore'
 import { Message } from '../types/core'
-import styles from './SearchModal.module.css'
 
 interface MessageWithContext extends Message {
   chapterName: string
@@ -30,22 +30,24 @@ export function SearchModal() {
 
     // Get all messages with chapter context
     const messagesWithContext: MessageWithContext[] = messagesStore.messages
-      .filter(msg => msg.role === 'assistant' && !msg.isQuery)
-      .map(msg => {
+      .filter((msg) => msg.role === 'assistant' && !msg.isQuery)
+      .map((msg) => {
         // Find the chapter/node this message belongs to
         const node = nodeStore.getNode(msg.nodeId || msg.chapterId || '')
         const chapterName = node?.title || 'Unknown Chapter'
 
         // Calculate message index within its chapter
         const chapterMessages = messagesStore.messages
-          .filter(m => (m.nodeId === msg.nodeId || m.chapterId === msg.chapterId) && m.role === 'assistant' && !m.isQuery)
+          .filter(
+            (m) => (m.nodeId === msg.nodeId || m.chapterId === msg.chapterId) && m.role === 'assistant' && !m.isQuery,
+          )
           .sort((a, b) => a.order - b.order)
-        const messageIndex = chapterMessages.findIndex(m => m.id === msg.id) + 1
+        const messageIndex = chapterMessages.findIndex((m) => m.id === msg.id) + 1
 
         return {
           ...msg,
           chapterName,
-          messageIndex
+          messageIndex,
         }
       })
 
@@ -53,7 +55,11 @@ export function SearchModal() {
     // For replace mode, use exact case-sensitive search
     const baseTerms = replaceTerm
       ? [searchTerm]
-      : searchTerm.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0)
+      : searchTerm
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)
+          .filter((term) => term.length > 0)
 
     const searchTerms = replaceTerm
       ? baseTerms // Keep original case for replace mode
@@ -72,9 +78,9 @@ export function SearchModal() {
       if (searchModalStore.searchInContent && message.content) {
         const contentSnippets = findSnippetsInText(message.content, searchTerms, 'content', isReplaceMode)
         snippets.push(...contentSnippets)
-        contentSnippets.forEach(snippet => {
+        contentSnippets.forEach((snippet) => {
           // Count which terms matched in this snippet
-          searchTerms.forEach(term => {
+          searchTerms.forEach((term) => {
             const textToCheck = isReplaceMode ? snippet.text : snippet.text.toLowerCase()
             const termToCheck = isReplaceMode ? term : term.toLowerCase()
             if (textToCheck.includes(termToCheck)) {
@@ -88,8 +94,8 @@ export function SearchModal() {
       if (searchModalStore.searchInInstruction && message.instruction) {
         const instructionSnippets = findSnippetsInText(message.instruction, searchTerms, 'instruction', isReplaceMode)
         snippets.push(...instructionSnippets)
-        instructionSnippets.forEach(snippet => {
-          searchTerms.forEach(term => {
+        instructionSnippets.forEach((snippet) => {
+          searchTerms.forEach((term) => {
             const textToCheck = isReplaceMode ? snippet.text : snippet.text.toLowerCase()
             const termToCheck = isReplaceMode ? term : term.toLowerCase()
             if (textToCheck.includes(termToCheck)) {
@@ -103,8 +109,8 @@ export function SearchModal() {
       if (searchModalStore.searchInThink && message.think) {
         const thinkSnippets = findSnippetsInText(message.think, searchTerms, 'think', isReplaceMode)
         snippets.push(...thinkSnippets)
-        thinkSnippets.forEach(snippet => {
-          searchTerms.forEach(term => {
+        thinkSnippets.forEach((snippet) => {
+          searchTerms.forEach((term) => {
             const textToCheck = isReplaceMode ? snippet.text : snippet.text.toLowerCase()
             const termToCheck = isReplaceMode ? term : term.toLowerCase()
             if (textToCheck.includes(termToCheck)) {
@@ -131,7 +137,7 @@ export function SearchModal() {
           messageIndex: message.messageIndex,
           snippets,
           matchCount: matchedTermCount,
-          replacements
+          replacements,
         })
       }
     }
@@ -153,7 +159,11 @@ export function SearchModal() {
   }
 
   // Generate replace previews for a message
-  const generateReplacePreviews = (message: MessageWithContext, searchText: string, replaceText: string): ReplacePreview[] => {
+  const generateReplacePreviews = (
+    message: MessageWithContext,
+    searchText: string,
+    replaceText: string,
+  ): ReplacePreview[] => {
     const previews: ReplacePreview[] = []
 
     if (searchModalStore.searchInContent && message.content && message.content.includes(searchText)) {
@@ -168,7 +178,7 @@ export function SearchModal() {
           originalText: searchText,
           replacementText: replaceText,
           context: (contextStart > 0 ? '...' : '') + context + (contextEnd < message.content.length ? '...' : ''),
-          contextStart: index - contextStart + (contextStart > 0 ? 3 : 0)
+          contextStart: index - contextStart + (contextStart > 0 ? 3 : 0),
         })
         index += searchText.length
       }
@@ -186,7 +196,7 @@ export function SearchModal() {
           originalText: searchText,
           replacementText: replaceText,
           context: (contextStart > 0 ? '...' : '') + context + (contextEnd < message.instruction.length ? '...' : ''),
-          contextStart: index - contextStart + (contextStart > 0 ? 3 : 0)
+          contextStart: index - contextStart + (contextStart > 0 ? 3 : 0),
         })
         index += searchText.length
       }
@@ -204,7 +214,7 @@ export function SearchModal() {
           originalText: searchText,
           replacementText: replaceText,
           context: (contextStart > 0 ? '...' : '') + context + (contextEnd < message.think.length ? '...' : ''),
-          contextStart: index - contextStart + (contextStart > 0 ? 3 : 0)
+          contextStart: index - contextStart + (contextStart > 0 ? 3 : 0),
         })
         index += searchText.length
       }
@@ -214,10 +224,15 @@ export function SearchModal() {
   }
 
   // Extract snippets with context around matches
-  const findSnippetsInText = (text: string, searchTerms: string[], section: 'content' | 'instruction' | 'think', caseSensitive: boolean = false): SearchSnippet[] => {
+  const findSnippetsInText = (
+    text: string,
+    searchTerms: string[],
+    section: 'content' | 'instruction' | 'think',
+    caseSensitive = false,
+  ): SearchSnippet[] => {
     const snippets: SearchSnippet[] = []
     const searchText = caseSensitive ? text : text.toLowerCase()
-    const processedRanges: Array<{start: number, end: number}> = []
+    const processedRanges: Array<{ start: number; end: number }> = []
 
     for (const term of searchTerms) {
       const searchTerm = caseSensitive ? term : term.toLowerCase()
@@ -228,10 +243,11 @@ export function SearchModal() {
         const snippetEnd = Math.min(text.length, index + searchTerm.length + 100)
 
         // Check for overlap with existing ranges
-        const overlaps = processedRanges.some(range =>
-          (snippetStart >= range.start && snippetStart <= range.end) ||
-          (snippetEnd >= range.start && snippetEnd <= range.end) ||
-          (snippetStart <= range.start && snippetEnd >= range.end)
+        const overlaps = processedRanges.some(
+          (range) =>
+            (snippetStart >= range.start && snippetStart <= range.end) ||
+            (snippetEnd >= range.start && snippetEnd <= range.end) ||
+            (snippetStart <= range.start && snippetEnd >= range.end),
         )
 
         if (!overlaps) {
@@ -242,7 +258,7 @@ export function SearchModal() {
             text: (snippetStart > 0 ? '...' : '') + snippetText + (snippetEnd < text.length ? '...' : ''),
             section,
             matchStart: matchStartInSnippet + (snippetStart > 0 ? 3 : 0), // Account for '...'
-            matchLength: searchTerm.length
+            matchLength: searchTerm.length,
           })
 
           processedRanges.push({ start: snippetStart, end: snippetEnd })
@@ -268,7 +284,7 @@ export function SearchModal() {
       messageId,
       searchModalStore.searchTerm,
       searchModalStore.replaceTerm,
-      [section]
+      [section],
     )
     if (replaced) {
       searchModalStore.markAsReplaced(messageId, section)
@@ -281,15 +297,15 @@ export function SearchModal() {
   const handleReplaceAllInMessage = (result: SearchResult) => {
     if (!result.replacements) return
 
-    const sections = [...new Set(result.replacements.map(r => r.section))]
+    const sections = [...new Set(result.replacements.map((r) => r.section))]
     const count = messagesStore.replaceAllInMessage(
       result.messageId,
       searchModalStore.searchTerm,
       searchModalStore.replaceTerm,
-      sections
+      sections,
     )
     if (count > 0) {
-      sections.forEach(section => searchModalStore.markAsReplaced(result.messageId, section))
+      sections.forEach((section) => searchModalStore.markAsReplaced(result.messageId, section))
       // Re-run search to update results
       performSearch(searchModalStore.searchTerm, searchModalStore.replaceTerm)
     }
@@ -297,8 +313,9 @@ export function SearchModal() {
 
   // Handle replace all globally
   const handleReplaceAll = async () => {
-    const totalReplacements = searchModalStore.searchResults.reduce((sum, result) =>
-      sum + (result.replacements?.length || 0), 0
+    const totalReplacements = searchModalStore.searchResults.reduce(
+      (sum, result) => sum + (result.replacements?.length || 0),
+      0,
     )
     const totalMessages = searchModalStore.searchResults.length
 
@@ -312,14 +329,14 @@ export function SearchModal() {
     // Perform all replacements
     for (const result of searchModalStore.searchResults) {
       if (result.replacements && result.replacements.length > 0) {
-        const sections = [...new Set(result.replacements.map(r => r.section))]
+        const sections = [...new Set(result.replacements.map((r) => r.section))]
         messagesStore.replaceAllInMessage(
           result.messageId,
           searchModalStore.searchTerm,
           searchModalStore.replaceTerm,
-          sections
+          sections,
         )
-        sections.forEach(section => searchModalStore.markAsReplaced(result.messageId, section))
+        sections.forEach((section) => searchModalStore.markAsReplaced(result.messageId, section))
       }
     }
 
@@ -329,7 +346,7 @@ export function SearchModal() {
 
   // Handle result click - navigate to message
   const handleResultClick = (result: SearchResult) => {
-    const message = messagesStore.messages.find(m => m.id === result.messageId)
+    const message = messagesStore.messages.find((m) => m.id === result.messageId)
     if (!message) return
 
     const nodeId = message.nodeId || message.chapterId
@@ -346,7 +363,7 @@ export function SearchModal() {
         if (messageElement) {
           messageElement.scrollIntoView({
             behavior: 'smooth',
-            block: 'center'
+            block: 'center',
           })
         }
       }, 100)
@@ -359,10 +376,32 @@ export function SearchModal() {
     const after = preview.context.substring(preview.contextStart + preview.originalText.length)
 
     return (
-      <div class={styles.replacePreview}>
+      <div
+        style={{ 'font-family': 'monospace', 'font-size': '0.9em', 'line-height': '1.5', color: 'var(--text-primary)' }}
+      >
         <span>{before}</span>
-        <span class={styles.replaceRemove}>{preview.originalText}</span>
-        <span class={styles.replaceAdd}>{preview.replacementText}</span>
+        <span
+          style={{
+            background: 'rgba(255, 0, 0, 0.2)',
+            color: '#ff4444',
+            'text-decoration': 'line-through',
+            padding: '2px 4px',
+            'border-radius': '2px',
+          }}
+        >
+          {preview.originalText}
+        </span>
+        <span
+          style={{
+            background: 'rgba(0, 255, 0, 0.2)',
+            color: '#44ff44',
+            padding: '2px 4px',
+            'border-radius': '2px',
+            'font-weight': '500',
+          }}
+        >
+          {preview.replacementText}
+        </span>
         <span>{after}</span>
       </div>
     )
@@ -370,7 +409,7 @@ export function SearchModal() {
 
   // Check if a section has been replaced for a message
   const isSectionReplaced = (messageId: string, section: 'content' | 'instruction' | 'think') => {
-    const status = searchModalStore.completedReplacements.find(r => r.messageId === messageId)
+    const status = searchModalStore.completedReplacements.find((r) => r.messageId === messageId)
     return status?.sectionsReplaced.includes(section) || false
   }
 
@@ -378,10 +417,10 @@ export function SearchModal() {
   const renderSnippet = (snippet: SearchSnippet, searchTerms: string[]) => {
     const text = snippet.text
     let lastIndex = 0
-    const parts: Array<{ text: string, isHighlight: boolean }> = []
+    const parts: Array<{ text: string; isHighlight: boolean }> = []
 
     // Find all matches in this snippet
-    const matches: Array<{ start: number, end: number }> = []
+    const matches: Array<{ start: number; end: number }> = []
     const lowerText = text.toLowerCase()
 
     for (const term of searchTerms) {
@@ -394,7 +433,7 @@ export function SearchModal() {
 
     // Sort matches by position and merge overlapping ones
     matches.sort((a, b) => a.start - b.start)
-    const mergedMatches: Array<{ start: number, end: number }> = []
+    const mergedMatches: Array<{ start: number; end: number }> = []
 
     for (const match of matches) {
       if (mergedMatches.length === 0) {
@@ -427,11 +466,21 @@ export function SearchModal() {
     }
 
     return (
-      <span class={styles.snippet}>
+      <span style={{ display: 'inline' }}>
         <For each={parts}>
           {(part) => (
             <Show when={part.isHighlight} fallback={<span>{part.text}</span>}>
-              <mark class={styles.highlight}>{part.text}</mark>
+              <mark
+                style={{
+                  background: 'var(--warning-color)',
+                  color: 'var(--bg-primary)',
+                  padding: '1px 2px',
+                  'border-radius': '2px',
+                  'font-weight': '500',
+                }}
+              >
+                {part.text}
+              </mark>
             </Show>
           )}
         </For>
@@ -441,16 +490,27 @@ export function SearchModal() {
 
   const getSectionLabel = (section: string) => {
     switch (section) {
-      case 'content': return 'Content'
-      case 'instruction': return 'Instruction'
-      case 'think': return 'Think'
-      default: return section
+      case 'content':
+        return 'Content'
+      case 'instruction':
+        return 'Instruction'
+      case 'think':
+        return 'Think'
+      default:
+        return section
     }
   }
 
-  const searchTokens = () => Array.from(new Set(
-    searchModalStore.searchTerm.toLowerCase().trim().split(/\s+/).filter((term: string) => term.length > 0)
-  ))
+  const searchTokens = () =>
+    Array.from(
+      new Set(
+        searchModalStore.searchTerm
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)
+          .filter((term: string) => term.length > 0),
+      ),
+    )
 
   // Get displayed results (limited or all)
   const displayedResults = () => {
@@ -465,247 +525,357 @@ export function SearchModal() {
     return !searchModalStore.showAllResults && searchModalStore.searchResults.length > 20
   }
 
+  const checkboxLabelStyle = {
+    display: 'flex',
+    'align-items': 'center',
+    gap: '6px',
+    color: 'var(--text-secondary)',
+    'font-size': '0.9em',
+    cursor: 'pointer',
+  }
+
   return (
-    <Show when={searchModalStore.isOpen}>
-      <div class={styles.container}>
-        <div class={styles.modal}>
-          <h2>{searchModalStore.isReplaceMode ? 'Search and Replace' : 'Search Messages'}</h2>
+    <Modal
+      open={searchModalStore.isOpen}
+      onClose={() => searchModalStore.hide()}
+      title={searchModalStore.isReplaceMode ? 'Search and Replace' : 'Search Messages'}
+      size="lg"
+    >
+      <Stack gap="md" style={{ 'margin-bottom': '16px' }}>
+        <Input
+          type="text"
+          value={searchModalStore.searchTerm}
+          onInput={(e) => searchModalStore.setSearchTerm(e.currentTarget.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Search for... (Press Enter to search)"
+          autofocus
+          disabled={!!searchModalStore.replaceTerm && searchModalStore.searchTerm.includes(' ')}
+        />
 
-          <div class={styles.searchSection}>
-            <input
-              type="text"
-              value={searchModalStore.searchTerm}
-              onInput={(e) => searchModalStore.setSearchTerm(e.currentTarget.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Search for... (Press Enter to search)"
-              class={styles.searchInput}
-              autofocus
-              disabled={!!searchModalStore.replaceTerm && searchModalStore.searchTerm.includes(' ')}
-            />
-
-            <input
-              type="text"
-              value={searchModalStore.replaceTerm}
-              onInput={(e) => {
-                searchModalStore.setReplaceTerm(e.currentTarget.value)
-                // Generate replacement previews for existing results
-                if (e.currentTarget.value && searchModalStore.searchResults.length > 0) {
-                  const updatedResults = searchModalStore.searchResults.map(result => {
-                    const message = messagesStore.messages.find(m => m.id === result.messageId)
-                    if (message) {
-                      const messageWithContext = {
-                        ...message,
-                        chapterName: result.chapterName,
-                        messageIndex: result.messageIndex
-                      }
-                      return {
-                        ...result,
-                        replacements: generateReplacePreviews(messageWithContext, searchModalStore.searchTerm, e.currentTarget.value)
-                      }
-                    }
-                    return result
-                  })
-                  searchModalStore.setSearchResults(updatedResults)
-                } else if (!e.currentTarget.value) {
-                  // Clear replacements when replace term is removed
-                  const updatedResults = searchModalStore.searchResults.map(result => ({
+        <Input
+          type="text"
+          value={searchModalStore.replaceTerm}
+          onInput={(e) => {
+            searchModalStore.setReplaceTerm(e.currentTarget.value)
+            // Generate replacement previews for existing results
+            if (e.currentTarget.value && searchModalStore.searchResults.length > 0) {
+              const updatedResults = searchModalStore.searchResults.map((result) => {
+                const message = messagesStore.messages.find((m) => m.id === result.messageId)
+                if (message) {
+                  const messageWithContext = {
+                    ...message,
+                    chapterName: result.chapterName,
+                    messageIndex: result.messageIndex,
+                  }
+                  return {
                     ...result,
-                    replacements: undefined
-                  }))
-                  searchModalStore.setSearchResults(updatedResults)
+                    replacements: generateReplacePreviews(
+                      messageWithContext,
+                      searchModalStore.searchTerm,
+                      e.currentTarget.value,
+                    ),
+                  }
                 }
-              }}
-              onKeyPress={handleKeyPress}
-              placeholder="Replace with... (optional)"
-              class={styles.searchInput}
-              disabled={searchModalStore.searchTerm.includes(' ') && searchModalStore.searchTerm.trim().length > 0}
+                return result
+              })
+              searchModalStore.setSearchResults(updatedResults)
+            } else if (!e.currentTarget.value) {
+              // Clear replacements when replace term is removed
+              const updatedResults = searchModalStore.searchResults.map((result) => ({
+                ...result,
+                replacements: undefined,
+              }))
+              searchModalStore.setSearchResults(updatedResults)
+            }
+          }}
+          onKeyPress={handleKeyPress}
+          placeholder="Replace with... (optional)"
+          disabled={searchModalStore.searchTerm.includes(' ') && searchModalStore.searchTerm.trim().length > 0}
+        />
+
+        <Button
+          onClick={() => performSearch(searchModalStore.searchTerm, searchModalStore.replaceTerm || undefined)}
+          variant="primary"
+          disabled={!searchModalStore.searchTerm.trim()}
+        >
+          Search
+        </Button>
+
+        <Show when={searchModalStore.searchTerm.includes(' ') && searchModalStore.replaceTerm}>
+          <Alert variant="warning">Multi-word search is disabled in replace mode. Use single words only.</Alert>
+        </Show>
+
+        <div
+          style={{ 'margin-top': '10px', display: 'flex', gap: '15px', 'align-items': 'center', 'flex-wrap': 'wrap' }}
+        >
+          <label style={checkboxLabelStyle}>
+            <input
+              type="checkbox"
+              checked={searchModalStore.searchInContent}
+              onChange={(e) => searchModalStore.setSearchInContent(e.currentTarget.checked)}
+              style={{ cursor: 'pointer' }}
             />
+            Content
+          </label>
+          <label style={checkboxLabelStyle}>
+            <input
+              type="checkbox"
+              checked={searchModalStore.searchInInstruction}
+              onChange={(e) => searchModalStore.setSearchInInstruction(e.currentTarget.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            Instructions
+          </label>
+          <label style={checkboxLabelStyle}>
+            <input
+              type="checkbox"
+              checked={searchModalStore.searchInThink}
+              onChange={(e) => searchModalStore.setSearchInThink(e.currentTarget.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            Think sections
+          </label>
+          <label
+            style={{
+              ...checkboxLabelStyle,
+              opacity: searchTokens().length <= 1 ? 0.6 : 1,
+              cursor: searchTokens().length <= 1 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={searchTokens().length > 1 && searchModalStore.requireAllTerms}
+              onChange={(e) => searchModalStore.setRequireAllTerms(e.currentTarget.checked)}
+              style={{ cursor: searchTokens().length <= 1 ? 'not-allowed' : 'pointer' }}
+              disabled={searchTokens().length <= 1}
+            />
+            Match all terms
+          </label>
+        </div>
+      </Stack>
 
-            <button
-              onClick={() => performSearch(searchModalStore.searchTerm, searchModalStore.replaceTerm || undefined)}
-              class={styles.searchButton}
-              disabled={!searchModalStore.searchTerm.trim()}
-            >
-              Search
-            </button>
+      <Show when={isSearching()}>
+        <Card variant="flat" style={{ 'margin-bottom': '16px' }}>
+          <CardBody style={{ 'text-align': 'center' }}>
+            <Spinner size="sm" /> Searching...
+          </CardBody>
+        </Card>
+      </Show>
 
-            <Show when={searchModalStore.searchTerm.includes(' ') && searchModalStore.replaceTerm}>
-              <div class={styles.warning}>
-                Multi-word search is disabled in replace mode. Use single words only.
-              </div>
-            </Show>
+      <div
+        style={{
+          display: 'flex',
+          'justify-content': 'space-between',
+          'align-items': 'center',
+          'padding-bottom': '10px',
+          'border-bottom': '1px solid var(--border-color)',
+          color: 'var(--text-secondary)',
+          'font-size': '0.9em',
+        }}
+      >
+        <span>
+          {searchModalStore.showAllResults || searchModalStore.searchResults.length <= 20
+            ? `${searchModalStore.searchResults.length} results`
+            : `Showing 20 of ${searchModalStore.searchResults.length} results`}
+          {searchModalStore.searchTerm && ` for "${searchModalStore.searchTerm}"`}
+        </span>
+      </div>
 
-            <div class={styles.searchOptions}>
-              <label class={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={searchModalStore.searchInContent}
-                  onChange={(e) => searchModalStore.setSearchInContent(e.currentTarget.checked)}
-                  class={styles.checkbox}
-                />
-                Content
-              </label>
-              <label class={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={searchModalStore.searchInInstruction}
-                  onChange={(e) => searchModalStore.setSearchInInstruction(e.currentTarget.checked)}
-                  class={styles.checkbox}
-                />
-                Instructions
-              </label>
-              <label class={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={searchModalStore.searchInThink}
-                  onChange={(e) => searchModalStore.setSearchInThink(e.currentTarget.checked)}
-                  class={styles.checkbox}
-                />
-                Think sections
-              </label>
-              <label
-                class={`${styles.checkboxLabel} ${searchTokens().length <= 1 ? styles.checkboxLabelDisabled : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={searchTokens().length > 1 && searchModalStore.requireAllTerms}
-                  onChange={(e) => searchModalStore.setRequireAllTerms(e.currentTarget.checked)}
-                  class={styles.checkbox}
-                  disabled={searchTokens().length <= 1}
-                />
-                Match all terms
-              </label>
-            </div>
-          </div>
-
-          <Show when={isSearching()}>
-            <div class={styles.searchingIndicator}>
-              Searching...
-            </div>
-          </Show>
-
-          <div class={styles.resultsHeader}>
-            <span>
-              {searchModalStore.showAllResults || searchModalStore.searchResults.length <= 20
-                ? `${searchModalStore.searchResults.length} results`
-                : `Showing 20 of ${searchModalStore.searchResults.length} results`}
-              {searchModalStore.searchTerm && ` for "${searchModalStore.searchTerm}"`}
-            </span>
-          </div>
-
-          <div class={styles.resultsList}>
-            <For each={displayedResults()}>
-              {(result) => (
+      <div
+        style={{
+          flex: 1,
+          'overflow-y': 'auto',
+          'max-height': '50vh',
+          display: 'flex',
+          'flex-direction': 'column',
+          gap: '8px',
+          'margin-top': '8px',
+        }}
+      >
+        <For each={displayedResults()}>
+          {(result) => (
+            <Card interactive onClick={() => handleResultClick(result)} style={{ cursor: 'pointer' }}>
+              <CardBody padding="sm">
                 <div
-                  class={styles.resultItem}
-                  onClick={() => handleResultClick(result)}
+                  style={{
+                    display: 'flex',
+                    'justify-content': 'space-between',
+                    'align-items': 'center',
+                    'margin-bottom': '8px',
+                    'font-size': '0.9em',
+                  }}
                 >
-                  <div class={styles.resultHeader}>
-                    <span class={styles.chapterInfo}>
-                      {result.chapterName} • Message {result.messageIndex}
-                    </span>
-                    <span class={styles.matchCount}>
-                      {result.matchCount} term{result.matchCount !== 1 ? 's' : ''} matched
-                    </span>
-                  </div>
+                  <span style={{ color: 'var(--text-primary)', 'font-weight': '500' }}>
+                    {result.chapterName} • Message {result.messageIndex}
+                  </span>
+                  <Badge variant="secondary" size="sm">
+                    {result.matchCount} term{result.matchCount !== 1 ? 's' : ''} matched
+                  </Badge>
+                </div>
 
-                  <Show
-                    when={searchModalStore.isReplaceMode && result.replacements}
-                    fallback={
-                      <div class={styles.snippets}>
-                        <For each={result.snippets}>
-                          {(snippet) => (
-                            <div class={styles.snippetItem}>
-                              <div class={styles.sectionLabel}>
-                                {getSectionLabel(snippet.section)}:
-                              </div>
-                              <div class={styles.snippetContent}>
-                                {renderSnippet(snippet, searchTokens())}
-                              </div>
+                <Show
+                  when={searchModalStore.isReplaceMode && result.replacements}
+                  fallback={
+                    <Stack gap="xs">
+                      <For each={result.snippets}>
+                        {(snippet) => (
+                          <div style={{ display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
+                            <div
+                              style={{
+                                color: 'var(--text-secondary)',
+                                'font-size': '0.8em',
+                                'font-weight': '500',
+                                'text-transform': 'uppercase',
+                                'letter-spacing': '0.5px',
+                              }}
+                            >
+                              {getSectionLabel(snippet.section)}:
                             </div>
-                          )}
-                        </For>
-                      </div>
-                    }
-                  >
-                    <div class={styles.replacements}>
-                      <For each={result.replacements}>
-                        {(preview) => (
-                          <div class={styles.replacementItem}>
-                            <div class={styles.sectionLabel}>
-                              {getSectionLabel(preview.section)}:
+                            <div style={{ color: 'var(--text-primary)', 'line-height': '1.4', 'font-size': '0.9em' }}>
+                              {renderSnippet(snippet, searchTokens())}
                             </div>
-                            {renderReplacePreview(preview)}
-                            <Show when={!isSectionReplaced(result.messageId, preview.section)}>
-                              <div class={styles.replaceActions}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleReplace(result.messageId, preview.section)
-                                  }}
-                                  class={styles.replaceButton}
-                                >
-                                  Replace
-                                </button>
-                              </div>
-                            </Show>
-                            <Show when={isSectionReplaced(result.messageId, preview.section)}>
-                              <div class={styles.replacedLabel}>✓ Replaced</div>
-                            </Show>
                           </div>
                         )}
                       </For>
-                      <Show when={result.replacements && result.replacements.length > 1 && !result.replacements.every(r => isSectionReplaced(result.messageId, r.section))}>
-                        <div class={styles.replaceAllMessageActions}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleReplaceAllInMessage(result)
+                    </Stack>
+                  }
+                >
+                  <Stack gap="sm">
+                    <For each={result.replacements}>
+                      {(preview) => (
+                        <div
+                          style={{
+                            display: 'flex',
+                            'flex-direction': 'column',
+                            gap: '6px',
+                            padding: '8px',
+                            background: 'var(--bg-tertiary)',
+                            'border-radius': '4px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              color: 'var(--text-secondary)',
+                              'font-size': '0.8em',
+                              'font-weight': '500',
+                              'text-transform': 'uppercase',
+                              'letter-spacing': '0.5px',
                             }}
-                            class={styles.replaceAllButton}
                           >
-                            Replace All in This Message ({result.replacements?.filter(r => !isSectionReplaced(result.messageId, r.section)).length || 0})
-                          </button>
+                            {getSectionLabel(preview.section)}:
+                          </div>
+                          {renderReplacePreview(preview)}
+                          <Show when={!isSectionReplaced(result.messageId, preview.section)}>
+                            <div style={{ display: 'flex', gap: '8px', 'margin-top': '4px' }}>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleReplace(result.messageId, preview.section)
+                                }}
+                                variant="primary"
+                                size="sm"
+                              >
+                                Replace
+                              </Button>
+                            </div>
+                          </Show>
+                          <Show when={isSectionReplaced(result.messageId, preview.section)}>
+                            <Badge variant="success" size="sm">
+                              ✓ Replaced
+                            </Badge>
+                          </Show>
                         </div>
-                      </Show>
-                    </div>
-                  </Show>
-                </div>
-              )}
-            </For>
-          </div>
-
-          <Show when={hasMoreResults()}>
-            <div class={styles.showMoreSection}>
-              <button
-                onClick={() => searchModalStore.setShowAllResults(true)}
-                class={styles.showMoreButton}
-              >
-                Show All {searchModalStore.searchResults.length} Results
-              </button>
-            </div>
-          </Show>
-
-          <div class={styles.actions}>
-            <Show when={searchModalStore.isReplaceMode && searchModalStore.searchResults.some(r => r.replacements && r.replacements.length > 0 && !r.replacements.every(rp => isSectionReplaced(r.messageId, rp.section)))}>
-              <button
-                onClick={handleReplaceAll}
-                class={styles.replaceAllGlobalButton}
-              >
-                Replace All ({searchModalStore.searchResults.reduce((sum, r) =>
-                  sum + (r.replacements?.filter(rp => !isSectionReplaced(r.messageId, rp.section)).length || 0), 0
-                )} occurrences)
-              </button>
-            </Show>
-            <button onClick={() => searchModalStore.clearSearch()}>
-              Clear Search
-            </button>
-            <button onClick={() => searchModalStore.hide()} class={styles.primaryButton}>
-              Close
-            </button>
-          </div>
-        </div>
+                      )}
+                    </For>
+                    <Show
+                      when={
+                        result.replacements &&
+                        result.replacements.length > 1 &&
+                        !result.replacements.every((r) => isSectionReplaced(result.messageId, r.section))
+                      }
+                    >
+                      <div
+                        style={{
+                          'margin-top': '8px',
+                          'padding-top': '8px',
+                          'border-top': '1px solid var(--border-color)',
+                        }}
+                      >
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleReplaceAllInMessage(result)
+                          }}
+                          variant="primary"
+                          size="sm"
+                        >
+                          Replace All in This Message (
+                          {result.replacements?.filter((r) => !isSectionReplaced(result.messageId, r.section)).length ||
+                            0}
+                          )
+                        </Button>
+                      </div>
+                    </Show>
+                  </Stack>
+                </Show>
+              </CardBody>
+            </Card>
+          )}
+        </For>
       </div>
-    </Show>
+
+      <Show when={hasMoreResults()}>
+        <div
+          style={{
+            display: 'flex',
+            'justify-content': 'center',
+            padding: '10px 0',
+            'border-top': '1px solid var(--border-color)',
+          }}
+        >
+          <Button onClick={() => searchModalStore.setShowAllResults(true)} variant="secondary">
+            Show All {searchModalStore.searchResults.length} Results
+          </Button>
+        </div>
+      </Show>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          'justify-content': 'flex-end',
+          'padding-top': '10px',
+          'border-top': '1px solid var(--border-color)',
+        }}
+      >
+        <Show
+          when={
+            searchModalStore.isReplaceMode &&
+            searchModalStore.searchResults.some(
+              (r) =>
+                r.replacements &&
+                r.replacements.length > 0 &&
+                !r.replacements.every((rp) => isSectionReplaced(r.messageId, rp.section)),
+            )
+          }
+        >
+          <Button onClick={handleReplaceAll} variant="danger">
+            Replace All (
+            {searchModalStore.searchResults.reduce(
+              (sum, r) =>
+                sum + (r.replacements?.filter((rp) => !isSectionReplaced(r.messageId, rp.section)).length || 0),
+              0,
+            )}{' '}
+            occurrences)
+          </Button>
+        </Show>
+        <Button onClick={() => searchModalStore.clearSearch()} variant="secondary">
+          Clear Search
+        </Button>
+        <Button onClick={() => searchModalStore.hide()} variant="primary">
+          Close
+        </Button>
+      </div>
+    </Modal>
   )
 }

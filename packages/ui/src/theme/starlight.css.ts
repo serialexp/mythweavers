@@ -1,6 +1,6 @@
 import { createTheme } from '@vanilla-extract/css'
-import { tokens } from './tokens.css'
 import { starlightColors } from './starlight.colors'
+import { tokens } from './tokens.css'
 
 /**
  * Starlight Theme - Light Mode
@@ -96,7 +96,7 @@ export const starlightTheme = createTheme(tokens, {
     lg: '0 10px 15px -3px rgba(26, 31, 46, 0.1), 0 4px 6px -2px rgba(26, 31, 46, 0.05)',
     xl: '0 20px 25px -5px rgba(26, 31, 46, 0.1), 0 10px 10px -5px rgba(26, 31, 46, 0.04)',
     inner: 'inset 0 2px 4px 0 rgba(26, 31, 46, 0.05)',
-    glow: '0 0 20px rgba(59, 125, 216, 0.25)',  // Blue glow
+    glow: '0 0 20px rgba(59, 125, 216, 0.25)', // Blue glow
   },
 
   duration: {

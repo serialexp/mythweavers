@@ -1,23 +1,23 @@
-import { Component, Show, For, Accessor, Setter } from "solid-js";
-import { BsPlus, BsTrash, BsPencil, BsX, BsCheck } from "solid-icons/bs";
-import { mapsStore } from "../../stores/mapsStore";
-import { EJSCodeEditor } from "../EJSCodeEditor";
-import styles from "../Maps.module.css";
+import { BsCheck, BsPencil, BsPlus, BsTrash, BsX } from 'solid-icons/bs'
+import { Accessor, Component, For, Setter, Show } from 'solid-js'
+import { mapsStore } from '../../stores/mapsStore'
+import { EJSCodeEditor } from '../EJSCodeEditor'
+import * as styles from '../Maps.css'
 
 interface MapControlsProps {
-  showAddMap: Accessor<boolean>;
-  setShowAddMap: Setter<boolean>;
-  newMapName: Accessor<string>;
-  setNewMapName: Setter<string>;
-  newMapBorderColor: Accessor<string>;
-  setNewMapBorderColor: Setter<string>;
-  selectedFileName: Accessor<string>;
-  editingBorderColor: Accessor<boolean>;
-  setEditingBorderColor: Setter<boolean>;
-  editBorderColorValue: Accessor<string>;
-  setEditBorderColorValue: Setter<string>;
-  onFileSelect: (e: Event) => void;
-  onAddMap: () => void;
+  showAddMap: Accessor<boolean>
+  setShowAddMap: Setter<boolean>
+  newMapName: Accessor<string>
+  setNewMapName: Setter<string>
+  newMapBorderColor: Accessor<string>
+  setNewMapBorderColor: Setter<string>
+  selectedFileName: Accessor<string>
+  editingBorderColor: Accessor<boolean>
+  setEditingBorderColor: Setter<boolean>
+  editBorderColorValue: Accessor<string>
+  setEditBorderColorValue: Setter<string>
+  onFileSelect: (e: Event) => void
+  onAddMap: () => void
 }
 
 /**
@@ -27,37 +27,35 @@ export const MapControls: Component<MapControlsProps> = (props) => {
   const handleToggleAddMap = () => {
     if (props.showAddMap()) {
       // Reset form when hiding
-      props.setNewMapName("");
-      props.setNewMapBorderColor("");
+      props.setNewMapName('')
+      props.setNewMapBorderColor('')
     }
-    props.setShowAddMap(!props.showAddMap());
-  };
+    props.setShowAddMap(!props.showAddMap())
+  }
 
   const handleToggleBorderColorEdit = () => {
     if (mapsStore.selectedMap) {
-      props.setEditBorderColorValue(
-        mapsStore.selectedMap.borderColor || "",
-      );
-      props.setEditingBorderColor(!props.editingBorderColor());
+      props.setEditBorderColorValue(mapsStore.selectedMap.borderColor || '')
+      props.setEditingBorderColor(!props.editingBorderColor())
     }
-  };
+  }
 
   const handleDeleteMap = async () => {
     if (mapsStore.selectedMapId) {
-      if (confirm("Are you sure you want to delete this map?")) {
-        await mapsStore.deleteMap(mapsStore.selectedMapId);
+      if (confirm('Are you sure you want to delete this map?')) {
+        await mapsStore.deleteMap(mapsStore.selectedMapId)
       }
     }
-  };
+  }
 
   const handleSaveBorderColor = async () => {
     if (mapsStore.selectedMapId) {
       await mapsStore.updateMap(mapsStore.selectedMapId, {
         borderColor: props.editBorderColorValue() || undefined,
-      });
-      props.setEditingBorderColor(false);
+      })
+      props.setEditingBorderColor(false)
     }
-  };
+  }
 
   return (
     <>
@@ -69,24 +67,22 @@ export const MapControls: Component<MapControlsProps> = (props) => {
         <div class={styles.mapDropdown}>
           <select
             class={styles.mapSelect}
-            value={mapsStore.selectedMapId || ""}
+            value={mapsStore.selectedMapId || ''}
             onChange={(e) => {
               if (e.target.value) {
-                mapsStore.selectMap(e.target.value);
+                mapsStore.selectMap(e.target.value)
               }
             }}
           >
             <option value="">Select a map...</option>
-            <For each={mapsStore.maps}>
-              {(map) => <option value={map.id}>{map.name}</option>}
-            </For>
+            <For each={mapsStore.maps}>{(map) => <option value={map.id}>{map.name}</option>}</For>
           </select>
 
           <div class={styles.mapActions}>
             <button
               class={styles.iconButton}
               onClick={handleToggleAddMap}
-              title={props.showAddMap() ? "Hide add map" : "Add new map"}
+              title={props.showAddMap() ? 'Hide add map' : 'Add new map'}
             >
               <BsPlus />
             </button>
@@ -121,16 +117,10 @@ export const MapControls: Component<MapControlsProps> = (props) => {
             minHeight="100px"
           />
           <div class={styles.mapActions}>
-            <button
-              class={styles.addMapButton}
-              onClick={handleSaveBorderColor}
-            >
+            <button class={styles.addMapButton} onClick={handleSaveBorderColor}>
               <BsCheck /> Save Border Color
             </button>
-            <button
-              class={styles.landmarkCancelButton}
-              onClick={() => props.setEditingBorderColor(false)}
-            >
+            <button class={styles.landmarkCancelButton} onClick={() => props.setEditingBorderColor(false)}>
               <BsX /> Cancel
             </button>
           </div>
@@ -164,19 +154,15 @@ export const MapControls: Component<MapControlsProps> = (props) => {
               onChange={props.onFileSelect}
             />
             <label for="map-file-input" class={styles.fileInputLabel}>
-              {props.selectedFileName() || "Choose map image..."}
+              {props.selectedFileName() || 'Choose map image...'}
             </label>
           </div>
 
-          <button
-            class={styles.addMapButton}
-            onClick={props.onAddMap}
-            disabled={!props.newMapName().trim()}
-          >
+          <button class={styles.addMapButton} onClick={props.onAddMap} disabled={!props.newMapName().trim()}>
             <BsPlus /> Add Map
           </button>
         </div>
       </Show>
     </>
-  );
-};
+  )
+}

@@ -1,58 +1,58 @@
-import { Accessor, Component, JSX, createContext, createSignal, useContext } from "solid-js";
+import { Accessor, Component, JSX, createContext, createSignal, useContext } from 'solid-js'
 
-export type DropPosition = "before" | "after" | "inside";
+export type DropPosition = 'before' | 'after' | 'inside'
 
 export interface DropTarget {
-  nodeId: string;
-  position: DropPosition;
+  nodeId: string
+  position: DropPosition
 }
 
 interface TreeDragDropContextValue {
-  draggingIds: Accessor<string[]>;
-  dropTarget: Accessor<DropTarget | null>;
-  selectedIds: Accessor<string[]>;
-  startDrag: (nodeIds: string[]) => void;
-  setSelection: (nodeIds: string[]) => void;
-  toggleSelection: (nodeId: string) => void;
-  clearSelection: () => void;
-  setDropTarget: (target: DropTarget | null) => void;
-  endDrag: () => void;
+  draggingIds: Accessor<string[]>
+  dropTarget: Accessor<DropTarget | null>
+  selectedIds: Accessor<string[]>
+  startDrag: (nodeIds: string[]) => void
+  setSelection: (nodeIds: string[]) => void
+  toggleSelection: (nodeId: string) => void
+  clearSelection: () => void
+  setDropTarget: (target: DropTarget | null) => void
+  endDrag: () => void
 }
 
-const TreeDragDropContext = createContext<TreeDragDropContextValue>();
+const TreeDragDropContext = createContext<TreeDragDropContextValue>()
 
 export const TreeDragDropProvider: Component<{ children: JSX.Element }> = (props) => {
-  const [draggingIds, setDraggingIds] = createSignal<string[]>([]);
-  const [dropTarget, setDropTarget] = createSignal<DropTarget | null>(null);
-  const [selectedIds, setSelectedIds] = createSignal<string[]>([]);
+  const [draggingIds, setDraggingIds] = createSignal<string[]>([])
+  const [dropTarget, setDropTarget] = createSignal<DropTarget | null>(null)
+  const [selectedIds, setSelectedIds] = createSignal<string[]>([])
 
   const startDrag = (nodeIds: string[]) => {
-    const uniqueIds = Array.from(new Set(nodeIds));
-    setDraggingIds(uniqueIds);
-  };
+    const uniqueIds = Array.from(new Set(nodeIds))
+    setDraggingIds(uniqueIds)
+  }
 
   const setSelection = (nodeIds: string[]) => {
-    const uniqueIds = Array.from(new Set(nodeIds));
-    setSelectedIds(uniqueIds);
-  };
+    const uniqueIds = Array.from(new Set(nodeIds))
+    setSelectedIds(uniqueIds)
+  }
 
   const toggleSelection = (nodeId: string) => {
     setSelectedIds((prev) => {
       if (prev.includes(nodeId)) {
-        return prev.filter((id) => id !== nodeId);
+        return prev.filter((id) => id !== nodeId)
       }
-      return [...prev, nodeId];
-    });
-  };
+      return [...prev, nodeId]
+    })
+  }
 
   const clearSelection = () => {
-    setSelectedIds([]);
-  };
+    setSelectedIds([])
+  }
 
   const endDrag = () => {
-    setDraggingIds([]);
-    setDropTarget(null);
-  };
+    setDraggingIds([])
+    setDropTarget(null)
+  }
 
   return (
     <TreeDragDropContext.Provider
@@ -70,13 +70,13 @@ export const TreeDragDropProvider: Component<{ children: JSX.Element }> = (props
     >
       {props.children}
     </TreeDragDropContext.Provider>
-  );
-};
+  )
+}
 
 export const useTreeDragDrop = () => {
-  const context = useContext(TreeDragDropContext);
+  const context = useContext(TreeDragDropContext)
   if (!context) {
-    throw new Error("useTreeDragDrop must be used within a TreeDragDropProvider");
+    throw new Error('useTreeDragDrop must be used within a TreeDragDropProvider')
   }
-  return context;
-};
+  return context
+}

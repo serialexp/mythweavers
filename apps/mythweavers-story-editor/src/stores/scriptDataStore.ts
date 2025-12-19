@@ -1,16 +1,16 @@
-import { createStore } from 'solid-js/store'
-import { createEffect, batch } from 'solid-js'
 import { produce } from 'immer'
+import { batch, createEffect } from 'solid-js'
+import { createStore } from 'solid-js/store'
+import { Character, ContextItem } from '../types/core'
+import { getCharacterDisplayName } from '../utils/character'
+import { getMessagesInStoryOrder } from '../utils/nodeTraversal'
 import { executeScript } from '../utils/scriptEngine'
-import { messagesStore } from './messagesStore'
-import { currentStoryStore } from './currentStoryStore'
-import { nodeStore } from './nodeStore'
+import { calendarStore } from './calendarStore'
 import { charactersStore } from './charactersStore'
 import { contextItemsStore } from './contextItemsStore'
-import { getMessagesInStoryOrder } from '../utils/nodeTraversal'
-import { Character, ContextItem } from '../types/core'
-import { calendarStore } from './calendarStore'
-import { getCharacterDisplayName } from '../utils/character'
+import { currentStoryStore } from './currentStoryStore'
+import { messagesStore } from './messagesStore'
+import { nodeStore } from './nodeStore'
 
 // Script data can be arbitrary user-defined values
 type ScriptDataValue = string | number | boolean | null | undefined | ScriptDataObject | ScriptDataValue[]
@@ -45,12 +45,15 @@ interface ScriptDataStore {
 const [store, setStore] = createStore<ScriptDataStore>({
   dataStates: {},
   nodeChanges: {},
-  isDirty: true
+  isDirty: true,
 })
 
 // Helper function to detect changes between two objects
-const detectChanges = (before: ScriptDataObject, after: ScriptDataObject): Array<{key: string, oldValue: ScriptDataValue, newValue: ScriptDataValue}> => {
-  const changes: Array<{key: string, oldValue: ScriptDataValue, newValue: ScriptDataValue}> = []
+const detectChanges = (
+  before: ScriptDataObject,
+  after: ScriptDataObject,
+): Array<{ key: string; oldValue: ScriptDataValue; newValue: ScriptDataValue }> => {
+  const changes: Array<{ key: string; oldValue: ScriptDataValue; newValue: ScriptDataValue }> = []
   const allKeys = new Set([...Object.keys(before), ...Object.keys(after)])
 
   for (const key of allKeys) {
@@ -165,9 +168,9 @@ const evaluateAllScripts = () => {
 
     functions = result.functions || {}
     // Store this under a special key
-    newDataStates['__global__'] = {
+    newDataStates.__global__ = {
       before: beforeGlobal,
-      after: JSON.parse(JSON.stringify(currentData))
+      after: JSON.parse(JSON.stringify(currentData)),
     }
   } else {
     // Even if there's no global script, initialize characters and context items
@@ -201,30 +204,29 @@ const evaluateAllScripts = () => {
       role: lastMessage.role,
       chapterId: lastMessage.chapterId,
       order: lastMessage.order,
-      content: lastMessage.content?.substring(0, 50) + '...'
+      content: `${lastMessage.content?.substring(0, 50)}...`,
     })
   }
 
   // Get messages in story order using node traversal
-  const messagesInOrder = nodes.length > 0
-    ? getMessagesInStoryOrder(messages, nodes, lastMessage.id)
-    : messages
+  const messagesInOrder = nodes.length > 0 ? getMessagesInStoryOrder(messages, nodes, lastMessage.id) : messages
 
   // Debug: Log the order of messages being processed
-  console.log('[scriptDataStore] Processing messages in this order:',
-    messagesInOrder.map(m => ({
+  console.log(
+    '[scriptDataStore] Processing messages in this order:',
+    messagesInOrder.map((m) => ({
       id: m.id.substring(0, 8),
       nodeId: m.nodeId?.substring(0, 8),
       order: m.order,
       hasScript: !!m.script,
-      content: m.content?.substring(0, 30) + '...'
-    }))
+      content: `${m.content?.substring(0, 30)}...`,
+    })),
   )
 
   // Track changes per node
   let currentNodeId: string | null = null
   let nodeStartData: ScriptDataObject = JSON.parse(JSON.stringify(currentData))
-  let currentNode = nodes.find(n => n.id === currentNodeId)
+  let currentNode = nodes.find((n) => n.id === currentNodeId)
 
   // Execute each message's script in story order
   for (const message of messagesInOrder) {
@@ -238,14 +240,14 @@ const evaluateAllScripts = () => {
             nodeId: currentNodeId,
             nodeTitle: currentNode.title,
             changes,
-            finalState: JSON.parse(JSON.stringify(currentData))
+            finalState: JSON.parse(JSON.stringify(currentData)),
           }
         }
       }
 
       // Start tracking the new node
       currentNodeId = message.nodeId
-      currentNode = nodes.find(n => n.id === currentNodeId)
+      currentNode = nodes.find((n) => n.id === currentNodeId)
       nodeStartData = JSON.parse(JSON.stringify(currentData))
 
       // Handle storyTime for the new node
@@ -282,7 +284,9 @@ const evaluateAllScripts = () => {
           const beforeAge = beforeData.characters[charName]?.age
           const afterAge = result.data.characters[charName]?.age
           if (beforeAge !== afterAge) {
-            console.log(`[scriptDataStore] Age change for ${charName} in message ${message.id.substring(0, 8)}: ${beforeAge} -> ${afterAge}`)
+            console.log(
+              `[scriptDataStore] Age change for ${charName} in message ${message.id.substring(0, 8)}: ${beforeAge} -> ${afterAge}`,
+            )
           }
         }
       }
@@ -290,7 +294,7 @@ const evaluateAllScripts = () => {
       // Store the before and after states
       newDataStates[message.id] = {
         before: beforeData,
-        after: JSON.parse(JSON.stringify(currentData))
+        after: JSON.parse(JSON.stringify(currentData)),
       }
     }
   }
@@ -303,7 +307,7 @@ const evaluateAllScripts = () => {
         nodeId: currentNodeId,
         nodeTitle: currentNode.title,
         changes,
-        finalState: JSON.parse(JSON.stringify(currentData))
+        finalState: JSON.parse(JSON.stringify(currentData)),
       }
     }
   }
@@ -321,20 +325,18 @@ createEffect(() => {
   currentStoryStore.globalScript
 
   // Track message script changes - accessing them triggers reactivity
-  messagesStore.messages
-    .filter(m => m.role === 'assistant' && !m.isQuery)
-    .forEach(m => m.script)
+  messagesStore.messages.filter((m) => m.role === 'assistant' && !m.isQuery).forEach((m) => m.script)
 
   // Track node changes (for proper story order and storyTime changes)
   nodeStore.nodesArray.length
-  nodeStore.nodesArray.forEach(n => {
+  nodeStore.nodesArray.forEach((n) => {
     n.order
     n.storyTime
   })
 
   // Track character changes - character data is initialized into script context
   charactersStore.characters.length
-  charactersStore.characters.forEach(c => {
+  charactersStore.characters.forEach((c) => {
     c.firstName
     c.lastName
     c.birthdate
@@ -343,7 +345,7 @@ createEffect(() => {
 
   // Track context item changes - context items are initialized into script context
   contextItemsStore.contextItems.length
-  contextItemsStore.contextItems.forEach(i => {
+  contextItemsStore.contextItems.forEach((i) => {
     i.name
     i.type
     i.isGlobal
@@ -388,7 +390,7 @@ export const scriptDataStore = {
 
   // Get the cumulative script data state at a specific message
   // This finds the last script execution at or before the target message
-  getCumulativeDataAtMessage(targetMessageId: string, forceRefresh: boolean = false): ScriptDataObject | null {
+  getCumulativeDataAtMessage(targetMessageId: string, forceRefresh = false): ScriptDataObject | null {
     // If forced refresh or cache is dirty, re-evaluate first
     if (forceRefresh || store.isDirty) {
       evaluateAllScripts()
@@ -403,7 +405,7 @@ export const scriptDataStore = {
     }
 
     // Find the target message
-    const targetMessage = messages.find(m => m.id === targetMessageId)
+    const targetMessage = messages.find((m) => m.id === targetMessageId)
     if (!targetMessage) {
       console.warn('[scriptDataStore] Target message not found', { targetMessageId })
       return null
@@ -421,8 +423,8 @@ export const scriptDataStore = {
     let lastScriptData: ScriptDataObject = {}
 
     // Start with global script data if it exists
-    if (store.dataStates['__global__']) {
-      lastScriptData = store.dataStates['__global__'].after
+    if (store.dataStates.__global__) {
+      lastScriptData = store.dataStates.__global__.after
     }
 
     // Track current node to detect chapter changes
@@ -435,7 +437,7 @@ export const scriptDataStore = {
       // Check if we've moved to a new node - update currentTime if needed
       if (message.nodeId && message.nodeId !== currentNodeId) {
         currentNodeId = message.nodeId
-        const currentNode = nodes.find(n => n.id === currentNodeId)
+        const currentNode = nodes.find((n) => n.id === currentNodeId)
 
         // Handle storyTime for the new node
         if (currentNode?.storyTime != null) {
@@ -444,14 +446,14 @@ export const scriptDataStore = {
           lastScriptData = {
             ...lastScriptData,
             currentTime: currentNode.storyTime,
-            currentDate: calendarStore.formatStoryTime(currentNode.storyTime) || ''
+            currentDate: calendarStore.formatStoryTime(currentNode.storyTime) || '',
           }
         } else {
           // Node doesn't have storyTime - reset to last chapter's base time
           lastScriptData = {
             ...lastScriptData,
             currentTime: lastChapterBaseTime,
-            currentDate: calendarStore.formatStoryTime(lastChapterBaseTime) || ''
+            currentDate: calendarStore.formatStoryTime(lastChapterBaseTime) || '',
           }
         }
       }
@@ -467,13 +469,19 @@ export const scriptDataStore = {
     }
 
     // Debug: Log what age we're returning for characters
-    if (lastScriptData.characters && typeof lastScriptData.characters === 'object' && !Array.isArray(lastScriptData.characters)) {
+    if (
+      lastScriptData.characters &&
+      typeof lastScriptData.characters === 'object' &&
+      !Array.isArray(lastScriptData.characters)
+    ) {
       for (const charName of Object.keys(lastScriptData.characters)) {
         const charData = lastScriptData.characters[charName]
         if (charData && typeof charData === 'object' && !Array.isArray(charData) && 'age' in charData) {
           const age = charData.age
           if (age !== undefined) {
-            console.log(`[getCumulativeDataAtMessage] Returning age ${age} for ${charName} at message ${targetMessageId.substring(0, 8)}`)
+            console.log(
+              `[getCumulativeDataAtMessage] Returning age ${age} for ${charName} at message ${targetMessageId.substring(0, 8)}`,
+            )
           }
         }
       }
@@ -485,5 +493,5 @@ export const scriptDataStore = {
   // Force re-evaluation
   refresh() {
     setStore('isDirty', true)
-  }
+  },
 }

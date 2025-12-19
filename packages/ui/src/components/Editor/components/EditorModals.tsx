@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js"
+import { createSignal } from 'solid-js'
 
 interface RewriteModalProps {
   isOpen: boolean
@@ -7,12 +7,12 @@ interface RewriteModalProps {
 }
 
 export function RewriteModal(props: RewriteModalProps) {
-  const [instructions, setInstructions] = createSignal("")
+  const [instructions, setInstructions] = createSignal('')
 
   const handleSubmit = () => {
     if (instructions().trim()) {
       props.onSubmit(instructions())
-      setInstructions("")
+      setInstructions('')
       props.onClose()
     }
   }
@@ -30,25 +30,20 @@ export function RewriteModal(props: RewriteModalProps) {
               class="input input-bordered w-full mt-4"
               placeholder="Enter rewrite instructions..."
               onKeyPress={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === 'Enter') {
                   handleSubmit()
                 }
               }}
             />
             <div class="modal-action">
-              <button
-                type="button"
-                class="btn btn-success"
-                onClick={handleSubmit}
-                disabled={!instructions().trim()}
-              >
+              <button type="button" class="btn btn-success" onClick={handleSubmit} disabled={!instructions().trim()}>
                 Submit
               </button>
               <button
                 type="button"
                 class="btn"
                 onClick={() => {
-                  setInstructions("")
+                  setInstructions('')
                   props.onClose()
                 }}
               >
@@ -70,7 +65,7 @@ interface TranslationModalProps {
 }
 
 export function TranslationModal(props: TranslationModalProps) {
-  const [text, setText] = createSignal(props.initialValue || "")
+  const [text, setText] = createSignal(props.initialValue || '')
 
   const handleSave = () => {
     props.onSave(text())
@@ -90,24 +85,20 @@ export function TranslationModal(props: TranslationModalProps) {
               class="input input-bordered w-full mt-4"
               placeholder="Enter translation..."
               onKeyPress={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === 'Enter') {
                   handleSave()
                 }
               }}
             />
             <div class="modal-action">
-              <button
-                type="button"
-                class="btn btn-success"
-                onClick={handleSave}
-              >
+              <button type="button" class="btn btn-success" onClick={handleSave}>
                 Save
               </button>
               <button
                 type="button"
                 class="btn"
                 onClick={() => {
-                  setText(props.initialValue || "")
+                  setText(props.initialValue || '')
                   props.onClose()
                 }}
               >
@@ -130,7 +121,7 @@ interface GenerateBetweenModalProps {
 }
 
 export function GenerateBetweenModal(props: GenerateBetweenModalProps) {
-  const [text, setText] = createSignal(props.initialValue || "")
+  const [text, setText] = createSignal(props.initialValue || '')
 
   const handleGenerate = () => {
     if (text().trim()) {
@@ -159,17 +150,13 @@ export function GenerateBetweenModal(props: GenerateBetweenModalProps) {
                 onClick={handleGenerate}
                 disabled={props.isGenerating || !text().trim()}
               >
-                {props.isGenerating ? (
-                  <span class="loading loading-spinner" />
-                ) : (
-                  "Generate"
-                )}
+                {props.isGenerating ? <span class="loading loading-spinner" /> : 'Generate'}
               </button>
               <button
                 type="button"
                 class="btn"
                 onClick={() => {
-                  setText(props.initialValue || "")
+                  setText(props.initialValue || '')
                   props.onClose()
                 }}
               >

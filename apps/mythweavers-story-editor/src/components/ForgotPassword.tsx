@@ -1,97 +1,87 @@
-import { createSignal, Show } from 'solid-js';
-import { apiClient } from '../utils/apiClient';
-import styles from './ForgotPassword.module.css';
+import { Alert, Button, FormField, Input, Modal } from '@mythweavers/ui'
+import { Show, createSignal } from 'solid-js'
+import { apiClient } from '../utils/apiClient'
 
 interface ForgotPasswordProps {
-  onClose: () => void;
-  onBackToLogin: () => void;
+  onClose: () => void
+  onBackToLogin: () => void
 }
 
 export function ForgotPassword(props: ForgotPasswordProps) {
-  const [email, setEmail] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal('');
-  const [success, setSuccess] = createSignal(false);
+  const [email, setEmail] = createSignal('')
+  const [loading, setLoading] = createSignal(false)
+  const [error, setError] = createSignal('')
+  const [success, setSuccess] = createSignal(false)
 
   const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+    e.preventDefault()
+    setError('')
+    setLoading(true)
 
     try {
-      const result = await apiClient.requestPasswordReset(email());
+      const result = await apiClient.requestPasswordReset(email())
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to request password reset');
+        throw new Error(result.error || 'Failed to request password reset')
       }
 
-      setSuccess(true);
+      setSuccess(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div class={styles.overlay}>
-      <div class={styles.container}>
-        <button class={styles.closeButton} onClick={props.onClose}>×</button>
-        
-        <Show when={!success()} fallback={
-          <div class={styles.successMessage}>
-            <h2>Check Your Email</h2>
-            <p>If an account exists with the email address you provided, we've sent password reset instructions to that email.</p>
-            <p>Please check your inbox and follow the link to reset your password.</p>
-            <button 
-              class={styles.button}
-              onClick={props.onBackToLogin}
-            >
-              Back to Login
-            </button>
-          </div>
-        }>
-          <form onSubmit={handleSubmit} class={styles.form}>
-            <h2>Forgot Password</h2>
-            <p class={styles.description}>
-              Enter your email address and we'll send you a link to reset your password.
+    <Modal open={true} onClose={props.onClose} title={success() ? 'Check Your Email' : 'Forgot Password'} size="sm">
+      <Show
+        when={!success()}
+        fallback={
+          <div style={{ 'text-align': 'center' }}>
+            <Alert variant="success" style={{ 'margin-bottom': '1rem' }}>
+              If an account exists with the email address you provided, we've sent password reset instructions to that
+              email.
+            </Alert>
+            <p style={{ color: 'var(--text-secondary)', 'margin-bottom': '1.5rem' }}>
+              Please check your inbox and follow the link to reset your password.
             </p>
-            
-            <Show when={error()}>
-              <div class={styles.error}>{error()}</div>
-            </Show>
+            <Button onClick={props.onBackToLogin}>Back to Login</Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit}>
+          <p style={{ color: 'var(--text-secondary)', 'margin-bottom': '1.5rem' }}>
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
 
-            <div class={styles.field}>
-              <label for="email">Email</label>
-              <input
-                type="email"
-                id="email"
-                value={email()}
-                onInput={(e) => setEmail(e.currentTarget.value)}
-                required
-                disabled={loading()}
-                placeholder="Enter your email"
-              />
-            </div>
+          <Show when={error()}>
+            <Alert variant="error" style={{ 'margin-bottom': '1rem' }}>
+              {error()}
+            </Alert>
+          </Show>
 
-            <button 
-              type="submit" 
-              class={styles.submitButton}
-              disabled={loading() || !email()}
-            >
-              {loading() ? 'Sending...' : 'Send Reset Link'}
-            </button>
+          <FormField label="Email" required>
+            <Input
+              type="email"
+              id="email"
+              value={email()}
+              onInput={(e) => setEmail(e.currentTarget.value)}
+              required
+              disabled={loading()}
+              placeholder="Enter your email"
+            />
+          </FormField>
 
-            <button 
-              type="button"
-              class={styles.linkButton}
-              onClick={props.onBackToLogin}
-            >
-              Back to Login
-            </button>
-          </form>
-        </Show>
-      </div>
-    </div>
-  );
+          <Button type="submit" fullWidth disabled={loading() || !email()} style={{ 'margin-bottom': '0.5rem' }}>
+            {loading() ? 'Sending...' : 'Send Reset Link'}
+          </Button>
+
+          <Button type="button" variant="ghost" fullWidth onClick={props.onBackToLogin}>
+            Back to Login
+          </Button>
+        </form>
+      </Show>
+    </Modal>
+  )
 }

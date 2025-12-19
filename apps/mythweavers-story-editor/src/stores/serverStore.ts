@@ -1,6 +1,5 @@
 import { createStore } from 'solid-js/store'
 import { getHealth } from '../client/config'
-import { authStore } from './authStore'
 
 interface ServerState {
   isAvailable: boolean
@@ -13,7 +12,7 @@ const [state, setState] = createStore<ServerState>({
   isAvailable: true, // Assume available initially
   isChecking: false,
   lastChecked: null,
-  error: null
+  error: null,
 })
 
 export const serverStore = {
@@ -69,21 +68,21 @@ export const serverStore = {
   },
 
   // Periodically check server health
-  startHealthCheck(intervalMs: number = 30000): () => void {
+  startHealthCheck(intervalMs = 30000): () => void {
     console.log('[ServerStore] Starting periodic health checks with interval:', intervalMs)
     // Do an initial check
     this.checkHealth()
-    
+
     // Set up periodic checks
     const interval = setInterval(() => {
       console.log('[ServerStore] Running periodic health check...')
       this.checkHealth()
     }, intervalMs)
-    
+
     // Return cleanup function
     return () => {
       console.log('[ServerStore] Stopping periodic health checks')
       clearInterval(interval)
     }
-  }
+  },
 }

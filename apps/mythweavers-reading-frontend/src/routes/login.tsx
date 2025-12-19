@@ -1,116 +1,90 @@
-import { Title, Meta } from "@solidjs/meta";
-import { Layout } from "~/components/Layout";
-import { createSignal, Show } from "solid-js";
-import {
-  action,
-  redirect,
-  useSearchParams,
-  useSubmission,
-} from "@solidjs/router";
-import { createUserSession, destroyUserSession } from "~/lib/session";
-import { trpc } from "~/lib/trpc";
+import { Alert, Button, Card, CardBody, FormField, Input, LinkButton } from '@mythweavers/ui'
+import { Meta, Title } from '@solidjs/meta'
+import { action, redirect, useSubmission } from '@solidjs/router'
+import { Show, createSignal } from 'solid-js'
+import { Layout } from '~/components/Layout'
+import { authApi } from '~/lib/api'
+import { createUserSession } from '~/lib/session'
+import * as pageStyles from '~/styles/pages.css'
 
 const loginAction = action(async (formData: FormData) => {
-  "use server";
+  'use server'
 
   try {
-    const result = await trpc.sessionLogin.mutate({
-      email: formData.get("email") as string,
-      password: formData.get("password") as string,
-    });
+    const result = await authApi.login(formData.get('email') as string, formData.get('password') as string)
 
-    if (result?.token && result.user) {
+    if (result?.success && result.user) {
       await createUserSession(
         {
           id: result.user.id.toString(),
-          name: result.user.name,
+          name: result.user.username,
           email: result.user.email,
-          avatarUrl: result.user.avatarUrl || undefined,
-          token: result.token,
         },
-        "/",
-      );
+        '/',
+      )
     }
-    return redirect("/");
-  } catch (error: any) {
-    console.error("Login action error:", error);
+    return redirect('/')
+  } catch (error: unknown) {
+    console.error('Login action error:', error)
     if (error instanceof Response && error.status === 302) {
-      throw error;
+      throw error
     }
     return {
       success: false,
-      error: error.message || "An error occurred during login.",
-    };
+      error: error instanceof Error ? error.message : 'An error occurred during login.',
+    }
   }
-}, "loginUser");
+}, 'loginUser')
 
 export default function Login() {
-  const submission = useSubmission(loginAction);
-  const [email, setEmail] = createSignal("");
-  const [password, setPassword] = createSignal("");
-  const [localError, setLocalError] = createSignal<string | null>(null);
+  const submission = useSubmission(loginAction)
+  const [localError, _setLocalError] = createSignal<string | null>(null)
 
   return (
     <Layout>
-      <Title>Login - Reader</Title>
-      <Meta name="description" content="Sign in to your Reader account" />
+      <Title>MythWeavers - Sign In</Title>
+      <Meta name="description" content="Sign in to your MythWeavers account" />
 
-      <div class="flex items-center justify-center min-h-[70vh]">
-        <div class="card w-full max-w-md bg-base-200 shadow-xl">
-          <div class="card-body">
-            <h1 class="card-title text-3xl mb-6">Sign In</h1>
+      <div class={pageStyles.pageContainer}>
+        <Card size="sm">
+          <CardBody padding="lg" gap="md">
+            <h1 class={pageStyles.pageTitle}>Sign In</h1>
 
-            <Show when={localError()}>
-              <div class="alert alert-error mb-4">{localError()}</div>
+            <Show when={localError() || submission.result?.error}>
+              <Alert variant="error">
+                {localError() || submission.result?.error}
+              </Alert>
             </Show>
 
             <form action={loginAction} method="post">
-              <div class="form-control mb-4">
-                <label class="label" for="email">
-                  <span class="label-text">Email</span>
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  name="email"
-                  class="input input-bordered"
-                />
-              </div>
+              <FormField label="Email or Username" class={pageStyles.formGroup}>
+                <Input id="email" type="text" name="email" />
+              </FormField>
 
-              <div class="form-control mb-6">
-                <label class="label" for="password">
-                  <span class="label-text">Password</span>
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  name="password"
-                  class="input input-bordered"
-                />
-              </div>
+              <FormField label="Password" class={pageStyles.formGroup}>
+                <Input id="password" type="password" name="password" />
+              </FormField>
 
-              <div class="form-control">
-                <button
-                  type="submit"
-                  class="btn btn-primary"
-                  disabled={submission.pending}
-                >
-                  {submission.pending ? "Signing in..." : "Sign In"}
-                </button>
-              </div>
+              <Button type="submit" variant="primary" fullWidth disabled={submission.pending}>
+                {submission.pending ? 'Signing in...' : 'Sign In'}
+              </Button>
             </form>
 
-            <div class="divider my-8">OR</div>
-
-            <div class="text-center">
-              <p class="mb-4">Don't have an account?</p>
-              <a href="/register" class="btn btn-outline btn-block">
-                Create Account
-              </a>
+            <div class={pageStyles.formDivider}>
+              <span class={pageStyles.formDividerLine} />
+              <span>OR</span>
+              <span class={pageStyles.formDividerLine} />
             </div>
-          </div>
-        </div>
+
+            <div class={pageStyles.textCenter}>
+              <p class={pageStyles.mb4}>Don't have an account?</p>
+              <LinkButton href="/register" variant="secondary" fullWidth>
+                Create Account
+              </LinkButton>
+            </div>
+          </CardBody>
+        </Card>
       </div>
     </Layout>
-  );
+  )
 }

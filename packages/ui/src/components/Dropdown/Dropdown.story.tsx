@@ -1,6 +1,6 @@
-import { Dropdown, DropdownItem, DropdownDivider } from './Dropdown'
-import { Button } from '../Button'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Button } from '../Button'
+import { Dropdown, DropdownDivider, DropdownItem } from './Dropdown'
 
 const EditIcon = () => (
   <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -95,6 +95,29 @@ export default (props: { Hst: any }) => {
             <DropdownItem>Share</DropdownItem>
             <DropdownDivider />
             <DropdownItem danger>Delete</DropdownItem>
+          </Dropdown>
+        </ThemeComparison>
+      </Hst.Variant>
+
+      <Hst.Variant title="With Active State">
+        <ThemeComparison>
+          <Dropdown trigger={<Button variant="secondary">View Mode</Button>}>
+            <DropdownItem active>Normal View</DropdownItem>
+            <DropdownItem>Compact View</DropdownItem>
+            <DropdownItem>Expanded View</DropdownItem>
+          </Dropdown>
+        </ThemeComparison>
+      </Hst.Variant>
+
+      <Hst.Variant title="Portal Mode (escapes overflow:hidden)">
+        <ThemeComparison>
+          <Dropdown portal trigger={<Button variant="secondary">Portal Dropdown</Button>}>
+            <DropdownItem icon={<EditIcon />}>Edit</DropdownItem>
+            <DropdownItem icon={<CopyIcon />}>Duplicate</DropdownItem>
+            <DropdownDivider />
+            <DropdownItem icon={<TrashIcon />} danger>
+              Delete
+            </DropdownItem>
           </Dropdown>
         </ThemeComparison>
       </Hst.Variant>

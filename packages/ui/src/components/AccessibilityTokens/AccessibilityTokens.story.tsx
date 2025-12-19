@@ -1,11 +1,11 @@
-import { tokens } from '../../theme/tokens.css'
-import { chronicleTheme } from '../../theme/chronicle.css'
-import { starlightTheme } from '../../theme/starlight.css'
-import { chronicleColors } from '../../theme/chronicle.colors'
-import { starlightColors } from '../../theme/starlight.colors'
 import { colord, extend } from 'colord'
 import a11yPlugin from 'colord/plugins/a11y'
 import type { ParentComponent } from 'solid-js'
+import { chronicleColors } from '../../theme/chronicle.colors'
+import { chronicleTheme } from '../../theme/chronicle.css'
+import { starlightColors } from '../../theme/starlight.colors'
+import { starlightTheme } from '../../theme/starlight.css'
+import { tokens } from '../../theme/tokens.css'
 
 extend([a11yPlugin])
 
@@ -62,9 +62,7 @@ const ContrastRow = (props: {
         'margin-bottom': '0.5rem',
       }}
     >
-      <span style={{ color: props.textColor, 'min-width': '120px', 'font-size': '14px' }}>
-        Sample Text
-      </span>
+      <span style={{ color: props.textColor, 'min-width': '120px', 'font-size': '14px' }}>Sample Text</span>
       <span style={{ color: props.textColor, 'font-size': '12px', opacity: 0.8, flex: 1 }}>
         {props.textName} on {props.bgName}
       </span>
@@ -91,9 +89,7 @@ const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => 
       'min-width': '500px',
     }}
   >
-    <h2 style={{ margin: '0 0 1rem 0', 'font-size': '18px', 'font-weight': '600' }}>
-      {props.name}
-    </h2>
+    <h2 style={{ margin: '0 0 1rem 0', 'font-size': '18px', 'font-weight': '600' }}>{props.name}</h2>
     <p style={{ margin: '0 0 1.5rem 0', 'font-size': '12px', opacity: 0.7 }}>
       AA+ = Large text (3:1) | AA = Normal text (4.5:1) | AAA = Enhanced (7:1)
     </p>
@@ -103,14 +99,16 @@ const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => 
 
 const TokenGroup = (props: { title: string; children: any }) => (
   <div style={{ 'margin-bottom': '1.5rem' }}>
-    <h3 style={{
-      margin: '0 0 0.75rem 0',
-      'font-size': '13px',
-      'font-weight': '600',
-      'text-transform': 'uppercase',
-      'letter-spacing': '0.05em',
-      opacity: 0.7,
-    }}>
+    <h3
+      style={{
+        margin: '0 0 0.75rem 0',
+        'font-size': '13px',
+        'font-weight': '600',
+        'text-transform': 'uppercase',
+        'letter-spacing': '0.05em',
+        opacity: 0.7,
+      }}
+    >
       {props.title}
     </h3>
     {props.children}
@@ -120,32 +118,102 @@ const TokenGroup = (props: { title: string; children: any }) => (
 const AllContrasts = (props: { colors: ColorValues }) => (
   <>
     <TokenGroup title="Text on Base Background">
-      <ContrastRow textName="text.primary" textColor={props.colors.text.primary} bgName="bg.base" bgColor={props.colors.bg.base} />
-      <ContrastRow textName="text.secondary" textColor={props.colors.text.secondary} bgName="bg.base" bgColor={props.colors.bg.base} />
-      <ContrastRow textName="text.muted" textColor={props.colors.text.muted} bgName="bg.base" bgColor={props.colors.bg.base} />
+      <ContrastRow
+        textName="text.primary"
+        textColor={props.colors.text.primary}
+        bgName="bg.base"
+        bgColor={props.colors.bg.base}
+      />
+      <ContrastRow
+        textName="text.secondary"
+        textColor={props.colors.text.secondary}
+        bgName="bg.base"
+        bgColor={props.colors.bg.base}
+      />
+      <ContrastRow
+        textName="text.muted"
+        textColor={props.colors.text.muted}
+        bgName="bg.base"
+        bgColor={props.colors.bg.base}
+      />
     </TokenGroup>
 
     <TokenGroup title="Text on Raised Background">
-      <ContrastRow textName="text.primary" textColor={props.colors.text.primary} bgName="bg.raised" bgColor={props.colors.bg.raised} />
-      <ContrastRow textName="text.secondary" textColor={props.colors.text.secondary} bgName="bg.raised" bgColor={props.colors.bg.raised} />
-      <ContrastRow textName="text.muted" textColor={props.colors.text.muted} bgName="bg.raised" bgColor={props.colors.bg.raised} />
+      <ContrastRow
+        textName="text.primary"
+        textColor={props.colors.text.primary}
+        bgName="bg.raised"
+        bgColor={props.colors.bg.raised}
+      />
+      <ContrastRow
+        textName="text.secondary"
+        textColor={props.colors.text.secondary}
+        bgName="bg.raised"
+        bgColor={props.colors.bg.raised}
+      />
+      <ContrastRow
+        textName="text.muted"
+        textColor={props.colors.text.muted}
+        bgName="bg.raised"
+        bgColor={props.colors.bg.raised}
+      />
     </TokenGroup>
 
     <TokenGroup title="Text on Surface">
-      <ContrastRow textName="text.primary" textColor={props.colors.text.primary} bgName="surface.default" bgColor={props.colors.surface.default} />
-      <ContrastRow textName="text.secondary" textColor={props.colors.text.secondary} bgName="surface.default" bgColor={props.colors.surface.default} />
+      <ContrastRow
+        textName="text.primary"
+        textColor={props.colors.text.primary}
+        bgName="surface.default"
+        bgColor={props.colors.surface.default}
+      />
+      <ContrastRow
+        textName="text.secondary"
+        textColor={props.colors.text.secondary}
+        bgName="surface.default"
+        bgColor={props.colors.surface.default}
+      />
     </TokenGroup>
 
     <TokenGroup title="Accent Colors">
-      <ContrastRow textName="text.inverse" textColor={props.colors.text.inverse} bgName="accent.primary" bgColor={props.colors.accent.primary} />
-      <ContrastRow textName="text.inverse" textColor={props.colors.text.inverse} bgName="accent.secondary" bgColor={props.colors.accent.secondary} />
+      <ContrastRow
+        textName="text.inverse"
+        textColor={props.colors.text.inverse}
+        bgName="accent.primary"
+        bgColor={props.colors.accent.primary}
+      />
+      <ContrastRow
+        textName="text.inverse"
+        textColor={props.colors.text.inverse}
+        bgName="accent.secondary"
+        bgColor={props.colors.accent.secondary}
+      />
     </TokenGroup>
 
     <TokenGroup title="Semantic Colors">
-      <ContrastRow textName="text.primary" textColor={props.colors.text.primary} bgName="semantic.successSubtle" bgColor={props.colors.semantic.successSubtle} />
-      <ContrastRow textName="text.primary" textColor={props.colors.text.primary} bgName="semantic.errorSubtle" bgColor={props.colors.semantic.errorSubtle} />
-      <ContrastRow textName="text.primary" textColor={props.colors.text.primary} bgName="semantic.warningSubtle" bgColor={props.colors.semantic.warningSubtle} />
-      <ContrastRow textName="text.primary" textColor={props.colors.text.primary} bgName="semantic.infoSubtle" bgColor={props.colors.semantic.infoSubtle} />
+      <ContrastRow
+        textName="text.primary"
+        textColor={props.colors.text.primary}
+        bgName="semantic.successSubtle"
+        bgColor={props.colors.semantic.successSubtle}
+      />
+      <ContrastRow
+        textName="text.primary"
+        textColor={props.colors.text.primary}
+        bgName="semantic.errorSubtle"
+        bgColor={props.colors.semantic.errorSubtle}
+      />
+      <ContrastRow
+        textName="text.primary"
+        textColor={props.colors.text.primary}
+        bgName="semantic.warningSubtle"
+        bgColor={props.colors.semantic.warningSubtle}
+      />
+      <ContrastRow
+        textName="text.primary"
+        textColor={props.colors.text.primary}
+        bgName="semantic.infoSubtle"
+        bgColor={props.colors.semantic.infoSubtle}
+      />
     </TokenGroup>
   </>
 )

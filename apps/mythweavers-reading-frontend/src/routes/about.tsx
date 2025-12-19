@@ -1,12 +1,12 @@
-import { useNavigate } from "@solidjs/router";
-import { onMount } from "solid-js";
+import { useNavigate } from '@solidjs/router'
+import { onMount } from 'solid-js'
 
 export default function About() {
-  const navigate = useNavigate();
-  
-  onMount(() => {
-    navigate("/", { replace: true });
-  });
+  const navigate = useNavigate()
 
-  return <div>Redirecting...</div>;
+  onMount(() => {
+    navigate('/', { replace: true })
+  })
+
+  return <div>Redirecting...</div>
 }

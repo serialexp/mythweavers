@@ -1,29 +1,29 @@
-import { Match, Switch } from "solid-js";
-import { viewModeStore } from "../stores/viewModeStore";
-import { NormalModeView } from "./NormalModeView";
-import { ScriptModeView } from "./ScriptModeView";
-import { ReorderModeView } from "./ReorderModeView";
-import { ReadModeView } from "./ReadModeView";
+import { Match, Switch } from 'solid-js'
+import { viewModeStore } from '../stores/viewModeStore'
+import { NormalModeView } from './NormalModeView'
+import { ReadModeView } from './ReadModeView'
+import { ReorderModeView } from './ReorderModeView'
+import { ScriptModeView } from './ScriptModeView'
 
 interface MessageListItemsProps {
-    isGenerating: boolean;
+  isGenerating: boolean
 }
 
 export default function MessageListItems(props: MessageListItemsProps) {
-    return (
-        <Switch>
-            <Match when={viewModeStore.isReorderMode()}>
-                <ReorderModeView isGenerating={props.isGenerating} />
-            </Match>
-            <Match when={viewModeStore.isScriptMode()}>
-                <ScriptModeView isGenerating={props.isGenerating} />
-            </Match>
-            <Match when={viewModeStore.isReadMode()}>
-                <ReadModeView isGenerating={props.isGenerating} />
-            </Match>
-            <Match when={true}>
-                <NormalModeView isGenerating={props.isGenerating} />
-            </Match>
-        </Switch>
-    );
+  return (
+    <Switch>
+      <Match when={viewModeStore.isReorderMode()}>
+        <ReorderModeView isGenerating={props.isGenerating} />
+      </Match>
+      <Match when={viewModeStore.isScriptMode()}>
+        <ScriptModeView isGenerating={props.isGenerating} />
+      </Match>
+      <Match when={viewModeStore.isReadMode()}>
+        <ReadModeView isGenerating={props.isGenerating} />
+      </Match>
+      <Match when={true}>
+        <NormalModeView isGenerating={props.isGenerating} />
+      </Match>
+    </Switch>
+  )
 }

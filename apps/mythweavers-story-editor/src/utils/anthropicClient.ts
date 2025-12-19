@@ -2,13 +2,15 @@ import { settingsStore } from '../stores/settingsStore'
 
 interface AnthropicMessage {
   role: 'user' | 'assistant' | 'system'
-  content: string | Array<{
-    type: 'text'
-    text: string
-    cache_control?: {
-      type: 'ephemeral'
-    }
-  }>
+  content:
+    | string
+    | Array<{
+        type: 'text'
+        text: string
+        cache_control?: {
+          type: 'ephemeral'
+        }
+      }>
 }
 
 interface AnthropicResponse {
@@ -72,7 +74,10 @@ export class AnthropicClient {
   private prepareMessages(
     messages?: ChatMessage[],
     prompt?: string,
-  ): { anthropicMessages: AnthropicMessage[]; systemContent: string | Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> | '' } {
+  ): {
+    anthropicMessages: AnthropicMessage[]
+    systemContent: string | Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> | ''
+  } {
     const anthropicMessages: AnthropicMessage[] = []
     let systemContent: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> | string = ''
 
@@ -84,11 +89,13 @@ export class AnthropicClient {
               console.error('Empty system content with cache_control, ignoring cache hint')
               systemContent = msg.content || ''
             } else {
-              systemContent = [{
-                type: 'text',
-                text: msg.content,
-                cache_control: msg.cache_control
-              }]
+              systemContent = [
+                {
+                  type: 'text',
+                  text: msg.content,
+                  cache_control: msg.cache_control,
+                },
+              ]
             }
           } else {
             systemContent = msg.content
@@ -98,22 +105,24 @@ export class AnthropicClient {
             console.error(`Empty content with cache_control in ${msg.role} message, skipping cache_control`)
             anthropicMessages.push({
               role: msg.role as 'user' | 'assistant',
-              content: msg.content || ''
+              content: msg.content || '',
             })
           } else {
             anthropicMessages.push({
               role: msg.role as 'user' | 'assistant',
-              content: [{
-                type: 'text',
-                text: msg.content,
-                cache_control: msg.cache_control
-              }]
+              content: [
+                {
+                  type: 'text',
+                  text: msg.content,
+                  cache_control: msg.cache_control,
+                },
+              ],
             })
           }
         } else {
           anthropicMessages.push({
             role: msg.role as 'user' | 'assistant',
-            content: msg.content
+            content: msg.content,
           })
         }
       }
@@ -132,15 +141,15 @@ export class AnthropicClient {
         console.log('No Anthropic API key configured, returning empty model list')
         return { models: [] }
       }
-      
+
       const response = await fetch(`${this.baseUrl}/models`, {
         method: 'GET',
         headers: {
           'x-api-key': currentApiKey,
           'anthropic-version': '2023-06-01',
           'anthropic-beta': 'prompt-caching-2024-07-31',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        }
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
       })
 
       if (!response.ok) {
@@ -159,32 +168,32 @@ export class AnthropicClient {
           prompt: '0.000003',
           completion: '0.000015',
           input_cache_write: '0.00000375',
-          input_cache_read: '0.0000003'
+          input_cache_read: '0.0000003',
         },
         'claude-3-5-haiku': {
           prompt: '0.0000008',
           completion: '0.000004',
           input_cache_write: '0.000001',
-          input_cache_read: '0.00000008'
+          input_cache_read: '0.00000008',
         },
         'claude-3-opus': {
           prompt: '0.000015',
           completion: '0.000075',
           input_cache_write: '0.00001875',
-          input_cache_read: '0.0000015'
+          input_cache_read: '0.0000015',
         },
         'claude-3-haiku': {
           prompt: '0.00000025',
           completion: '0.00000125',
           input_cache_write: '0.0000003',
-          input_cache_read: '0.000000025'
+          input_cache_read: '0.000000025',
         },
         'claude-3-sonnet': {
           prompt: '0.000003',
           completion: '0.000015',
           input_cache_write: '0.00000375',
-          input_cache_read: '0.0000003'
-        }
+          input_cache_read: '0.0000003',
+        },
       }
 
       const models = data.data.map((model: any) => {
@@ -207,9 +216,9 @@ export class AnthropicClient {
             prompt: '0.000003',
             completion: '0.000015',
             input_cache_write: '0.00000375',
-            input_cache_read: '0.0000003'
+            input_cache_read: '0.0000003',
           },
-          display_name: model.display_name
+          display_name: model.display_name,
         }
       })
 
@@ -239,7 +248,7 @@ export class AnthropicClient {
     // Disable thinking for very small token budgets
     const maxTokens = genOptions?.num_ctx || 8192
     const isThinkingEnabled = (model.includes('sonnet') || model.includes('opus')) && maxTokens > 128
-    
+
     const requestBody = {
       model: model,
       messages: anthropicMessages,
@@ -249,14 +258,15 @@ export class AnthropicClient {
       ...(systemContent && { system: systemContent }),
       // Add thinking budget for models that support it
       // Only enable if we have enough tokens for the minimum budget (1024)
-      ...(isThinkingEnabled && maxTokens >= 4096 && {
-        thinking: {
-          type: 'enabled' as const,
-          budget_tokens: Math.max(1024, Math.floor(maxTokens / 4))
-        }
-      })
+      ...(isThinkingEnabled &&
+        maxTokens >= 4096 && {
+          thinking: {
+            type: 'enabled' as const,
+            budget_tokens: Math.max(1024, Math.floor(maxTokens / 4)),
+          },
+        }),
     }
-    
+
     // Log cache control points for debugging
     const cachePoints: string[] = []
     if (typeof systemContent === 'object' && Array.isArray(systemContent)) {
@@ -286,9 +296,9 @@ export class AnthropicClient {
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31,extended-cache-ttl-2025-04-11',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {
@@ -336,43 +346,44 @@ export class AnthropicClient {
 
               try {
                 const event = JSON.parse(data)
-                
+
                 // Debug logging for all event types
                 if (event.type !== 'content_block_delta' && event.type !== 'ping') {
                   console.log('Anthropic SSE event:', event.type, event)
                 }
-                
+
                 if (event.type === 'error') {
                   // Handle error events from Anthropic
                   const errorMessage = event.error?.message || 'Unknown error'
                   const errorType = event.error?.type || 'unknown_error'
                   console.error('Anthropic streaming error:', errorType, errorMessage)
-                  
+
                   // Only add newlines if we've already accumulated some text
                   const prefix = accumulatedText.length > 0 ? '\n\n' : ''
-                  
+
                   // Yield an error response that will be shown to the user
                   yield {
                     response: `${prefix}⚠️ Anthropic API Error: ${errorMessage}`,
                     done: true,
-                    error: errorType // Add error type to response
+                    error: errorType, // Add error type to response
                   }
-                  
+
                   // If it's an overloaded error, provide helpful context
                   if (errorType === 'overloaded_error') {
                     yield {
                       response: '\n\nThe Anthropic API is currently overloaded. Please try again in a few moments.',
                       done: true,
-                      error: errorType
+                      error: errorType,
                     }
                   }
-                  
+
                   // Stop processing further events
                   return
-                } else if (event.type === 'content_block_delta' && event.delta?.text) {
+                }
+                if (event.type === 'content_block_delta' && event.delta?.text) {
                   accumulatedText += event.delta.text
                   yield {
-                    response: event.delta.text
+                    response: event.delta.text,
                   }
                 } else if (event.type === 'message_start' && event.message?.usage) {
                   // Initial usage data (including cache info) comes in message_start
@@ -385,8 +396,9 @@ export class AnthropicClient {
                     ...usage,
                     ...event.usage,
                     // Preserve cache information from message_start
-                    cache_creation_input_tokens: usage?.cache_creation_input_tokens || event.usage.cache_creation_input_tokens,
-                    cache_read_input_tokens: usage?.cache_read_input_tokens || event.usage.cache_read_input_tokens
+                    cache_creation_input_tokens:
+                      usage?.cache_creation_input_tokens || event.usage.cache_creation_input_tokens,
+                    cache_read_input_tokens: usage?.cache_read_input_tokens || event.usage.cache_read_input_tokens,
                   }
                 } else if (event.type === 'message_stop') {
                   // Message has ended, usage should have been collected
@@ -408,19 +420,19 @@ export class AnthropicClient {
         eval_count: usage?.output_tokens || 0,
         prompt_eval_count: usage?.input_tokens || 0,
         cache_creation_input_tokens: usage?.cache_creation_input_tokens,
-        cache_read_input_tokens: usage?.cache_read_input_tokens
+        cache_read_input_tokens: usage?.cache_read_input_tokens,
       }
     } else {
       const data: AnthropicResponse = await response.json()
       const content = data.content[0]?.text || ''
-      
+
       yield {
         response: content,
         done: true,
         eval_count: data.usage.output_tokens,
         prompt_eval_count: data.usage.input_tokens,
         cache_creation_input_tokens: data.usage.cache_creation_input_tokens,
-        cache_read_input_tokens: data.usage.cache_read_input_tokens
+        cache_read_input_tokens: data.usage.cache_read_input_tokens,
       }
     }
   }
@@ -457,9 +469,9 @@ export class AnthropicClient {
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31,extended-cache-ttl-2025-04-11',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {

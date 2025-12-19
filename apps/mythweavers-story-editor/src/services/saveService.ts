@@ -1,45 +1,55 @@
-import { apiClient } from '../utils/apiClient'
+import type { Paragraph } from '@mythweavers/shared'
 import {
-  postMyStoriesByStoryIdBooks,
-  patchMyBooksById,
-  deleteMyBooksById,
-  postMyBooksByBookIdArcs,
-  patchMyArcsById,
   deleteMyArcsById,
-  postMyArcsByArcIdChapters,
-  patchMyChaptersById,
+  deleteMyBooksById,
   deleteMyChaptersById,
-  postMyStoriesByStoryIdCharacters,
-  patchMyCharactersById,
   deleteMyCharactersById,
-  postMyStoriesByStoryIdContextItems,
-  patchMyContextItemsById,
   deleteMyContextItemsById,
-  postMyStoriesByStoryIdMaps,
-  putMyMapsById,
-  deleteMyMapsById,
-  postMyMapsByMapIdLandmarks,
-  putMyLandmarksById,
   deleteMyLandmarksById,
-  postMyMapsByMapIdPawns,
-  putMyPawnsById,
-  deleteMyPawnsById,
-  postMyMapsByMapIdPaths,
-  putMyPathsById,
-  deleteMyPathsById,
-  postMyFiles,
-  patchMyStoriesById,
-  postMyScenesBySceneIdMessages,
-  patchMyMessagesById,
+  deleteMyMapsById,
   deleteMyMessagesById,
-  postMyMessageRevisionsByRevisionIdParagraphs,
-  patchMyParagraphsById,
   deleteMyParagraphsById,
+  deleteMyPathsById,
+  deleteMyPawnsById,
+  patchMyArcsById,
+  patchMyBooksById,
+  patchMyChaptersById,
+  patchMyCharactersById,
+  patchMyContextItemsById,
+  patchMyMessagesById,
+  patchMyParagraphsById,
+  patchMyStoriesById,
+  postMyArcsByArcIdChapters,
+  postMyBooksByBookIdArcs,
+  postMyMapsByMapIdLandmarks,
+  postMyMapsByMapIdPaths,
+  postMyMapsByMapIdPawns,
+  postMyMessageRevisionsByRevisionIdParagraphs,
+  postMyScenesBySceneIdMessages,
+  postMyStoriesByStoryIdBooks,
+  postMyStoriesByStoryIdCharacters,
+  postMyStoriesByStoryIdContextItems,
+  postMyStoriesByStoryIdMaps,
+  putMyLandmarksById,
+  putMyMapsById,
+  putMyPathsById,
+  putMyPawnsById,
 } from '../client/config'
-import { VersionConflictError } from '../types/api'
-import { Message, Chapter, Character, ContextItem, StoryMap, Node, Fleet, FleetMovement, Hyperlane } from '../types/core'
 import { currentStoryStore } from '../stores/currentStoryStore'
-import type { Paragraph } from '@story/shared'
+import { VersionConflictError } from '../types/api'
+import {
+  Chapter,
+  Character,
+  ContextItem,
+  Fleet,
+  FleetMovement,
+  Hyperlane,
+  Landmark,
+  Message,
+  Node,
+  StoryMap,
+} from '../types/core'
+import { apiClient } from '../utils/apiClient'
 
 type SaveOperationType =
   | 'message-insert'
@@ -84,7 +94,22 @@ type SaveOperationType =
 interface SaveOperation {
   id: string // Unique ID for this operation
   type: SaveOperationType
-  entityType: 'message' | 'paragraph' | 'chapter' | 'character' | 'context' | 'context-states' | 'map' | 'landmark' | 'landmark-state' | 'node' | 'fleet' | 'fleet-movement' | 'hyperlane' | 'story-settings' | 'story'
+  entityType:
+    | 'message'
+    | 'paragraph'
+    | 'chapter'
+    | 'character'
+    | 'context'
+    | 'context-states'
+    | 'map'
+    | 'landmark'
+    | 'landmark-state'
+    | 'node'
+    | 'fleet'
+    | 'fleet-movement'
+    | 'hyperlane'
+    | 'story-settings'
+    | 'story'
   entityId: string // ID of the entity being saved
   storyId: string
   data?: any // The actual data to save
@@ -106,7 +131,7 @@ export class SaveService {
     isProcessing: false,
     currentOperation: null,
     lastKnownUpdatedAt: null,
-    isFullSaveInProgress: false
+    isFullSaveInProgress: false,
   }
 
   private processingPromise: Promise<void> | null = null
@@ -141,7 +166,7 @@ export class SaveService {
 
   // Trigger full save function (to be set by messagesStore)
   private triggerFullSave: () => void = () => {}
-  
+
   setTriggerFullSave(fn: () => void) {
     this.triggerFullSave = fn
   }
@@ -165,11 +190,11 @@ export class SaveService {
     const op: SaveOperation = {
       ...operation,
       id: `${operation.entityType}-${operation.entityId}-${Date.now()}`,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     }
 
     const existingIndex = this.state.queue.findIndex(
-      existing => existing.entityType === op.entityType && existing.entityId === op.entityId
+      (existing) => existing.entityType === op.entityType && existing.entityId === op.entityId,
     )
 
     let shouldQueueOperation = true
@@ -219,7 +244,7 @@ export class SaveService {
       // Add to queue
       this.state.queue.push(op)
       // Queued operation
-      
+
       // Notify about queue length change
       this.onQueueLengthChange?.(this.state.queue.length)
     }
@@ -245,7 +270,7 @@ export class SaveService {
     while (this.state.queue.length > 0 && !this.state.isFullSaveInProgress) {
       const operation = this.state.queue.shift()!
       this.state.currentOperation = operation
-      
+
       // Notify about queue length change after removing item
       this.onQueueLengthChange?.(this.state.queue.length)
 
@@ -260,7 +285,12 @@ export class SaveService {
 
         // Check for authentication errors
         const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes('401') || errorMessage.includes('authentication') || errorMessage.includes('Unauthorized') || errorMessage.includes('Invalid session token')) {
+        if (
+          errorMessage.includes('401') ||
+          errorMessage.includes('authentication') ||
+          errorMessage.includes('Unauthorized') ||
+          errorMessage.includes('Invalid session token')
+        ) {
           console.error('[SaveService] Authentication error detected - user may need to log in again')
           this.onError?.(new Error('Authentication failed. Please log in again to save your work.'))
           // Clear the queue to prevent further failures
@@ -270,12 +300,14 @@ export class SaveService {
         }
 
         // Handle version conflicts
-        if (error instanceof VersionConflictError ||
-            (error instanceof Error && (error as any).code === 'VERSION_CONFLICT')) {
+        if (
+          error instanceof VersionConflictError ||
+          (error instanceof Error && (error as any).code === 'VERSION_CONFLICT')
+        ) {
           const conflictError = error as VersionConflictError
           this.onConflict?.(
             conflictError.serverUpdatedAt || (error as any).serverUpdatedAt,
-            conflictError.clientUpdatedAt || (error as any).clientUpdatedAt
+            conflictError.clientUpdatedAt || (error as any).clientUpdatedAt,
           )
           // Clear the queue on conflict
           this.state.queue = []
@@ -292,7 +324,7 @@ export class SaveService {
         if (!statusCode && errorMessage) {
           const match = errorMessage.match(/status (\d{3})/)
           if (match) {
-            statusCode = parseInt(match[1], 10)
+            statusCode = Number.parseInt(match[1], 10)
           }
         }
 
@@ -310,7 +342,9 @@ export class SaveService {
 
           if (operation.retryCount < 3) {
             operation.retryCount++
-            console.log(`[SaveService] Retrying operation (attempt ${operation.retryCount}/3), status: ${statusCode || 'unknown'}`)
+            console.log(
+              `[SaveService] Retrying operation (attempt ${operation.retryCount}/3), status: ${statusCode || 'unknown'}`,
+            )
             this.state.queue.unshift(operation) // Put it back at the front
           } else {
             console.error(`[SaveService] Failed after 3 retries (status: ${statusCode || 'unknown'}), notifying user`)
@@ -329,11 +363,11 @@ export class SaveService {
   // Execute a single save operation
   private async executeSaveOperation(operation: SaveOperation): Promise<void> {
     const { storyId, entityId, data, type } = operation
-    
+
     // Execute save operation
 
     switch (type) {
-      case 'message-insert':
+      case 'message-insert': {
         // For inserts, we need to know where to insert the message
         // The data should contain the afterMessageId and sceneId
         const insertData = data as Message & { afterMessageId?: string | null }
@@ -342,6 +376,7 @@ export class SaveService {
           throw new Error('sceneId is required to insert a message')
         }
         // Insert message using new endpoint
+        // Note: id is passed for client-side ID generation (offline-first support)
         const insertResponse = await postMyScenesBySceneIdMessages({
           path: { sceneId },
           body: {
@@ -349,15 +384,16 @@ export class SaveService {
             instruction: insertData.instruction,
             script: insertData.script,
             sortOrder: insertData.order,
-          }
+          } as { instruction?: string; script?: string; sortOrder?: number; id?: string },
         })
         // Message inserted
         if (insertResponse.data?.message) {
           this.updateLastKnownTimestamp(insertResponse.data.message.updatedAt)
         }
         break
+      }
 
-      case 'message-update':
+      case 'message-update': {
         // Update message metadata using new endpoint
         // Note: content/paragraphs are saved separately via saveParagraphs()
         const updateData = data as Partial<Message>
@@ -367,25 +403,28 @@ export class SaveService {
             instruction: updateData.instruction,
             script: updateData.script,
             sortOrder: updateData.order,
-          }
+          },
         })
         // Message updated
         if (updateResponse.data?.message) {
           this.updateLastKnownTimestamp(updateResponse.data.message.updatedAt)
         }
         break
+      }
 
-      case 'message-delete':
+      case 'message-delete': {
         const deleteResponse = await deleteMyMessagesById({ path: { id: entityId } })
         if (deleteResponse.data) {
           this.updateLastKnownTimestamp(new Date().toISOString())
         }
         break
+      }
 
-      case 'message-reorder':
+      case 'message-reorder': {
         const reorderResponse = await apiClient.reorderMessages(storyId, data)
         this.updateLastKnownTimestamp(reorderResponse.updatedAt)
         break
+      }
 
       case 'chapter-update': {
         const chapterData = data as Partial<Chapter>
@@ -395,8 +434,8 @@ export class SaveService {
             name: chapterData.title,
             summary: chapterData.summary,
             sortOrder: chapterData.order,
-            nodeType: (chapterData as any).nodeType,
-          }
+            nodeType: chapterData.nodeType,
+          },
         })
         break
       }
@@ -415,10 +454,10 @@ export class SaveService {
             middleName: characterData.middleName || undefined,
             nickname: characterData.nickname || undefined,
             description: characterData.description || undefined,
-            birthdate: characterData.birthdate,
+            birthdate: characterData.birthdate ?? undefined,
             isMainCharacter: characterData.isMainCharacter,
             pictureFileId: characterData.pictureFileId || undefined,
-          }
+          },
         })
         break
       }
@@ -433,10 +472,10 @@ export class SaveService {
             middleName: characterData.middleName,
             nickname: characterData.nickname,
             description: characterData.description,
-            birthdate: characterData.birthdate,
+            birthdate: characterData.birthdate ?? undefined,
             isMainCharacter: characterData.isMainCharacter,
             pictureFileId: characterData.pictureFileId,
-          }
+          },
         })
         break
       }
@@ -454,7 +493,7 @@ export class SaveService {
             name: contextData.name,
             description: contextData.description,
             isGlobal: contextData.isGlobal,
-          }
+          },
         })
         break
       }
@@ -468,7 +507,7 @@ export class SaveService {
             name: contextData.name,
             description: contextData.description,
             isGlobal: contextData.isGlobal,
-          }
+          },
         })
         break
       }
@@ -486,7 +525,7 @@ export class SaveService {
           // Convert base64 to blob
           const base64Data = mapData.imageData.split(',')[1] || mapData.imageData
           const mimeType = mapData.imageData.match(/data:([^;]+);/)?.[1] || 'image/png'
-          const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then(r => r.blob())
+          const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then((r) => r.blob())
 
           // Upload file using multipart/form-data
           const formData = new FormData()
@@ -510,6 +549,7 @@ export class SaveService {
         }
 
         // Create map with fileId
+        // Note: id is passed for client-side ID generation
         await postMyStoriesByStoryIdMaps({
           path: { storyId },
           body: {
@@ -517,7 +557,7 @@ export class SaveService {
             name: mapData.name,
             borderColor: mapData.borderColor,
             fileId,
-          }
+          } as { name: string; id?: string; fileId?: string; borderColor?: string },
         })
         break
       }
@@ -529,7 +569,7 @@ export class SaveService {
           body: {
             name: mapData.name,
             borderColor: mapData.borderColor,
-          }
+          },
         })
         break
       }
@@ -539,7 +579,7 @@ export class SaveService {
         break
 
       case 'landmark-insert': {
-        const landmarkData = data as any // Landmark type from core.ts
+        const landmarkData = data as Landmark
         await postMyMapsByMapIdLandmarks({
           path: { mapId: landmarkData.mapId },
           body: {
@@ -555,13 +595,13 @@ export class SaveService {
             region: landmarkData.region,
             sector: landmarkData.sector,
             planetaryBodies: landmarkData.planetaryBodies,
-          }
+          },
         })
         break
       }
 
       case 'landmark-update': {
-        const landmarkData = data as any // Landmark type from core.ts
+        const landmarkData = data as Landmark
         await putMyLandmarksById({
           path: { id: entityId },
           body: {
@@ -577,7 +617,7 @@ export class SaveService {
             region: landmarkData.region,
             sector: landmarkData.sector,
             planetaryBodies: landmarkData.planetaryBodies,
-          }
+          },
         })
         break
       }
@@ -596,7 +636,7 @@ export class SaveService {
               name: nodeData.title,
               summary: nodeData.summary || undefined,
               sortOrder: nodeData.sortOrder || nodeData.order || 0,
-            }
+            },
           })
         } else if (nodeData.type === 'arc') {
           await postMyBooksByBookIdArcs({
@@ -606,7 +646,7 @@ export class SaveService {
               name: nodeData.title,
               summary: nodeData.summary || undefined,
               sortOrder: nodeData.sortOrder || nodeData.order || 0,
-            }
+            },
           })
         } else if (nodeData.type === 'chapter') {
           await postMyArcsByArcIdChapters({
@@ -616,19 +656,20 @@ export class SaveService {
               name: nodeData.title,
               summary: nodeData.summary || undefined,
               sortOrder: nodeData.sortOrder || nodeData.order || 0,
-              nodeType: (nodeData as any).nodeType || 'story',
-            }
+              nodeType: nodeData.nodeType || 'story',
+            },
           })
         } else if (nodeData.type === 'scene') {
           const { postMyChaptersByChapterIdScenes } = await import('../client/config')
+          // Note: id is passed for client-side ID generation
           await postMyChaptersByChapterIdScenes({
             path: { chapterId: nodeData.parentId! },
             body: {
-              id: nodeData.id, // Pass client-generated ID
+              id: nodeData.id,
               name: nodeData.title,
               summary: nodeData.summary || undefined,
               sortOrder: nodeData.sortOrder || nodeData.order || 0,
-            }
+            } as any,
           })
         }
         break
@@ -643,7 +684,7 @@ export class SaveService {
               name: nodeData.title,
               summary: nodeData.summary,
               sortOrder: nodeData.sortOrder ?? nodeData.order,
-            }
+            },
           })
         } else if (nodeData.type === 'arc') {
           await patchMyArcsById({
@@ -652,7 +693,7 @@ export class SaveService {
               name: nodeData.title,
               summary: nodeData.summary,
               sortOrder: nodeData.sortOrder ?? nodeData.order,
-            }
+            },
           })
         } else if (nodeData.type === 'chapter') {
           await patchMyChaptersById({
@@ -661,8 +702,8 @@ export class SaveService {
               name: nodeData.title,
               summary: nodeData.summary,
               sortOrder: nodeData.sortOrder ?? nodeData.order,
-              nodeType: (nodeData as any).nodeType,
-            }
+              nodeType: nodeData.nodeType,
+            },
           })
         } else if (nodeData.type === 'scene') {
           const { patchMyScenesById } = await import('../client/config')
@@ -672,7 +713,7 @@ export class SaveService {
               name: nodeData.title,
               summary: nodeData.summary,
               sortOrder: nodeData.sortOrder ?? nodeData.order,
-            }
+            },
           })
         }
         break
@@ -693,7 +734,7 @@ export class SaveService {
         break
       }
 
-      case 'node-bulk-update':
+      case 'node-bulk-update': {
         // Bulk update needs to be split into individual updates
         const nodes = data as Node[]
         for (const node of nodes) {
@@ -704,7 +745,7 @@ export class SaveService {
                 name: node.title,
                 summary: node.summary,
                 sortOrder: node.sortOrder ?? node.order,
-              }
+              },
             })
           } else if (node.type === 'arc') {
             await patchMyArcsById({
@@ -713,7 +754,7 @@ export class SaveService {
                 name: node.title,
                 summary: node.summary,
                 sortOrder: node.sortOrder ?? node.order,
-              }
+              },
             })
           } else if (node.type === 'chapter') {
             await patchMyChaptersById({
@@ -722,8 +763,8 @@ export class SaveService {
                 name: node.title,
                 summary: node.summary,
                 sortOrder: node.sortOrder ?? node.order,
-                nodeType: (node as any).nodeType,
-              }
+                nodeType: node.nodeType,
+              },
             })
           } else if (node.type === 'scene') {
             const { patchMyScenesById } = await import('../client/config')
@@ -733,28 +774,33 @@ export class SaveService {
                 name: node.title,
                 summary: node.summary,
                 sortOrder: node.sortOrder ?? node.order,
-              }
+              },
             })
           }
         }
         break
+      }
 
-      case 'context-states':
-        const contextStatesResponse = await apiClient.fetch('/context-states/batch-update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            storyId,
-            ...data
+      case 'context-states': {
+        const contextStatesResponse = await apiClient
+          .fetch('/context-states/batch-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              storyId,
+              ...data,
+            }),
           })
-        }).then(res => res.json())
+          .then((res) => res.json())
         this.updateLastKnownTimestamp(contextStatesResponse.updatedAt)
         break
+      }
 
-      case 'landmark-state':
+      case 'landmark-state': {
         const stateResponse = await apiClient.setLandmarkState(storyId, data)
         this.updateLastKnownTimestamp(stateResponse.updatedAt)
         break
+      }
 
       case 'fleet-insert': {
         const fleetData = data as Fleet
@@ -770,7 +816,7 @@ export class SaveService {
             defaultY: fleetData.defaultY,
             color: fleetData.color,
             size: fleetData.size,
-          }
+          },
         })
         break
       }
@@ -789,7 +835,7 @@ export class SaveService {
             defaultY: fleetData.defaultY,
             color: fleetData.color,
             size: fleetData.size,
-          }
+          },
         })
         break
       }
@@ -798,36 +844,34 @@ export class SaveService {
         await deleteMyPawnsById({ path: { id: entityId } })
         break
 
-      case 'fleet-movement-insert':
+      case 'fleet-movement-insert': {
         const movementCreateResponse = await apiClient.createFleetMovement(
           storyId,
           data.mapId,
           data.fleetId,
-          data as FleetMovement
+          data as FleetMovement,
         )
         this.updateLastKnownTimestamp(movementCreateResponse.updatedAt)
         break
+      }
 
-      case 'fleet-movement-update':
+      case 'fleet-movement-update': {
         const movementUpdateResponse = await apiClient.updateFleetMovement(
           storyId,
           data.mapId,
           data.fleetId,
           entityId,
-          data as FleetMovement
+          data as FleetMovement,
         )
         this.updateLastKnownTimestamp(movementUpdateResponse.updatedAt)
         break
+      }
 
-      case 'fleet-movement-delete':
-        const movementDeleteResponse = await apiClient.deleteFleetMovement(
-          storyId,
-          data.mapId,
-          data.fleetId,
-          entityId
-        )
+      case 'fleet-movement-delete': {
+        const movementDeleteResponse = await apiClient.deleteFleetMovement(storyId, data.mapId, data.fleetId, entityId)
         this.updateLastKnownTimestamp(movementDeleteResponse.updatedAt)
         break
+      }
 
       case 'hyperlane-insert': {
         const hyperlaneData = data as Hyperlane
@@ -836,7 +880,7 @@ export class SaveService {
           path: { mapId: hyperlaneData.mapId },
           body: {
             speedMultiplier: hyperlaneData.speedMultiplier,
-          }
+          },
         })
         // TODO: PathSegments need to be created separately - segments not yet migrated
         break
@@ -849,7 +893,7 @@ export class SaveService {
           path: { id: entityId },
           body: {
             speedMultiplier: hyperlaneData.speedMultiplier,
-          }
+          },
         })
         break
       }
@@ -858,7 +902,7 @@ export class SaveService {
         await deleteMyPathsById({ path: { id: entityId } })
         break
 
-      case 'story-settings':
+      case 'story-settings': {
         console.log('[SaveService] Saving story settings:', data)
         const settingsResponse = await patchMyStoriesById({
           path: { id: storyId },
@@ -867,7 +911,7 @@ export class SaveService {
             summary: data.storySetting,
             // Note: other fields like person, tense, globalScript, etc.
             // will need to be added to unified backend schema
-          }
+          },
         })
         console.log('[SaveService] Settings response:', settingsResponse)
         if (settingsResponse.data?.story.updatedAt) {
@@ -877,6 +921,7 @@ export class SaveService {
           throw new Error(settingsResponse.error.error || 'Failed to save settings')
         }
         break
+      }
 
       default:
         console.warn('Unknown operation type:', type)
@@ -908,7 +953,7 @@ export class SaveService {
 
   private debouncedQueueSave(
     operation: Omit<SaveOperation, 'id' | 'timestamp'>,
-    delay: number = 2000  // Increased from 500ms to 2000ms to reduce saves during streaming
+    delay = 2000, // Increased from 500ms to 2000ms to reduce saves during streaming
   ) {
     const key = `${operation.entityType}-${operation.entityId}`
 
@@ -929,25 +974,24 @@ export class SaveService {
 
   // Public save methods
   saveMessage(
-    storyId: string, 
-    messageId: string, 
-    message: Message, 
-    operation: 'insert' | 'update' | 'delete', 
-    debounce: boolean = true,
-    afterMessageId?: string | null
+    storyId: string,
+    messageId: string,
+    message: Message,
+    operation: 'insert' | 'update' | 'delete',
+    debounce = true,
+    afterMessageId?: string | null,
   ) {
     // Save message
-    
-    const messageData = operation === 'insert' && afterMessageId !== undefined
-      ? { ...message, afterMessageId }
-      : message;
-      
+
+    const messageData =
+      operation === 'insert' && afterMessageId !== undefined ? { ...message, afterMessageId } : message
+
     const saveOp = {
       type: `message-${operation}` as SaveOperationType,
       entityType: 'message' as const,
       entityId: messageId,
       storyId,
-      data: operation !== 'delete' ? messageData : undefined
+      data: operation !== 'delete' ? messageData : undefined,
     }
 
     if (debounce && operation === 'update') {
@@ -959,13 +1003,13 @@ export class SaveService {
     }
   }
 
-  saveChapter(storyId: string, chapterId: string, updates: Partial<Chapter>, debounce: boolean = false) {
+  saveChapter(storyId: string, chapterId: string, updates: Partial<Chapter>, debounce = false) {
     const saveOp = {
       type: 'chapter-update' as SaveOperationType,
       entityType: 'chapter' as const,
       entityId: chapterId,
       storyId,
-      data: updates
+      data: updates,
     }
 
     if (debounce) {
@@ -980,7 +1024,7 @@ export class SaveService {
       type: 'chapter-delete',
       entityType: 'chapter',
       entityId: chapterId,
-      storyId
+      storyId,
     })
   }
 
@@ -990,7 +1034,7 @@ export class SaveService {
       entityType: 'character',
       entityId: character.id,
       storyId,
-      data: character
+      data: character,
     })
   }
 
@@ -1000,7 +1044,7 @@ export class SaveService {
       entityType: 'character',
       entityId: characterId,
       storyId,
-      data: character
+      data: character,
     })
   }
 
@@ -1009,7 +1053,7 @@ export class SaveService {
       type: 'character-delete',
       entityType: 'character',
       entityId: characterId,
-      storyId
+      storyId,
     })
   }
 
@@ -1019,7 +1063,7 @@ export class SaveService {
       entityType: 'context',
       entityId: item.id,
       storyId,
-      data: item
+      data: item,
     })
   }
 
@@ -1029,7 +1073,7 @@ export class SaveService {
       entityType: 'context',
       entityId: itemId,
       storyId,
-      data: item
+      data: item,
     })
   }
 
@@ -1038,7 +1082,7 @@ export class SaveService {
       type: 'context-delete',
       entityType: 'context',
       entityId: itemId,
-      storyId
+      storyId,
     })
   }
 
@@ -1048,17 +1092,17 @@ export class SaveService {
       entityType: 'map',
       entityId: map.id,
       storyId,
-      data: map
+      data: map,
     })
   }
 
-  updateMap(storyId: string, mapId: string, map: StoryMap, debounce: boolean = false) {
+  updateMap(storyId: string, mapId: string, map: StoryMap, debounce = false) {
     const saveOp = {
       type: 'map-update' as SaveOperationType,
       entityType: 'map' as const,
       entityId: mapId,
       storyId,
-      data: map
+      data: map,
     }
 
     if (debounce) {
@@ -1073,7 +1117,7 @@ export class SaveService {
       type: 'map-delete',
       entityType: 'map',
       entityId: mapId,
-      storyId
+      storyId,
     })
   }
 
@@ -1084,17 +1128,17 @@ export class SaveService {
       entityType: 'landmark',
       entityId: landmark.id,
       storyId,
-      data: { ...landmark, mapId }
+      data: { ...landmark, mapId },
     })
   }
 
-  updateLandmark(storyId: string, mapId: string, landmarkId: string, landmark: any, debounce: boolean = false) {
+  updateLandmark(storyId: string, mapId: string, landmarkId: string, landmark: any, debounce = false) {
     const saveOp = {
       type: 'landmark-update' as SaveOperationType,
       entityType: 'landmark' as const,
       entityId: landmarkId,
       storyId,
-      data: { ...landmark, mapId }
+      data: { ...landmark, mapId },
     }
 
     if (debounce) {
@@ -1110,7 +1154,7 @@ export class SaveService {
       entityType: 'landmark',
       entityId: landmarkId,
       storyId,
-      data: { mapId }
+      data: { mapId },
     })
   }
 
@@ -1120,14 +1164,14 @@ export class SaveService {
     landmarkId: string,
     messageId: string,
     field: string,
-    value: string | null
+    value: string | null,
   ) {
     this.queueSave({
       type: 'landmark-state',
       entityType: 'landmark-state',
       entityId: `${mapId}-${landmarkId}-${field}`,
       storyId,
-      data: { mapId, landmarkId, messageId, field, value }
+      data: { mapId, landmarkId, messageId, field, value },
     })
   }
 
@@ -1135,37 +1179,45 @@ export class SaveService {
   saveContextStates(
     storyId: string,
     characterStates: Array<{ characterId: string; messageId: string; isActive: boolean }>,
-    contextItemStates: Array<{ contextItemId: string; messageId: string; isActive: boolean }>
+    contextItemStates: Array<{ contextItemId: string; messageId: string; isActive: boolean }>,
   ) {
     this.queueSave({
       type: 'context-states',
       entityType: 'context-states',
       entityId: `context-states-${Date.now()}`,
       storyId,
-      data: { characterStates, contextItemStates }
+      data: { characterStates, contextItemStates },
     })
   }
 
   // Node operations
-  saveNode(storyId: string, nodeId: string, node: Node | Partial<Node>, operation: 'insert' | 'update' | 'delete', debounce: boolean = false) {
+  saveNode(
+    storyId: string,
+    nodeId: string,
+    node: Node | Partial<Node>,
+    operation: 'insert' | 'update' | 'delete',
+    debounce = false,
+  ) {
     if (operation === 'delete') {
       // Deletes should not be debounced
       this.queueSave({
         type: 'node-delete',
         entityType: 'node',
         entityId: nodeId,
-        storyId
+        storyId,
+        data: node,
       })
     } else {
       // Filter out UI-only and computed fields before saving
-      const { isSummarizing, wordCount, messageWordCounts, children, createdAt, updatedAt, isOpen, ...nodeData } = node as any
+      const { isSummarizing, wordCount, messageWordCounts, children, createdAt, updatedAt, isOpen, ...nodeData } =
+        node as any
 
       const saveOp = {
-        type: operation === 'insert' ? 'node-insert' as const : 'node-update' as const,
+        type: operation === 'insert' ? ('node-insert' as const) : ('node-update' as const),
         entityType: 'node' as const,
         entityId: nodeId,
         storyId,
-        data: nodeData
+        data: nodeData,
       }
 
       if (debounce) {
@@ -1178,8 +1230,9 @@ export class SaveService {
 
   // Bulk update nodes (for structure changes like reordering)
   saveNodesBulk(storyId: string, nodes: Node[]) {
-    const sanitizedNodes = nodes.map(node => {
-      const { isSummarizing, wordCount, messageWordCounts, children, createdAt, updatedAt, isOpen, ...nodeData } = node as any
+    const sanitizedNodes = nodes.map((node) => {
+      const { isSummarizing, wordCount, messageWordCounts, children, createdAt, updatedAt, isOpen, ...nodeData } =
+        node as any
       return nodeData
     })
 
@@ -1188,7 +1241,7 @@ export class SaveService {
       entityType: 'node',
       entityId: `bulk-${Date.now()}`,
       storyId,
-      data: sanitizedNodes
+      data: sanitizedNodes,
     })
   }
 
@@ -1199,26 +1252,29 @@ export class SaveService {
       entityType: 'message',
       entityId: 'reorder-batch', // Special ID for reorder operations
       storyId,
-      data: { items }
+      data: { items },
     })
   }
 
   // Save story settings (person, tense, etc.)
-  saveStorySettings(storyId: string, settings: Partial<{
-    name: string;
-    person: 'first' | 'second' | 'third';
-    tense: 'present' | 'past';
-    storySetting: string;
-    globalScript: string;
-    selectedChapterId: string | null;
-    selectedNodeId: string | null;
-    branchChoices: Record<string, string>;
-    timelineStartTime: number | undefined;
-    timelineEndTime: number | undefined;
-    timelineGranularity: 'hour' | 'day';
-    provider: string;
-    model: string | null;
-  }>) {
+  saveStorySettings(
+    storyId: string,
+    settings: Partial<{
+      name: string
+      person: 'first' | 'second' | 'third'
+      tense: 'present' | 'past'
+      storySetting: string
+      globalScript: string
+      selectedChapterId: string | null
+      selectedNodeId: string | null
+      branchChoices: Record<string, string>
+      timelineStartTime: number | undefined
+      timelineEndTime: number | undefined
+      timelineGranularity: 'hour' | 'day'
+      provider: string
+      model: string | null
+    }>,
+  ) {
     // Generate a unique ID for this settings update
     const settingsId = `settings-${Date.now()}`
 
@@ -1227,7 +1283,7 @@ export class SaveService {
       entityType: 'story-settings',
       entityId: settingsId,
       storyId,
-      data: settings
+      data: settings,
     })
   }
 
@@ -1238,17 +1294,17 @@ export class SaveService {
       entityType: 'fleet',
       entityId: fleet.id,
       storyId,
-      data: { ...fleet, mapId }
+      data: { ...fleet, mapId },
     })
   }
 
-  updateFleet(storyId: string, mapId: string, fleetId: string, fleet: Fleet, debounce: boolean = false) {
+  updateFleet(storyId: string, mapId: string, fleetId: string, fleet: Fleet, debounce = false) {
     const saveOp = {
       type: 'fleet-update' as SaveOperationType,
       entityType: 'fleet' as const,
       entityId: fleetId,
       storyId,
-      data: { ...fleet, mapId }
+      data: { ...fleet, mapId },
     }
 
     if (debounce) {
@@ -1264,7 +1320,7 @@ export class SaveService {
       entityType: 'fleet',
       entityId: fleetId,
       storyId,
-      data: { mapId }
+      data: { mapId },
     })
   }
 
@@ -1274,17 +1330,24 @@ export class SaveService {
       entityType: 'fleet-movement',
       entityId: movement.id,
       storyId,
-      data: { ...movement, mapId, fleetId }
+      data: { ...movement, mapId, fleetId },
     })
   }
 
-  updateFleetMovement(storyId: string, mapId: string, fleetId: string, movementId: string, movement: FleetMovement, debounce: boolean = false) {
+  updateFleetMovement(
+    storyId: string,
+    mapId: string,
+    fleetId: string,
+    movementId: string,
+    movement: FleetMovement,
+    debounce = false,
+  ) {
     const saveOp = {
       type: 'fleet-movement-update' as SaveOperationType,
       entityType: 'fleet-movement' as const,
       entityId: movementId,
       storyId,
-      data: { ...movement, mapId, fleetId }
+      data: { ...movement, mapId, fleetId },
     }
 
     if (debounce) {
@@ -1300,7 +1363,7 @@ export class SaveService {
       entityType: 'fleet-movement',
       entityId: movementId,
       storyId,
-      data: { mapId, fleetId }
+      data: { mapId, fleetId },
     })
   }
 
@@ -1311,17 +1374,17 @@ export class SaveService {
       entityType: 'hyperlane',
       entityId: hyperlane.id,
       storyId,
-      data: { ...hyperlane, mapId }
+      data: { ...hyperlane, mapId },
     })
   }
 
-  updateHyperlane(storyId: string, mapId: string, hyperlaneId: string, hyperlane: Hyperlane, debounce: boolean = false) {
+  updateHyperlane(storyId: string, mapId: string, hyperlaneId: string, hyperlane: Hyperlane, debounce = false) {
     const saveOp = {
       type: 'hyperlane-update' as SaveOperationType,
       entityType: 'hyperlane' as const,
       entityId: hyperlaneId,
       storyId,
-      data: { ...hyperlane, mapId }
+      data: { ...hyperlane, mapId },
     }
 
     if (debounce) {
@@ -1337,7 +1400,7 @@ export class SaveService {
       entityType: 'hyperlane',
       entityId: hyperlaneId,
       storyId,
-      data: { mapId }
+      data: { mapId },
     })
   }
 
@@ -1345,7 +1408,7 @@ export class SaveService {
   async saveFullStory(storyId: string, storyData: any): Promise<void> {
     // Cancel all pending operations
     this.cancelAllPendingSaves()
-    
+
     // Set flag to prevent new saves during full save
     this.state.isFullSaveInProgress = true
     this.onSaveStatusChange?.(true)
@@ -1353,18 +1416,20 @@ export class SaveService {
     try {
       const response = await apiClient.updateStory(storyId, {
         ...storyData,
-        lastKnownUpdatedAt: this.state.lastKnownUpdatedAt
+        lastKnownUpdatedAt: this.state.lastKnownUpdatedAt,
       })
       this.updateLastKnownTimestamp(response.updatedAt)
       // Full story save completed
     } catch (error) {
       // Handle version conflicts
-      if (error instanceof VersionConflictError || 
-          (error instanceof Error && (error as any).code === 'VERSION_CONFLICT')) {
+      if (
+        error instanceof VersionConflictError ||
+        (error instanceof Error && (error as any).code === 'VERSION_CONFLICT')
+      ) {
         const conflictError = error as VersionConflictError
         this.onConflict?.(
           conflictError.serverUpdatedAt || (error as any).serverUpdatedAt,
-          conflictError.clientUpdatedAt || (error as any).clientUpdatedAt
+          conflictError.clientUpdatedAt || (error as any).clientUpdatedAt,
         )
       } else {
         this.onError?.(error as Error)
@@ -1404,10 +1469,10 @@ export class SaveService {
   async saveParagraphs(
     messageRevisionId: string,
     originalParagraphs: Paragraph[],
-    newParagraphs: Paragraph[]
+    newParagraphs: Paragraph[],
   ): Promise<{ created: number; updated: number; deleted: number }> {
-    const originalMap = new Map(originalParagraphs.map(p => [p.id, p]))
-    const newMap = new Map(newParagraphs.map(p => [p.id, p]))
+    const originalMap = new Map(originalParagraphs.map((p) => [p.id, p]))
+    const newMap = new Map(newParagraphs.map((p) => [p.id, p]))
 
     const toCreate: Paragraph[] = []
     const toUpdate: Paragraph[] = []
@@ -1421,9 +1486,11 @@ export class SaveService {
         toCreate.push(newPara)
       } else {
         // Check if changed (compare body and contentSchema)
-        if (original.body !== newPara.body ||
-            original.contentSchema !== newPara.contentSchema ||
-            original.state !== newPara.state) {
+        if (
+          original.body !== newPara.body ||
+          original.contentSchema !== newPara.contentSchema ||
+          original.state !== newPara.state
+        ) {
           toUpdate.push(newPara)
         }
       }
@@ -1436,7 +1503,9 @@ export class SaveService {
       }
     }
 
-    console.log(`[SaveService.saveParagraphs] Changes: ${toCreate.length} create, ${toUpdate.length} update, ${toDelete.length} delete`)
+    console.log(
+      `[SaveService.saveParagraphs] Changes: ${toCreate.length} create, ${toUpdate.length} update, ${toDelete.length} delete`,
+    )
 
     // Execute all operations
     const errors: Error[] = []
@@ -1445,6 +1514,7 @@ export class SaveService {
     for (let i = 0; i < toCreate.length; i++) {
       const para = toCreate[i]
       try {
+        // Note: id and contentSchema passed for client-side ID generation and rich text
         await postMyMessageRevisionsByRevisionIdParagraphs({
           path: { revisionId: messageRevisionId },
           body: {
@@ -1452,8 +1522,8 @@ export class SaveService {
             body: para.body,
             contentSchema: para.contentSchema,
             state: para.state?.toUpperCase() as any,
-            sortOrder: newParagraphs.findIndex(p => p.id === para.id),
-          },
+            sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
+          } as any,
         })
         console.log(`[SaveService.saveParagraphs] Created paragraph ${para.id}`)
       } catch (error) {
@@ -1465,14 +1535,15 @@ export class SaveService {
     // Update changed paragraphs
     for (const para of toUpdate) {
       try {
+        // Note: contentSchema passed for rich text editing
         await patchMyParagraphsById({
           path: { id: para.id },
           body: {
             body: para.body,
             contentSchema: para.contentSchema,
             state: para.state?.toUpperCase() as any,
-            sortOrder: newParagraphs.findIndex(p => p.id === para.id),
-          },
+            sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
+          } as any,
         })
         console.log(`[SaveService.saveParagraphs] Updated paragraph ${para.id}`)
       } catch (error) {
@@ -1511,7 +1582,7 @@ export class SaveService {
       isSaving: this.state.isProcessing || this.state.isFullSaveInProgress,
       queueLength: this.state.queue.length,
       currentOperation: this.state.currentOperation,
-      isFullSaveInProgress: this.state.isFullSaveInProgress
+      isFullSaveInProgress: this.state.isFullSaveInProgress,
     }
   }
 }

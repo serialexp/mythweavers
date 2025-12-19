@@ -4,21 +4,21 @@
  * Helpers for calculating fleet positions and movements over time
  */
 
-import { Fleet } from "../types/core";
+import { Fleet } from '../types/core'
 
 export interface FleetPosition {
-  x: number;
-  y: number;
-  status: 'stationed' | 'in_transit';
+  x: number
+  y: number
+  status: 'stationed' | 'in_transit'
 }
 
 /**
  * Calculate the Euclidean distance between two points on the map
  */
 export function calculateDistance(x1: number, y1: number, x2: number, y2: number): number {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  return Math.sqrt(dx * dx + dy * dy);
+  const dx = x2 - x1
+  const dy = y2 - y1
+  return Math.sqrt(dx * dx + dy * dy)
 }
 
 /**
@@ -37,16 +37,16 @@ export function calculateTravelTime(
   startY: number,
   endX: number,
   endY: number,
-  hyperdriveRating: number
+  hyperdriveRating: number,
 ): number {
-  const distance = calculateDistance(startX, startY, endX, endY);
+  const distance = calculateDistance(startX, startY, endX, endY)
 
   // Base travel time: diagonal = 31.5 days = 45,360 minutes (7 days * 4.5)
-  const baseMinutesPerUnit = 45360 / 1.414;
-  const baseTime = distance * baseMinutesPerUnit;
+  const baseMinutesPerUnit = 45360 / Math.SQRT2
+  const baseTime = distance * baseMinutesPerUnit
 
   // Adjust by hyperdrive rating
-  return Math.round(baseTime * hyperdriveRating);
+  return Math.round(baseTime * hyperdriveRating)
 }
 
 /**
@@ -54,46 +54,43 @@ export function calculateTravelTime(
  *
  * Returns the fleet's position or null if the fleet is "in transit" without a visible position
  */
-export function getFleetPositionAtTime(
-  fleet: Fleet,
-  storyTime: number
-): FleetPosition {
+export function getFleetPositionAtTime(fleet: Fleet, storyTime: number): FleetPosition {
   // Sort movements by start time
-  const sortedMovements = [...fleet.movements].sort((a, b) => a.startStoryTime - b.startStoryTime);
+  const sortedMovements = [...fleet.movements].sort((a, b) => a.startStoryTime - b.startStoryTime)
 
   // If no movements, fleet is at default position
   if (sortedMovements.length === 0) {
     return {
       x: fleet.defaultX,
       y: fleet.defaultY,
-      status: 'stationed'
-    };
+      status: 'stationed',
+    }
   }
 
   // Check if before first movement
-  const firstMovement = sortedMovements[0];
+  const firstMovement = sortedMovements[0]
   if (storyTime < firstMovement.startStoryTime) {
     return {
       x: fleet.defaultX,
       y: fleet.defaultY,
-      status: 'stationed'
-    };
+      status: 'stationed',
+    }
   }
 
   // Find the relevant movement
   for (let i = 0; i < sortedMovements.length; i++) {
-    const movement = sortedMovements[i];
-    const nextMovement = sortedMovements[i + 1];
+    const movement = sortedMovements[i]
+    const nextMovement = sortedMovements[i + 1]
 
     // Currently in transit for this movement
     if (storyTime >= movement.startStoryTime && storyTime < movement.endStoryTime) {
       // Interpolate position
-      const progress = (storyTime - movement.startStoryTime) / (movement.endStoryTime - movement.startStoryTime);
+      const progress = (storyTime - movement.startStoryTime) / (movement.endStoryTime - movement.startStoryTime)
       return {
         x: movement.startX + (movement.endX - movement.startX) * progress,
         y: movement.startY + (movement.endY - movement.startY) * progress,
-        status: 'in_transit'
-      };
+        status: 'in_transit',
+      }
     }
 
     // After this movement ends
@@ -103,8 +100,8 @@ export function getFleetPositionAtTime(
         return {
           x: movement.endX,
           y: movement.endY,
-          status: 'stationed'
-        };
+          status: 'stationed',
+        }
       }
 
       // If this is the last movement and we're past it, fleet is at final position
@@ -112,8 +109,8 @@ export function getFleetPositionAtTime(
         return {
           x: movement.endX,
           y: movement.endY,
-          status: 'stationed'
-        };
+          status: 'stationed',
+        }
       }
     }
   }
@@ -122,15 +119,15 @@ export function getFleetPositionAtTime(
   return {
     x: fleet.defaultX,
     y: fleet.defaultY,
-    status: 'stationed'
-  };
+    status: 'stationed',
+  }
 }
 
 /**
  * Check if a fleet is currently in transit at a given time
  */
 export function isFleetInTransit(fleet: Fleet, storyTime: number): boolean {
-  return getFleetPositionAtTime(fleet, storyTime).status === 'in_transit';
+  return getFleetPositionAtTime(fleet, storyTime).status === 'in_transit'
 }
 
 /**
@@ -138,7 +135,5 @@ export function isFleetInTransit(fleet: Fleet, storyTime: number): boolean {
  * Returns the movement where storyTime is between startStoryTime and endStoryTime
  */
 export function getActiveMovement(fleet: Fleet, storyTime: number) {
-  return fleet.movements.find(
-    m => storyTime >= m.startStoryTime && storyTime < m.endStoryTime
-  );
+  return fleet.movements.find((m) => storyTime >= m.startStoryTime && storyTime < m.endStoryTime)
 }

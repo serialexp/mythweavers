@@ -1,12 +1,21 @@
-import { Component, onMount, onCleanup, createEffect } from 'solid-js'
-import { EditorView, keymap, highlightSpecialChars, drawSelection, highlightActiveLine, dropCursor, rectangularSelection, placeholder } from '@codemirror/view'
-import { EditorState, Compartment } from '@codemirror/state'
+import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { html } from '@codemirror/lang-html'
+import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { Compartment, EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language'
-import styles from './CodeEditor.module.css'
+import {
+  EditorView,
+  drawSelection,
+  dropCursor,
+  highlightActiveLine,
+  highlightSpecialChars,
+  keymap,
+  placeholder,
+  rectangularSelection,
+} from '@codemirror/view'
+import { Component, createEffect, onCleanup, onMount } from 'solid-js'
+import * as styles from './CodeEditor.css'
 
 interface EJSCodeEditorProps {
   value: string
@@ -27,7 +36,7 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
   onMount(() => {
     // Detect if user prefers dark mode
     const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
-    
+
     // Create a basic setup for EJS editing
     const basicExtensions = [
       history(),
@@ -42,13 +51,7 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
       highlightActiveLine(),
       highlightSpecialChars(),
       EditorView.lineWrapping,
-      keymap.of([
-        ...closeBracketsKeymap,
-        ...defaultKeymap,
-        ...historyKeymap,
-        ...completionKeymap,
-        indentWithTab
-      ])
+      keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),
     ]
 
     const startState = EditorState.create({
@@ -58,7 +61,7 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
         // Use HTML mode for EJS templates (gives decent highlighting for mixed content)
         html({
           matchClosingTags: true,
-          autoCloseTags: false // Don't auto-close since we're not writing HTML
+          autoCloseTags: false, // Don't auto-close since we're not writing HTML
         }),
         ...(isDarkMode ? [oneDark] : []),
         ...(props.placeholder ? [placeholder(props.placeholder)] : []),
@@ -70,51 +73,51 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
         }),
         readOnlyCompartment.of(EditorState.readOnly.of(props.readOnly || false)),
         EditorView.theme({
-          "&": {
-            fontSize: "14px",
-            height: props.height || "auto"
+          '&': {
+            fontSize: '14px',
+            height: props.height || 'auto',
           },
-          ".cm-content": {
-            padding: "8px 12px",
-            minHeight: props.minHeight || props.height || "60px",
-            fontFamily: "'Monaco', 'Menlo', 'Ubuntu Mono', monospace"
+          '.cm-content': {
+            padding: '8px 12px',
+            minHeight: props.minHeight || props.height || '60px',
+            fontFamily: "'Monaco', 'Menlo', 'Ubuntu Mono', monospace",
           },
-          ".cm-focused .cm-cursor": {
-            borderLeftColor: "var(--primary-color)"
+          '.cm-focused .cm-cursor': {
+            borderLeftColor: 'var(--primary-color)',
           },
-          ".cm-placeholder": {
-            color: "var(--text-secondary)",
-            fontStyle: "italic"
+          '.cm-placeholder': {
+            color: 'var(--text-secondary)',
+            fontStyle: 'italic',
           },
-          "&.cm-editor": {
-            border: "1px solid var(--border-color)",
-            borderRadius: "4px",
-            backgroundColor: "var(--surface-primary)"
+          '&.cm-editor': {
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--surface-primary)',
           },
-          "&.cm-editor.cm-focused": {
-            outline: "2px solid var(--primary-color)",
-            outlineOffset: "-1px"
+          '&.cm-editor.cm-focused': {
+            outline: '2px solid var(--primary-color)',
+            outlineOffset: '-1px',
           },
-          ".cm-gutters": {
-            display: "none" // Hide line numbers for character descriptions
+          '.cm-gutters': {
+            display: 'none', // Hide line numbers for character descriptions
           },
           // Style EJS tags distinctively
-          ".cm-tag": {
-            color: "var(--primary-color)"
+          '.cm-tag': {
+            color: 'var(--primary-color)',
           },
-          ".cm-attribute": {
-            color: "var(--secondary-color)"
+          '.cm-attribute': {
+            color: 'var(--secondary-color)',
           },
-          ".cm-string": {
-            color: "var(--success-color)"
-          }
-        })
-      ]
+          '.cm-string': {
+            color: 'var(--success-color)',
+          },
+        }),
+      ],
     })
 
     view = new EditorView({
       state: startState,
-      parent: editorContainer!
+      parent: editorContainer!,
     })
 
     // Expose methods to parent via ref
@@ -125,10 +128,10 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
             const pos = view.state.selection.main.head
             view.dispatch({
               changes: { from: pos, insert: text },
-              selection: { anchor: pos + text.length }
+              selection: { anchor: pos + text.length },
             })
           }
-        }
+        },
       })
     }
   })
@@ -140,8 +143,8 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
         changes: {
           from: 0,
           to: view.state.doc.length,
-          insert: props.value
-        }
+          insert: props.value,
+        },
       })
     }
   })
@@ -150,7 +153,7 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
   createEffect(() => {
     if (view && props.readOnly !== undefined) {
       view.dispatch({
-        effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(props.readOnly))
+        effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(props.readOnly)),
       })
     }
   })
@@ -161,10 +164,7 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
 
   return (
     <div class={styles.container}>
-      <div 
-        ref={editorContainer} 
-        class={`${styles.editor} ${props.error ? styles.hasError : ''}`}
-      />
+      <div ref={editorContainer} class={`${styles.editor} ${props.error ? styles.hasError : ''}`} />
     </div>
   )
 }

@@ -1,7 +1,13 @@
 import { JSX, splitProps } from 'solid-js'
-import { container, type ContainerVariants } from './Container.css'
+import { container } from './Container.css'
 
-export interface ContainerProps extends ContainerVariants {
+export interface ContainerProps {
+  /** Container max-width size */
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
+  /** Container padding */
+  padding?: 'none' | 'sm' | 'md' | 'lg'
+  /** Center content */
+  center?: boolean
   /** Container content */
   children?: JSX.Element
   /** Additional class */

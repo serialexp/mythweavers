@@ -1,6 +1,6 @@
-import { Component } from 'solid-js'
+import { IconButton } from '@mythweavers/ui'
 import { BsPlus } from 'solid-icons/bs'
-import { IconButton } from './IconButton'
+import { Component } from 'solid-js'
 
 interface InsertMessageButtonProps {
   onInsert: () => void
@@ -8,10 +8,7 @@ interface InsertMessageButtonProps {
 
 export const InsertMessageButton: Component<InsertMessageButtonProps> = (props) => {
   return (
-    <IconButton
-      onClick={props.onInsert}
-      title="Insert new message here"
-    >
+    <IconButton onClick={props.onInsert} aria-label="Insert new message here">
       <BsPlus size={18} />
     </IconButton>
   )

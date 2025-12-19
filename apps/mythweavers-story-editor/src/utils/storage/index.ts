@@ -23,7 +23,7 @@ const LOCAL_STORAGE_KEYS = [
   // Migration status keys
   'story-storage-migrated',
   'story-storage-migration-status',
-  'story-storage-migration-info'
+  'story-storage-migration-info',
 ]
 
 class StorageManager {
@@ -47,7 +47,7 @@ class StorageManager {
     // Create IndexedDB provider
     this.storageProvider = new IndexedDBProvider({
       name: 'StoryWriterDB',
-      version: 1
+      version: 1,
     })
 
     // Perform migration from localStorage
@@ -74,9 +74,8 @@ class StorageManager {
 
       // Get all localStorage keys
       const allKeys = Object.keys(localStorage)
-      const keysToMigrate = allKeys.filter(key => 
-        !LOCAL_STORAGE_KEYS.includes(key) && 
-        !key.includes('storage-migration')
+      const keysToMigrate = allKeys.filter(
+        (key) => !LOCAL_STORAGE_KEYS.includes(key) && !key.includes('storage-migration'),
       )
 
       let migratedCount = 0
@@ -91,7 +90,7 @@ class StorageManager {
             let parsedValue
             try {
               parsedValue = JSON.parse(value)
-              
+
               // Special handling for saved stories to ensure they have storageMode
               if (key.startsWith('story-saved-') && typeof parsedValue === 'object') {
                 // If no storageMode is set, determine based on serverId
@@ -99,12 +98,12 @@ class StorageManager {
                   parsedValue.storageMode = parsedValue.serverId ? 'server' : 'local'
                 }
               }
-              
+
               // Special handling for story index
               if (key === 'story-index' && Array.isArray(parsedValue)) {
-                parsedValue = parsedValue.map(story => ({
+                parsedValue = parsedValue.map((story) => ({
                   ...story,
-                  storageMode: story.storageMode || (story.serverId ? 'server' : 'local')
+                  storageMode: story.storageMode || (story.serverId ? 'server' : 'local'),
                 }))
               }
             } catch {
@@ -124,13 +123,16 @@ class StorageManager {
 
       // Mark migration as done (but not cleaned up)
       localStorage.setItem('story-storage-migrated', 'true')
-      localStorage.setItem('story-storage-migration-info', JSON.stringify({
-        date: new Date().toISOString(),
-        keysToMigrate: keysToMigrate.length,
-        migratedCount,
-        errors: migrationErrors
-      }))
-      
+      localStorage.setItem(
+        'story-storage-migration-info',
+        JSON.stringify({
+          date: new Date().toISOString(),
+          keysToMigrate: keysToMigrate.length,
+          migratedCount,
+          errors: migrationErrors,
+        }),
+      )
+
       console.log(`Migration completed: ${migratedCount}/${keysToMigrate.length} keys migrated`)
       if (migrationErrors.length > 0) {
         console.error('Failed to migrate keys:', migrationErrors)
@@ -161,9 +163,8 @@ class StorageManager {
 
       // Remove migrated keys from localStorage
       const allKeys = Object.keys(localStorage)
-      const keysToRemove = allKeys.filter(key => 
-        !LOCAL_STORAGE_KEYS.includes(key) && 
-        !key.includes('storage-migration')
+      const keysToRemove = allKeys.filter(
+        (key) => !LOCAL_STORAGE_KEYS.includes(key) && !key.includes('storage-migration'),
       )
 
       let removedCount = 0
@@ -178,10 +179,10 @@ class StorageManager {
 
       // Mark cleanup as complete
       localStorage.setItem('story-storage-migration-status', 'completed')
-      
+
       const message = `Successfully cleaned up ${removedCount} keys from localStorage`
       console.log(message)
-      
+
       return { success: true, message }
     } catch (error) {
       console.error('Cleanup failed:', error)
@@ -257,7 +258,7 @@ class StorageManager {
         valueType: typeof value,
         errorName: error instanceof Error ? error.name : 'Unknown',
         errorMessage: error instanceof Error ? error.message : String(error),
-        isDOMException: error instanceof DOMException
+        isDOMException: error instanceof DOMException,
       })
       throw error
     }
@@ -332,7 +333,7 @@ class StorageManager {
     return {
       indexedDBKeys: indexedDBKeys.length,
       localStorageKeys: localStorageKeys.length,
-      estimatedSize
+      estimatedSize,
     }
   }
 }

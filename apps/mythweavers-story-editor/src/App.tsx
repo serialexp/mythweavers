@@ -1,52 +1,205 @@
-import { Component, createEffect, Show, createSignal, onCleanup, createMemo, onMount, untrack } from 'solid-js'
 import { Route, useNavigate, useParams } from '@solidjs/router'
+import { Component, JSX, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from 'solid-js'
 import './styles/variables.css'
 import './App.css'
-import styles from './App.module.css'
-import { Message, Character, Chapter, ContextItem, Node } from './types/core'
-import { ApiStory } from './types/api'
-import { useOllama } from './hooks/useOllama'
-import { useStoryGeneration } from './hooks/useStoryGeneration'
-import { useCacheManagement } from './hooks/useCacheManagement'
-import { migrateChaptersToScenes, needsSceneMigration } from './utils/scenesMigration'
-import { SceneEditorWrapper } from './components/SceneEditorWrapper'
-import { MessageList } from './components/MessageList'
-import { GlobalStatusIndicator } from './components/GlobalStatusIndicator'
-import { PendingEntitiesModal } from './components/PendingEntitiesModal'
-import { StorageFullModal } from './components/StorageFullModal'
-import { StorageMigrationBanner } from './components/StorageMigrationBanner'
+import { Spinner } from '@mythweavers/ui'
 import { ConflictResolutionDialog } from './components/ConflictResolutionDialog'
-import { StoryInput } from './components/StoryInput'
-import { StoryHeader } from './components/StoryHeader'
-import { StoryManager } from './components/StoryManager'
 import { ContextPreviewModal } from './components/ContextPreviewModal'
-import { StoryLandingPage } from './components/StoryLandingPage'
-import { MessageRewriterDialog } from './components/MessageRewriterDialog'
-import { SearchModal } from './components/SearchModal'
 import { CopyTokenModal } from './components/CopyTokenModal'
 import { EpisodeViewer } from './components/EpisodeViewer'
 import { ErrorNotifications } from './components/ErrorNotifications'
-import { ServerStatusIndicator } from './components/ServerStatusIndicator'
+import { GlobalStatusIndicator } from './components/GlobalStatusIndicator'
 import { LoginForm } from './components/LoginForm'
+// SceneEditorWrapper import removed - component used via lazy loading or routes
+import { MessageList } from './components/MessageList'
+import { MessageRewriterDialog } from './components/MessageRewriterDialog'
+import { PendingEntitiesModal } from './components/PendingEntitiesModal'
 import { ResetPassword } from './components/ResetPassword'
-import { AboutPage } from './pages/AboutPage'
+import { SearchModal } from './components/SearchModal'
+import { ServerStatusIndicator } from './components/ServerStatusIndicator'
+import { StorageFullModal } from './components/StorageFullModal'
+import { StoryHeader } from './components/StoryHeader'
+import { StoryInput } from './components/StoryInput'
+import { StoryLandingPage } from './components/StoryLandingPage'
+import { StoryManager } from './components/StoryManager'
 import { StoryNavigation } from './components/StoryNavigation'
-import { messagesStore } from './stores/messagesStore'
-import { settingsStore } from './stores/settingsStore'
-import { modelsStore } from './stores/modelsStore'
+import { useCacheManagement } from './hooks/useCacheManagement'
+import { useOllama } from './hooks/useOllama'
+import { useStoryGeneration } from './hooks/useStoryGeneration'
+import { authStore } from './stores/authStore'
+import { calendarStore } from './stores/calendarStore'
 import { charactersStore } from './stores/charactersStore'
 import { contextItemsStore } from './stores/contextItemsStore'
-import { globalOperationStore } from './stores/globalOperationStore'
-import { storyManager } from './utils/storyManager'
 import { currentStoryStore } from './stores/currentStoryStore'
-import { serverStore } from './stores/serverStore'
-import { authStore } from './stores/authStore'
+import { episodeViewerStore } from './stores/episodeViewerStore'
+import { globalOperationStore } from './stores/globalOperationStore'
+import { headerStore } from './stores/headerStore'
+import { mapsStore } from './stores/mapsStore'
+import { messagesStore } from './stores/messagesStore'
+import { navigationStore } from './stores/navigationStore'
+import { modelsStore } from './stores/modelsStore'
 import { nodeStore } from './stores/nodeStore'
 import { rewriteDialogStore } from './stores/rewriteDialogStore'
-import { headerStore } from './stores/headerStore'
-import { episodeViewerStore } from './stores/episodeViewerStore'
-import { mapsStore } from './stores/mapsStore'
-import { calendarStore } from './stores/calendarStore'
+import { serverStore } from './stores/serverStore'
+import { settingsStore } from './stores/settingsStore'
+import { ApiStory } from './types/api'
+import { Chapter, Character, ContextItem, Message, Node } from './types/core'
+import { migrateChaptersToScenes, needsSceneMigration } from './utils/scenesMigration'
+import { storyManager } from './utils/storyManager'
+
+// App layout styles
+const appStyles = {
+  app: {
+    display: 'flex',
+    'flex-direction': 'column',
+    height: '100vh',
+    width: '100%',
+    background: 'var(--bg-primary)',
+  } as JSX.CSSProperties,
+
+  mainContent: {
+    display: 'flex',
+    'flex-direction': 'row',
+    flex: '1',
+    overflow: 'hidden',
+    position: 'relative',
+  } as JSX.CSSProperties,
+
+  desktopNavigation: {
+    width: '400px',
+    'flex-shrink': '0',
+    height: '100%',
+    'border-right': '1px solid var(--border-color)',
+    background: 'var(--bg-secondary)',
+    overflow: 'hidden',
+  } as JSX.CSSProperties,
+
+  // Mobile navigation overlay
+  mobileNavigation: {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    width: '85vw',
+    'max-width': '400px',
+    height: '100vh',
+    background: 'var(--bg-secondary)',
+    'z-index': '900',
+    'box-shadow': '4px 0 20px rgba(0, 0, 0, 0.3)',
+    overflow: 'hidden',
+    animation: 'slideInFromLeft 0.2s ease-out',
+  } as JSX.CSSProperties,
+
+  mobileNavBackdrop: {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    background: 'rgba(0, 0, 0, 0.5)',
+    'z-index': '899',
+  } as JSX.CSSProperties,
+
+  desktopEpisodeViewer: {
+    width: '400px',
+    'flex-shrink': '0',
+    height: '100%',
+    background: 'var(--bg-secondary)',
+    overflow: 'hidden',
+  } as JSX.CSSProperties,
+
+  chatContainer: {
+    flex: '1',
+    display: 'flex',
+    'flex-direction': 'column',
+    overflow: 'hidden',
+    background: 'var(--bg-primary)',
+    'max-width': '60rem',
+    margin: '0 auto',
+  } as JSX.CSSProperties,
+
+  authLoadingOverlay: {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    background: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    'align-items': 'center',
+    'justify-content': 'center',
+    'z-index': '9999',
+  } as JSX.CSSProperties,
+
+  authLoadingContent: {
+    display: 'flex',
+    'flex-direction': 'column',
+    'align-items': 'center',
+    gap: '1.5rem',
+    background: 'var(--bg-primary)',
+    padding: '2rem 3rem',
+    'border-radius': 'var(--radius-lg)',
+    'box-shadow': 'var(--shadow-lg)',
+  } as JSX.CSSProperties,
+
+  loadingContainer: {
+    display: 'flex',
+    'flex-direction': 'column',
+    'align-items': 'center',
+    'justify-content': 'center',
+    height: '100vh',
+    gap: '1.5rem',
+  } as JSX.CSSProperties,
+
+  loadingText: {
+    color: 'var(--text-secondary)',
+    'font-size': '1.125rem',
+    'font-weight': '500',
+  } as JSX.CSSProperties,
+
+  errorText: {
+    color: 'var(--error-color, #ef4444)',
+    'font-size': '1.125rem',
+    'text-align': 'center',
+    'max-width': '400px',
+    'line-height': '1.5',
+  } as JSX.CSSProperties,
+
+  errorContainer: {
+    display: 'flex',
+    'flex-direction': 'column',
+    'align-items': 'center',
+    gap: '1rem',
+    padding: '2rem',
+    background: 'var(--bg-secondary)',
+    'border-radius': 'var(--radius-md)',
+    border: '1px solid var(--border-color)',
+  } as JSX.CSSProperties,
+
+  errorTitle: {
+    'font-size': '1.25rem',
+    'font-weight': '600',
+    color: 'var(--error-color, #ef4444)',
+  } as JSX.CSSProperties,
+
+  errorDetails: {
+    'margin-top': '1rem',
+    'font-size': '0.875rem',
+    color: 'var(--text-secondary)',
+    'max-width': '100%',
+    overflow: 'auto',
+  } as JSX.CSSProperties,
+
+  retryButton: {
+    'margin-top': '1rem',
+    padding: '0.5rem 1rem',
+    background: 'var(--primary-color)',
+    color: 'white',
+    border: 'none',
+    'border-radius': 'var(--radius-sm)',
+    cursor: 'pointer',
+    'font-size': '1rem',
+  } as JSX.CSSProperties,
+}
 
 // Component to redirect to login
 const RedirectToLogin: Component = () => {
@@ -54,16 +207,29 @@ const RedirectToLogin: Component = () => {
   onMount(() => {
     navigate('/login', { replace: true })
   })
-  return <div class={styles.app}>Redirecting...</div>
+  return <div style={appStyles.app}>Redirecting...</div>
 }
 
 const App: Component = () => {
   const { generateResponse, generateSummaries, abortGeneration, isGenerating, checkIfOllamaIsBusy } = useOllama()
 
   const [showContextPreview, setShowContextPreview] = createSignal(false)
-  const [contextPreviewData, setContextPreviewData] = createSignal<{type: string, messages: Array<{role: 'system' | 'user' | 'assistant', content: string, cache_control?: {type: 'ephemeral', ttl?: '5m' | '1h'}}> } | null>(null)
+  const [contextPreviewData, setContextPreviewData] = createSignal<{
+    type: string
+    messages: Array<{
+      role: 'system' | 'user' | 'assistant'
+      content: string
+      cache_control?: { type: 'ephemeral'; ttl?: '5m' | '1h' }
+    }>
+  } | null>(null)
   const [ollamaExternallyBusy, setOllamaExternallyBusy] = createSignal(false)
-  const [serverDataConflict, setServerDataConflict] = createSignal<{serverStory: ApiStory, localMessages: Message[]} | null>(null)
+  const [serverDataConflict, setServerDataConflict] = createSignal<{
+    serverStory: ApiStory
+    localMessages: Message[]
+  } | null>(null)
+
+  // Mobile detection - updates on window resize
+  const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768)
 
   // Check if story is initialized
   const storyLoaded = createMemo(() => currentStoryStore.isInitialized)
@@ -75,7 +241,7 @@ const App: Component = () => {
     regenerateLastMessage,
     handleSummarizeMessage,
     handleAnalyzeMessage,
-    handleShowContextPreview
+    handleShowContextPreview,
   } = useStoryGeneration({
     generateResponse,
     generateSummaries,
@@ -86,15 +252,15 @@ const App: Component = () => {
 
   // Effective context size based on model and provider
   const effectiveContextSize = createMemo(() => {
-    const selectedModel = modelsStore.availableModels.find(m => m.name === settingsStore.model)
-    
+    const selectedModel = modelsStore.availableModels.find((m) => m.name === settingsStore.model)
+
     // For Anthropic and OpenRouter, always use the model's full context length
     if (settingsStore.provider === 'anthropic' || settingsStore.provider === 'openrouter') {
       if (selectedModel?.context_length) {
         return selectedModel.context_length
       }
     }
-    
+
     // For Ollama, use the minimum of user setting and model's context length
     if (selectedModel?.context_length) {
       return Math.min(settingsStore.contextSize, selectedModel.context_length)
@@ -120,11 +286,18 @@ const App: Component = () => {
       serverStore.checkHealth()
     }
 
+    // Update mobile detection on resize
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+
     window.addEventListener('focus', handleFocus)
+    window.addEventListener('resize', handleResize)
 
     onCleanup(() => {
       cleanup()
       window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('resize', handleResize)
     })
   })
 
@@ -140,7 +313,6 @@ const App: Component = () => {
     }
   })
 
-  
   // Helper function to load server story data from export format
   const loadServerStoryData = async (exportData: any, storyId: string) => {
     try {
@@ -167,7 +339,7 @@ const App: Component = () => {
         undefined, // TODO: We removed timelineEndTime from the schema
         'hour', // TODO: We removed timelineGranularity from the schema
         story.provider || 'ollama',
-        story.model
+        story.model,
       )
 
       console.log('[loadServerStoryData] Setting last known updated at...')
@@ -278,15 +450,16 @@ const App: Component = () => {
               scene.messages?.forEach((message: any) => {
                 if (message.revision) {
                   // Map paragraphs using body/contentSchema format directly (matches backend)
-                  const paragraphs = message.revision.paragraphs?.map((para: any) => ({
-                    id: para.id,
-                    body: para.revision?.body || '',
-                    contentSchema: para.revision?.contentSchema || null,
-                    state: (para.revision?.state || 'draft').toLowerCase(),
-                    comments: [],
-                    plotPointActions: para.revision?.plotPointActions || [],
-                    inventoryActions: para.revision?.inventoryActions || [],
-                  })) || []
+                  const paragraphs =
+                    message.revision.paragraphs?.map((para: any) => ({
+                      id: para.id,
+                      body: para.revision?.body || '',
+                      contentSchema: para.revision?.contentSchema || null,
+                      state: (para.revision?.state || 'draft').toLowerCase(),
+                      comments: [],
+                      plotPointActions: para.revision?.plotPointActions || [],
+                      inventoryActions: para.revision?.inventoryActions || [],
+                    })) || []
 
                   // Create flattened content for display (body is always plain text)
                   const content = paragraphs.map((p: any) => p.body).join('\n\n')
@@ -335,7 +508,7 @@ const App: Component = () => {
         null, // selectedChapterId
         contextItems || [],
         nodes,
-        null // selectedNodeId - will auto-select first chapter
+        null, // selectedNodeId - will auto-select first chapter
       )
 
       // Clean up any local duplicate
@@ -369,14 +542,14 @@ const App: Component = () => {
   // Load story by ID (used by story route)
   const loadStoryById = async (storyId: string): Promise<boolean> => {
     // Loading story by ID
-    
+
     // Check if this is an old ID format (timestamp-based)
     // Matches patterns like: 1754232850821-w2kv7u3vl or 1754232438376-pm7i6zrj2
     if (/^\d{13}-\w+$/.test(storyId)) {
       // Detected old story ID format
       return false
     }
-    
+
     // Try server first (server stories take priority)
     try {
       const { getMyStoriesByIdExport } = await import('./client/config')
@@ -403,9 +576,8 @@ const App: Component = () => {
         // Load the exported story data
         await loadServerStoryData(exportData, storyId)
         return true
-      } else {
-        console.log('[loadStoryById] Export succeeded but no story in response data:', exportData)
       }
+      console.log('[loadStoryById] Export succeeded but no story in response data:', exportData)
     } catch (error: any) {
       console.log('[loadStoryById] Export endpoint failed:', error)
 
@@ -423,18 +595,16 @@ const App: Component = () => {
         })
 
         // Set error state instead of "not found"
-        setStoryLoadError({
-          message: errorMessage,
-          details: errorDetails,
-          status,
-        })
+        // TODO: setStoryLoadError is defined in StoryPage, not accessible here
+        // This code path should display the error differently
+        console.error('[loadStoryById] Cannot set story load error - signal not in scope')
         return false
       }
 
       // 404 or other client errors - try local storage
       // Story not found on server, checking local storage
     }
-    
+
     // If not on server, try local storage
     const story = await storyManager.loadStory(storyId)
     if (story) {
@@ -456,7 +626,7 @@ const App: Component = () => {
         story.timelineEndTime,
         story.timelineGranularity,
         story.provider,
-        story.model
+        story.model,
       )
 
       // Sync provider and model from story to settingsStore
@@ -467,8 +637,8 @@ const App: Component = () => {
       let messagesToLoad = story.messages || []
 
       if (nodesToLoad.length > 0) {
-        const chapters = nodesToLoad.filter(n => n.type === 'chapter')
-        const scenes = nodesToLoad.filter(n => n.type === 'scene')
+        const chapters = nodesToLoad.filter((n) => n.type === 'chapter')
+        const scenes = nodesToLoad.filter((n) => n.type === 'scene')
 
         if (needsSceneMigration(chapters, scenes, messagesToLoad)) {
           console.log('[loadStoryById] Running scene migration for local story')
@@ -486,20 +656,30 @@ const App: Component = () => {
       }
 
       // Load the story data
-      handleLoadStory(messagesToLoad, story.characters, story.input, story.storySetting, story.chapters, story.selectedChapterId, story.contextItems, nodesToLoad, story.selectedNodeId)
+      handleLoadStory(
+        messagesToLoad,
+        story.characters,
+        story.input,
+        story.storySetting,
+        story.chapters,
+        story.selectedChapterId,
+        story.contextItems,
+        nodesToLoad,
+        story.selectedNodeId,
+      )
       // Set branch choices after data is loaded (now with loop detection)
       if (story.branchChoices) {
         currentStoryStore.setBranchChoices(story.branchChoices)
       }
       return true
     }
-    
+
     return false // Story not found
   }
 
   // Run story migration on startup
   createEffect(() => {
-    storyManager.migrateStories().catch(error => {
+    storyManager.migrateStories().catch((error) => {
       console.error('Failed to migrate stories:', error)
     })
   })
@@ -509,15 +689,15 @@ const App: Component = () => {
     const handleAutoGenerate = async (event: Event) => {
       const customEvent = event as CustomEvent
       const instructions = customEvent.detail?.instructions || ''
-      
+
       // Auto-generate event received
       messagesStore.setInput(instructions)
-      
+
       await handleSubmit(false)
     }
 
     window.addEventListener('auto-generate-story', handleAutoGenerate as unknown as EventListener)
-    
+
     onCleanup(() => {
       window.removeEventListener('auto-generate-story', handleAutoGenerate as unknown as EventListener)
     })
@@ -564,9 +744,9 @@ const App: Component = () => {
             messages: [
               {
                 role: 'system' as const,
-                content: `Context preview too large to display safely.\n\nSummary:\n- Type: ${data.type}\n- Total messages: ${data.messages.length}\n- Total size: ${(dataSize / 1024 / 1024).toFixed(2)} MB\n\nThe context would include all ${data.messages.length} messages but is too large to display in the preview modal.`
-              }
-            ]
+                content: `Context preview too large to display safely.\n\nSummary:\n- Type: ${data.type}\n- Total messages: ${data.messages.length}\n- Total size: ${(dataSize / 1024 / 1024).toFixed(2)} MB\n\nThe context would include all ${data.messages.length} messages but is too large to display in the preview modal.`,
+              },
+            ],
           }
           setContextPreviewData(summary)
           setShowContextPreview(true)
@@ -584,16 +764,15 @@ const App: Component = () => {
     } catch (error) {
       console.error('[App] Failed to show context preview:', error)
       console.error('[App] Error stack:', error instanceof Error ? error.stack : 'No stack')
-      alert('Failed to generate context preview: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      alert(`Failed to generate context preview: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
     console.log('[App] handleShowContextPreviewModal completed')
   }
 
-
   const handleBulkSummarize = async () => {
     if (!confirm('This will generate summaries for all messages. Continue?')) return
 
-    const messages = messagesStore.messages.filter(m => m.role === 'assistant' && !m.isQuery && !m.summary)
+    const messages = messagesStore.messages.filter((m) => m.role === 'assistant' && !m.isQuery && !m.summary)
     globalOperationStore.startOperation('bulk-summarize', messages.length, 'Generating summaries...')
 
     try {
@@ -611,10 +790,12 @@ const App: Component = () => {
     if (!confirm('This will analyze all story messages for scene context. Continue?')) return
 
     messagesStore.setIsAnalyzing(true)
-    
+
     try {
-      const storyMessages = messagesStore.messages.filter(m => m.role === 'assistant' && !m.isQuery && !m.sceneAnalysis)
-      
+      const storyMessages = messagesStore.messages.filter(
+        (m) => m.role === 'assistant' && !m.isQuery && !m.sceneAnalysis,
+      )
+
       for (const message of storyMessages) {
         await handleAnalyzeMessage(message.id)
       }
@@ -639,18 +820,18 @@ const App: Component = () => {
     if (!confirm('This will remove all <think> tags from the story content. Continue?')) return
     messagesStore.cleanupThinkTags()
   }
-  
+
   const handleRewriteMessages = (messageId?: string) => {
     rewriteDialogStore.show(messageId ? [messageId] : [])
   }
 
   const handleExportStory = () => {
-    const storyMessages = messagesStore.messages.filter(m => m.role === 'assistant' && !m.isQuery)
+    const storyMessages = messagesStore.messages.filter((m) => m.role === 'assistant' && !m.isQuery)
     const chapters = storyMessages.map((msg, index) => {
       const chapterHeader = `--- Chapter ${index + 1} ---\n\n`
       return chapterHeader + msg.content
     })
-    
+
     const storyContent = chapters.join('\n\n\n')
     const blob = new Blob([storyContent], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -668,7 +849,7 @@ const App: Component = () => {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (!file) return
-      
+
       const text = await file.text()
       await importStoryFromText(text)
     }
@@ -678,27 +859,27 @@ const App: Component = () => {
   const importStoryFromText = async (importText: string) => {
     try {
       const importData = JSON.parse(importText)
-      
+
       if (Array.isArray(importData.messages)) {
         messagesStore.clearMessages()
-        
+
         importData.messages.forEach((msg: Message) => {
           const message: Message = {
             ...msg,
             timestamp: new Date(msg.timestamp),
-            isSummarizing: false
+            isSummarizing: false,
           }
           messagesStore.appendMessage(message)
         })
-        
+
         if (importData.characters) {
           charactersStore.setCharacters(importData.characters)
         }
-        
+
         if (importData.contextItems) {
           contextItemsStore.setContextItems(importData.contextItems)
         }
-        
+
         if (importData.settings) {
           if (importData.settings.storySetting) {
             settingsStore.setStorySetting(importData.settings.storySetting)
@@ -710,27 +891,27 @@ const App: Component = () => {
             settingsStore.setModel(importData.settings.model)
           }
         }
-        
+
         if (importData.currentInput) {
           messagesStore.setInput(importData.currentInput)
         }
-        
+
         // Story imported from JSON
         return
       }
-    } catch (jsonError) {
+    } catch (_jsonError) {
       // JSON import failed, trying text import
     }
-    
+
     messagesStore.clearMessages()
-    
+
     const chapters = importText
       .split(/--- Chapter \d+ ---|\n\n\n/)
-      .map(chapter => chapter.trim())
-      .filter(chapter => chapter.length > 0)
+      .map((chapter) => chapter.trim())
+      .filter((chapter) => chapter.length > 0)
 
     const { generateMessageId } = await import('./utils/id')
-    
+
     chapters.forEach((chapter, index) => {
       const message: Message = {
         id: generateMessageId(),
@@ -738,8 +919,8 @@ const App: Component = () => {
         content: chapter,
         instruction: index === 0 ? 'Begin the story' : 'Continue the story',
         timestamp: new Date(Date.now() + index * 1000),
-        order: index,  // Use index as order for imported messages
-        isQuery: false
+        order: index, // Use index as order for imported messages
+        isQuery: false,
       }
       messagesStore.appendMessage(message)
     })
@@ -747,12 +928,21 @@ const App: Component = () => {
     // Story imported from text
   }
 
-
-  const handleLoadStory = (messages: Message[], characters: Character[], input: string, storySetting: string, chapters?: Chapter[], selectedChapterId?: string | null, contextItems?: ContextItem[], nodes?: any[], selectedNodeId?: string | null) => {
+  const handleLoadStory = (
+    messages: Message[],
+    characters: Character[],
+    input: string,
+    storySetting: string,
+    chapters?: Chapter[],
+    selectedChapterId?: string | null,
+    contextItems?: ContextItem[],
+    nodes?: any[],
+    selectedNodeId?: string | null,
+  ) => {
     console.log('[handleLoadStory] Called with:', {
       messageCount: messages?.length,
       characterCount: characters?.length,
-      nodeCount: nodes?.length
+      nodeCount: nodes?.length,
     })
 
     // Clear existing story state so new data doesn't mix with the previous story
@@ -765,20 +955,20 @@ const App: Component = () => {
 
     // Debug: Check if messages have order field
     // Checking message order
-    
+
     // Check if any messages are missing order field
-    const messagesWithoutOrder = messages.filter(m => m.order === undefined || m.order === null)
+    const messagesWithoutOrder = messages.filter((m) => m.order === undefined || m.order === null)
     if (messagesWithoutOrder.length > 0) {
       // Found messages without order field
     }
-    
+
     // Ensure timestamps are Date objects and fix missing order fields
     let messagesWithDates = messages.map((msg, index) => ({
       ...msg,
       timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
-      order: msg.order !== undefined && msg.order !== null ? msg.order : index  // Use index as fallback
+      order: msg.order !== undefined && msg.order !== null ? msg.order : index, // Use index as fallback
     }))
-    
+
     // Handle chapters - but only if we're not using the new node system
     // The node system will handle chapter organization
     if (!nodes || nodes.length === 0) {
@@ -790,17 +980,17 @@ const App: Component = () => {
         // chaptersStore.reconstructChapterAssociations(messagesWithDates)
       }
     }
-    
+
     // Load nodes first, as we might need to update messages with node IDs
     if (nodes && nodes.length > 0) {
       nodeStore.setNodes(nodes)
 
       // Ensure all messages have nodeId if they have chapterId
       // This handles messages from the transition period
-      messagesWithDates = messagesWithDates.map(msg => {
+      messagesWithDates = messagesWithDates.map((msg) => {
         if (!msg.nodeId && msg.chapterId) {
           // Check if there's a node with the same ID as the chapterId
-          const matchingNode = nodes.find(n => n.id === msg.chapterId)
+          const matchingNode = nodes.find((n) => n.id === msg.chapterId)
           if (matchingNode) {
             return { ...msg, nodeId: msg.chapterId }
           }
@@ -812,21 +1002,20 @@ const App: Component = () => {
       if (selectedNodeId) {
         nodeStore.selectNode(selectedNodeId)
       } else {
-        const sceneNodes = nodes.filter(n => n.type === 'scene')
+        const sceneNodes = nodes.filter((n) => n.type === 'scene')
         if (sceneNodes.length > 0 && !nodeStore.selectedNodeId) {
           nodeStore.selectNode(sceneNodes[0].id)
         }
       }
-
     } else if (chapters && chapters.length > 0) {
       // Migrate from old chapter system to nodes
       // Migrating chapters to node structure
       const bookNode = nodeStore.addNode(null, 'book', 'Book 1')
       const arcNode = nodeStore.addNode(bookNode.id, 'arc', 'Arc 1')
-      
+
       // Create nodes for existing chapters, keeping their original IDs
       const chapterIdMap = new Map<string, string>() // old ID -> new node ID
-      
+
       chapters.forEach((chapter, index) => {
         // Create a node with the chapter's data
         const newNode: Node = {
@@ -842,24 +1031,24 @@ const App: Component = () => {
           expanded: chapter.expanded !== false,
           isOpen: true,
           createdAt: chapter.createdAt,
-          updatedAt: chapter.updatedAt
+          updatedAt: chapter.updatedAt,
         }
-        
+
         // Add directly to store without generating new ID
         nodeStore.setNodes([...nodeStore.nodesArray, newNode])
         chapterIdMap.set(chapter.id, chapter.id)
-        
+
         // Update messages that belong to this chapter
-        messagesWithDates = messagesWithDates.map(msg => {
+        messagesWithDates = messagesWithDates.map((msg) => {
           if (msg.chapterId === chapter.id) {
             return { ...msg, nodeId: chapter.id }
           }
           return msg
         })
       })
-      
+
       // Select the first or previously selected chapter
-      if (selectedChapterId && chapters.find(c => c.id === selectedChapterId)) {
+      if (selectedChapterId && chapters.find((c) => c.id === selectedChapterId)) {
         nodeStore.selectNode(selectedChapterId)
       } else if (chapters.length > 0) {
         nodeStore.selectNode(chapters[0].id)
@@ -878,20 +1067,20 @@ const App: Component = () => {
       // If we have messages, assign them all to the default scene
       if (messagesWithDates.length > 0) {
         // Assigning messages to default scene
-        messagesWithDates = messagesWithDates.map(msg => ({
+        messagesWithDates = messagesWithDates.map((msg) => ({
           ...msg,
           chapterId: chapterNode.id, // Keep for backwards compatibility
-          nodeId: sceneNode.id
+          nodeId: sceneNode.id,
         }))
       }
     }
-    
+
     // Now set messages with updated node IDs
     messagesStore.setMessages(messagesWithDates)
     charactersStore.setCharacters(characters)
     messagesStore.setInput(input)
     settingsStore.setStorySetting(storySetting)
-    
+
     // Load context items if provided
     if (contextItems) {
       contextItemsStore.setContextItems(contextItems)
@@ -900,354 +1089,395 @@ const App: Component = () => {
     // Story loaded successfully
   }
 
-
   return (
     <>
       {/* Auth loading indicator */}
       <Show when={authStore.isLoading}>
-        <div class={styles.authLoadingOverlay}>
-          <div class={styles.authLoadingContent}>
-            <div class={styles.loadingSpinner}></div>
-            <div class={styles.loadingText}>Checking authentication...</div>
+        <div style={appStyles.authLoadingOverlay}>
+          <div style={appStyles.authLoadingContent}>
+            <Spinner size="lg" />
+            <div style={appStyles.loadingText}>Checking authentication...</div>
           </div>
         </div>
       </Show>
 
-      {/* Public routes */}
-      <Route path="/" component={AboutPage} />
-      
-      <Route path="/login" component={() => {
-        const navigate = useNavigate();
+      <Route
+        path="/login"
+        component={() => {
+          const navigate = useNavigate()
 
-        return <LoginForm onSuccess={(user) => {
-          console.log('[App] Login onSuccess called with user:', user);
-          if ('offline' in user && user.offline) {
-            console.log('[App] Setting offline mode');
-            authStore.setOfflineMode();
-          } else {
-            console.log('[App] Setting user in authStore');
-            authStore.setUser(user);
-          }
-          console.log('[App] Navigating to /stories');
-          navigate('/stories', { replace: true });
-        }} />;
-      }} />
-      
-      <Route path="/reset-password" component={() => {
-        const navigate = useNavigate();
-        return (
-          <ResetPassword 
-            onClose={() => navigate('/login')}
-            onSuccess={() => {
-              // Navigate to login
-              navigate('/login', { replace: true });
-            }}
-          />
-        );
-      }} />
-      
-      {/* Story selection route */}
-      <Route path="/stories" component={() => {
-        const navigate = useNavigate();
-        return (
-          <Show
-            when={!authStore.isLoading}
-            fallback={<div class={styles.app}>Loading...</div>}
-          >
-            <Show
-              when={authStore.isAuthenticated}
-              fallback={<RedirectToLogin />}
-            >
-              <StoryLandingPage 
-                onSelectStory={(storyId: string) => {
-                  // Navigate to the story route
-                  navigate(`/story/${storyId}`);
-                }}
-              />
+          return (
+            <LoginForm
+              onSuccess={(user) => {
+                console.log('[App] Login onSuccess called with user:', user)
+                if ('offline' in user && user.offline) {
+                  console.log('[App] Setting offline mode')
+                  authStore.setOfflineMode()
+                } else {
+                  console.log('[App] Setting user in authStore')
+                  authStore.setUser(user)
+                }
+                console.log('[App] Navigating to /stories')
+                navigate('/stories', { replace: true })
+              }}
+            />
+          )
+        }}
+      />
+
+      <Route
+        path="/reset-password"
+        component={() => {
+          const navigate = useNavigate()
+          return (
+            <ResetPassword
+              onClose={() => navigate('/login')}
+              onSuccess={() => {
+                // Navigate to login
+                navigate('/login', { replace: true })
+              }}
+            />
+          )
+        }}
+      />
+
+      {/* Root route - story selection (same as /stories) */}
+      <Route
+        path="/"
+        component={() => {
+          const navigate = useNavigate()
+          return (
+            <Show when={!authStore.isLoading} fallback={<div style={appStyles.app}>Loading...</div>}>
+              <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
+                <StoryLandingPage
+                  onSelectStory={(storyId: string) => {
+                    navigate(`/story/${storyId}`)
+                  }}
+                />
+              </Show>
             </Show>
-          </Show>
-        );
-      }} />
-      
+          )
+        }}
+      />
+
+      {/* Story selection route (legacy, same as root) */}
+      <Route
+        path="/stories"
+        component={() => {
+          const navigate = useNavigate()
+          return (
+            <Show when={!authStore.isLoading} fallback={<div style={appStyles.app}>Loading...</div>}>
+              <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
+                <StoryLandingPage
+                  onSelectStory={(storyId: string) => {
+                    // Navigate to the story route
+                    navigate(`/story/${storyId}`)
+                  }}
+                />
+              </Show>
+            </Show>
+          )
+        }}
+      />
+
       {/* Story route - loads and displays a specific story */}
-      <Route path="/story/:id" component={() => {
-        const params = useParams();
-        const navigate = useNavigate();
-        const [loadingStory, setLoadingStory] = createSignal(true);
-        const [storyNotFound, setStoryNotFound] = createSignal(false);
-        const [storyLoadError, setStoryLoadError] = createSignal<{ message: string; details?: any; status: number } | null>(null);
+      <Route
+        path="/story/:id"
+        component={() => {
+          const params = useParams()
+          const navigate = useNavigate()
+          const [loadingStory, setLoadingStory] = createSignal(true)
+          const [storyNotFound, setStoryNotFound] = createSignal(false)
+          const [storyLoadError, setStoryLoadError] = createSignal<{
+            message: string
+            details?: any
+            status: number
+          } | null>(null)
 
-        createEffect(() => {
-          const storyId = params.id;
-          if (!storyId) return;
+          createEffect(() => {
+            const storyId = params.id
+            if (!storyId) return
 
-          let disposed = false;
-          onCleanup(() => {
-            disposed = true;
-          });
-
-          // Use untrack to check if already loaded without creating dependencies
-          const alreadyLoaded = untrack(() =>
-            currentStoryStore.isInitialized && currentStoryStore.id === storyId
-          );
-
-          if (alreadyLoaded) {
-            setLoadingStory(false);
-            return; // Don't load again if already loaded
-          }
-
-          setLoadingStory(true);
-          setStoryNotFound(false);
-          setStoryLoadError(null);
-
-          void loadStoryById(storyId)
-            .then((loaded) => {
-              if (disposed) return;
-              if (!loaded) {
-                // Only set "not found" if we don't already have a server error
-                if (!storyLoadError()) {
-                  setStoryNotFound(true);
-                  setTimeout(() => navigate('/stories'), 2000);
-                }
-              }
+            let disposed = false
+            onCleanup(() => {
+              disposed = true
             })
-            .finally(() => {
-              if (!disposed) {
-                setLoadingStory(false);
-              }
-            });
-        });
-        
-        return (
-          <Show
-            when={!authStore.isLoading}
-            fallback={
-              <div class={styles.loadingContainer}>
-                <div class={styles.loadingSpinner}></div>
-                <div class={styles.loadingText}>Loading...</div>
-              </div>
+
+            // Use untrack to check if already loaded without creating dependencies
+            const alreadyLoaded = untrack(() => currentStoryStore.isInitialized && currentStoryStore.id === storyId)
+
+            if (alreadyLoaded) {
+              setLoadingStory(false)
+              return // Don't load again if already loaded
             }
-          >
-            <Show
-              when={authStore.isAuthenticated}
-              fallback={<RedirectToLogin />}
-            >
-              <Show
-                when={!loadingStory()}
-                fallback={
-                  <div class={styles.loadingContainer}>
-                    <div class={styles.loadingSpinner}></div>
-                    <div class={styles.loadingText}>Loading story...</div>
-                  </div>
+
+            setLoadingStory(true)
+            setStoryNotFound(false)
+            setStoryLoadError(null)
+
+            void loadStoryById(storyId)
+              .then((loaded) => {
+                if (disposed) return
+                if (!loaded) {
+                  // Only set "not found" if we don't already have a server error
+                  if (!storyLoadError()) {
+                    setStoryNotFound(true)
+                    setTimeout(() => navigate('/stories'), 2000)
+                  }
                 }
-              >
+              })
+              .finally(() => {
+                if (!disposed) {
+                  setLoadingStory(false)
+                }
+              })
+          })
+
+          return (
+            <Show
+              when={!authStore.isLoading}
+              fallback={
+                <div style={appStyles.loadingContainer}>
+                  <Spinner size="lg" />
+                  <div style={appStyles.loadingText}>Loading...</div>
+                </div>
+              }
+            >
+              <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
                 <Show
-                  when={!storyLoadError() && !storyNotFound()}
+                  when={!loadingStory()}
                   fallback={
-                    <div class={styles.loadingContainer}>
-                      <Show when={storyLoadError()}>
-                        {(error) => (
-                          <div class={styles.errorContainer}>
-                            <div class={styles.errorTitle}>Server Error ({error().status})</div>
-                            <div class={styles.errorText}>{error().message}</div>
-                            <Show when={error().details}>
-                              <details class={styles.errorDetails}>
-                                <summary>Technical Details</summary>
-                                <pre>{JSON.stringify(error().details, null, 2)}</pre>
-                              </details>
-                            </Show>
-                            <button class={styles.retryButton} onClick={() => window.location.reload()}>
-                              Retry
-                            </button>
-                          </div>
-                        )}
-                      </Show>
-                      <Show when={storyNotFound()}>
-                        <div class={styles.errorText}>Story not found. Redirecting to stories page...</div>
-                      </Show>
+                    <div style={appStyles.loadingContainer}>
+                      <Spinner size="lg" />
+                      <div style={appStyles.loadingText}>Loading story...</div>
                     </div>
                   }
                 >
                   <Show
-                    when={storyLoaded()}
+                    when={!storyLoadError() && !storyNotFound()}
                     fallback={
-                      <div class={styles.loadingContainer}>
-                        <div class={styles.loadingSpinner}></div>
-                        <div class={styles.loadingText}>Preparing story...</div>
+                      <div style={appStyles.loadingContainer}>
+                        <Show when={storyLoadError()}>
+                          {(error) => (
+                            <div style={appStyles.errorContainer}>
+                              <div style={appStyles.errorTitle}>Server Error ({error().status})</div>
+                              <div style={appStyles.errorText}>{error().message}</div>
+                              <Show when={error().details}>
+                                <details style={appStyles.errorDetails}>
+                                  <summary>Technical Details</summary>
+                                  <pre>{JSON.stringify(error().details, null, 2)}</pre>
+                                </details>
+                              </Show>
+                              <button style={appStyles.retryButton} onClick={() => window.location.reload()}>
+                                Retry
+                              </button>
+                            </div>
+                          )}
+                        </Show>
+                        <Show when={storyNotFound()}>
+                          <div style={appStyles.errorText}>Story not found. Redirecting to stories page...</div>
+                        </Show>
                       </div>
                     }
                   >
-                    <div class={styles.app}>
-                      <StorageMigrationBanner />
-                      <GlobalStatusIndicator />
-                    
-                      <StoryHeader
-                        onLoadStory={handleLoadStory}
-                        onBulkSummarize={handleBulkSummarize}
-                        onBulkAnalysis={handleBulkAnalysis}
-                        onMigrateInstructions={handleMigrateInstructions}
-                        onRemoveUserMessages={handleRemoveUserMessages}
-                        onCleanupThinkTags={handleCleanupThinkTags}
-                        onRewriteMessages={handleRewriteMessages}
-                        onExportStory={handleExportStory}
-                        onImportStory={handleImportStory}
-                        isGenerating={isGenerating() || ollamaExternallyBusy()}
-                        contextSize={effectiveContextSize()}
-                        charsPerToken={settingsStore.charsPerToken}
-                      />
+                    <Show
+                      when={storyLoaded()}
+                      fallback={
+                        <div style={appStyles.loadingContainer}>
+                          <Spinner size="lg" />
+                          <div style={appStyles.loadingText}>Preparing story...</div>
+                        </div>
+                      }
+                    >
+                      <div style={appStyles.app}>
+                        <GlobalStatusIndicator />
 
-                      <div class={styles.mainContent}>
-                        {/* Desktop: Fixed sidebar */}
-                        <Show when={!headerStore.isCollapsed()}>
-                          <div class={styles.desktopNavigation}>
-                            <StoryNavigation />
-                          </div>
-                        </Show>
-                        <main class={styles.chatContainer}>
-                        <Show
-                          when={(() => {
-                            const selectedNode = nodeStore.getSelectedNode()
-                            return selectedNode?.type === 'scene'
-                          })()}
-                          fallback={
-                            <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
-                              Select a scene to edit content
-                            </div>
-                          }
-                        >
-                          <MessageList
-                            isLoading={messagesStore.isLoading}
-                            hasStoryMessages={messagesStore.hasStoryMessages}
-                            isGenerating={isGenerating() || ollamaExternallyBusy()}
-                            model={settingsStore.model}
-                            provider={settingsStore.provider as 'ollama' | 'openrouter' | 'anthropic'}
-                          />
-                        </Show>
-
-                        <StoryInput
-                          isLoading={messagesStore.isLoading}
-                          isAnalyzing={messagesStore.isAnalyzing}
+                        <StoryHeader
+                          onLoadStory={handleLoadStory}
+                          onBulkSummarize={handleBulkSummarize}
+                          onBulkAnalysis={handleBulkAnalysis}
+                          onMigrateInstructions={handleMigrateInstructions}
+                          onRemoveUserMessages={handleRemoveUserMessages}
+                          onCleanupThinkTags={handleCleanupThinkTags}
+                          onRewriteMessages={handleRewriteMessages}
+                          onExportStory={handleExportStory}
+                          onImportStory={handleImportStory}
                           isGenerating={isGenerating() || ollamaExternallyBusy()}
-                          onSubmit={handleSubmit}
-                          onAutoOrManualSubmit={handleAutoOrManualSubmit}
-                          onRegenerate={regenerateLastMessage}
-                          onAbort={abortGeneration}
-                          onShowContextPreview={handleShowContextPreviewModal}
+                          contextSize={effectiveContextSize()}
+                          charsPerToken={settingsStore.charsPerToken}
                         />
-                        </main>
 
-                        {/* Right sidebar: Docked Episode Viewer on wide screens */}
-                        <Show when={episodeViewerStore.isDocked && episodeViewerStore.isOpen}>
-                          <div class={styles.desktopEpisodeViewer}>
-                            <EpisodeViewer
-                              isOpen={true}
-                              onClose={() => episodeViewerStore.hide()}
-                              mode="docked"
-                            />
-                          </div>
-                        </Show>
-                      </div>
-
-                      <ContextPreviewModal
-                        show={showContextPreview()}
-                        data={contextPreviewData()}
-                        onClose={() => {
-                          console.log('[App] Closing context preview modal')
-                          setShowContextPreview(false)
-                          setContextPreviewData(null)  // Clear data when closing
-                        }}
-                      />
-
-                      <PendingEntitiesModal />
-                      
-                      <MessageRewriterDialog />
-
-                      <CopyTokenModal />
-
-                      <SearchModal />
-
-                      <StorageFullModal
-                        isOpen={messagesStore.showStorageFullModal}
-                        onClose={() => messagesStore.setShowStorageFullModal(false)}
-                      />
-                      
-                      <ConflictResolutionDialog
-                        isOpen={messagesStore.showConflictDialog}
-                        serverUpdatedAt={messagesStore.conflictInfo?.serverUpdatedAt || ''}
-                        clientUpdatedAt={messagesStore.conflictInfo?.clientUpdatedAt || ''}
-                        onForce={() => messagesStore.forceSave()}
-                        onCancel={() => messagesStore.setShowConflictDialog(false)}
-                      />
-                      
-                      <Show when={serverDataConflict()}>
-                        <div class="modal-overlay" onClick={(e) => e.stopPropagation()}>
-                          <div class="modal-content" style="max-width: 500px;">
-                            <div class="modal-header">
-                              <h3>Local Changes Detected</h3>
+                        <div style={appStyles.mainContent}>
+                          {/* Desktop: Fixed inline sidebar - visible when header is visible */}
+                          <Show when={!isMobile() && !headerStore.isCollapsed()}>
+                            <div style={appStyles.desktopNavigation}>
+                              <StoryNavigation />
                             </div>
-                            <div class="modal-body">
-                              <p style="margin-bottom: 1rem;">
-                                You have local messages that don't exist on the server. Loading the server version will lose these changes.
-                              </p>
-                              <p style="margin-bottom: 1rem;">
-                                <strong>Server story:</strong> {serverDataConflict()!.serverStory.messages.length} messages<br/>
-                                <strong>Local story:</strong> {serverDataConflict()!.localMessages.length} messages
-                              </p>
-                              <p style="margin-bottom: 1.5rem;">
-                                Do you want to load the server version and lose your local changes?
-                              </p>
-                              <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                                <button 
-                                  class="secondary-button"
-                                  onClick={() => {
-                                    // Keep local version
-                                    setServerDataConflict(null)
-                                    // Go back to stories page
-                                    navigate('/stories')
-                                  }}
-                                >
-                                  Keep Local Version
-                                </button>
-                                <button 
-                                  class="primary-button"
-                                  onClick={async () => {
-                                    const conflict = serverDataConflict()
-                                    if (conflict) {
-                                      await loadServerStoryData(conflict.serverStory, conflict.serverStory.id)
+                          </Show>
+
+                          {/* Mobile: Overlay sidebar - controlled independently by navigationStore */}
+                          <Show when={isMobile() && navigationStore.showNavigation}>
+                            <div
+                              style={appStyles.mobileNavBackdrop}
+                              onClick={() => navigationStore.setShowNavigation(false)}
+                            />
+                            <div style={appStyles.mobileNavigation}>
+                              <StoryNavigation
+                                onSelectChapter={() => {
+                                  // Auto-close sidebar on mobile when selecting a scene
+                                  navigationStore.setShowNavigation(false)
+                                }}
+                              />
+                            </div>
+                          </Show>
+                          <main style={appStyles.chatContainer}>
+                            <Show
+                              when={(() => {
+                                const selectedNode = nodeStore.getSelectedNode()
+                                return selectedNode?.type === 'scene'
+                              })()}
+                              fallback={
+                                <div style={{ padding: '2rem', 'text-align': 'center', color: '#666' }}>
+                                  Select a scene to edit content
+                                </div>
+                              }
+                            >
+                              <MessageList
+                                isLoading={messagesStore.isLoading}
+                                hasStoryMessages={messagesStore.hasStoryMessages}
+                                isGenerating={isGenerating() || ollamaExternallyBusy()}
+                                model={settingsStore.model}
+                                provider={settingsStore.provider as 'ollama' | 'openrouter' | 'anthropic'}
+                              />
+                            </Show>
+
+                            <StoryInput
+                              isLoading={messagesStore.isLoading}
+                              isAnalyzing={messagesStore.isAnalyzing}
+                              isGenerating={isGenerating() || ollamaExternallyBusy()}
+                              onSubmit={handleSubmit}
+                              onAutoOrManualSubmit={handleAutoOrManualSubmit}
+                              onRegenerate={regenerateLastMessage}
+                              onAbort={abortGeneration}
+                              onShowContextPreview={handleShowContextPreviewModal}
+                            />
+                          </main>
+
+                          {/* Right sidebar: Docked Episode Viewer on wide screens */}
+                          <Show when={episodeViewerStore.isDocked && episodeViewerStore.isOpen}>
+                            <div style={appStyles.desktopEpisodeViewer}>
+                              <EpisodeViewer isOpen={true} onClose={() => episodeViewerStore.hide()} mode="docked" />
+                            </div>
+                          </Show>
+                        </div>
+
+                        <ContextPreviewModal
+                          show={showContextPreview()}
+                          data={contextPreviewData()}
+                          onClose={() => {
+                            console.log('[App] Closing context preview modal')
+                            setShowContextPreview(false)
+                            setContextPreviewData(null) // Clear data when closing
+                          }}
+                        />
+
+                        <PendingEntitiesModal />
+
+                        <MessageRewriterDialog />
+
+                        <CopyTokenModal />
+
+                        <SearchModal />
+
+                        <StorageFullModal
+                          isOpen={messagesStore.showStorageFullModal}
+                          onClose={() => messagesStore.setShowStorageFullModal(false)}
+                        />
+
+                        <ConflictResolutionDialog
+                          isOpen={messagesStore.showConflictDialog}
+                          serverUpdatedAt={messagesStore.conflictInfo?.serverUpdatedAt || ''}
+                          clientUpdatedAt={messagesStore.conflictInfo?.clientUpdatedAt || ''}
+                          onForce={() => messagesStore.forceSave()}
+                          onCancel={() => messagesStore.setShowConflictDialog(false)}
+                        />
+
+                        <Show when={serverDataConflict()}>
+                          <div class="modal-overlay" onClick={(e) => e.stopPropagation()}>
+                            <div class="modal-content" style="max-width: 500px;">
+                              <div class="modal-header">
+                                <h3>Local Changes Detected</h3>
+                              </div>
+                              <div class="modal-body">
+                                <p style="margin-bottom: 1rem;">
+                                  You have local messages that don't exist on the server. Loading the server version
+                                  will lose these changes.
+                                </p>
+                                <p style="margin-bottom: 1rem;">
+                                  <strong>Server story:</strong> {serverDataConflict()!.serverStory.messages.length}{' '}
+                                  messages
+                                  <br />
+                                  <strong>Local story:</strong> {serverDataConflict()!.localMessages.length} messages
+                                </p>
+                                <p style="margin-bottom: 1.5rem;">
+                                  Do you want to load the server version and lose your local changes?
+                                </p>
+                                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                                  <button
+                                    class="secondary-button"
+                                    onClick={() => {
+                                      // Keep local version
                                       setServerDataConflict(null)
-                                    }
-                                  }}
-                                >
-                                  Load Server Version
-                                </button>
+                                      // Go back to stories page
+                                      navigate('/stories')
+                                    }}
+                                  >
+                                    Keep Local Version
+                                  </button>
+                                  <button
+                                    class="primary-button"
+                                    onClick={async () => {
+                                      const conflict = serverDataConflict()
+                                      if (conflict) {
+                                        await loadServerStoryData(conflict.serverStory, conflict.serverStory.id)
+                                        setServerDataConflict(null)
+                                      }
+                                    }}
+                                  >
+                                    Load Server Version
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </Show>
-                      
-                      <ErrorNotifications />
-                      <ServerStatusIndicator />
+                        </Show>
 
-                      {/* StoryManager modal */}
-                      <StoryManager />
-                    </div>
+                        <ErrorNotifications />
+                        <ServerStatusIndicator />
+
+                        {/* StoryManager modal */}
+                        <StoryManager />
+                      </div>
+                    </Show>
                   </Show>
                 </Show>
               </Show>
             </Show>
-          </Show>
-        );
-      }} />
-      
+          )
+        }}
+      />
+
       {/* Legacy app route - redirects to stories */}
-      <Route path="/app" component={() => {
-        const navigate = useNavigate();
-        onMount(() => {
-          navigate('/stories', { replace: true });
-        });
-        return <div class={styles.app}>Redirecting to stories...</div>;
-      }} />
+      <Route
+        path="/app"
+        component={() => {
+          const navigate = useNavigate()
+          onMount(() => {
+            navigate('/stories', { replace: true })
+          })
+          return <div style={appStyles.app}>Redirecting to stories...</div>
+        }}
+      />
     </>
   )
 }

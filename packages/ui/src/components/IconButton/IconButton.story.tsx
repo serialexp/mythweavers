@@ -1,5 +1,5 @@
-import { IconButton } from './IconButton'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { IconButton } from './IconButton'
 
 // Simple icon components for demo purposes
 const CloseIcon = () => (

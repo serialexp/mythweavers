@@ -1,20 +1,238 @@
-import { Component, Show, For, createSignal, batch } from 'solid-js'
-import { Character } from '../types/core'
-import { charactersStore } from '../stores/charactersStore'
-import { BsPlus, BsX, BsPencil, BsCheck, BsStar, BsStarFill, BsCalendar, BsArrowLeft } from 'solid-icons/bs'
-import { generateMessageId } from '../utils/id'
-import { EJSRenderer } from './EJSRenderer'
-import { EJSCodeEditor } from './EJSCodeEditor'
-import { EJSDocumentation } from './EJSDocumentation'
-import { AvailableFunctions } from './AvailableFunctions'
-import { TemplateChangeRequest } from './TemplateChangeRequest'
-import { StoryTimePicker } from './StoryTimePicker'
+import { Button, ListDetailPanel, type ListDetailPanelRef, Stack } from '@mythweavers/ui'
+import { BsArrowLeft, BsCalendar, BsCheck, BsPencil, BsPlus, BsStar, BsStarFill, BsX } from 'solid-icons/bs'
+import { type Component, type JSX, Show, batch, createSignal } from 'solid-js'
 import { calendarStore } from '../stores/calendarStore'
+import { charactersStore } from '../stores/charactersStore'
+import type { Character } from '../types/core'
 import { getCharacterDisplayName, parseCharacterName } from '../utils/character'
-import styles from './Characters.module.css'
+import { generateMessageId } from '../utils/id'
+import { EJSCodeEditor } from './EJSCodeEditor'
+import { ScriptHelpTabs } from './ScriptHelpTabs'
+import { EJSRenderer } from './EJSRenderer'
+import { StoryTimePicker } from './StoryTimePicker'
+import { TemplateChangeRequest } from './TemplateChangeRequest'
 
-export const Characters: Component = () => {
-  const [selectedCharacterId, setSelectedCharacterId] = createSignal<string | 'new'>('')
+// Styles
+const styles = {
+  listItemContent: {
+    display: 'flex',
+    'align-items': 'center',
+    gap: '0.75rem',
+    flex: '1',
+    'min-width': '0',
+  } as JSX.CSSProperties,
+
+  listItemAvatar: {
+    width: '32px',
+    height: '32px',
+    'border-radius': '50%',
+    overflow: 'hidden',
+    'flex-shrink': '0',
+  } as JSX.CSSProperties,
+
+  listItemAvatarImage: {
+    width: '100%',
+    height: '100%',
+    'object-fit': 'cover',
+  } as JSX.CSSProperties,
+
+  listItemAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    'align-items': 'center',
+    'justify-content': 'center',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
+    'font-weight': '500',
+    'font-size': '0.85rem',
+  } as JSX.CSSProperties,
+
+  listItemName: {
+    flex: '1',
+    'min-width': '0',
+    'white-space': 'nowrap',
+    overflow: 'hidden',
+    'text-overflow': 'ellipsis',
+    'font-size': '0.95rem',
+  } as JSX.CSSProperties,
+
+  protagonistIcon: {
+    color: 'var(--warning-color)',
+    'font-size': '0.9rem',
+  } as JSX.CSSProperties,
+
+  form: {
+    display: 'flex',
+    'flex-direction': 'column',
+    gap: '0.75rem',
+  } as JSX.CSSProperties,
+
+  input: {
+    padding: '0.625rem 0.875rem',
+    background: 'var(--bg-primary)',
+    border: '1px solid var(--border-color)',
+    'border-radius': '6px',
+    color: 'var(--text-primary)',
+    'font-size': '0.95rem',
+    transition: 'border-color 0.2s ease',
+  } as JSX.CSSProperties,
+
+  imageSection: {
+    display: 'flex',
+    gap: '1rem',
+    'align-items': 'flex-start',
+  } as JSX.CSSProperties,
+
+  imagePreview: {
+    width: '80px',
+    height: '80px',
+    'border-radius': '50%',
+    overflow: 'hidden',
+    'flex-shrink': '0',
+    border: '2px solid var(--border-color)',
+  } as JSX.CSSProperties,
+
+  imagePreviewImage: {
+    width: '100%',
+    height: '100%',
+    'object-fit': 'cover',
+  } as JSX.CSSProperties,
+
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    'align-items': 'center',
+    'justify-content': 'center',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
+    'font-size': '2rem',
+    'font-weight': '500',
+  } as JSX.CSSProperties,
+
+  imageControls: {
+    display: 'flex',
+    'flex-direction': 'column',
+    gap: '0.5rem',
+  } as JSX.CSSProperties,
+
+  imageUploadButton: {
+    display: 'inline-flex',
+    'align-items': 'center',
+    gap: '0.25rem',
+    padding: '0.5rem 0.75rem',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-color)',
+    'border-radius': '6px',
+    cursor: 'pointer',
+    'font-size': '0.85rem',
+    color: 'var(--text-primary)',
+    transition: 'all 0.2s ease',
+  } as JSX.CSSProperties,
+
+  imageRemoveButton: {
+    display: 'inline-flex',
+    'align-items': 'center',
+    gap: '0.25rem',
+    padding: '0.375rem 0.625rem',
+    background: 'transparent',
+    border: 'none',
+    'border-radius': '4px',
+    cursor: 'pointer',
+    'font-size': '0.8rem',
+    color: 'var(--error-color)',
+  } as JSX.CSSProperties,
+
+  quickInsertButtons: {
+    display: 'flex',
+    'align-items': 'center',
+    gap: '0.5rem',
+    'flex-wrap': 'wrap',
+  } as JSX.CSSProperties,
+
+  quickInsertLabel: {
+    'font-size': '0.8rem',
+    color: 'var(--text-secondary)',
+  } as JSX.CSSProperties,
+
+  quickInsertButton: {
+    padding: '0.25rem 0.5rem',
+    'font-size': '0.75rem',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border-color)',
+    'border-radius': '4px',
+    cursor: 'pointer',
+    color: 'var(--text-primary)',
+    transition: 'all 0.2s ease',
+  } as JSX.CSSProperties,
+
+  detailView: {
+    display: 'flex',
+    'flex-direction': 'column',
+    gap: '1rem',
+  } as JSX.CSSProperties,
+
+  detailAvatar: {
+    width: '100px',
+    height: '100px',
+    'border-radius': '50%',
+    overflow: 'hidden',
+    'flex-shrink': '0',
+    border: '3px solid var(--border-color)',
+    'align-self': 'center',
+  } as JSX.CSSProperties,
+
+  detailAvatarImage: {
+    width: '100%',
+    height: '100%',
+    'object-fit': 'cover',
+  } as JSX.CSSProperties,
+
+  detailAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    'align-items': 'center',
+    'justify-content': 'center',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
+    'font-size': '2.5rem',
+    'font-weight': '500',
+  } as JSX.CSSProperties,
+
+  characterDescription: {
+    'line-height': '1.6',
+    color: 'var(--text-primary)',
+  } as JSX.CSSProperties,
+
+  characterBirthdate: {
+    'font-size': '0.9rem',
+    color: 'var(--text-secondary)',
+    display: 'flex',
+    'align-items': 'center',
+    gap: '0.5rem',
+  } as JSX.CSSProperties,
+
+  detailActions: {
+    display: 'flex',
+    gap: '0.5rem',
+    'flex-wrap': 'wrap',
+    'margin-top': '0.5rem',
+    'padding-top': '1rem',
+    'border-top': '1px solid var(--border-color)',
+  } as JSX.CSSProperties,
+}
+
+export interface CharactersRef {
+  addNew: () => void
+}
+
+interface CharactersProps {
+  ref?: (ref: CharactersRef) => void
+}
+
+export const Characters: Component<CharactersProps> = (props) => {
   const [newCharacterName, setNewCharacterName] = createSignal('')
   const [newCharacterDescription, setNewCharacterDescription] = createSignal('')
   const [newCharacterBirthdate, setNewCharacterBirthdate] = createSignal<number | undefined>(undefined)
@@ -28,8 +246,12 @@ export const Characters: Component = () => {
   const [editProfileImageData, setEditProfileImageData] = createSignal<string | null | undefined>(undefined)
   const [editProfileImagePreview, setEditProfileImagePreview] = createSignal<string | null>(null)
 
+  let panelRef: ListDetailPanelRef | undefined
   let newEditorRef: { insertAtCursor: (text: string) => void } | null = null
   let editEditorRef: { insertAtCursor: (text: string) => void } | null = null
+
+  // Expose addNew method via ref
+  props.ref?.({ addNew: () => panelRef?.select('new') })
 
   const addCharacter = () => {
     const nameInput = newCharacterName().trim()
@@ -54,17 +276,17 @@ export const Characters: Component = () => {
     setNewCharacterDescription('')
     setNewCharacterBirthdate(undefined)
     setNewCharacterImageData(null)
-    setSelectedCharacterId(character.id)
+    panelRef?.select(character.id)
   }
 
   const startEditing = (character: Character) => {
     batch(() => {
       setEditName(getCharacterDisplayName(character))
       setEditDescription(character.description ?? '')
-      setEditBirthdate(character.birthdate)
+      setEditBirthdate(character.birthdate ?? undefined)
       setEditProfileImagePreview(character.profileImageData ?? null)
       setEditProfileImageData(undefined)
-      setEditingId(character.id) // Set this last to trigger the UI switch after data is ready
+      setEditingId(character.id)
     })
   }
 
@@ -123,7 +345,7 @@ export const Characters: Component = () => {
   const handleNewImageSelect = (event: Event) => {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0]
-    if (file && file.type.startsWith('image/')) {
+    if (file?.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onload = () => {
         if (typeof reader.result === 'string') {
@@ -138,7 +360,7 @@ export const Characters: Component = () => {
   const handleEditImageSelect = (event: Event) => {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0]
-    if (file && file.type.startsWith('image/')) {
+    if (file?.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onload = () => {
         if (typeof reader.result === 'string') {
@@ -160,12 +382,6 @@ export const Characters: Component = () => {
     setEditProfileImageData(null)
   }
 
-  const selectedCharacter = () => {
-    const id = selectedCharacterId()
-    if (!id || id === 'new') return null
-    return charactersStore.characters.find(c => c.id === id)
-  }
-
   const getAvatarInitial = (name: string) => {
     const trimmed = name.trim()
     return trimmed ? trimmed.charAt(0).toUpperCase() : '?'
@@ -180,116 +396,82 @@ export const Characters: Component = () => {
 
   return (
     <Show when={charactersStore.showCharacters}>
-      <div class={styles.container}>
-        {/* Character List */}
-        <div class={`${styles.listColumn} ${selectedCharacterId() ? styles.listColumnHidden : ''}`}>
-          <div class={styles.listHeader}>
-            <h3 class={styles.listTitle}>Characters</h3>
-            <button
-              class={styles.addButton}
-              onClick={() => setSelectedCharacterId('new')}
-              title="Add new character"
-            >
-              <BsPlus /> Add
-            </button>
-          </div>
-          <div class={styles.characterList}>
-            <For each={charactersStore.characters}>
-              {(character) => (
-                <button
-                  class={`${styles.listItem} ${selectedCharacterId() === character.id ? styles.listItemSelected : ''}`}
-                  onClick={() => {
-                    // Cancel any active edit when switching characters
-                    if (editingId()) {
-                      cancelEdit()
-                    }
-                    setSelectedCharacterId(character.id)
-                  }}
-                >
-                  <div class={styles.listItemContent}>
-                    <div class={styles.listItemAvatar}>
-                      <Show when={character.profileImageData}>
-                        {(image) => (
-                          <img
-                            src={image()}
-                            alt={`${getCharacterDisplayName(character)} avatar`}
-                            class={styles.listItemAvatarImage}
-                          />
-                        )}
-                      </Show>
-                      <Show when={!character.profileImageData}>
-                        <div class={styles.listItemAvatarPlaceholder}>
-                          {getAvatarInitial(getCharacterDisplayName(character))}
-                        </div>
-                      </Show>
-                    </div>
-                    <div class={styles.listItemName}>
-                      <EJSRenderer template={getCharacterDisplayName(character)} mode="inline" />
-                    </div>
+      <ListDetailPanel
+        ref={(r) => (panelRef = r)}
+        items={charactersStore.characters}
+        backIcon={<BsArrowLeft />}
+        renderListItem={(character) => (
+          <>
+            <div style={styles.listItemContent}>
+              <div style={styles.listItemAvatar}>
+                <Show when={character.profileImageData}>
+                  {(image) => (
+                    <img
+                      src={image()}
+                      alt={`${getCharacterDisplayName(character)} avatar`}
+                      style={styles.listItemAvatarImage}
+                    />
+                  )}
+                </Show>
+                <Show when={!character.profileImageData}>
+                  <div style={styles.listItemAvatarPlaceholder}>
+                    {getAvatarInitial(getCharacterDisplayName(character))}
                   </div>
-                  <Show when={character.isMainCharacter}>
-                    <BsStarFill class={styles.protagonistIcon} />
-                  </Show>
-                </button>
-              )}
-            </For>
-          </div>
-        </div>
-
-        {/* Detail Panel */}
-        <div class={`${styles.detailColumn} ${selectedCharacterId() ? styles.detailColumnVisible : ''}`}>
-          <Show when={selectedCharacterId() === 'new'}>
-            <div class={styles.detailContent}>
-              <div class={styles.detailHeader}>
-                <button
-                  class={styles.backButton}
-                  onClick={() => setSelectedCharacterId('')}
-                  title="Back to list"
-                >
-                  <BsArrowLeft />
-                </button>
-                <h3 class={styles.detailTitle}>Add New Character</h3>
+                </Show>
               </div>
-              <div class={styles.form}>
+              <div style={styles.listItemName}>
+                <EJSRenderer template={getCharacterDisplayName(character)} mode="inline" />
+              </div>
+            </div>
+            <Show when={character.isMainCharacter}>
+              <BsStarFill style={styles.protagonistIcon} />
+            </Show>
+          </>
+        )}
+        detailTitle={(char) => (
+          <Stack direction="horizontal" gap="sm" align="center" style={{ flex: '1' }}>
+            <span style={{ flex: '1' }}>
+              <EJSRenderer template={getCharacterDisplayName(char)} mode="inline" />
+            </span>
+            <Show when={char.isMainCharacter}>
+              <BsStarFill style={{ color: 'var(--warning-color)' }} />
+            </Show>
+          </Stack>
+        )}
+        renderDetail={(char) => (
+          <Show
+            when={editingId() !== char.id}
+            fallback={
+              <div style={styles.form}>
                 <input
                   type="text"
-                  value={newCharacterName()}
-                  onInput={(e) => setNewCharacterName(e.target.value)}
-                  onKeyDown={(e) => handleKeyPress(e, addCharacter)}
+                  value={editName()}
+                  onInput={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => handleKeyPress(e, saveEdit)}
                   placeholder="Character name"
-                  class={styles.input}
+                  style={styles.input}
                 />
-                <div class={styles.imageSection}>
-                  <div class={styles.imagePreview}>
-                    <Show when={newCharacterImageData()}>
-                      {(image) => (
-                        <img
-                          src={image()}
-                          alt="New character preview"
-                          class={styles.imagePreviewImage}
-                        />
-                      )}
+                <div style={styles.imageSection}>
+                  <div style={styles.imagePreview}>
+                    <Show when={editProfileImagePreview()}>
+                      {(image) => <img src={image()} alt="Character preview" style={styles.imagePreviewImage} />}
                     </Show>
-                    <Show when={!newCharacterImageData()}>
-                      <div class={styles.imagePlaceholder}>
-                        {getAvatarInitial(newCharacterName() || '?')}
+                    <Show when={!editProfileImagePreview()}>
+                      <div style={styles.imagePlaceholder}>
+                        {getAvatarInitial(editName() || getCharacterDisplayName(char))}
                       </div>
                     </Show>
                   </div>
-                  <div class={styles.imageControls}>
-                    <label class={styles.imageUploadButton}>
+                  <div style={styles.imageControls}>
+                    <label style={styles.imageUploadButton}>
                       Upload Image
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleNewImageSelect}
-                      />
+                      <input type="file" accept="image/*" onChange={handleEditImageSelect} style={{ display: 'none' }} />
                     </label>
-                    <Show when={newCharacterImageData()}>
+                    <Show when={editProfileImagePreview()}>
                       <button
                         type="button"
-                        class={styles.imageRemoveButton}
-                        onClick={clearNewImage}
+                        style={styles.imageRemoveButton}
+                        onClick={clearEditImage}
                         title="Remove profile image"
                       >
                         <BsX /> Remove
@@ -298,17 +480,17 @@ export const Characters: Component = () => {
                   </div>
                 </div>
                 <EJSCodeEditor
-                  value={newCharacterDescription()}
-                  onChange={setNewCharacterDescription}
+                  value={editDescription()}
+                  onChange={setEditDescription}
                   placeholder="Character description (supports EJS templates)"
                   minHeight="80px"
-                  ref={(methods) => newEditorRef = methods}
+                  ref={(methods) => (editEditorRef = methods)}
                 />
-                <div class={styles.quickInsertButtons}>
-                  <span class={styles.quickInsertLabel}>Quick Insert:</span>
+                <div style={styles.quickInsertButtons}>
+                  <span style={styles.quickInsertLabel}>Quick Insert:</span>
                   <button
-                    class={styles.quickInsertButton}
-                    onClick={() => insertAgeScript(newCharacterName(), newEditorRef)}
+                    style={styles.quickInsertButton}
+                    onClick={() => insertAgeScript(editName(), editEditorRef)}
                     title="Insert age script"
                     type="button"
                   >
@@ -316,249 +498,205 @@ export const Characters: Component = () => {
                   </button>
                 </div>
                 <TemplateChangeRequest
-                  currentTemplate={newCharacterDescription()}
-                  onTemplateChange={setNewCharacterDescription}
+                  currentTemplate={editDescription()}
+                  onTemplateChange={setEditDescription}
                   placeholder="Describe how you want to change this character's description"
                 />
-                <EJSRenderer template={newCharacterDescription()} mode="preview-always" />
-                <div style="margin-top: 0.5rem;">
-                  <Show when={!showNewBirthdatePicker()}>
+                <EJSRenderer template={editDescription()} mode="preview-always" />
+                <div style={{ 'margin-top': '0.5rem' }}>
+                  <Show when={!showEditBirthdatePicker()}>
                     <button
-                      class={styles.input}
-                      style="width: 100%; text-align: left; display: flex; align-items: center; gap: 0.5rem;"
-                      onClick={() => setShowNewBirthdatePicker(true)}
+                      style={{
+                        ...styles.input,
+                        width: '100%',
+                        'text-align': 'left',
+                        display: 'flex',
+                        'align-items': 'center',
+                        gap: '0.5rem',
+                      }}
+                      onClick={() => setShowEditBirthdatePicker(true)}
                     >
                       <BsCalendar />
-                      {newCharacterBirthdate() !== undefined
-                        ? `Birthdate: ${calendarStore.formatStoryTime(newCharacterBirthdate()!)}`
+                      {editBirthdate() !== undefined
+                        ? `Birthdate: ${calendarStore.formatStoryTime(editBirthdate()!)}`
                         : 'Set Birthdate (Optional)'}
                     </button>
                   </Show>
-                  <Show when={showNewBirthdatePicker()}>
+                  <Show when={showEditBirthdatePicker()}>
                     <StoryTimePicker
-                      currentTime={newCharacterBirthdate() ?? null}
+                      currentTime={editBirthdate() ?? null}
                       onSave={(time) => {
-                        setNewCharacterBirthdate(time ?? undefined)
-                        setShowNewBirthdatePicker(false)
+                        setEditBirthdate(time ?? undefined)
+                        setShowEditBirthdatePicker(false)
                       }}
-                      onCancel={() => setShowNewBirthdatePicker(false)}
+                      onCancel={() => setShowEditBirthdatePicker(false)}
                     />
                   </Show>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                  <EJSDocumentation />
-                  <AvailableFunctions />
-                </div>
-                <button
-                  onClick={addCharacter}
-                  disabled={!newCharacterName().trim() || !newCharacterDescription().trim()}
-                  class={styles.saveButton}
-                  title="Add character"
+                <ScriptHelpTabs />
+                <Stack direction="horizontal" gap="sm" style={{ 'margin-top': '0.5rem' }}>
+                  <Button variant="primary" onClick={saveEdit}>
+                    <BsCheck /> Save
+                  </Button>
+                  <Button variant="secondary" onClick={cancelEdit}>
+                    <BsX /> Cancel
+                  </Button>
+                </Stack>
+              </div>
+            }
+          >
+            <div style={styles.detailView}>
+              <div style={styles.detailAvatar}>
+                <Show when={char.profileImageData}>
+                  {(image) => (
+                    <img
+                      src={image()}
+                      alt={`${getCharacterDisplayName(char)} portrait`}
+                      style={styles.detailAvatarImage}
+                    />
+                  )}
+                </Show>
+                <Show when={!char.profileImageData}>
+                  <div style={styles.detailAvatarPlaceholder}>{getAvatarInitial(getCharacterDisplayName(char))}</div>
+                </Show>
+              </div>
+              <div style={styles.characterDescription}>
+                <EJSRenderer template={char.description ?? ''} mode="inline" />
+              </div>
+              <Show when={char.birthdate !== undefined}>
+                <div style={styles.characterBirthdate}>Born: {calendarStore.formatStoryTime(char.birthdate!)}</div>
+              </Show>
+              <div style={styles.detailActions}>
+                <Button
+                  variant={char.isMainCharacter ? 'primary' : 'secondary'}
+                  onClick={() => charactersStore.updateCharacter(char.id, { isMainCharacter: !char.isMainCharacter })}
                 >
-                  <BsPlus /> Add Character
-                </button>
+                  <Show when={char.isMainCharacter} fallback={<BsStar />}>
+                    <BsStarFill />
+                  </Show>
+                  {char.isMainCharacter ? 'Protagonist' : 'Mark as Protagonist'}
+                </Button>
+                <Button variant="secondary" onClick={() => startEditing(char)}>
+                  <BsPencil /> Edit
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    if (confirm(`Delete "${getCharacterDisplayName(char)}"?`)) {
+                      charactersStore.deleteCharacter(char.id)
+                      panelRef?.clearSelection()
+                    }
+                  }}
+                >
+                  <BsX /> Delete
+                </Button>
               </div>
             </div>
           </Show>
-
-          <Show when={selectedCharacter()} keyed>
-            {(char) => (
-              <div class={styles.detailContent}>
-                <div class={styles.detailHeader}>
-                  <button
-                    class={styles.backButton}
-                    onClick={() => setSelectedCharacterId('')}
-                    title="Back to list"
-                  >
-                    <BsArrowLeft />
-                  </button>
-                  <h3 class={styles.detailTitle}>
-                    <EJSRenderer template={getCharacterDisplayName(char)} mode="inline" />
-                  </h3>
-                  <Show when={char.isMainCharacter}>
-                    <BsStarFill class={styles.protagonistBadge} title="Protagonist" />
-                  </Show>
-                </div>
-
-              <Show when={editingId() === char.id} fallback={
-                  <div class={styles.detailView}>
-                    <div class={styles.detailAvatar}>
-                      <Show when={char.profileImageData}>
-                        {(image) => (
-                          <img
-                            src={image()}
-                            alt={`${getCharacterDisplayName(char)} portrait`}
-                            class={styles.detailAvatarImage}
-                          />
-                        )}
-                      </Show>
-                      <Show when={!char.profileImageData}>
-                        <div class={styles.detailAvatarPlaceholder}>
-                          {getAvatarInitial(getCharacterDisplayName(char))}
-                        </div>
-                      </Show>
-                    </div>
-                    <div class={styles.characterDescription}>
-                      <EJSRenderer template={char.description ?? ''} mode="inline" />
-                    </div>
-                    <Show when={char.birthdate !== undefined}>
-                      <div class={styles.characterBirthdate}>
-                        Born: {calendarStore.formatStoryTime(char.birthdate!)}
-                      </div>
-                    </Show>
-                    <div class={styles.detailActions}>
-                      <button
-                        class={`${styles.actionButton} ${char.isMainCharacter ? styles.protagonistButtonActive : ''}`}
-                        onClick={() => charactersStore.updateCharacter(char.id, { isMainCharacter: !char.isMainCharacter })}
-                        title={char.isMainCharacter ? "Remove protagonist status" : "Mark as protagonist"}
-                      >
-                        <Show when={char.isMainCharacter} fallback={<BsStar />}>
-                          <BsStarFill />
-                        </Show>
-                        {char.isMainCharacter ? 'Protagonist' : 'Mark as Protagonist'}
-                      </button>
-                      <button
-                        class={styles.actionButton}
-                        onClick={() => startEditing(char)}
-                        title="Edit character"
-                      >
-                        <BsPencil /> Edit
-                      </button>
-                      <button
-                        class={`${styles.actionButton} ${styles.deleteButton}`}
-                        onClick={() => {
-                          charactersStore.deleteCharacter(char.id)
-                          setSelectedCharacterId('')
-                        }}
-                        title="Delete character"
-                      >
-                        <BsX /> Delete
-                      </button>
-                    </div>
-                  </div>
-                }>
-                  <div class={styles.form}>
-                    <input
-                      type="text"
-                      value={editName()}
-                      onInput={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => handleKeyPress(e, saveEdit)}
-                      placeholder="Character name"
-                      class={styles.input}
-                    />
-                    <div class={styles.imageSection}>
-                      <div class={styles.imagePreview}>
-                        <Show when={editProfileImagePreview()}>
-                          {(image) => (
-                            <img
-                              src={image()}
-                              alt="Character preview"
-                              class={styles.imagePreviewImage}
-                            />
-                          )}
-                        </Show>
-                        <Show when={!editProfileImagePreview()}>
-                          <div class={styles.imagePlaceholder}>
-                            {getAvatarInitial(editName() || getCharacterDisplayName(char))}
-                          </div>
-                        </Show>
-                      </div>
-                      <div class={styles.imageControls}>
-                        <label class={styles.imageUploadButton}>
-                          Upload Image
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleEditImageSelect}
-                          />
-                        </label>
-                        <Show when={editProfileImagePreview()}>
-                          <button
-                            type="button"
-                            class={styles.imageRemoveButton}
-                            onClick={clearEditImage}
-                            title="Remove profile image"
-                          >
-                            <BsX /> Remove
-                          </button>
-                        </Show>
-                      </div>
-                    </div>
-                    <EJSCodeEditor
-                      value={editDescription()}
-                      onChange={setEditDescription}
-                      placeholder="Character description (supports EJS templates)"
-                      minHeight="80px"
-                      ref={(methods) => editEditorRef = methods}
-                    />
-                    <div class={styles.quickInsertButtons}>
-                      <span class={styles.quickInsertLabel}>Quick Insert:</span>
-                      <button
-                        class={styles.quickInsertButton}
-                        onClick={() => insertAgeScript(editName(), editEditorRef)}
-                        title="Insert age script"
-                        type="button"
-                      >
-                        Age
-                      </button>
-                    </div>
-                    <TemplateChangeRequest
-                      currentTemplate={editDescription()}
-                      onTemplateChange={setEditDescription}
-                      placeholder="Describe how you want to change this character's description"
-                    />
-                    <EJSRenderer template={editDescription()} mode="preview-always" />
-                    <div style="margin-top: 0.5rem;">
-                      <Show when={!showEditBirthdatePicker()}>
-                        <button
-                          class={styles.input}
-                          style="width: 100%; text-align: left; display: flex; align-items: center; gap: 0.5rem;"
-                          onClick={() => setShowEditBirthdatePicker(true)}
-                        >
-                          <BsCalendar />
-                          {editBirthdate() !== undefined
-                            ? `Birthdate: ${calendarStore.formatStoryTime(editBirthdate()!)}`
-                            : 'Set Birthdate (Optional)'}
-                        </button>
-                      </Show>
-                      <Show when={showEditBirthdatePicker()}>
-                        <StoryTimePicker
-                          currentTime={editBirthdate() ?? null}
-                          onSave={(time) => {
-                            setEditBirthdate(time ?? undefined)
-                            setShowEditBirthdatePicker(false)
-                          }}
-                          onCancel={() => setShowEditBirthdatePicker(false)}
-                        />
-                      </Show>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                      <EJSDocumentation />
-                      <AvailableFunctions />
-                    </div>
-                    <div class={styles.formActions}>
-                      <button
-                        class={styles.saveButton}
-                        onClick={saveEdit}
-                        title="Save changes"
-                      >
-                        <BsCheck /> Save
-                      </button>
-                      <button
-                        class={styles.cancelButton}
-                        onClick={cancelEdit}
-                        title="Cancel editing"
-                      >
-                        <BsX /> Cancel
-                      </button>
-                    </div>
-                  </div>
+        )}
+        newItemTitle="Add New Character"
+        renderNewForm={() => (
+          <div style={styles.form}>
+            <input
+              type="text"
+              value={newCharacterName()}
+              onInput={(e) => setNewCharacterName(e.target.value)}
+              onKeyDown={(e) => handleKeyPress(e, addCharacter)}
+              placeholder="Character name"
+              style={styles.input}
+            />
+            <div style={styles.imageSection}>
+              <div style={styles.imagePreview}>
+                <Show when={newCharacterImageData()}>
+                  {(image) => <img src={image()} alt="New character preview" style={styles.imagePreviewImage} />}
+                </Show>
+                <Show when={!newCharacterImageData()}>
+                  <div style={styles.imagePlaceholder}>{getAvatarInitial(newCharacterName() || '?')}</div>
                 </Show>
               </div>
-            )}
-          </Show>
-        </div>
-      </div>
+              <div style={styles.imageControls}>
+                <label style={styles.imageUploadButton}>
+                  Upload Image
+                  <input type="file" accept="image/*" onChange={handleNewImageSelect} style={{ display: 'none' }} />
+                </label>
+                <Show when={newCharacterImageData()}>
+                  <button
+                    type="button"
+                    style={styles.imageRemoveButton}
+                    onClick={clearNewImage}
+                    title="Remove profile image"
+                  >
+                    <BsX /> Remove
+                  </button>
+                </Show>
+              </div>
+            </div>
+            <EJSCodeEditor
+              value={newCharacterDescription()}
+              onChange={setNewCharacterDescription}
+              placeholder="Character description (supports EJS templates)"
+              minHeight="80px"
+              ref={(methods) => (newEditorRef = methods)}
+            />
+            <div style={styles.quickInsertButtons}>
+              <span style={styles.quickInsertLabel}>Quick Insert:</span>
+              <button
+                style={styles.quickInsertButton}
+                onClick={() => insertAgeScript(newCharacterName(), newEditorRef)}
+                title="Insert age script"
+                type="button"
+              >
+                Age
+              </button>
+            </div>
+            <TemplateChangeRequest
+              currentTemplate={newCharacterDescription()}
+              onTemplateChange={setNewCharacterDescription}
+              placeholder="Describe how you want to change this character's description"
+            />
+            <EJSRenderer template={newCharacterDescription()} mode="preview-always" />
+            <div style={{ 'margin-top': '0.5rem' }}>
+              <Show when={!showNewBirthdatePicker()}>
+                <button
+                  style={{
+                    ...styles.input,
+                    width: '100%',
+                    'text-align': 'left',
+                    display: 'flex',
+                    'align-items': 'center',
+                    gap: '0.5rem',
+                  }}
+                  onClick={() => setShowNewBirthdatePicker(true)}
+                >
+                  <BsCalendar />
+                  {newCharacterBirthdate() !== undefined
+                    ? `Birthdate: ${calendarStore.formatStoryTime(newCharacterBirthdate()!)}`
+                    : 'Set Birthdate (Optional)'}
+                </button>
+              </Show>
+              <Show when={showNewBirthdatePicker()}>
+                <StoryTimePicker
+                  currentTime={newCharacterBirthdate() ?? null}
+                  onSave={(time) => {
+                    setNewCharacterBirthdate(time ?? undefined)
+                    setShowNewBirthdatePicker(false)
+                  }}
+                  onCancel={() => setShowNewBirthdatePicker(false)}
+                />
+              </Show>
+            </div>
+            <ScriptHelpTabs />
+            <Button
+              variant="primary"
+              onClick={addCharacter}
+              disabled={!newCharacterName().trim() || !newCharacterDescription().trim()}
+              style={{ 'margin-top': '0.5rem' }}
+            >
+              <BsPlus /> Add Character
+            </Button>
+          </div>
+        )}
+      />
     </Show>
   )
 }

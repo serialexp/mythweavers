@@ -2,14 +2,16 @@ import { settingsStore } from '../stores/settingsStore'
 
 interface OpenRouterMessage {
   role: 'user' | 'assistant' | 'system'
-  content: string | Array<{
-    type: 'text'
-    text: string
-    cache_control?: {
-      type: 'ephemeral'
-      ttl?: '5m' | '1h' // Optional TTL, defaults to 5m
-    }
-  }>
+  content:
+    | string
+    | Array<{
+        type: 'text'
+        text: string
+        cache_control?: {
+          type: 'ephemeral'
+          ttl?: '5m' | '1h' // Optional TTL, defaults to 5m
+        }
+      }>
   cache_control?: {
     type: 'ephemeral'
     ttl?: '5m' | '1h' // Optional TTL, defaults to 5m
@@ -78,7 +80,7 @@ let lastOpenRouterMessages: any[] = []
 
 export const getLastOpenRouterDebugInfo = () => ({
   request: lastOpenRouterRequest,
-  messagesWithCache: lastOpenRouterMessages
+  messagesWithCache: lastOpenRouterMessages,
 })
 
 export class OpenRouterClient {
@@ -94,10 +96,10 @@ export class OpenRouterClient {
     try {
       response = await fetch(`${this.baseUrl}/models`, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Story App'
-        }
+          'X-Title': 'Story App',
+        },
       })
     } catch (error) {
       console.error('OpenRouter fetch error:', error)
@@ -123,24 +125,24 @@ export class OpenRouterClient {
     }
 
     const data = await response.json()
-    
+
     // Sort models by provider (extracted from model ID), then by recency (created date)
     const sortedModels = data.data.sort((a: any, b: any) => {
       // Extract provider from model ID (e.g., "openai/gpt-4" -> "openai")
       const providerA = a.id.split('/')[0] || a.id
       const providerB = b.id.split('/')[0] || b.id
-      
+
       // First sort by provider name
       if (providerA !== providerB) {
         return providerA.localeCompare(providerB)
       }
-      
+
       // Then sort by recency (newer first)
       const createdA = a.created || 0
       const createdB = b.created || 0
       return createdB - createdA
     })
-    
+
     return {
       models: sortedModels.map((model: any) => ({
         name: model.id,
@@ -148,15 +150,17 @@ export class OpenRouterClient {
         digest: '', // Not applicable for OpenRouter
         modified_at: model.created ? new Date(model.created * 1000).toISOString() : new Date().toISOString(),
         context_length: model.context_length || 4096,
-        pricing: model.pricing ? {
-          prompt: model.pricing.prompt,
-          completion: model.pricing.completion,
-          request: model.pricing.request,
-          image: model.pricing.image,
-          input_cache_read: model.pricing.input_cache_read,
-          input_cache_write: model.pricing.input_cache_write
-        } : undefined
-      }))
+        pricing: model.pricing
+          ? {
+              prompt: model.pricing.prompt,
+              completion: model.pricing.completion,
+              request: model.pricing.request,
+              image: model.pricing.image,
+              input_cache_read: model.pricing.input_cache_read,
+              input_cache_write: model.pricing.input_cache_write,
+            }
+          : undefined,
+      })),
     }
   }
 
@@ -164,40 +168,45 @@ export class OpenRouterClient {
     const { model, prompt, messages, stream, options: genOptions } = options
 
     // Debug: Log what we received
-    console.log('OpenRouter generate called with:', { model, hasPrompt: !!prompt, hasMessages: !!messages, messageCount: messages?.length })
+    console.log('OpenRouter generate called with:', {
+      model,
+      hasPrompt: !!prompt,
+      hasMessages: !!messages,
+      messageCount: messages?.length,
+    })
 
     // Use either messages or convert prompt to messages for backward compatibility
-    const chatMessages: OpenRouterMessage[] = messages ? 
-      messages.map(msg => {
-        // For Anthropic models, always use multipart content format
-        // This is required for cache control to work properly
-        if (model.includes('anthropic')) {
+    const chatMessages: OpenRouterMessage[] = messages
+      ? messages.map((msg) => {
+          // For Anthropic models, always use multipart content format
+          // This is required for cache control to work properly
+          if (model.includes('anthropic')) {
+            return {
+              role: msg.role,
+              content: [
+                {
+                  type: 'text',
+                  text: msg.content,
+                  ...(msg.cache_control && { cache_control: msg.cache_control }),
+                },
+              ],
+            }
+          }
+          // For other models with cache control, include it at message level
+          if (msg.cache_control) {
+            return {
+              role: msg.role,
+              content: msg.content,
+              cache_control: msg.cache_control,
+            }
+          }
+          // For messages without cache control
           return {
             role: msg.role,
-            content: [
-              {
-                type: 'text',
-                text: msg.content,
-                ...(msg.cache_control && { cache_control: msg.cache_control })
-              }
-            ]
-          }
-        }
-        // For other models with cache control, include it at message level
-        else if (msg.cache_control) {
-          return {
-            role: msg.role, 
             content: msg.content,
-            cache_control: msg.cache_control
           }
-        }
-        // For messages without cache control
-        return {
-          role: msg.role, 
-          content: msg.content
-        }
-      }) :
-      [{ role: 'user', content: prompt || '' }]
+        })
+      : [{ role: 'user', content: prompt || '' }]
 
     const requestBody: any = {
       model: model,
@@ -207,48 +216,53 @@ export class OpenRouterClient {
       temperature: 0.7,
       // Enable usage tracking to get cache information
       usage: {
-        include: true
-      }
+        include: true,
+      },
     }
-    
+
     // Note: OpenRouter doesn't support Anthropic beta features like extended cache TTL
 
     // Only store debug info for story generation (multiple messages), not summarization (single message)
     const isStoryGeneration = chatMessages.length > 2 // Story gen has system + history + context + instruction
     if (isStoryGeneration) {
       lastOpenRouterRequest = JSON.parse(JSON.stringify(requestBody)) // Deep copy
-      lastOpenRouterMessages = chatMessages.filter(msg => 
-        msg.cache_control || (Array.isArray(msg.content) && msg.content.some((c: any) => c.cache_control))
-      ).map(msg => ({
-        role: msg.role,
-        hasCache: true,
-        contentLength: typeof msg.content === 'string' ? msg.content.length : msg.content[0]?.text?.length || 0,
-        cacheControl: msg.cache_control || (Array.isArray(msg.content) ? msg.content[0]?.cache_control : null)
-      }))
+      lastOpenRouterMessages = chatMessages
+        .filter(
+          (msg) => msg.cache_control || (Array.isArray(msg.content) && msg.content.some((c: any) => c.cache_control)),
+        )
+        .map((msg) => ({
+          role: msg.role,
+          hasCache: true,
+          contentLength: typeof msg.content === 'string' ? msg.content.length : msg.content[0]?.text?.length || 0,
+          cacheControl: msg.cache_control || (Array.isArray(msg.content) ? msg.content[0]?.cache_control : null),
+        }))
     }
-    
+
     // Debug logging for cache control
     console.log('OpenRouter request body:', JSON.stringify(requestBody, null, 2))
     console.log('Messages with cache control:', lastOpenRouterMessages)
     console.log('Total messages:', chatMessages.length)
-    console.log('Cache control summary:', chatMessages.map((msg, i) => ({
-      index: i,
-      role: msg.role,
-      contentType: Array.isArray(msg.content) ? 'multipart' : 'string',
-      hasCache: !!(msg.cache_control || (Array.isArray(msg.content) && msg.content[0]?.cache_control))
-    })))
-    
+    console.log(
+      'Cache control summary:',
+      chatMessages.map((msg, i) => ({
+        index: i,
+        role: msg.role,
+        contentType: Array.isArray(msg.content) ? 'multipart' : 'string',
+        hasCache: !!(msg.cache_control || (Array.isArray(msg.content) && msg.content[0]?.cache_control)),
+      })),
+    )
+
     let response: Response
     try {
       response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Story App'
+          'X-Title': 'Story App',
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
       })
     } catch (error) {
       console.error('OpenRouter fetch error:', error)
@@ -304,7 +318,7 @@ export class OpenRouterClient {
                   eval_count: totalTokens,
                   prompt_eval_count: promptTokens,
                   cache_creation_input_tokens: cacheCreationTokens,
-                  cache_read_input_tokens: cacheReadTokens
+                  cache_read_input_tokens: cacheReadTokens,
                 }
                 return
               }
@@ -316,7 +330,7 @@ export class OpenRouterClient {
                 if (choice?.delta?.content) {
                   totalTokens++
                   yield {
-                    response: choice.delta.content
+                    response: choice.delta.content,
                   }
                 }
 
@@ -325,16 +339,13 @@ export class OpenRouterClient {
                   totalTokens = parsed.usage.completion_tokens
                   cacheCreationTokens = parsed.usage.cache_creation_input_tokens
                   cacheReadTokens = parsed.usage.cache_read_input_tokens
-                  
+
                   // Debug cache information
                   if (cacheCreationTokens || cacheReadTokens) {
                     console.log('Cache tokens detected:', { cacheCreationTokens, cacheReadTokens })
                   }
                 }
-              } catch (e) {
-                // Skip malformed JSON
-                continue
-              }
+              } catch (_e) {}
             }
           }
         }
@@ -351,7 +362,7 @@ export class OpenRouterClient {
         eval_count: data.usage?.completion_tokens || 0,
         prompt_eval_count: data.usage?.prompt_tokens || 0,
         cache_creation_input_tokens: data.usage?.cache_creation_input_tokens,
-        cache_read_input_tokens: data.usage?.cache_read_input_tokens
+        cache_read_input_tokens: data.usage?.cache_read_input_tokens,
       }
     }
   }

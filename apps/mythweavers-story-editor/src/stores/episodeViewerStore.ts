@@ -43,5 +43,5 @@ export const episodeViewerStore = {
   // Internal method to update window width (called by resize listener)
   _setWindowWidth(width: number) {
     setWindowWidth(width)
-  }
+  },
 }

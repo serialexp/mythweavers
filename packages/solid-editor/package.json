@@ -13,16 +13,45 @@
     "./model": {
       "import": "./dist/model/index.js",
       "types": "./dist/model/index.d.ts"
+    },
+    "./state": {
+      "import": "./dist/state/index.js",
+      "types": "./dist/state/index.d.ts"
+    },
+    "./transform": {
+      "import": "./dist/transform/index.js",
+      "types": "./dist/transform/index.d.ts"
+    },
+    "./view": {
+      "import": "./dist/view/index.js",
+      "types": "./dist/view/index.d.ts"
+    },
+    "./keymap": {
+      "import": "./dist/keymap/index.js",
+      "types": "./dist/keymap/index.d.ts"
     }
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:browser": "vitest --config vitest.browser.config.ts",
+    "test:browser:run": "vitest run --config vitest.browser.config.ts"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.5"
   },
   "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
+    "@vitest/browser": "^4.0.15",
+    "@vitest/browser-playwright": "^4.0.15",
+    "playwright": "^1.57.0",
     "typescript": "^5.8.3",
-    "vitest": "^2.1.9"
+    "vite-plugin-solid": "^2.11.10",
+    "vitest": "^4.0.15"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.0"
   }
 }

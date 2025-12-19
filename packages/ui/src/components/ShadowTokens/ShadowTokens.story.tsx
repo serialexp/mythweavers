@@ -1,7 +1,7 @@
-import { tokens } from '../../theme/tokens.css'
+import type { ParentComponent } from 'solid-js'
 import { chronicleTheme } from '../../theme/chronicle.css'
 import { starlightTheme } from '../../theme/starlight.css'
-import type { ParentComponent } from 'solid-js'
+import { tokens } from '../../theme/tokens.css'
 
 const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => (
   <div
@@ -13,9 +13,7 @@ const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => 
       'border-radius': '8px',
     }}
   >
-    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>
-      {props.name}
-    </h2>
+    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>{props.name}</h2>
     {props.children}
   </div>
 )

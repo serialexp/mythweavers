@@ -1,7 +1,7 @@
 import { settingsStore } from '../stores/settingsStore'
+import { AnthropicClient } from './anthropicClient'
 import { createOllamaClient } from './ollamaClient'
 import { createOpenRouterClient } from './openrouterClient'
-import { AnthropicClient } from './anthropicClient'
 
 /**
  * Generate a new template based on a change request using AI
@@ -9,7 +9,7 @@ import { AnthropicClient } from './anthropicClient'
 export const generateTemplateChange = async (
   currentTemplate: string,
   currentResolvedState: any,
-  changeRequest: string
+  changeRequest: string,
 ): Promise<string> => {
   const { provider, model, anthropicApiKey } = settingsStore
 
@@ -22,30 +22,27 @@ export const generateTemplateChange = async (
   if (provider === 'ollama') {
     const client = createOllamaClient()
     return generateWithOllamaClient(client, prompt, model)
-  } else if (provider === 'openrouter') {
+  }
+  if (provider === 'openrouter') {
     const client = createOpenRouterClient()
     return generateWithOpenRouterClient(client, prompt, model)
-  } else if (provider === 'anthropic') {
+  }
+  if (provider === 'anthropic') {
     if (!anthropicApiKey) {
       throw new Error('Anthropic API key not configured')
     }
     const client = new AnthropicClient(anthropicApiKey)
     return generateWithAnthropicClient(client, prompt, model)
-  } else {
-    throw new Error('Unknown provider')
   }
+  throw new Error('Unknown provider')
 }
 
 /**
  * Create the prompt for template generation
  */
-function createTemplatePrompt(
-  currentTemplate: string,
-  currentResolvedState: any,
-  changeRequest: string
-): string {
+function createTemplatePrompt(currentTemplate: string, currentResolvedState: any, changeRequest: string): string {
   const stateJson = JSON.stringify(currentResolvedState, null, 2)
-  
+
   return `You are a template editor assistant. Your task is to modify an EJS template based on a user's change request.
 
 CURRENT TEMPLATE:
@@ -82,8 +79,8 @@ async function generateWithOllamaClient(client: any, prompt: string, model: stri
       num_ctx: 4096,
       temperature: 0.3, // Low temperature for consistent template generation
       top_p: 0.9,
-      stop: []
-    }
+      stop: [],
+    },
   })
 
   for await (const part of response) {
@@ -109,8 +106,8 @@ async function generateWithOpenRouterClient(client: any, prompt: string, model: 
       num_ctx: 4096,
       temperature: 0.3,
       top_p: 0.9,
-      stop: []
-    }
+      stop: [],
+    },
   })
 
   for await (const part of response) {
@@ -133,13 +130,13 @@ async function generateWithAnthropicClient(client: AnthropicClient, prompt: stri
     messages: [
       {
         role: 'user',
-        content: prompt
-      }
+        content: prompt,
+      },
     ],
     stream: true,
     options: {
-      num_ctx: 4096
-    }
+      num_ctx: 4096,
+    },
   })
 
   for await (const part of response) {

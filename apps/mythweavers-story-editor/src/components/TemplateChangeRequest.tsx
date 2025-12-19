@@ -1,12 +1,12 @@
-import { Component, createSignal, Show } from 'solid-js'
+import { Alert, IconButton, Input, Spinner, Stack } from '@mythweavers/ui'
 import { BsArrowRepeat, BsCheckCircle, BsExclamationTriangle } from 'solid-icons/bs'
-import { generateTemplateChange } from '../utils/templateAI'
-import { getTemplatePreview } from '../utils/scriptEngine'
-import { messagesStore } from '../stores/messagesStore'
-import { currentStoryStore } from '../stores/currentStoryStore'
-import { nodeStore } from '../stores/nodeStore'
+import { Component, Show, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
-import styles from './TemplateChangeRequest.module.css'
+import { currentStoryStore } from '../stores/currentStoryStore'
+import { messagesStore } from '../stores/messagesStore'
+import { nodeStore } from '../stores/nodeStore'
+import { getTemplatePreview } from '../utils/scriptEngine'
+import { generateTemplateChange } from '../utils/templateAI'
 
 interface TemplateChangeRequestProps {
   currentTemplate: string
@@ -33,7 +33,7 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
       // Get the current resolved state for context
       const messages = messagesStore.messages
       const messageId = contextMessageId()
-      
+
       let currentResolvedState = {}
       if (messageId) {
         const preview = getTemplatePreview(
@@ -41,17 +41,13 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
           messages,
           messageId,
           nodeStore.nodesArray,
-          currentStoryStore.globalScript
+          currentStoryStore.globalScript,
         )
         currentResolvedState = preview.data
       }
 
       // Generate new template using AI
-      const newTemplate = await generateTemplateChange(
-        props.currentTemplate,
-        currentResolvedState,
-        request
-      )
+      const newTemplate = await generateTemplateChange(props.currentTemplate, currentResolvedState, request)
 
       // Validate the new template by trying to evaluate it
       if (messageId) {
@@ -60,9 +56,9 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
           messages,
           messageId,
           nodeStore.nodesArray,
-          currentStoryStore.globalScript
+          currentStoryStore.globalScript,
         )
-        
+
         if (validationResult.error) {
           setError(`Invalid template generated: ${validationResult.error}`)
           return
@@ -73,7 +69,7 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
       props.onTemplateChange(newTemplate)
       setChangeRequest('')
       setSuccess(true)
-      
+
       // Clear success message after 2 seconds
       setTimeout(() => setSuccess(false), 2000)
     } catch (err) {
@@ -91,40 +87,41 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
   }
 
   return (
-    <div class={styles.container}>
-      <div class={styles.inputWrapper}>
-        <input
-          type="text"
+    <Stack direction="vertical" gap="xs" style={{ margin: '8px 0' }}>
+      <Stack direction="horizontal" gap="sm" align="center">
+        <Input
           value={changeRequest()}
-          onInput={(e) => setChangeRequest(e.target.value)}
+          onInput={(e) => setChangeRequest(e.currentTarget.value)}
           onKeyDown={handleKeyPress}
-          placeholder={props.placeholder || "e.g., 'Make the description more mysterious' or 'Add their current emotional state'"}
-          class={styles.input}
+          placeholder={
+            props.placeholder || "e.g., 'Make the description more mysterious' or 'Add their current emotional state'"
+          }
           disabled={isLoading()}
+          style={{ flex: 1 }}
         />
-        <button
+        <IconButton
           onClick={handleSubmit}
           disabled={!changeRequest().trim() || isLoading()}
-          class={styles.button}
           title="Generate new template with AI"
+          aria-label="Generate template"
         >
           <Show when={isLoading()} fallback={<BsArrowRepeat />}>
-            <span class={styles.spinner}>⟳</span>
+            <Spinner size="sm" />
           </Show>
-        </button>
-      </div>
-      
+        </IconButton>
+      </Stack>
+
       <Show when={error()}>
-        <div class={styles.error}>
-          <BsExclamationTriangle /> {error()}
-        </div>
+        <Alert variant="error">
+          <BsExclamationTriangle style={{ 'margin-right': '6px' }} /> {error()}
+        </Alert>
       </Show>
-      
+
       <Show when={success()}>
-        <div class={styles.success}>
-          <BsCheckCircle /> Template updated successfully!
-        </div>
+        <Alert variant="success">
+          <BsCheckCircle style={{ 'margin-right': '6px' }} /> Template updated successfully!
+        </Alert>
       </Show>
-    </div>
+    </Stack>
   )
 }

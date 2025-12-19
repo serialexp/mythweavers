@@ -1,8 +1,8 @@
-import { Component, createSignal, Show } from 'solid-js'
+import { IconButton } from '@mythweavers/ui'
 import { BsSignpost2 } from 'solid-icons/bs'
+import { Component, Show, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
-import { IconButton } from './IconButton'
-import styles from './InsertEventButton.module.css'
+import * as styles from './InsertEventButton.css'
 
 interface InsertBranchButtonProps {
   afterMessageId?: string | null
@@ -34,10 +34,7 @@ export const InsertBranchButton: Component<InsertBranchButtonProps> = (props) =>
 
   return (
     <>
-      <IconButton
-        onClick={() => setShowForm(true)}
-        title="Insert branch point"
-      >
+      <IconButton onClick={() => setShowForm(true)} aria-label="Insert branch point">
         <BsSignpost2 size={18} />
       </IconButton>
 
@@ -69,16 +66,10 @@ export const InsertBranchButton: Component<InsertBranchButtonProps> = (props) =>
             </div>
 
             <div class={styles.modalFooter}>
-              <button
-                class={styles.insertButtonConfirm}
-                onClick={handleInsert}
-              >
+              <button class={styles.insertButtonConfirm} onClick={handleInsert}>
                 Insert Branch
               </button>
-              <button
-                class={styles.cancelButton}
-                onClick={handleCancel}
-              >
+              <button class={styles.cancelButton} onClick={handleCancel}>
                 Cancel
               </button>
             </div>

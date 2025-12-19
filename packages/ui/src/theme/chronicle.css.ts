@@ -1,6 +1,6 @@
 import { createTheme } from '@vanilla-extract/css'
-import { tokens } from './tokens.css'
 import { chronicleColors } from './chronicle.colors'
+import { tokens } from './tokens.css'
 
 /**
  * Chronicle Theme - Dark Mode

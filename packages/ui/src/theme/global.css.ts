@@ -1,7 +1,7 @@
 import { globalStyle } from '@vanilla-extract/css'
-import { tokens } from './tokens.css'
 import { chronicleTheme } from './chronicle.css'
 import { starlightTheme } from './starlight.css'
+import { tokens } from './tokens.css'
 
 /**
  * Global styles scoped to theme containers
@@ -9,11 +9,9 @@ import { starlightTheme } from './starlight.css'
  */
 
 // Helper to scope styles to both themes
-const themed = (selector: string) =>
-  `.${chronicleTheme} ${selector}, .${starlightTheme} ${selector}`
+const themed = (selector: string) => `.${chronicleTheme} ${selector}, .${starlightTheme} ${selector}`
 
-const themedRoot = () =>
-  `.${chronicleTheme}, .${starlightTheme}`
+const themedRoot = () => `.${chronicleTheme}, .${starlightTheme}`
 
 // Reset box-sizing for all elements inside themed containers
 globalStyle(`${themed('*')}, ${themed('*::before')}, ${themed('*::after')}`, {
@@ -51,16 +49,6 @@ globalStyle(themed(':focus:not(:focus-visible)'), {
 globalStyle(themed('::selection'), {
   backgroundColor: tokens.color.accent.primary,
   color: tokens.color.text.inverse,
-})
-
-// Links
-globalStyle(themed('a'), {
-  color: tokens.color.accent.primary,
-  textDecoration: 'none',
-})
-
-globalStyle(themed('a:hover'), {
-  textDecoration: 'underline',
 })
 
 // Code

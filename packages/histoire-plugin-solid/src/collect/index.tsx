@@ -1,11 +1,11 @@
-import type { ServerRunPayload, ServerStory, ServerVariant } from '@histoire/shared'
-import type { SolidStorySetupHandler } from '../helpers.js'
-import { render } from 'solid-js/web'
-import { createContext, useContext, type ParentComponent } from 'solid-js'
 // @ts-expect-error virtual module id
 import * as generatedSetup from 'virtual:$histoire-generated-global-setup'
 // @ts-expect-error virtual module id
 import * as setup from 'virtual:$histoire-setup'
+import type { ServerRunPayload, ServerStory, ServerVariant } from '@histoire/shared'
+import { createComponent, createRoot } from 'solid-js'
+import { type ParentComponent, createContext, useContext } from 'solid-js'
+import type { SolidStorySetupHandler } from '../helpers.js'
 
 // Context for story collection
 interface StoryContext {
@@ -56,11 +56,7 @@ export const Story: ParentComponent<{
   }
 
   // Provide context but DON'T render children content - only Variant registration
-  return (
-    <VariantContext.Provider value={variantCtx}>
-      {props.children}
-    </VariantContext.Provider>
-  )
+  return <VariantContext.Provider value={variantCtx}>{props.children}</VariantContext.Provider>
 }
 
 // Variant component for collection - registers variant metadata, doesn't render content
@@ -88,8 +84,12 @@ export const Variant: ParentComponent<{
   return null
 }
 
-export async function run({ file, el, storyData }: ServerRunPayload) {
-  const { default: Comp } = await import(/* @vite-ignore */ file.moduleId)
+export async function run({ file, storyData }: ServerRunPayload) {
+  const module = await import(/* @vite-ignore */ file.moduleId)
+  const Comp = module.default
+  if (!Comp) {
+    return
+  }
 
   const storyCtx: StoryContext = {
     addStory: (story) => {
@@ -98,18 +98,22 @@ export async function run({ file, el, storyData }: ServerRunPayload) {
     fileData: file,
   }
 
-  // Render with client-side render (we configure vite to use browser bundle)
-  const dispose = render(
-    () => (
-      <StoryContext.Provider value={storyCtx}>
-        <Comp Hst={{ Story, Variant }} />
-      </StoryContext.Provider>
-    ),
-    el
-  )
-
-  // Wait a tick for Solid to process
-  await new Promise(resolve => setTimeout(resolve, 0))
+  // Execute component tree to collect story metadata
+  // We use createRoot to establish a reactive context, then createComponent to build the tree
+  let dispose: () => void
+  createRoot((d) => {
+    dispose = d
+    createComponent(StoryContext.Provider, {
+      value: storyCtx,
+      get children() {
+        return createComponent(Comp, {
+          Hst: { Story, Variant },
+        })
+      },
+    })
+  })
+  // Dispose after execution
+  dispose!()
 
   // Call setup functions
   if (typeof generatedSetup?.setupSolid === 'function') {
@@ -129,7 +133,4 @@ export async function run({ file, el, storyData }: ServerRunPayload) {
       title: 'default',
     })
   }
-
-  // Cleanup
-  dispose()
 }

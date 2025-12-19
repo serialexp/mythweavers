@@ -5,6 +5,7 @@
   "description": "Writer monorepo",
   "pnpm": {
     "overrides": {
+      "@types/node": "catalog:",
       "happy-dom": ">=20.0.0",
       "form-data": ">=4.0.4",
       "esbuild": ">=0.25.0",
@@ -29,16 +30,25 @@
   },
   "scripts": {
     "dev": "pnpm build:shared && pnpm -r --parallel dev",
-    "dev:reader": "pnpm build:shared && pnpm --filter @writer/reader dev",
-    "dev:server": "pnpm build:shared && pnpm --filter @writer/server dev",
+    "dev:all": "pnpm build:shared && concurrently -n backend,reader,editor -c blue,green,magenta \"pnpm --filter @mythweavers/backend dev\" \"pnpm --filter @mythweavers/reading-frontend-astro dev\" \"pnpm --filter @mythweavers/story-editor dev\"",
+    "dev:reader": "pnpm build:shared && pnpm --filter @mythweavers/reading-frontend-astro dev",
+    "dev:backend": "pnpm --filter @mythweavers/backend dev",
+    "dev:editor": "pnpm build:shared && pnpm --filter @mythweavers/story-editor dev",
+    "dev:legacy-server": "pnpm build:shared && pnpm --filter @writer/legacy-backend dev",
     "build": "pnpm -r build",
-    "build:shared": "pnpm --filter @writer/shared build",
-    "test": "pnpm -r test"
+    "build:shared": "pnpm --filter @mythweavers/shared build",
+    "test": "pnpm -r test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "check": "biome check --write --unsafe ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "concurrently": "^9.1.2",
     "typescript": "^5.8.3"
   }
 }

@@ -1,8 +1,7 @@
-import { createSignal, Show } from "solid-js"
-import type { SceneEditorProps } from "./SceneEditorProps"
-import { ProseMirrorEditor } from "./components/ProseMirrorEditor"
-import { RewriteModal, GenerateBetweenModal } from "./components/EditorModals"
-import { sceneEditor } from "./scene-editor.css"
+import { Show, createSignal } from 'solid-js'
+import type { SceneEditorProps } from './SceneEditorProps'
+import { GenerateBetweenModal, RewriteModal } from './components/EditorModals'
+import { ProseMirrorEditor } from './components/ProseMirrorEditor'
 
 /**
  * SceneEditor - Full-featured rich text editor for story scenes
@@ -25,7 +24,7 @@ export function SceneEditor(props: SceneEditorProps) {
   const currentParagraph = () => {
     const id = currentParagraphId()
     if (!id) return null
-    return props.scene.paragraphs.find(p => p.id === id)
+    return props.scene.paragraphs.find((p) => p.id === id)
   }
 
   // Handle paragraph text changes from editor
@@ -34,33 +33,34 @@ export function SceneEditor(props: SceneEditorProps) {
     props.onParagraphsChange?.(paragraphs)
 
     for (const id of changedIds) {
-      const paragraph = paragraphs.find(p => p.id === id)
+      const paragraph = paragraphs.find((p) => p.id === id)
       if (paragraph) {
         props.onParagraphUpdate(id, { body: paragraph.body, contentSchema: paragraph.contentSchema })
       }
     }
 
     // Handle new paragraphs (paragraphs in doc but not in scene)
-    const sceneIds = new Set(props.scene.paragraphs.map(p => p.id))
-    const newParagraphs = paragraphs.filter(p => !sceneIds.has(p.id))
+    const sceneIds = new Set(props.scene.paragraphs.map((p) => p.id))
+    const newParagraphs = paragraphs.filter((p) => !sceneIds.has(p.id))
 
     for (const newPara of newParagraphs) {
-      const index = paragraphs.findIndex(p => p.id === newPara.id)
+      const index = paragraphs.findIndex((p) => p.id === newPara.id)
       const afterId = index > 0 ? paragraphs[index - 1].id : undefined
 
-      props.onParagraphCreate({
-        body: newPara.body,
-        contentSchema: newPara.contentSchema,
-        state: "draft",
-        comments: [],
-      }, afterId)
+      props.onParagraphCreate(
+        {
+          body: newPara.body,
+          contentSchema: newPara.contentSchema,
+          state: 'draft',
+          comments: [],
+        },
+        afterId,
+      )
     }
 
     // Handle deleted paragraphs (paragraphs in scene but not in doc)
-    const docIds = new Set(paragraphs.map(p => p.id))
-    const deletedIds = props.scene.paragraphs
-      .filter(p => !docIds.has(p.id))
-      .map(p => p.id)
+    const docIds = new Set(paragraphs.map((p) => p.id))
+    const deletedIds = props.scene.paragraphs.filter((p) => !docIds.has(p.id)).map((p) => p.id)
 
     for (const id of deletedIds) {
       props.onParagraphDelete(id)
@@ -69,7 +69,7 @@ export function SceneEditor(props: SceneEditorProps) {
 
   // Handle AI rewrite request
   const handleRewrite = async (paragraphId: string, customInstructions?: string) => {
-    const result = await props.onAiRequest('rewrite', paragraphId, customInstructions)
+    const result = await props.onAiRequest?.('rewrite', paragraphId, customInstructions)
     if (result) {
       props.onParagraphUpdate(paragraphId, {
         extra: result,
@@ -95,18 +95,21 @@ export function SceneEditor(props: SceneEditorProps) {
     props.onGenerateBetweenTextSave?.(text)
 
     try {
-      const result = await props.onAiRequest('generate_between', id, text)
+      const result = await props.onAiRequest?.('generate_between', id, text)
       if (result) {
         // Split result into paragraphs and create them
-        const paragraphs = result.split("\n\n")
-        let afterId = id
+        const paragraphs = result.split('\n\n')
+        const afterId = id
 
         for (const paragraph of paragraphs) {
-          props.onParagraphCreate({
-            body: paragraph,
-            state: "ai",
-            comments: [],
-          }, afterId)
+          props.onParagraphCreate(
+            {
+              body: paragraph,
+              state: 'ai',
+              comments: [],
+            },
+            afterId,
+          )
           // We don't know the new ID here, so apps need to handle this
         }
       }
@@ -121,14 +124,14 @@ export function SceneEditor(props: SceneEditorProps) {
     props.onParagraphUpdate(paragraphId, {
       body: content,
       contentSchema: null,
-      extra: "",
+      extra: '',
       extraLoading: false,
     })
   }
 
   const handleSuggestionReject = (paragraphId: string) => {
     props.onParagraphUpdate(paragraphId, {
-      extra: "",
+      extra: '',
       extraLoading: false,
     })
   }
@@ -139,36 +142,39 @@ export function SceneEditor(props: SceneEditorProps) {
     moveDown: props.onParagraphMoveDown,
     delete: props.onParagraphDelete,
     addAfter: (id: string) => {
-      props.onParagraphCreate({
-        body: "",
-        state: "draft",
-        comments: [],
-      }, id)
+      props.onParagraphCreate(
+        {
+          body: '',
+          state: 'draft',
+          comments: [],
+        },
+        id,
+      )
     },
     generateBetween: (id: string) => {
       setCurrentParagraphId(id)
       setGenerateBetweenModalOpen(true)
     },
     spellCheck: async (id: string) => {
-      const result = await props.onAiRequest('rewrite_spelling', id)
+      const result = await props.onAiRequest?.('rewrite_spelling', id)
       if (result) {
         props.onParagraphUpdate(id, { extra: result, extraLoading: false })
       }
     },
     rewrite: async (id: string) => {
-      const result = await props.onAiRequest('rewrite', id)
+      const result = await props.onAiRequest?.('rewrite', id)
       if (result) {
         props.onParagraphUpdate(id, { extra: result, extraLoading: false })
       }
     },
     refineStyle: async (id: string) => {
-      const result = await props.onAiRequest('snowflake_refine_scene_style', id)
+      const result = await props.onAiRequest?.('snowflake_refine_scene_style', id)
       if (result) {
         props.onParagraphUpdate(id, { extra: result, extraLoading: false })
       }
     },
     addSensory: async (id: string) => {
-      const result = await props.onAiRequest('add_sensory_details', id)
+      const result = await props.onAiRequest?.('add_sensory_details', id)
       if (result) {
         props.onParagraphUpdate(id, { extra: result, extraLoading: false })
       }
@@ -178,12 +184,12 @@ export function SceneEditor(props: SceneEditorProps) {
     },
     toggleInventory: (id: string) => {
       setCurrentParagraphId(id)
-      setShowInventory(prev => !prev)
+      setShowInventory((prev) => !prev)
       setShowPlotpoint(false)
     },
     togglePlotpoint: (id: string) => {
       setCurrentParagraphId(id)
-      setShowPlotpoint(prev => !prev)
+      setShowPlotpoint((prev) => !prev)
       setShowInventory(false)
     },
     customRewrite: (id: string) => {
@@ -191,7 +197,7 @@ export function SceneEditor(props: SceneEditorProps) {
       setRewriteModalOpen(true)
     },
     convertPerspective: async (id: string) => {
-      const result = await props.onAiRequest('snowflake_convert_perspective', id)
+      const result = await props.onAiRequest?.('snowflake_convert_perspective', id)
       if (result) {
         props.onParagraphUpdate(id, { extra: result, extraLoading: false })
       }
@@ -224,11 +230,7 @@ export function SceneEditor(props: SceneEditorProps) {
         <div class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-base-100 shadow-lg rounded-lg p-4 border border-gray-200">
           <div class="flex justify-between items-center mb-4">
             <h3 class="font-bold text-lg">Inventory Actions</h3>
-            <button
-              type="button"
-              class="btn btn-sm btn-ghost"
-              onClick={() => setShowInventory(false)}
-            >
+            <button type="button" class="btn btn-sm btn-ghost" onClick={() => setShowInventory(false)}>
               ✕
             </button>
           </div>
@@ -241,11 +243,7 @@ export function SceneEditor(props: SceneEditorProps) {
         <div class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-base-100 shadow-lg rounded-lg p-4 border border-gray-200">
           <div class="flex justify-between items-center mb-4">
             <h3 class="font-bold text-lg">Plot Point Actions</h3>
-            <button
-              type="button"
-              class="btn btn-sm btn-ghost"
-              onClick={() => setShowPlotpoint(false)}
-            >
+            <button type="button" class="btn btn-sm btn-ghost" onClick={() => setShowPlotpoint(false)}>
               ✕
             </button>
           </div>
@@ -257,7 +255,7 @@ export function SceneEditor(props: SceneEditorProps) {
       <Show when={currentParagraphId() && currentParagraph() && props.AudioButtonComponent}>
         <div class="fixed top-4 right-4 z-40">
           {props.AudioButtonComponent?.({
-            text: currentParagraph()!.body
+            text: currentParagraph()!.body,
           })}
         </div>
       </Show>

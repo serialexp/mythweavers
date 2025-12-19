@@ -1,14 +1,14 @@
 // ABOUTME: Component for managing which characters and context items are active in a chapter
 // ABOUTME: Allows selecting/deselecting entities and copying from previous chapter
 
-import { Component, Show, For, createSignal, createEffect } from 'solid-js'
-import { Node } from '../types/core'
+import { Badge, Button, Modal, Stack } from '@mythweavers/ui'
+import { BsCheck, BsFiles } from 'solid-icons/bs'
+import { Component, For, Show, createEffect, createSignal } from 'solid-js'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { nodeStore } from '../stores/nodeStore'
-import { BsX, BsCheck, BsFiles } from 'solid-icons/bs'
+import { Node } from '../types/core'
 import { getCharacterDisplayName } from '../utils/character'
-import styles from './ChapterContextManager.module.css'
 
 interface ChapterContextManagerProps {
   isOpen: boolean
@@ -29,29 +29,27 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
   })
 
   const toggleCharacter = (characterId: string) => {
-    setSelectedCharacterIds(prev => {
+    setSelectedCharacterIds((prev) => {
       if (prev.includes(characterId)) {
-        return prev.filter(id => id !== characterId)
-      } else {
-        return [...prev, characterId]
+        return prev.filter((id) => id !== characterId)
       }
+      return [...prev, characterId]
     })
   }
 
   const toggleContextItem = (itemId: string) => {
-    setSelectedContextItemIds(prev => {
+    setSelectedContextItemIds((prev) => {
       if (prev.includes(itemId)) {
-        return prev.filter(id => id !== itemId)
-      } else {
-        return [...prev, itemId]
+        return prev.filter((id) => id !== itemId)
       }
+      return [...prev, itemId]
     })
   }
 
   const copyFromPreviousChapter = () => {
     // Find the previous chapter in story order
-    const allChapters = nodeStore.nodesArray.filter(n => n.type === 'chapter').sort((a, b) => a.order - b.order)
-    const currentIndex = allChapters.findIndex(ch => ch.id === props.chapterNode.id)
+    const allChapters = nodeStore.nodesArray.filter((n) => n.type === 'chapter').sort((a, b) => a.order - b.order)
+    const currentIndex = allChapters.findIndex((ch) => ch.id === props.chapterNode.id)
 
     if (currentIndex > 0) {
       const previousChapter = allChapters[currentIndex - 1]
@@ -62,110 +60,159 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
 
   const handleSave = () => {
     // Preserve plot-type items
-    const currentIds = props.chapterNode.activeContextItemIds || [];
-    const plotIds = currentIds.filter(id => {
-      const item = contextItemsStore.contextItems.find(i => i.id === id);
-      return item && item.type === 'plot';
-    });
+    const currentIds = props.chapterNode.activeContextItemIds || []
+    const plotIds = currentIds.filter((id) => {
+      const item = contextItemsStore.contextItems.find((i) => i.id === id)
+      return item && item.type === 'plot'
+    })
 
     nodeStore.updateNode(props.chapterNode.id, {
       activeCharacterIds: selectedCharacterIds(),
-      activeContextItemIds: [...plotIds, ...selectedContextItemIds()]
+      activeContextItemIds: [...plotIds, ...selectedContextItemIds()],
     })
     props.onClose()
   }
 
   // Check if there's a previous chapter
   const hasPreviousChapter = () => {
-    const allChapters = nodeStore.nodesArray.filter(n => n.type === 'chapter').sort((a, b) => a.order - b.order)
-    const currentIndex = allChapters.findIndex(ch => ch.id === props.chapterNode.id)
+    const allChapters = nodeStore.nodesArray.filter((n) => n.type === 'chapter').sort((a, b) => a.order - b.order)
+    const currentIndex = allChapters.findIndex((ch) => ch.id === props.chapterNode.id)
     return currentIndex > 0
   }
 
+  const itemStyle = {
+    display: 'flex',
+    'align-items': 'center',
+    gap: '0.5rem',
+    padding: '0.5rem',
+    'border-radius': 'var(--radius-sm)',
+    cursor: 'pointer',
+    transition: 'background var(--transition-fast)',
+  }
+
   return (
-    <Show when={props.isOpen}>
-      <div class={styles.overlay} onClick={props.onClose}>
-        <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
-          <div class={styles.header}>
-            <h3>Active Characters & Context - {props.chapterNode.title}</h3>
-            <button class={styles.closeButton} onClick={props.onClose}>
-              <BsX />
-            </button>
-          </div>
+    <Modal
+      open={props.isOpen}
+      onClose={props.onClose}
+      title={`Active Characters & Context - ${props.chapterNode.title}`}
+      size="md"
+    >
+      <Stack gap="md" style={{ padding: '1rem' }}>
+        <Show when={hasPreviousChapter()}>
+          <Button variant="secondary" onClick={copyFromPreviousChapter}>
+            <BsFiles /> Copy from Previous Chapter
+          </Button>
+        </Show>
 
-          <div class={styles.content}>
-            <Show when={hasPreviousChapter()}>
-              <button class={styles.copyButton} onClick={copyFromPreviousChapter}>
-                <BsFiles /> Copy from Previous Chapter
-              </button>
+        <div>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Characters</h4>
+          <div
+            style={{
+              display: 'flex',
+              'flex-direction': 'column',
+              gap: '0.25rem',
+              'max-height': '200px',
+              'overflow-y': 'auto',
+            }}
+          >
+            <For each={charactersStore.characters}>
+              {(character) => (
+                <label style={itemStyle}>
+                  <input
+                    type="checkbox"
+                    checked={selectedCharacterIds().includes(character.id)}
+                    onChange={() => toggleCharacter(character.id)}
+                  />
+                  <span
+                    style={{ color: 'var(--text-primary)', display: 'flex', 'align-items': 'center', gap: '0.5rem' }}
+                  >
+                    {getCharacterDisplayName(character)}
+                    <Show when={character.isMainCharacter}>
+                      <Badge variant="primary" size="sm">
+                        protagonist
+                      </Badge>
+                    </Show>
+                  </span>
+                </label>
+              )}
+            </For>
+            <Show when={charactersStore.characters.length === 0}>
+              <p style={{ color: 'var(--text-muted)', 'font-style': 'italic', margin: 0 }}>No characters defined yet</p>
             </Show>
-
-            <div class={styles.section}>
-              <h4>Characters</h4>
-              <div class={styles.itemList}>
-                <For each={charactersStore.characters}>
-                  {(character) => (
-                    <label class={styles.item}>
-                      <input
-                        type="checkbox"
-                        checked={selectedCharacterIds().includes(character.id)}
-                        onChange={() => toggleCharacter(character.id)}
-                      />
-                      <span class={styles.itemName}>
-                        {getCharacterDisplayName(character)}
-                        <Show when={character.isMainCharacter}>
-                          <span class={styles.badge}>(protagonist)</span>
-                        </Show>
-                      </span>
-                    </label>
-                  )}
-                </For>
-                <Show when={charactersStore.characters.length === 0}>
-                  <p class={styles.empty}>No characters defined yet</p>
-                </Show>
-              </div>
-            </div>
-
-            <div class={styles.section}>
-              <h4>Context Items</h4>
-              <div class={styles.itemList}>
-                <For each={contextItemsStore.contextItems.filter(item => !item.isGlobal && item.type !== 'plot')}>
-                  {(item) => (
-                    <label class={styles.item}>
-                      <input
-                        type="checkbox"
-                        checked={selectedContextItemIds().includes(item.id)}
-                        onChange={() => toggleContextItem(item.id)}
-                      />
-                      <span class={styles.itemName}>
-                        {item.name}
-                        <span class={styles.badge}>({item.type})</span>
-                      </span>
-                    </label>
-                  )}
-                </For>
-                <Show when={contextItemsStore.contextItems.filter(item => !item.isGlobal && item.type !== 'plot').length === 0}>
-                  <p class={styles.empty}>No non-global context items defined yet</p>
-                </Show>
-              </div>
-              <Show when={contextItemsStore.contextItems.filter(item => item.isGlobal).length > 0}>
-                <p class={styles.note}>
-                  Note: Global context items are always active and don't need to be selected.
-                </p>
-              </Show>
-            </div>
-          </div>
-
-          <div class={styles.footer}>
-            <button class={styles.cancelButton} onClick={props.onClose}>
-              Cancel
-            </button>
-            <button class={styles.saveButton} onClick={handleSave}>
-              <BsCheck /> Save
-            </button>
           </div>
         </div>
+
+        <div>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Context Items</h4>
+          <div
+            style={{
+              display: 'flex',
+              'flex-direction': 'column',
+              gap: '0.25rem',
+              'max-height': '200px',
+              'overflow-y': 'auto',
+            }}
+          >
+            <For each={contextItemsStore.contextItems.filter((item) => !item.isGlobal && item.type !== 'plot')}>
+              {(item) => (
+                <label style={itemStyle}>
+                  <input
+                    type="checkbox"
+                    checked={selectedContextItemIds().includes(item.id)}
+                    onChange={() => toggleContextItem(item.id)}
+                  />
+                  <span
+                    style={{ color: 'var(--text-primary)', display: 'flex', 'align-items': 'center', gap: '0.5rem' }}
+                  >
+                    {item.name}
+                    <Badge variant="secondary" size="sm">
+                      {item.type}
+                    </Badge>
+                  </span>
+                </label>
+              )}
+            </For>
+            <Show
+              when={
+                contextItemsStore.contextItems.filter((item) => !item.isGlobal && item.type !== 'plot').length === 0
+              }
+            >
+              <p style={{ color: 'var(--text-muted)', 'font-style': 'italic', margin: 0 }}>
+                No non-global context items defined yet
+              </p>
+            </Show>
+          </div>
+          <Show when={contextItemsStore.contextItems.filter((item) => item.isGlobal).length > 0}>
+            <p
+              style={{
+                'margin-top': '0.5rem',
+                'font-size': '0.85rem',
+                color: 'var(--text-muted)',
+                'font-style': 'italic',
+              }}
+            >
+              Note: Global context items are always active and don't need to be selected.
+            </p>
+          </Show>
+        </div>
+      </Stack>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.5rem',
+          'justify-content': 'flex-end',
+          padding: '1rem',
+          'border-top': '1px solid var(--border-color)',
+        }}
+      >
+        <Button variant="secondary" onClick={props.onClose}>
+          Cancel
+        </Button>
+        <Button variant="primary" onClick={handleSave}>
+          <BsCheck /> Save
+        </Button>
       </div>
-    </Show>
+    </Modal>
   )
 }

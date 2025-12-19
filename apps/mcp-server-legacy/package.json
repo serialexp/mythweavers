@@ -1,0 +1,22 @@
+{
+  "name": "@writer/mcp-server-legacy",
+  "version": "1.0.0",
+  "description": "MCP server for reading writer story files",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "tsx src/index.ts",
+    "start": "./dist/mcp-server"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@mythweavers/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.25.12",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

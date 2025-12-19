@@ -1,12 +1,14 @@
-import solid from 'vite-plugin-solid'
 import fs from 'node:fs'
-import { globSync } from 'node:fs'
 import { defineConfig } from 'vite'
+import solid from 'vite-plugin-solid'
 import pkg from './package.json'
 
 export default defineConfig({
   plugins: [
-    solid(),
+    // Use client mode for all modules - collect module no longer uses SSR APIs
+    solid({
+      ssr: false,
+    }),
     {
       name: 'histoire:preserve:import.dynamic',
       enforce: 'pre',
@@ -42,8 +44,7 @@ export default defineConfig({
               fs.writeFileSync(file, content.replace(/import__dyn\(/g, 'import(/* @vite-ignore */'), 'utf-8')
             }
           }
-        }
-        catch (e) {
+        } catch (e) {
           console.error(e)
         }
       },
@@ -55,19 +56,14 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       external: [
-        ...Object.keys(pkg.dependencies ?? {}).map(dep => new RegExp(`^${dep}(\\/?)`)),
-        ...Object.keys(pkg.peerDependencies ?? {}).map(dep => new RegExp(`^${dep}(\\/?)`)),
+        ...Object.keys(pkg.dependencies ?? {}).map((dep) => new RegExp(`^${dep}(\\/?)`)),
+        ...Object.keys(pkg.peerDependencies ?? {}).map((dep) => new RegExp(`^${dep}(\\/?)`)),
         /^node:/,
         /^virtual:/,
         /^\$/, // Virtual modules
       ],
 
-      input: [
-        'src/index.ts',
-        'src/index.node.ts',
-        'src/client/index.ts',
-        'src/collect/index.tsx',
-      ],
+      input: ['src/index.ts', 'src/index.node.ts', 'src/client/index.ts', 'src/collect/index.tsx'],
 
       output: {
         entryFileNames: '[name].js',

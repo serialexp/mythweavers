@@ -1,6 +1,6 @@
-import { Divider } from './Divider'
-import { Stack, HStack, VStack } from '../Stack'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { HStack, VStack } from '../Stack'
+import { Divider } from './Divider'
 
 export default (props: { Hst: any }) => {
   const { Hst } = props
@@ -83,7 +83,11 @@ export default (props: { Hst: any }) => {
 
       <Hst.Variant title="In Toolbar">
         <ThemeComparison>
-          <HStack align="center" gap="sm" style={{ padding: '0.5rem', background: 'var(--color-bg-raised)', 'border-radius': '4px' }}>
+          <HStack
+            align="center"
+            gap="sm"
+            style={{ padding: '0.5rem', background: 'var(--color-bg-raised)', 'border-radius': '4px' }}
+          >
             <button>Cut</button>
             <button>Copy</button>
             <button>Paste</button>
@@ -98,7 +102,10 @@ export default (props: { Hst: any }) => {
 
       <Hst.Variant title="In List">
         <ThemeComparison>
-          <VStack gap="none" style={{ background: 'var(--color-bg-raised)', padding: '0.5rem', 'border-radius': '4px' }}>
+          <VStack
+            gap="none"
+            style={{ background: 'var(--color-bg-raised)', padding: '0.5rem', 'border-radius': '4px' }}
+          >
             <div style={{ padding: '0.5rem' }}>List item 1</div>
             <Divider color="subtle" />
             <div style={{ padding: '0.5rem' }}>List item 2</div>

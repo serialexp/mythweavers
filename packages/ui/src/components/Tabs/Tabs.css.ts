@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css'
-import { recipe, type RecipeVariants } from '@vanilla-extract/recipes'
+import { type RecipeVariants, recipe } from '@vanilla-extract/recipes'
 import { tokens } from '../../theme/tokens.css'
 
 export const container = style({
@@ -12,6 +12,13 @@ export const tabList = recipe({
     display: 'flex',
     gap: tokens.space['1'],
     borderBottom: `${tokens.borderWidth.default} solid ${tokens.color.border.subtle}`,
+    overflowX: 'auto',
+    flexShrink: 0,
+    // Hide scrollbar but keep functionality
+    scrollbarWidth: 'none',
+    '::-webkit-scrollbar': {
+      display: 'none',
+    },
   },
 
   variants: {
@@ -36,9 +43,9 @@ export const tab = recipe({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: tokens.space['2'],
-    padding: `${tokens.space['2']} ${tokens.space['4']}`,
-    fontSize: tokens.font.size.sm,
+    gap: tokens.space['1'],
+    padding: `${tokens.space['1']} 0`,
+    fontSize: tokens.font.size.xs,
     fontWeight: tokens.font.weight.medium,
     color: tokens.color.text.secondary,
     backgroundColor: 'transparent',
@@ -46,6 +53,8 @@ export const tab = recipe({
     cursor: 'pointer',
     transition: `all ${tokens.duration.fast} ${tokens.easing.default}`,
     position: 'relative',
+    flex: 1,
+    textAlign: 'center',
 
     ':hover': {
       color: tokens.color.text.primary,

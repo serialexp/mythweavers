@@ -10,15 +10,16 @@ import {
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import * as styles from './Modal.css'
-import type { ModalVariants } from './Modal.css'
 
-export interface ModalProps extends ModalVariants {
+export interface ModalProps {
+  /** Modal size */
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
   /** Whether the modal is open */
   open: boolean
   /** Called when the modal should close */
   onClose: () => void
   /** Modal title displayed in header */
-  title?: string
+  title?: string | JSX.Element
   /** Hide the close button in the header */
   hideCloseButton?: boolean
   /** Content for the modal body */
@@ -30,10 +31,10 @@ export interface ModalProps extends ModalVariants {
 }
 
 export const Modal: ParentComponent<ModalProps> = (props) => {
-  const [local, variants, rest] = splitProps(
+  const [local, variants, _rest] = splitProps(
     props,
     ['open', 'onClose', 'title', 'hideCloseButton', 'children', 'footer', 'class'],
-    ['size']
+    ['size'],
   )
 
   const titleId = createUniqueId()
@@ -52,13 +53,13 @@ export const Modal: ParentComponent<ModalProps> = (props) => {
     if (!modalRef || !local.open) return
 
     const focusableElements = modalRef.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     )
 
     if (focusableElements.length === 0) return
 
     const firstElement = focusableElements[0]
-    const lastElement = focusableElements[focusableElements.length - 1]
+    const _lastElement = focusableElements[focusableElements.length - 1]
 
     // If focus moved outside modal, bring it back
     if (!modalRef.contains(e.target as Node)) {
@@ -89,7 +90,7 @@ export const Modal: ParentComponent<ModalProps> = (props) => {
       setTimeout(() => {
         if (modalRef) {
           const firstFocusable = modalRef.querySelector<HTMLElement>(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
           )
           firstFocusable?.focus()
         }
@@ -134,11 +135,7 @@ export const Modal: ParentComponent<ModalProps> = (props) => {
                 </h2>
               </Show>
               <Show when={!local.hideCloseButton}>
-                <button
-                  class={styles.closeButton}
-                  onClick={local.onClose}
-                  aria-label="Close modal"
-                >
+                <button class={styles.closeButton} onClick={local.onClose} aria-label="Close modal">
                   ×
                 </button>
               </Show>

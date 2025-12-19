@@ -1,88 +1,71 @@
-import {
-  action,
-  redirect,
-  reload,
-  useSubmission,
-  type AccessorWithLatest,
-} from "@solidjs/router";
-import { Show, Suspense } from "solid-js";
-import { destroyUserSession, type UserSession } from "~/lib/session";
-import { trpc } from "~/lib/trpc";
+import { Button, Dropdown, DropdownDivider, DropdownItem, HStack, Spinner } from '@mythweavers/ui'
+import { type AccessorWithLatest, action, reload, useSubmission } from '@solidjs/router'
+import { Show, Suspense, createMemo } from 'solid-js'
+import { authApi } from '~/lib/api'
+import { type UserSession, destroyUserSession } from '~/lib/session'
 
-const logoutAction = action(async (formData: FormData) => {
-  "use server";
+const logoutAction = action(async () => {
+  'use server'
 
   try {
-    await trpc.sessionSignout.mutate().then(() => {
-      console.log(`--- Session signout completed ${Date.now()} ---`);
-    });
-    await destroyUserSession();
-    console.log(`--- Logout action completed ${Date.now()} ---`);
-    return reload();
-  } catch (error: any) {
-    console.error("Logout action error:", error);
-    if (error instanceof Response && error.status === 302) {
-      throw error;
-    }
+    await authApi.logout()
+    await destroyUserSession()
+    return reload()
+  } catch (error: unknown) {
+    console.error('Logout action error:', error)
+    await destroyUserSession()
+    return reload()
   }
-}, "logoutUser");
+}, 'logoutUser')
 
 const UserStatus = (props: {
-  user: AccessorWithLatest<UserSession | undefined | null>;
+  user?: AccessorWithLatest<UserSession | undefined | null>
 }) => {
-  const submission = useSubmission(logoutAction);
+  const submission = useSubmission(logoutAction)
+  // Memoize user to avoid multiple accessor calls
+  const userName = createMemo(() => props.user?.()?.name)
 
   return (
     <div class="flex-none">
-      <Suspense fallback={<div>Loading user...</div>}>
+      <Suspense fallback={<Spinner size="sm" />}>
         <Show
-          when={props.user?.()?.name}
+          when={userName()}
           fallback={
-            // Not logged in
-            <ul class="menu menu-horizontal px-1">
-              <li>
-                <a href="/login">Login</a>
-              </li>
-              <li>
-                <a href="/register">Register</a>
-              </li>
-            </ul>
+              <HStack gap="sm">
+              <a href="/login">
+                <Button variant="ghost" size="sm">
+                  Login
+                </Button>
+              </a>
+              <a href="/register">
+                <Button variant="primary" size="sm">
+                  Register
+                </Button>
+              </a>
+            </HStack>
           }
         >
-          <pre>{JSON.stringify(props.user(), null, 2)}</pre>
-          {/* Logged in */}
-          <div class="dropdown dropdown-end">
-            <button type="button" class="btn btn-ghost rounded-btn">
-              {props.user()?.name || "User"}
-            </button>
-            <ul class="menu dropdown-content z-[1] p-2 shadow bg-base-100 rounded-box w-52 mt-4">
-              <li>
-                <a href="/profile">Profile</a>
-              </li>
-              <li>
-                <a href="/settings">Settings</a>
-              </li>
-              <li>
-                <form
-                  method="post"
-                  action={logoutAction}
-                  style={{ display: "contents" }}
-                >
-                  <button
-                    type="submit"
-                    class="w-full text-left px-4 py-2 hover:bg-base-200 rounded-lg"
-                    disabled={submission.pending}
-                  >
-                    {submission.pending ? "Logging out..." : "Logout"}
-                  </button>
-                </form>
-              </li>
-            </ul>
-          </div>
+          <Dropdown alignRight trigger={<Button variant="ghost">{userName() || 'User'}</Button>}>
+            <DropdownItem onClick={() => (window.location.href = '/profile')}>Profile</DropdownItem>
+            <DropdownItem onClick={() => (window.location.href = '/settings')}>Settings</DropdownItem>
+            <DropdownDivider />
+            <form method="post" action={logoutAction} style={{ display: 'contents' }}>
+              <DropdownItem
+                danger
+                disabled={submission.pending}
+                onClick={() => {
+                  const form = document.querySelector('form[action]') as HTMLFormElement
+                  form?.requestSubmit()
+                }}
+              >
+                {submission.pending ? 'Logging out...' : 'Logout'}
+              </DropdownItem>
+            </form>
+          </Dropdown>
         </Show>
       </Suspense>
     </div>
-  );
-};
+  )
+}
 
-export default UserStatus;
+export default UserStatus

@@ -1,18 +1,18 @@
-import z from "zod";
+import z from 'zod'
 
 const entitySchema = z.object({
   id: z.string(),
   modifiedAt: z.number().or(z.string()).optional(),
-});
+})
 
 const plotPointSchema = entitySchema.extend({
   id: z.string(),
   summary: z.string(),
   title: z.string(),
-  state: z.enum(["introduced", "unresolved", "resolved"]).default("unresolved"),
-});
+  state: z.enum(['introduced', 'unresolved', 'resolved']).default('unresolved'),
+})
 
-export type PlotPoint = z.infer<typeof plotPointSchema>;
+export type PlotPoint = z.infer<typeof plotPointSchema>
 
 const characterSchema = entitySchema.extend({
   picture: z.string(),
@@ -47,15 +47,15 @@ const characterSchema = entitySchema.extend({
       }),
     )
     .optional(),
-});
-export type Character = z.infer<typeof characterSchema>;
+})
+export type Character = z.infer<typeof characterSchema>
 
 const treeDataSchema = entitySchema.extend({
   title: z.string(),
   extra: z.string().optional(),
-});
+})
 
-export type TreeData = z.infer<typeof treeDataSchema>;
+export type TreeData = z.infer<typeof treeDataSchema>
 
 const bookSchema = treeDataSchema.extend({
   summary: z.string(),
@@ -67,9 +67,9 @@ const bookSchema = treeDataSchema.extend({
   spineImage: z.string().optional(),
   separatorImage: z.string().optional(),
   start_date: z.string().optional(),
-});
+})
 
-export type Book = z.infer<typeof bookSchema>;
+export type Book = z.infer<typeof bookSchema>
 
 const arcSchema = treeDataSchema.extend({
   summary: z.string(),
@@ -79,46 +79,46 @@ const arcSchema = treeDataSchema.extend({
       z.object({
         text: z.string(),
         importance: z.string(),
-        category: z.enum(["character", "plot", "setting", "theme"]),
+        category: z.enum(['character', 'plot', 'setting', 'theme']),
         timestamp: z.number(),
       }),
     )
     .optional(),
-});
+})
 
-export type Arc = z.infer<typeof arcSchema>;
+export type Arc = z.infer<typeof arcSchema>
 
 const chapterSchema = treeDataSchema.extend({
   summary: z.string(),
   start_date: z.string().optional(),
   visibleFrom: z.string().datetime().optional(),
   royalRoadId: z.number().optional(),
-});
+})
 
-export type Chapter = z.infer<typeof chapterSchema>;
+export type Chapter = z.infer<typeof chapterSchema>
 
 const inventoryActionSchema = z.object({
-  type: z.enum(["add", "remove"]),
+  type: z.enum(['add', 'remove']),
   item_name: z.string(),
   item_amount: z.number(),
-});
+})
 
-export type InventoryAction = z.infer<typeof inventoryActionSchema>;
+export type InventoryAction = z.infer<typeof inventoryActionSchema>
 
 const plotpointActionSchema = z.object({
   plot_point_id: z.string(),
-  action: z.enum(["introduce", "mentioned", "partially resolved", "resolved"]),
-});
+  action: z.enum(['introduce', 'mentioned', 'partially resolved', 'resolved']),
+})
 
-export type PlotpointAction = z.infer<typeof plotpointActionSchema>;
+export type PlotpointAction = z.infer<typeof plotpointActionSchema>
 
 export const textNodeSchema = z.object({
-  type: z.literal("text"),
+  type: z.literal('text'),
   text: z.string(),
   marks: z
     .array(
       z.object({
-        type: z.literal("translation"),
+        type: z.literal('translation'),
         attrs: z.object({
           title: z.string(),
           from: z.string(),
@@ -127,21 +127,24 @@ export const textNodeSchema = z.object({
       }),
     )
     .optional(),
-});
+})
 
 export const blockNodeSchema = z.object({
-  type: z.literal("paragraph"),
+  type: z.literal('paragraph'),
   content: z.array(textNodeSchema).optional(),
-});
+})
 
 export const contentNodeSchema = z
   .object({
-    type: z.literal("doc"),
+    type: z.literal('doc'),
     content: z.array(blockNodeSchema),
   })
-  .passthrough();
+  .passthrough()
 
-export type ContentNode = z.infer<typeof contentNodeSchema>;
+export type ContentNode = z.infer<typeof contentNodeSchema>
+export type TextNode = z.infer<typeof textNodeSchema>
+export type BlockNode = z.infer<typeof blockNodeSchema>
+export type TextMark = NonNullable<TextNode['marks']>[number]
 
 const sceneParagraphSchema = entitySchema.extend({
   text: z.string().or(contentNodeSchema),
@@ -151,7 +154,7 @@ const sceneParagraphSchema = entitySchema.extend({
   extra: z.string().optional(),
   translation: z.string().optional(),
   extraLoading: z.boolean().optional(),
-  state: z.enum(["ai", "draft", "revise", "final", "sdt"]),
+  state: z.enum(['ai', 'draft', 'revise', 'final', 'sdt']),
   comments: z.array(
     z.object({
       text: z.string(),
@@ -161,9 +164,9 @@ const sceneParagraphSchema = entitySchema.extend({
   ),
   plot_point_actions: z.array(plotpointActionSchema).optional(),
   inventory_actions: z.array(inventoryActionSchema).optional(),
-});
+})
 
-export type SceneParagraph = z.infer<typeof sceneParagraphSchema>;
+export type SceneParagraph = z.infer<typeof sceneParagraphSchema>
 
 const sceneSchema = treeDataSchema.extend({
   summary: z.string(),
@@ -181,7 +184,7 @@ const sceneSchema = treeDataSchema.extend({
       action: z.string(),
     }),
   ),
-  perspective: z.enum(["first", "third"]).optional(),
+  perspective: z.enum(['first', 'third']).optional(),
   protagonistId: z.string().optional(),
   characterIds: z.array(z.string()).optional(),
   referredCharacterIds: z.array(z.string()).optional(),
@@ -193,7 +196,7 @@ const sceneSchema = treeDataSchema.extend({
       z.object({
         text: z.string(),
         importance: z.string(),
-        category: z.enum(["character", "plot", "setting", "theme"]),
+        category: z.enum(['character', 'plot', 'setting', 'theme']),
         timestamp: z.number(),
       }),
     )
@@ -208,16 +211,16 @@ const sceneSchema = treeDataSchema.extend({
       }),
     )
     .optional(),
-});
+})
 
-export type Scene = z.infer<typeof sceneSchema>;
+export type Scene = z.infer<typeof sceneSchema>
 
 const baseNodeSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(["book", "arc", "chapter", "scene"]),
+  type: z.enum(['book', 'arc', 'chapter', 'scene']),
   isOpen: z.boolean(),
-  nodeType: z.enum(["story", "non-story", "context"]).default("story"),
+  nodeType: z.enum(['story', 'non-story', 'context']).default('story'),
   oneliner: z.string().optional(),
   summaries: z
     .array(
@@ -228,15 +231,15 @@ const baseNodeSchema = z.object({
       }),
     )
     .optional(),
-});
+})
 
 export type Node = z.infer<typeof baseNodeSchema> & {
-  children?: Node[];
-};
+  children?: Node[]
+}
 
 const treeSchema: z.ZodType<Node> = baseNodeSchema.extend({
   children: z.lazy(() => treeSchema.array().optional()),
-});
+})
 
 export const languageSchema = z.object({
   languages: z.record(
@@ -275,41 +278,41 @@ export const languageSchema = z.object({
       ),
     }),
   ),
-});
+})
 
-export type Language = z.infer<typeof languageSchema>;
+export type Language = z.infer<typeof languageSchema>
 
 const itemSchema = entitySchema.extend({
   name: z.string(),
-});
+})
 
-export type Item = z.infer<typeof itemSchema>;
+export type Item = z.infer<typeof itemSchema>
 
 export const storySettingsSchema = z.object({
   headerImage: z.string().optional(),
   mangaChapterPath: z.string().optional(),
   aiInstructions: z.string().optional(),
   royalRoadId: z.string().optional(),
-  defaultPerspective: z.enum(["first", "third"]).default("third"),
+  defaultPerspective: z.enum(['first', 'third']).default('third'),
   defaultProtagonistId: z.string().optional(),
   publishToRoyalRoad: z.boolean().optional(),
-});
+})
 
-export type StorySettings = z.infer<typeof storySettingsSchema>;
+export type StorySettings = z.infer<typeof storySettingsSchema>
 
 export const uploadedFileSchema = z.object({
   hash: z.string(),
   publicUrl: z.string(),
-});
+})
 
-export type UploadedFile = z.infer<typeof uploadedFileSchema>;
+export type UploadedFile = z.infer<typeof uploadedFileSchema>
 
 const locationSchema = entitySchema.extend({
   name: z.string(),
   picture: z.string(),
   description: z.string(),
-});
-export type Location = z.infer<typeof locationSchema>;
+})
+export type Location = z.infer<typeof locationSchema>
 
 export const storySchema = z.object({
   id: z.string(),
@@ -328,32 +331,23 @@ export const storySchema = z.object({
   plotPoints: z.record(z.string(), plotPointSchema),
   scene: z.record(z.string(), sceneSchema),
   oneliner: z.string().optional(),
-});
-export type Story = z.infer<typeof storySchema>;
+})
+export type Story = z.infer<typeof storySchema>
 
 export const persistedSchema = z.object({
   story: storySchema,
   language: languageSchema,
-});
-export type PersistedStory = z.infer<typeof persistedSchema>;
+})
+export type PersistedStory = z.infer<typeof persistedSchema>
 
 export const saveSchema = persistedSchema.extend({
   newAutosave: z.boolean(),
   expectedLastModified: z.number(),
   changesSince: z.number().optional(),
-});
+})
 
-export type SavePayload = z.infer<typeof saveSchema>;
+export type SavePayload = z.infer<typeof saveSchema>
 
-export const entities = [
-  "item",
-  "scene",
-  "book",
-  "arc",
-  "chapter",
-  "characters",
-  "locations",
-  "plotPoints",
-] as const;
+export const entities = ['item', 'scene', 'book', 'arc', 'chapter', 'characters', 'locations', 'plotPoints'] as const
 
-export const languageEntities = ["languages"] as const;
+export const languageEntities = ['languages'] as const

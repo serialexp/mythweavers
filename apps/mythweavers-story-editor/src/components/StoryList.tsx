@@ -1,8 +1,17 @@
+import { Badge, Card, CardBody, IconButton, Input, Spinner } from '@mythweavers/ui'
+import {
+  BsCloudFill,
+  BsExclamationTriangle,
+  BsFilePdf,
+  BsHddFill,
+  BsPencil,
+  BsServer,
+  BsStars,
+  BsTrash,
+} from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
-import { BsCloudFill, BsHddFill, BsTrash, BsPencil, BsServer, BsFilePdf, BsStars, BsExclamationTriangle } from 'solid-icons/bs'
-import { storyManager } from '../utils/storyManager'
 import { currentStoryStore } from '../stores/currentStoryStore'
-import styles from './StoryList.module.css'
+import { storyManager } from '../utils/storyManager'
 
 export interface StoryListItem {
   id: string
@@ -38,12 +47,11 @@ export const StoryList: Component<StoryListProps> = (props) => {
   const [loadingId, setLoadingId] = createSignal<string | null>(null)
 
   const startEditing = (id: string, currentName: string) => {
-    console.log('Starting edit for story:', id, currentName)
     setEditingId(id)
     setEditingName(currentName)
     // Focus the input after a short delay to ensure it's rendered
     setTimeout(() => {
-      const input = document.querySelector(`.${styles.storyNameEdit}`) as HTMLInputElement
+      const input = document.querySelector('[data-edit-input]') as HTMLInputElement
       if (input) {
         input.focus()
         input.select()
@@ -55,26 +63,23 @@ export const StoryList: Component<StoryListProps> = (props) => {
     const id = editingId()
     const newName = editingName().trim()
     if (!id || !newName) return
-    
-    const story = props.stories.find(s => s.id === id)
+
+    const story = props.stories.find((s) => s.id === id)
     if (!story) return
-    
-    // Use storyManager for both local and server stories
+
     const success = await storyManager.renameStory(id, newName, story.type)
     if (!success) {
       alert('Failed to rename story')
       cancelEdit()
       return
     }
-    
-    // If this is the current story, update its name
+
     if (id === currentStoryStore.id) {
       currentStoryStore.setName(newName, false)
     }
-    
+
     setEditingId(null)
-    
-    // Refresh the story list
+
     if (props.onRename) {
       props.onRename()
     }
@@ -86,45 +91,34 @@ export const StoryList: Component<StoryListProps> = (props) => {
   }
 
   const formatDate = (date: Date) => {
-    // Check if mobile based on screen width
     const isMobile = window.innerWidth <= 768
 
     if (isMobile) {
-      // Shorter format for mobile: "Jan 5" or "Jan 5 '24" for older dates
       const now = new Date()
       const isCurrentYear = date.getFullYear() === now.getFullYear()
 
       if (isCurrentYear) {
-        return date.toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric'
-        })
-      } else {
-        return date.toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: '2-digit'
-        })
+        return date.toLocaleString('en-US', { month: 'short', day: 'numeric' })
       }
-    } else {
-      // Full format for desktop
-      return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
+      return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
     }
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
   }
 
   return (
-    <div class={styles.storyList}>
+    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>
       <For each={props.stories}>
         {(story) => (
-          <div
-            class={`${styles.storyItem} ${story.isCurrentStory ? styles.currentStory : ''} ${loadingId() === story.id ? styles.loading : ''}`}
+          <Card
+            interactive
+            variant={story.isCurrentStory ? 'elevated' : 'outlined'}
             onClick={async () => {
               if (!editingId() && loadingId() !== story.id) {
                 setLoadingId(story.id)
@@ -132,149 +126,224 @@ export const StoryList: Component<StoryListProps> = (props) => {
                   await props.onLoadStory(story.id, story.type)
                 } catch (error) {
                   console.error('Failed to load story:', error)
-                  setLoadingId(null) // Clear loading state on error
+                  setLoadingId(null)
                 }
               }
             }}
+            style={{
+              position: 'relative',
+              cursor: loadingId() === story.id ? 'wait' : 'pointer',
+              opacity: loadingId() === story.id ? '0.7' : '1',
+              'border-color': story.isCurrentStory ? 'var(--primary-color)' : undefined,
+            }}
           >
+            {/* Loading Overlay */}
             <Show when={loadingId() === story.id}>
-              <div class={styles.loadingOverlay}>
-                <div class={styles.loadingSpinner}></div>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '0',
+                  left: '0',
+                  right: '0',
+                  bottom: '0',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  'backdrop-filter': 'blur(2px)',
+                  display: 'flex',
+                  'align-items': 'center',
+                  'justify-content': 'center',
+                  gap: '1rem',
+                  'border-radius': '8px',
+                  'z-index': '10',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <Spinner size="sm" />
                 <span>Loading story...</span>
               </div>
             </Show>
 
-            <div class={styles.storyHeader}>
-              <Show 
-                when={editingId() === story.id} 
-                fallback={
-                  <div class={styles.storyName} onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}>
-                    {story.type === 'server' ? (
-                      <BsCloudFill class={styles.storyTypeIcon} title="Server story" />
-                    ) : (
-                      <BsHddFill class={styles.storyTypeIcon} title="Local story" />
-                    )}
-                    <span>{story.name}</span>
-                    {story.hasLocalDifferences && (
-                      <BsExclamationTriangle class={styles.differencesIcon} title="Local version differs from server" />
-                    )}
-                    {story.isCurrentStory && <span class={styles.currentIndicator} title="Currently loaded"> ✓</span>}
-                  </div>
-                }
+            <CardBody padding="md">
+              {/* Header Row */}
+              <div
+                style={{
+                  display: 'flex',
+                  'justify-content': 'space-between',
+                  'align-items': 'center',
+                  'margin-bottom': '0.5rem',
+                }}
               >
-                <input
-                  type="text"
-                  value={editingName()}
-                  onInput={(e) => setEditingName(e.target.value)}
-                  class={styles.storyNameEdit}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveRename()
-                    if (e.key === 'Escape') cancelEdit()
-                  }}
-                  onBlur={saveRename}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </Show>
-
-              <div class={styles.storyActions}>
-                <Show when={props.editingEnabled && editingId() !== story.id}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      startEditing(story.id, story.name)
+                <Show
+                  when={editingId() === story.id}
+                  fallback={
+                    <div
+                      style={{
+                        display: 'flex',
+                        'align-items': 'center',
+                        gap: '0.5rem',
+                        'font-weight': '500',
+                        'font-size': '1.1rem',
+                        color: 'var(--text-primary)',
+                      }}
+                      onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}
+                    >
+                      {story.type === 'server' ? (
+                        <BsCloudFill
+                          style={{ width: '16px', height: '16px', color: 'var(--text-secondary)' }}
+                          title="Server story"
+                        />
+                      ) : (
+                        <BsHddFill
+                          style={{ width: '16px', height: '16px', color: 'var(--text-secondary)' }}
+                          title="Local story"
+                        />
+                      )}
+                      <span>{story.name}</span>
+                      {story.hasLocalDifferences && (
+                        <BsExclamationTriangle
+                          style={{ width: '16px', height: '16px', color: 'var(--warning-color)' }}
+                          title="Local version differs from server"
+                        />
+                      )}
+                      {story.isCurrentStory && (
+                        <Badge variant="success" size="sm">
+                          Current
+                        </Badge>
+                      )}
+                    </div>
+                  }
+                >
+                  <Input
+                    type="text"
+                    value={editingName()}
+                    onInput={(e) => setEditingName(e.currentTarget.value)}
+                    data-edit-input
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveRename()
+                      if (e.key === 'Escape') cancelEdit()
                     }}
-                    class={styles.actionButton}
-                    title="Rename story"
-                  >
-                    <BsPencil />
-                  </button>
+                    onBlur={saveRename}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ flex: '1' }}
+                  />
                 </Show>
 
-                <Show when={story.type === 'server' && story.hasLocalDifferences}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      props.onLoadStory(story.id, 'local')
-                    }}
-                    class={styles.actionButton}
-                    title="Load local version"
-                  >
-                    <BsHddFill />
-                  </button>
-                </Show>
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '0.25rem' }} onClick={(e) => e.stopPropagation()}>
+                  <Show when={props.editingEnabled && editingId() !== story.id}>
+                    <IconButton
+                      aria-label="Rename story"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => startEditing(story.id, story.name)}
+                    >
+                      <BsPencil />
+                    </IconButton>
+                  </Show>
 
-                <Show when={props.serverAvailable && story.type === 'local' && props.onSyncToServer && !story.isCurrentStory}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      props.onSyncToServer!(story.id)
-                    }}
-                    class={styles.actionButton}
-                    title="Upload to server"
-                    disabled={props.syncing === story.id}
-                  >
-                    {props.syncing === story.id ? '⏳' : <BsServer />}
-                  </button>
-                </Show>
+                  <Show when={story.type === 'server' && story.hasLocalDifferences}>
+                    <IconButton
+                      aria-label="Load local version"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => props.onLoadStory(story.id, 'local')}
+                    >
+                      <BsHddFill />
+                    </IconButton>
+                  </Show>
 
-                <Show when={story.type === 'server' && props.onExportPdf}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      props.onExportPdf!(story.id)
-                    }}
-                    class={styles.actionButton}
-                    title="Export as PDF"
+                  <Show
+                    when={
+                      props.serverAvailable && story.type === 'local' && props.onSyncToServer && !story.isCurrentStory
+                    }
                   >
-                    <BsFilePdf />
-                  </button>
-                </Show>
+                    <IconButton
+                      aria-label="Upload to server"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => props.onSyncToServer!(story.id)}
+                      disabled={props.syncing === story.id}
+                    >
+                      {props.syncing === story.id ? <Spinner size="sm" /> : <BsServer />}
+                    </IconButton>
+                  </Show>
 
-                <Show when={story.type === 'server' && props.onRefineStory}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      props.onRefineStory!(story.id)
-                    }}
-                    class={styles.actionButton}
-                    title="Refine story with AI"
-                    disabled={props.refining === story.id}
-                  >
-                    {props.refining === story.id ? '⏳' : <BsStars />}
-                  </button>
-                </Show>
+                  <Show when={story.type === 'server' && props.onExportPdf}>
+                    <IconButton
+                      aria-label="Export as PDF"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => props.onExportPdf!(story.id)}
+                    >
+                      <BsFilePdf />
+                    </IconButton>
+                  </Show>
 
-                <Show when={props.onDeleteStory}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (!story.isCurrentStory && confirm(`Are you sure you want to delete "${story.name}"?`)) {
-                        props.onDeleteStory!(story.id, story.type)
-                      }
-                    }}
-                    class={styles.actionButton}
-                    title={story.isCurrentStory ? "Cannot delete currently loaded story" : "Delete story"}
-                    disabled={story.isCurrentStory}
-                  >
-                    <BsTrash />
-                  </button>
-                </Show>
+                  <Show when={story.type === 'server' && props.onRefineStory}>
+                    <IconButton
+                      aria-label="Refine story with AI"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => props.onRefineStory!(story.id)}
+                      disabled={props.refining === story.id}
+                    >
+                      {props.refining === story.id ? <Spinner size="sm" /> : <BsStars />}
+                    </IconButton>
+                  </Show>
+
+                  <Show when={props.onDeleteStory}>
+                    <IconButton
+                      aria-label={story.isCurrentStory ? 'Cannot delete currently loaded story' : 'Delete story'}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (!story.isCurrentStory && confirm(`Are you sure you want to delete "${story.name}"?`)) {
+                          props.onDeleteStory!(story.id, story.type)
+                        }
+                      }}
+                      disabled={story.isCurrentStory}
+                    >
+                      <BsTrash />
+                    </IconButton>
+                  </Show>
+                </div>
               </div>
-            </div>
 
-            <div class={styles.storyMeta}>
-              <span>{story.messageCount} messages</span>
-              <span>{story.characterCount} characters</span>
-              <Show when={story.chapterCount > 0}>
-                <span>{story.chapterCount} chapters</span>
+              {/* Meta Row */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '1rem',
+                  'font-size': '0.9rem',
+                  color: 'var(--text-secondary)',
+                  'margin-bottom': story.storySetting ? '0.5rem' : '0',
+                  'flex-wrap': 'wrap',
+                }}
+              >
+                <span>{story.messageCount} messages</span>
+                <span>{story.characterCount} characters</span>
+                <Show when={story.chapterCount > 0}>
+                  <span>{story.chapterCount} chapters</span>
+                </Show>
+                <span style={{ 'margin-left': 'auto' }}>{formatDate(story.savedAt)}</span>
+              </div>
+
+              {/* Story Setting */}
+              <Show when={story.storySetting}>
+                <div
+                  style={{
+                    'font-size': '0.9rem',
+                    color: 'var(--text-secondary)',
+                    'font-style': 'italic',
+                    overflow: 'hidden',
+                    'text-overflow': 'ellipsis',
+                    'white-space': 'nowrap',
+                  }}
+                >
+                  {story.storySetting}
+                </div>
               </Show>
-              <span class={styles.storyDate}>{formatDate(story.savedAt)}</span>
-            </div>
-
-            <Show when={story.storySetting}>
-              <div class={styles.storySetting}>{story.storySetting}</div>
-            </Show>
-          </div>
+            </CardBody>
+          </Card>
         )}
       </For>
     </div>

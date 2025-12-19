@@ -1,0 +1,188 @@
+html,
+body {
+  background-color: #c4bec6;
+  display: border-box;
+  background: #000;
+}
+
+.shelf {
+  box-sizing: border-box;
+  height: 351px;
+  background-image: url(./shelf.png);
+  padding-top: 74px;
+}
+
+.shelf-contents {
+  display: flex;
+  transform-origin: top center;
+  justify-content: center;
+  transform: scale(0.46);
+}
+
+.container {
+  z-index: 1;
+  perspective: 3000px;
+}
+
+.container .book {
+  display: block;
+  width: var(--width, 40px);
+  height: 600;
+  margin: auto;
+  border-radius: 2px 4px 4px 2px;
+  /* background: linear-gradient(45deg, #dad5dc 0%, #f2ebf4 100%);*/
+  font-family: acumin-pro, sans-serif;
+  font-weight: 400;
+  color: #2b2b2b;
+  transform-style: preserve-3d;
+  transition: width 0.5s, transform 0.5s, all 0.5s;
+  transform: rotate3d(0, 1, 0, 90deg) rotateX(var(--randomRotation, 0deg));
+}
+
+.container.selected .book {
+  width: calc(var(--width, 40px) + var(--opened-width, 400px));
+  transform: rotate3d(0, 1, 0, 5deg);
+}
+.container.selected .front > div {
+  height: var(--height, 600px);
+}
+.container.selected .spine {
+  height: var(--height, 600px);
+}
+
+.container .book > div,
+.container .front > div {
+  position: absolute;
+  bottom: 0;
+}
+
+.container .front {
+  -webkit-transform-style: preserve-3d;
+  -moz-transform-style: preserve-3d;
+  transform-style: preserve-3d;
+  -webkit-transform-origin: 0% 50%;
+  -moz-transform-origin: 0% 50%;
+  transform-origin: 0% 50%;
+  -webkit-transition: -webkit-transform 0.5s;
+  background-color: #fff;
+  -moz-transition: -moz-transform 0.5s;
+  transition: transform 0.5s;
+  transform: translate3d(0, 0, var(--neg-offset, 20px));
+  z-index: 10;
+}
+
+.container .front > div {
+  width: var(--opened-width, 400px);
+  transition: all 0.5s;
+  height: var(--height, 350px);
+}
+
+.container .spine {
+  width: var(--width, 40px);
+  height: var(--height, 550px);
+  position: relative;
+  display: flex;
+  transition: all 0.5s;
+  background: var(--spine-background, url(./dark-leather.png)),
+    linear-gradient(
+      90deg,
+      rgba(2, 0, 36, 1) 0%,
+      rgba(3, 1, 43, 0) 2%,
+      rgba(255, 255, 255, 0.15728298155199583) 37%,
+      rgba(255, 255, 255, 0.1600841020001751) 59%,
+      rgba(0, 0, 6, 0) 98%,
+      rgba(0, 0, 0, 1) 100%
+    );
+  transform: rotate3d(0, 1, 0, -90deg);
+  box-shadow: inset 4px 0 10px #0000001a;
+}
+
+.cover .num-up {
+  position: absolute;
+  top: 64px;
+  left: 47px;
+  letter-spacing: 50px;
+  transform: rotate(-90deg);
+}
+
+.cover .num-down {
+  position: relative;
+  top: 65px;
+  left: -95px;
+  transform: rotate(-90deg);
+}
+
+.author {
+  font-family: acumin-pro, sans-serif;
+  font-weight: 400;
+  position: absolute;
+  top: 475px;
+  left: 50px;
+  opacity: 0.8;
+}
+
+.container .front > div {
+  left: var(--neg-offset, 20px);
+  border-radius: 0 3px 3px 0;
+  box-shadow: inset 4px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.container .front:after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: -1px;
+  width: 1px;
+}
+
+.container .cover:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10px;
+  bottom: 0;
+  width: 3px;
+  background: rgba(0, 0, 0, 0.1);
+  box-shadow: 1px 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.spine h2 {
+  margin: 0;
+  padding: 1em 0 1em 0;
+  font-size: var(--title-size, 1.4em);
+  max-height: 100%;
+  max-width: 100%;
+  flex: 1;
+  font-family: var(--font, sans-serif);
+  box-sizing: border-box;
+  line-height: 1.2em;
+  text-align: right;
+  overflow: hidden;
+  transform-origin: 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.cover {
+  background: linear-gradient(45deg, #dad5dc 0%, #f2ebf4 100%);
+}
+
+/* .spine h2 span:first-child {
+    font-size: 80%;
+    font-weight: 400;
+    text-align: left;
+} */
+
+.spine h2 {
+  text-align: left;
+  background: var(--spine-text-background, none);
+  -webkit-text-fill-color: var(--text-fill-color, inherit);
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -moz-background-clip: text;
+}

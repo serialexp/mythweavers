@@ -1,7 +1,7 @@
-import { tokens } from '../../theme/tokens.css'
+import type { ParentComponent } from 'solid-js'
 import { chronicleTheme } from '../../theme/chronicle.css'
 import { starlightTheme } from '../../theme/starlight.css'
-import type { ParentComponent } from 'solid-js'
+import { tokens } from '../../theme/tokens.css'
 
 const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => (
   <div
@@ -14,28 +14,26 @@ const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => 
       'min-width': '300px',
     }}
   >
-    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>
-      {props.name}
-    </h2>
+    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>{props.name}</h2>
     {props.children}
   </div>
 )
 
 const TokenGroup = (props: { title: string; children: any }) => (
   <div style={{ 'margin-bottom': '2rem' }}>
-    <h3 style={{
-      margin: '0 0 1rem 0',
-      'font-size': '14px',
-      'font-weight': '600',
-      'text-transform': 'uppercase',
-      'letter-spacing': '0.05em',
-      opacity: 0.7,
-    }}>
+    <h3
+      style={{
+        margin: '0 0 1rem 0',
+        'font-size': '14px',
+        'font-weight': '600',
+        'text-transform': 'uppercase',
+        'letter-spacing': '0.05em',
+        opacity: 0.7,
+      }}
+    >
       {props.title}
     </h3>
-    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>
-      {props.children}
-    </div>
+    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>{props.children}</div>
   </div>
 )
 
@@ -66,15 +64,17 @@ const FontWeightSample = (props: { name: string; weight: string }) => (
 const LineHeightSample = (props: { name: string; lineHeight: string }) => (
   <div style={{ display: 'flex', gap: '1rem' }}>
     <span style={{ 'font-size': '12px', opacity: 0.6, 'min-width': '60px' }}>{props.name}</span>
-    <p style={{
-      'line-height': props.lineHeight,
-      'font-size': '14px',
-      margin: 0,
-      'max-width': '200px',
-      'background-color': tokens.color.surface.default,
-      padding: '4px',
-      'border-radius': '4px',
-    }}>
+    <p
+      style={{
+        'line-height': props.lineHeight,
+        'font-size': '14px',
+        margin: 0,
+        'max-width': '200px',
+        'background-color': tokens.color.surface.default,
+        padding: '4px',
+        'border-radius': '4px',
+      }}
+    >
       Line height {props.lineHeight}. This text demonstrates the spacing between lines.
     </p>
   </div>

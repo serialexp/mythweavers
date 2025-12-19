@@ -1,37 +1,20 @@
-import { Component, For } from 'solid-js';
-import { errorStore } from '../stores/errorStore';
-import { BsXLg, BsExclamationTriangle, BsExclamationOctagon } from 'solid-icons/bs';
-import styles from './ErrorNotifications.module.css';
+import { Toast, ToastContainer } from '@mythweavers/ui'
+import { Component, For } from 'solid-js'
+import { errorStore } from '../stores/errorStore'
 
 export const ErrorNotifications: Component = () => {
   return (
-    <div class={styles.container}>
+    <ToastContainer position="top-right">
       <For each={errorStore.errors}>
         {(error) => (
-          <div 
-            class={`${styles.notification} ${error.type === 'warning' ? styles.warning : styles.error}`}
-            role="alert"
-          >
-            <div class={styles.icon}>
-              {error.type === 'warning' ? (
-                <BsExclamationTriangle />
-              ) : (
-                <BsExclamationOctagon />
-              )}
-            </div>
-            <div class={styles.message}>
-              {error.message}
-            </div>
-            <button
-              class={styles.closeButton}
-              onClick={() => errorStore.removeError(error.id)}
-              aria-label="Dismiss"
-            >
-              <BsXLg />
-            </button>
-          </div>
+          <Toast
+            variant={error.type}
+            message={error.message}
+            onClose={() => errorStore.removeError(error.id)}
+            duration={error.type === 'warning' ? 15000 : 0}
+          />
         )}
       </For>
-    </div>
-  );
-};
+    </ToastContainer>
+  )
+}

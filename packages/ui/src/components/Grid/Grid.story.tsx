@@ -1,5 +1,5 @@
-import { Grid, GridItem } from './Grid'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Grid, GridItem } from './Grid'
 
 const Box = (props: { children?: string; style?: any }) => (
   <div
@@ -153,7 +153,9 @@ export default (props: { Hst: any }) => {
         <ThemeComparison>
           <Grid cols={4} gap="md">
             <GridItem colSpan="full">
-              <Box style={{ background: 'var(--color-accent-primary)', color: 'var(--color-text-inverse)' }}>Header</Box>
+              <Box style={{ background: 'var(--color-accent-primary)', color: 'var(--color-text-inverse)' }}>
+                Header
+              </Box>
             </GridItem>
             <GridItem colSpan={1} rowSpan={2}>
               <Box style={{ height: '100%' }}>Sidebar</Box>

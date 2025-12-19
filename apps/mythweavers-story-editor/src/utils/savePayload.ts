@@ -1,25 +1,25 @@
 import { unwrap } from 'solid-js/store'
-import { messagesStore } from '../stores/messagesStore'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
-import { nodeStore } from '../stores/nodeStore'
 import { mapsStore } from '../stores/mapsStore'
+import { messagesStore } from '../stores/messagesStore'
+import { nodeStore } from '../stores/nodeStore'
 
 /**
  * Creates a consistent save payload from all the stores
  * This is THE single source of truth for what gets saved
- * Note: For maps, we only send metadata (id/name) to track mapCount. 
+ * Note: For maps, we only send metadata (id/name) to track mapCount.
  * Full map data with images is saved separately through dedicated API endpoints
  */
 export function createSavePayload(overrides?: Partial<{ name: string }>) {
   // Get map metadata only (no image data or landmarks details, but include count)
-  const mapMetadata = unwrap(mapsStore.maps).map(map => ({
+  const mapMetadata = unwrap(mapsStore.maps).map((map) => ({
     id: map.id,
     name: map.name,
-    landmarkCount: map.landmarks?.length || 0
+    landmarkCount: map.landmarks?.length || 0,
   }))
-  
+
   return {
     name: currentStoryStore.name,
     messages: unwrap(messagesStore.messages),
@@ -36,6 +36,6 @@ export function createSavePayload(overrides?: Partial<{ name: string }>) {
     // selectedChapterId removed - now handled through selectedNodeId
     selectedNodeId: nodeStore.selectedNodeId, // Include selected node
     lastKnownUpdatedAt: currentStoryStore.lastKnownUpdatedAt,
-    ...overrides
+    ...overrides,
   }
 }

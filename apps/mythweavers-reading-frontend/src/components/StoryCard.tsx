@@ -1,107 +1,106 @@
-import { Component, Show } from 'solid-js';
-import { A } from '@solidjs/router';
-import { openAddToBookshelf } from '../lib/stores/bookshelf';
+import { Button, LinkButton } from '@mythweavers/ui'
+import { Component, Show } from 'solid-js'
+import { openAddToBookshelf } from '../lib/stores/bookshelf'
+import * as styles from './StoryCard.css'
 
 interface StoryCardProps {
-  id: string;
-  coverArtAsset?: string;
-  name: string;
-  summary: string;
-  color?: string;
-  textColor?: string;
-  pages: number;
-  fontFamily?: string;
-  lastChapterReleasedAt?: string;
-  spellingLevel?: number;
-  royalRoadId?: number;
-  status?: string;
-  wordsPerWeek?: number;
-  canAddToLibrary?: boolean;
+  id: string
+  coverArtAsset?: string
+  name: string
+  summary: string
+  color?: string
+  textColor?: string
+  pages: number
+  fontFamily?: string
+  lastChapterReleasedAt?: string
+  spellingLevel?: number
+  royalRoadId?: number
+  status?: string
+  wordsPerWeek?: number
+  canAddToLibrary?: boolean
 }
 
 const StoryCard: Component<StoryCardProps> = (props) => {
   const handleAddToLibraryClick = () => {
-    openAddToBookshelf(props.id);
-  };
+    openAddToBookshelf(props.id)
+  }
+
+  const getStatusEmoji = () => {
+    if (props.status === 'COMPLETED') return ' ✅'
+    if (props.status === 'HIATUS') return ' ⏸️'
+    return ' 🔥'
+  }
+
+  const getStatusTitle = () => {
+    if (props.status === 'COMPLETED') return 'Completed'
+    if (props.status === 'HIATUS') return 'Hiatus'
+    return 'Ongoing'
+  }
 
   return (
-    <div class="card-container relative">
-      <div 
-        class="card bg-base-100 shadow-xl transition-all hover:scale-105"
-        style={{ 
-          "--thickness": `${Math.round(props.pages / 20)}px`,
-          "background-color": props.color || 'var(--card-bg)',
-          "color": props.textColor || 'var(--card-text)'
+    <div class={styles.cardContainer}>
+      <div
+        class={styles.storyCard}
+        style={{
+          'background-color': props.color || undefined,
+          color: props.textColor || undefined,
         }}
       >
-        <div class="card-front relative overflow-hidden h-64">
-          <Show when={props.coverArtAsset} fallback={
-            <p class="text-center text-gray-500 self-start mt-8 px-4 text-xl font-bold"
-               style={{ "font-family": props.fontFamily || 'inherit' }}>
-              {props.name}
-            </p>
-          }>
-            <img 
-              src={props.coverArtAsset} 
-              alt={props.name} 
-              class="w-full h-full object-cover"
-            />
+        <div class={styles.cardFront}>
+          <Show
+            when={props.coverArtAsset}
+            fallback={
+              <p class={styles.titleFallback} style={{ 'font-family': props.fontFamily || 'inherit' }}>
+                {props.name}
+              </p>
+            }
+          >
+            <img src={props.coverArtAsset} alt={props.name} class={styles.coverImage} />
           </Show>
         </div>
-        
-        <div class="card-body">
-          <h2 class="card-title">{props.name}</h2>
-          <p class="text-xs overflow-x-hidden w-full">
+
+        <div class={styles.cardBody}>
+          <h2 class={styles.cardTitle}>{props.name}</h2>
+          <p class={styles.cardMeta}>
             {props.pages} pages
-            {props.status === "COMPLETED" ? " ✅" : 
-             props.status === "HIATUS" ? " ⏸️" : " 🔥"}{" "}
-            {props.wordsPerWeek ?? "?"} W/W
+            {getStatusEmoji()} {props.wordsPerWeek ?? '?'} W/W
           </p>
-          <div 
-            class="text-xs flex-1 overflow-x-hidden w-full"
-            innerHTML={props.summary}
-          />
-          
-          <div class="card-actions justify-around">
+          <div class={styles.cardSummary} innerHTML={props.summary} />
+
+          <div class={styles.cardActions}>
             <Show when={props.canAddToLibrary}>
-              <button
-                type="button"
-                class="btn btn-accent btn-sm"
-                onClick={handleAddToLibraryClick}
-              >
+              <Button variant="secondary" size="sm" onClick={handleAddToLibraryClick}>
                 + Library
-              </button>
+              </Button>
             </Show>
-            
-            <Show when={props.royalRoadId} fallback={
-              <A href={`/story/${props.id}`} class="btn btn-primary btn-sm">
-                Read
-              </A>
-            }>
-              <a
-                class="btn btn-primary btn-sm"
+
+            <Show
+              when={props.royalRoadId}
+              fallback={
+                <LinkButton href={`/story/${props.id}`} variant="primary" size="sm">
+                  Read
+                </LinkButton>
+              }
+            >
+              <LinkButton
                 href={`https://www.royalroad.com/fiction/${props.royalRoadId}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                variant="primary"
+                size="sm"
               >
                 Read on RR
-              </a>
+              </LinkButton>
             </Show>
           </div>
         </div>
       </div>
-      
-      <div class="text-lg text-gray-500 mt-4 flex items-center justify-center gap-1">
-        <span title={
-          props.status === "COMPLETED" ? "Completed" : 
-          props.status === "HIATUS" ? "Hiatus" : "Ongoing"
-        }>
-          {props.status === "COMPLETED" ? " ✅" : 
-           props.status === "HIATUS" ? " ⏸️" : " 🔥"}
-        </span>
+
+      <div class={styles.statusFooter}>
+        <span title={getStatusTitle()}>{getStatusEmoji()}</span>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default StoryCard;
+export default StoryCard

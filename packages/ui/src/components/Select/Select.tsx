@@ -1,5 +1,5 @@
-import { type JSX, splitProps, For } from 'solid-js'
-import { select, type SelectVariants } from './Select.css'
+import { For, type JSX, splitProps } from 'solid-js'
+import { select } from './Select.css'
 
 export interface SelectOption {
   value: string
@@ -7,9 +7,9 @@ export interface SelectOption {
   disabled?: boolean
 }
 
-export interface SelectProps
-  extends Omit<JSX.SelectHTMLAttributes<HTMLSelectElement>, 'size'>,
-    SelectVariants {
+export interface SelectProps extends Omit<JSX.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
+  /** Select size */
+  size?: 'sm' | 'md' | 'lg'
   /** Options to display */
   options: SelectOption[]
   /** Placeholder text when no value selected */
@@ -17,11 +17,7 @@ export interface SelectProps
 }
 
 export const Select = (props: SelectProps) => {
-  const [local, variants, rest] = splitProps(
-    props,
-    ['class', 'options', 'placeholder'],
-    ['size']
-  )
+  const [local, variants, rest] = splitProps(props, ['class', 'options', 'placeholder'], ['size'])
 
   return (
     <select class={`${select(variants)} ${local.class ?? ''}`} {...rest}>

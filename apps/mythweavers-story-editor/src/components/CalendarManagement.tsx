@@ -1,13 +1,13 @@
-import { Component, Show, For, createSignal, createResource, createEffect } from 'solid-js'
-import { BsPlus, BsTrash, BsCheck, BsPencil } from 'solid-icons/bs'
+import { CalendarConfig } from '@mythweavers/shared'
+import { Badge, Button, Card, CardBody, Select, Stack } from '@mythweavers/ui'
+import { BsCheck, BsPencil, BsPlus, BsTrash } from 'solid-icons/bs'
+import { Component, For, Show, createEffect, createResource, createSignal } from 'solid-js'
 import { getCalendarsPresets } from '../client/config'
-import { apiClient } from '../utils/apiClient'
-import { currentStoryStore } from '../stores/currentStoryStore'
 import { calendarStore } from '../stores/calendarStore'
+import { currentStoryStore } from '../stores/currentStoryStore'
 import { Calendar } from '../types/api'
-import { CalendarConfig } from '@story/shared'
+import { apiClient } from '../utils/apiClient'
 import { CalendarEditor } from './CalendarEditor'
-import styles from './CalendarManagement.module.css'
 
 export const CalendarManagement: Component = () => {
   const [calendars, setCalendars] = createSignal<Calendar[]>([])
@@ -20,7 +20,7 @@ export const CalendarManagement: Component = () => {
   const [calendarPresets] = createResource<CalendarConfig[]>(async () => {
     try {
       const response = await getCalendarsPresets()
-      return response.data?.presets || []
+      return (response.data?.presets || []) as CalendarConfig[]
     } catch (error) {
       console.error('Failed to fetch calendar presets:', error)
       return []
@@ -35,9 +35,9 @@ export const CalendarManagement: Component = () => {
       const story = await apiClient.getStory(currentStoryStore.id)
       if (story.calendars) {
         // Parse the JSON config strings
-        const parsedCalendars = story.calendars.map(cal => ({
+        const parsedCalendars = story.calendars.map((cal) => ({
           ...cal,
-          config: typeof cal.config === 'string' ? JSON.parse(cal.config) : cal.config
+          config: typeof cal.config === 'string' ? JSON.parse(cal.config) : cal.config,
         }))
         setCalendars(parsedCalendars)
       }
@@ -62,7 +62,7 @@ export const CalendarManagement: Component = () => {
     try {
       await apiClient.post(`/stories/${currentStoryStore.id}/calendars`, {
         config,
-        setAsDefault: calendars().length === 0 // Set as default if this is the first calendar
+        setAsDefault: calendars().length === 0, // Set as default if this is the first calendar
       })
 
       await loadCalendars()
@@ -78,7 +78,7 @@ export const CalendarManagement: Component = () => {
     if (selectedPresetId() === 'custom') {
       return undefined
     }
-    return calendarPresets()?.find(p => p.id === selectedPresetId())
+    return calendarPresets()?.find((p) => p.id === selectedPresetId())
   }
 
   const handleSetDefault = async (calendarId: string) => {
@@ -86,7 +86,7 @@ export const CalendarManagement: Component = () => {
 
     try {
       await apiClient.put(`/stories/${currentStoryStore.id}/default-calendar`, {
-        calendarId
+        calendarId,
       })
 
       setDefaultCalendarId(calendarId)
@@ -100,11 +100,11 @@ export const CalendarManagement: Component = () => {
   const handleDeleteCalendar = async (calendarId: string) => {
     if (!currentStoryStore.id) return
 
-    const calendar = calendars().find(c => c.id === calendarId)
+    const calendar = calendars().find((c) => c.id === calendarId)
     if (!calendar) return
 
     const confirmDelete = confirm(
-      `Are you sure you want to delete the calendar "${calendar.config.name}"? This action cannot be undone.`
+      `Are you sure you want to delete the calendar "${calendar.config.name}"? This action cannot be undone.`,
     )
 
     if (!confirmDelete) return
@@ -143,121 +143,193 @@ export const CalendarManagement: Component = () => {
     setEditingCalendarId(null)
   }
 
+  const containerStyle = {
+    display: 'flex',
+    'flex-direction': 'column' as const,
+    gap: '1rem',
+    padding: '1.5rem',
+  }
+
+  const emptyStyle = {
+    padding: '2rem',
+    'text-align': 'center' as const,
+    color: 'var(--text-secondary)',
+    background: 'var(--bg-secondary)',
+    border: '1px dashed var(--border-color)',
+    'border-radius': '6px',
+  }
+
+  const calendarInfoStyle = {
+    flex: '1',
+    display: 'flex',
+    'flex-direction': 'column' as const,
+    gap: '0.25rem',
+  }
+
+  const calendarNameStyle = {
+    display: 'flex',
+    'align-items': 'center',
+    gap: '0.5rem',
+    'font-weight': '500',
+    'font-size': '1rem',
+    color: 'var(--text-primary)',
+  }
+
+  const calendarDescStyle = {
+    'font-size': '0.875rem',
+    color: 'var(--text-secondary)',
+  }
+
+  const calendarDetailsStyle = {
+    'font-size': '0.75rem',
+    color: 'var(--text-muted)',
+    'font-family': 'monospace',
+  }
+
+  const presetDescStyle = {
+    padding: '0.5rem',
+    background: 'var(--bg-tertiary)',
+    'border-radius': '4px',
+    'font-size': '0.875rem',
+    color: 'var(--text-secondary)',
+  }
+
   return (
-    <div class={styles.container}>
-      <div class={styles.header}>
-        <h3 class={styles.title}>Calendar System</h3>
-        <button
-          class={styles.addButton}
-          onClick={() => setShowAddCalendar(!showAddCalendar())}
-        >
+    <div style={containerStyle}>
+      <Stack
+        direction="horizontal"
+        gap="md"
+        style={{ 'justify-content': 'space-between', 'align-items': 'center', 'margin-bottom': '1rem' }}
+      >
+        <h3 style={{ margin: '0', 'font-size': '1.25rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+          Calendar System
+        </h3>
+        <Button variant="primary" onClick={() => setShowAddCalendar(!showAddCalendar())}>
           <BsPlus /> Add Calendar
-        </button>
-      </div>
+        </Button>
+      </Stack>
 
       <Show when={calendars().length === 0}>
-        <div class={styles.empty}>
-          No calendars configured. Add one to enable timeline features.
-        </div>
+        <div style={emptyStyle}>No calendars configured. Add one to enable timeline features.</div>
       </Show>
 
-      <div class={styles.calendarList}>
+      <Stack gap="md">
         <For each={calendars()}>
           {(calendar) => (
-            <div class={styles.calendarItem}>
-              <div class={styles.calendarInfo}>
-                <div class={styles.calendarName}>
-                  {calendar.config.name}
-                  <Show when={calendar.id === defaultCalendarId()}>
-                    <span class={styles.defaultBadge}>Default</span>
-                  </Show>
-                </div>
-                <div class={styles.calendarDescription}>
-                  {calendar.config.description}
-                </div>
-                <div class={styles.calendarDetails}>
-                  {calendar.config.daysPerYear} days/year, {calendar.config.hoursPerDay} hours/day
-                </div>
-              </div>
-              <div class={styles.calendarActions}>
-                <button
-                  class={styles.actionButton}
-                  onClick={() => startEditing(calendar.id)}
-                  title="Edit calendar"
+            <Card>
+              <CardBody>
+                <Stack
+                  direction="horizontal"
+                  gap="md"
+                  style={{ 'justify-content': 'space-between', 'align-items': 'center' }}
                 >
-                  <BsPencil /> Edit
-                </button>
-                <Show when={calendar.id !== defaultCalendarId()}>
-                  <button
-                    class={styles.actionButton}
-                    onClick={() => handleSetDefault(calendar.id)}
-                    title="Set as default calendar"
-                  >
-                    <BsCheck /> Set Default
-                  </button>
-                </Show>
-                <button
-                  class={`${styles.actionButton} ${styles.deleteButton}`}
-                  onClick={() => handleDeleteCalendar(calendar.id)}
-                  title="Delete calendar"
-                >
-                  <BsTrash /> Delete
-                </button>
-              </div>
-            </div>
+                  <div style={calendarInfoStyle}>
+                    <div style={calendarNameStyle}>
+                      {calendar.config.name}
+                      <Show when={calendar.id === defaultCalendarId()}>
+                        <Badge variant="primary">Default</Badge>
+                      </Show>
+                    </div>
+                    <div style={calendarDescStyle}>{calendar.config.description}</div>
+                    <div style={calendarDetailsStyle}>
+                      {calendar.config.daysPerYear} days/year, {calendar.config.hoursPerDay} hours/day
+                    </div>
+                  </div>
+                  <Stack direction="horizontal" gap="sm">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => startEditing(calendar.id)}
+                      title="Edit calendar"
+                    >
+                      <BsPencil /> Edit
+                    </Button>
+                    <Show when={calendar.id !== defaultCalendarId()}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleSetDefault(calendar.id)}
+                        title="Set as default calendar"
+                      >
+                        <BsCheck /> Set Default
+                      </Button>
+                    </Show>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteCalendar(calendar.id)}
+                      title="Delete calendar"
+                    >
+                      <BsTrash /> Delete
+                    </Button>
+                  </Stack>
+                </Stack>
+              </CardBody>
+            </Card>
           )}
         </For>
-      </div>
+      </Stack>
 
       <Show when={showAddCalendar()}>
-        <div class={styles.addCalendarForm}>
-          <h4 class={styles.formTitle}>Add Calendar</h4>
-          <div class={styles.formGroup}>
-            <label class={styles.formLabel}>Start with:</label>
-            <select
-              class={styles.formSelect}
-              value={selectedPresetId()}
-              onChange={(e) => setSelectedPresetId(e.target.value)}
-            >
-              <Show when={!calendarPresets.loading && calendarPresets()}>
-                <For each={calendarPresets()}>
-                  {(preset) => (
-                    <option value={preset.id}>{preset.name}</option>
-                  )}
-                </For>
-                <option value="custom">Custom Calendar (blank)</option>
-              </Show>
-            </select>
-            <Show when={selectedPresetId() !== 'custom' && calendarPresets()}>
-              <div class={styles.presetDescription}>
-                {calendarPresets()!.find(p => p.id === selectedPresetId())?.description || ''}
-              </div>
-            </Show>
-          </div>
+        <Card style={{ 'margin-top': '0.5rem' }}>
+          <CardBody>
+            <Stack gap="md">
+              <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+                Add Calendar
+              </h4>
+              <Stack gap="sm">
+                <span style={{ 'font-weight': '500', 'font-size': '0.875rem', color: 'var(--text-primary)' }}>
+                  Start with:
+                </span>
+                <Show when={!calendarPresets.loading && calendarPresets()}>
+                  <Select
+                    value={selectedPresetId()}
+                    onChange={(e) => setSelectedPresetId(e.target.value)}
+                    options={[
+                      // Put Simple 365 first as the recommended default
+                      ...(calendarPresets() || [])
+                        .sort((a, b) => (a.id === 'simple365' ? -1 : b.id === 'simple365' ? 1 : 0))
+                        .map((preset) => ({ value: preset.id, label: preset.name })),
+                      { value: 'custom', label: 'Custom Calendar (blank)' },
+                    ]}
+                  />
+                </Show>
+                <Show when={selectedPresetId() !== 'custom' && calendarPresets()}>
+                  <div style={presetDescStyle}>
+                    {calendarPresets()!.find((p) => p.id === selectedPresetId())?.description || ''}
+                  </div>
+                </Show>
+              </Stack>
 
-          <Show when={selectedPresetId()} keyed>
-            {(_presetId) => (
-              <CalendarEditor
-                initialConfig={getInitialConfig()}
-                onSave={handleAddCalendar}
-                onCancel={() => setShowAddCalendar(false)}
-              />
-            )}
-          </Show>
-        </div>
+              <Show when={selectedPresetId()} keyed>
+                {(_presetId) => (
+                  <CalendarEditor
+                    initialConfig={getInitialConfig()}
+                    onSave={handleAddCalendar}
+                    onCancel={() => setShowAddCalendar(false)}
+                  />
+                )}
+              </Show>
+            </Stack>
+          </CardBody>
+        </Card>
       </Show>
 
       <Show when={editingCalendarId()}>
-        <div class={styles.addCalendarForm}>
-          <h4 class={styles.formTitle}>
-            Edit Calendar: {calendars().find(c => c.id === editingCalendarId())?.config.name}
-          </h4>
-          <CalendarEditor
-            initialConfig={calendars().find(c => c.id === editingCalendarId())?.config}
-            onSave={handleEditCalendar}
-            onCancel={cancelEditing}
-          />
-        </div>
+        <Card style={{ 'margin-top': '0.5rem' }}>
+          <CardBody>
+            <Stack gap="md">
+              <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+                Edit Calendar: {calendars().find((c) => c.id === editingCalendarId())?.config.name}
+              </h4>
+              <CalendarEditor
+                initialConfig={calendars().find((c) => c.id === editingCalendarId())?.config}
+                onSave={handleEditCalendar}
+                onCancel={cancelEditing}
+              />
+            </Stack>
+          </CardBody>
+        </Card>
       </Show>
     </div>
   )

@@ -1,8 +1,8 @@
+import { charactersStore } from '../stores/charactersStore'
+import { contextItemsStore } from '../stores/contextItemsStore'
+import { globalOperationStore } from '../stores/globalOperationStore'
 import { messagesStore } from '../stores/messagesStore'
 import { pendingEntitiesStore } from '../stores/pendingEntitiesStore'
-import { globalOperationStore } from '../stores/globalOperationStore'
-import { contextItemsStore } from '../stores/contextItemsStore'
-import { charactersStore } from '../stores/charactersStore'
 
 /**
  * Determines if the story is ready for a new automatic generation
@@ -25,13 +25,13 @@ export const isStoryReadyForGeneration = (): boolean => {
   }
 
   // Check if any messages are currently being summarized
-  const isSummarizing = messagesStore.messages.some(msg => msg.isSummarizing)
+  const isSummarizing = messagesStore.messages.some((msg) => msg.isSummarizing)
   if (isSummarizing) {
     return false
   }
 
   // Check if any messages are currently being analyzed
-  const isAnalyzing = messagesStore.messages.some(msg => msg.isAnalyzing)
+  const isAnalyzing = messagesStore.messages.some((msg) => msg.isAnalyzing)
   if (isAnalyzing) {
     return false
   }
@@ -45,17 +45,17 @@ export const isStoryReadyForGeneration = (): boolean => {
  */
 export const generateNextStoryBeatInstructions = async (
   generateFn: (prompt: string) => Promise<string>,
-  paragraphsPerTurn: number = 3
+  paragraphsPerTurn = 3,
 ): Promise<string> => {
   // Get the last few visible story messages for context
   const storyMessages = messagesStore.visibleMessages
-    .filter(msg => !msg.isQuery && msg.role === 'assistant')
+    .filter((msg) => !msg.isQuery && msg.role === 'assistant')
     .slice(-3) // Last 3 story beats
-    .map(msg => msg.content)
+    .map((msg) => msg.content)
     .join('\n\n')
 
   if (!storyMessages.trim()) {
-    return "Begin a compelling story that introduces the setting and main character."
+    return 'Begin a compelling story that introduces the setting and main character.'
   }
 
   // Get active context items and character information
@@ -72,16 +72,20 @@ IMPORTANT: Only provide the instruction for what should happen next. Do NOT incl
 Recent story content:
 ${storyMessages}
 
-${fullContext ? `Active story context:
+${
+  fullContext
+    ? `Active story context:
 ${fullContext}
 
-` : ''}Instructions for next story beat:`
+`
+    : ''
+}Instructions for next story beat:`
 
   try {
     const response = await generateFn(prompt)
-    return response.trim() || "Continue the story, developing the current scene further."
+    return response.trim() || 'Continue the story, developing the current scene further.'
   } catch (error) {
     console.warn('Failed to generate next story beat instructions:', error)
-    return "Continue the story, developing the current scene further."
+    return 'Continue the story, developing the current scene further.'
   }
 }

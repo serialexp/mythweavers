@@ -2,7 +2,7 @@ export interface Message {
   id: string
   role: 'assistant'
   content: string
-  instruction?: string  // For assistant messages, stores the original user instruction
+  instruction?: string // For assistant messages, stores the original user instruction
   timestamp: Date
   tokensPerSecond?: number
   totalTokens?: number
@@ -16,8 +16,8 @@ export interface Message {
   paragraphSummary?: string
   isExpanded?: boolean
   isSummarizing?: boolean
-  think?: string  // AI's thinking/reasoning content
-  showThink?: boolean  // Whether to display the think content
+  think?: string // AI's thinking/reasoning content
+  showThink?: boolean // Whether to display the think content
   sceneAnalysis?: SceneAnalysis // Cached analysis of this story beat
   isAnalyzing?: boolean // Whether scene analysis is in progress
   model?: string // Model used to generate this message
@@ -32,7 +32,6 @@ export interface SceneAnalysis {
   overallImportance: 'high' | 'medium' | 'low'
   explanation: string
 }
-
 
 export interface Model {
   name: string

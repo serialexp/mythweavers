@@ -1,0 +1,45 @@
+---
+import '../styles/global.css'
+import { HomePage } from '../components/pages/HomePage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { storiesApi, authApi, type PublicStory, type User } from '../lib/api'
+
+// Read theme from cookie for SSR
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+// Get user session from backend (pass cookie for SSR)
+let user: User | null = null
+try {
+  const cookieHeader = Astro.request.headers.get('cookie') || ''
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated && session.user) {
+    user = session.user
+  }
+} catch {
+  // Not authenticated
+}
+
+// Fetch stories
+let stories: PublicStory[] = []
+try {
+  const result = await storiesApi.list({ pageSize: 8, sortBy: 'random' })
+  stories = result.stories
+} catch (error) {
+  console.error('Error fetching stories:', error)
+}
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MythWeavers - Home</title>
+    <meta name="description" content="Read and write stories on MythWeavers" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <HomePage client:load initialTheme={initialTheme} user={user} stories={stories} />
+  </body>
+</html>

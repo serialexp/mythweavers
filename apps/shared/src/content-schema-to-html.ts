@@ -1,32 +1,24 @@
-import type { ContentNode } from "./schema.js";
-import { encode } from "html-entities";
+import { encode } from 'html-entities'
+import type { ContentNode } from './schema.js'
 
 export const contentSchemaToHtml = (content: ContentNode): string => {
   return content.content
     ?.map((node) => {
-      if (node.type === "paragraph") {
+      if (node.type === 'paragraph') {
         return node.content
           ?.map((textNode) => {
-            const translationMark = textNode.marks?.find(
-              (mark) => mark.type === "translation",
-            );
+            const translationMark = textNode.marks?.find((mark) => mark.type === 'translation')
             if (translationMark) {
-              return `<span title="${encode(translationMark.attrs.title)}">${
-                textNode.text
-              }</span>`;
+              return `<span title="${encode(translationMark.attrs.title)}">${textNode.text}</span>`
             }
-            return textNode.text;
+            return textNode.text
           })
-          .join("");
+          .join('')
       }
     })
-    .join("");
-};
+    .join('')
+}
 
 export const contentSchemaToText = (content: ContentNode): string => {
-  return (
-    content.content
-      ?.map((node) => node.content?.map((textNode) => textNode.text).join(""))
-      .join("") ?? ""
-  );
-};
+  return content.content?.map((node) => node.content?.map((textNode) => textNode.text).join('')).join('') ?? ''
+}

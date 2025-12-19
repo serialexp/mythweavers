@@ -1,47 +1,36 @@
-import { Component, JSX } from "solid-js";
-import styles from "./HeaderButton.module.css";
+import { IconButton } from '@mythweavers/ui'
+import { Component, JSX } from 'solid-js'
 
 interface HeaderButtonProps {
-    onClick?: () => void;
-    title?: string;
-    variant?: "default" | "active" | "danger" | "primary";
-    disabled?: boolean;
-    children: JSX.Element;
-    class?: string;
+  onClick?: () => void
+  title?: string
+  variant?: 'default' | 'active' | 'danger' | 'primary'
+  disabled?: boolean
+  children: JSX.Element
+  class?: string
 }
 
 export const HeaderButton: Component<HeaderButtonProps> = (props) => {
-    const getClassName = () => {
-        const classes = [styles.headerButton];
+  // Map HeaderButton variants to IconButton props
+  const getIconButtonVariant = (): 'secondary' | 'primary' | 'danger' => {
+    if (props.variant === 'danger') return 'danger'
+    if (props.variant === 'primary') return 'primary'
+    return 'secondary' // default maps to secondary
+  }
 
-        if (props.variant === "active") {
-            classes.push(styles.active);
-        } else if (props.variant === "danger") {
-            classes.push(styles.danger);
-        } else if (props.variant === "primary") {
-            classes.push(styles.primary);
-        }
+  const isActive = () => props.variant === 'active'
 
-        if (props.disabled) {
-            classes.push(styles.disabled);
-        }
-
-        if (props.class) {
-            classes.push(props.class);
-        }
-
-        return classes.join(" ");
-    };
-    
-    return (
-        <button
-            onClick={props.onClick}
-            class={getClassName()}
-            title={props.title}
-            disabled={props.disabled}
-            type="button"
-        >
-            {props.children}
-        </button>
-    );
-};
+  return (
+    <IconButton
+      onClick={props.onClick}
+      aria-label={props.title || 'Button'}
+      variant={getIconButtonVariant()}
+      active={isActive()}
+      disabled={props.disabled}
+      size="sm"
+      class={props.class}
+    >
+      {props.children}
+    </IconButton>
+  )
+}

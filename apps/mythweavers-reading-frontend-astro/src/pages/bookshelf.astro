@@ -1,0 +1,40 @@
+---
+import '../styles/global.css'
+import { BookshelfPage } from '../components/pages/BookshelfPage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { authApi, type User } from '../lib/api'
+
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+// Get user session from backend - redirect if not logged in (pass cookie for SSR)
+let user: User | null = null
+try {
+  const cookieHeader = Astro.request.headers.get('cookie') || ''
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated && session.user) {
+    user = session.user
+  }
+} catch {
+  // Not authenticated
+}
+
+// Redirect to login if not authenticated
+if (!user) {
+  return Astro.redirect('/login')
+}
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Bookshelf - MythWeavers</title>
+    <meta name="description" content="Your personal bookshelf" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <BookshelfPage client:load initialTheme={initialTheme} user={user} />
+  </body>
+</html>

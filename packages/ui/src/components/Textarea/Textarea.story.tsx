@@ -1,5 +1,5 @@
-import { Textarea } from './Textarea'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Textarea } from './Textarea'
 
 export default (props: { Hst: any }) => {
   const { Hst } = props

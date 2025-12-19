@@ -1,4 +1,4 @@
-import { Node, Message, BranchOption } from '../types/core'
+import { BranchOption, Message, Node } from '../types/core'
 import { generateMessageId } from './id'
 
 /**
@@ -13,7 +13,7 @@ export function getChaptersInStoryOrder(nodes: Node[]): Node[] {
   }
 
   const childrenMap = new Map<string | null, Node[]>()
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     const parentId = node.parentId || null
     if (!childrenMap.has(parentId)) {
       childrenMap.set(parentId, [])
@@ -47,12 +47,12 @@ export function getChaptersInStoryOrder(nodes: Node[]): Node[] {
  */
 export function getChapterNodesBeforeNode(nodes: Node[], currentNodeId: string): Node[] {
   const result: Node[] = []
-  const currentNode = nodes.find(n => n.id === currentNodeId)
+  const currentNode = nodes.find((n) => n.id === currentNodeId)
   if (!currentNode) return result
 
   // Build a map of parent to children for easy traversal
   const childrenMap = new Map<string | null, Node[]>()
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     const parentId = node.parentId || null
     if (!childrenMap.has(parentId)) {
       childrenMap.set(parentId, [])
@@ -107,12 +107,12 @@ export function getChapterNodesBeforeNode(nodes: Node[], currentNodeId: string):
  */
 export function getAllNodesUpToNode(nodes: Node[], currentNodeId: string): Node[] {
   const result: Node[] = []
-  const currentNode = nodes.find(n => n.id === currentNodeId)
+  const currentNode = nodes.find((n) => n.id === currentNodeId)
   if (!currentNode) return result
 
   // Build a map of parent to children for easy traversal
   const childrenMap = new Map<string | null, Node[]>()
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     const parentId = node.parentId || null
     if (!childrenMap.has(parentId)) {
       childrenMap.set(parentId, [])
@@ -163,14 +163,12 @@ export function getAllNodesUpToNode(nodes: Node[], currentNodeId: string): Node[
  * @param targetMessageId - The ID of the last message to include (process up to this point)
  * @returns Messages in story order from the beginning up to and including the target message
  */
-export function getMessagesInStoryOrder(
-  messages: Message[],
-  nodes: Node[],
-  targetMessageId: string
-): Message[] {
-  const targetMessage = messages.find(m => m.id === targetMessageId)
+export function getMessagesInStoryOrder(messages: Message[], nodes: Node[], targetMessageId: string): Message[] {
+  const targetMessage = messages.find((m) => m.id === targetMessageId)
   if (!targetMessage) {
-    throw new Error(`[getMessagesInStoryOrder] Target message not found: ${targetMessageId}. This should never happen - the target message must exist in the messages array.`)
+    throw new Error(
+      `[getMessagesInStoryOrder] Target message not found: ${targetMessageId}. This should never happen - the target message must exist in the messages array.`,
+    )
   }
 
   // If the target message doesn't have a nodeId, fall back to array order
@@ -183,27 +181,27 @@ export function getMessagesInStoryOrder(
         role: targetMessage.role,
         nodeId: targetMessage.nodeId,
         chapterId: targetMessage.chapterId,
-        content: targetMessage.content?.substring(0, 50) + '...',
+        content: `${targetMessage.content?.substring(0, 50)}...`,
         order: targetMessage.order,
         isQuery: targetMessage.isQuery,
-        script: !!targetMessage.script
+        script: !!targetMessage.script,
       },
-      allKeys: Object.keys(targetMessage)
+      allKeys: Object.keys(targetMessage),
     })
-    const targetIndex = messages.findIndex(m => m.id === targetMessageId)
+    const targetIndex = messages.findIndex((m) => m.id === targetMessageId)
     return targetIndex >= 0 ? messages.slice(0, targetIndex + 1) : []
   }
 
   // Get all nodes up to and including the target message's node
   const nodesInOrder = getAllNodesUpToNode(nodes, targetMessage.nodeId)
-  const nodeIds = new Set(nodesInOrder.map(n => n.id))
+  const nodeIds = new Set(nodesInOrder.map((n) => n.id))
 
   // Filter messages to only those in the nodes we've traversed
-  const messagesInNodes = messages.filter(m => m.nodeId && nodeIds.has(m.nodeId))
+  const messagesInNodes = messages.filter((m) => m.nodeId && nodeIds.has(m.nodeId))
 
   // Group messages by node
   const messagesByNode = new Map<string, Message[]>()
-  messagesInNodes.forEach(msg => {
+  messagesInNodes.forEach((msg) => {
     if (!msg.nodeId) return
     if (!messagesByNode.has(msg.nodeId)) {
       messagesByNode.set(msg.nodeId, [])
@@ -230,10 +228,9 @@ export function getMessagesInStoryOrder(
         }
       }
       break
-    } else {
-      // For other nodes, include all messages
-      result.push(...nodeMessages)
     }
+    // For other nodes, include all messages
+    result.push(...nodeMessages)
   }
 
   return result
@@ -253,8 +250,8 @@ export function getMessagesInStoryOrder(
 export function calculateActivePath(
   messages: Message[],
   nodes: Node[],
-  branchChoices: Record<string, string>
-): { activeMessageIds: Set<string>, activeNodeIds: Set<string> } {
+  branchChoices: Record<string, string>,
+): { activeMessageIds: Set<string>; activeNodeIds: Set<string> } {
   const activeMessageIds = new Set<string>()
   const activeNodeIds = new Set<string>()
 
@@ -267,7 +264,7 @@ export function calculateActivePath(
 
   // Build a map of messages by node for quick lookup
   const messagesByNode = new Map<string, Message[]>()
-  messages.forEach(msg => {
+  messages.forEach((msg) => {
     if (!msg.nodeId) return
     if (!messagesByNode.has(msg.nodeId)) {
       messagesByNode.set(msg.nodeId, [])
@@ -290,7 +287,7 @@ export function calculateActivePath(
   console.log('[calculateActivePath] Starting path calculation', {
     totalNodes: nodesInOrder.length,
     totalMessages: messages.length,
-    branchChoices
+    branchChoices,
   })
 
   // Walk through the story in order
@@ -332,7 +329,7 @@ export function calculateActivePath(
         }
 
         // Find the selected option
-        const selectedOption = message.options.find(opt => opt.id === selectedOptionId)
+        const selectedOption = message.options.find((opt) => opt.id === selectedOptionId)
 
         if (!selectedOption) {
           console.warn('[calculateActivePath] Selected option not found:', selectedOptionId, 'in branch:', message.id)
@@ -341,9 +338,9 @@ export function calculateActivePath(
         }
 
         // Jump to the target of the branch
-        const targetNodeIndex = nodesInOrder.findIndex(n => n.id === selectedOption.targetNodeId)
+        const targetNodeIndex = nodesInOrder.findIndex((n) => n.id === selectedOption.targetNodeId)
         const targetNodeMessages = messagesByNode.get(selectedOption.targetNodeId) || []
-        const targetMessageIndex = targetNodeMessages.findIndex(m => m.id === selectedOption.targetMessageId)
+        const targetMessageIndex = targetNodeMessages.findIndex((m) => m.id === selectedOption.targetMessageId)
 
         if (targetNodeIndex === -1) {
           console.warn('[calculateActivePath] Branch target node not found:', selectedOption.targetNodeId)
@@ -376,7 +373,7 @@ export function calculateActivePath(
 
   console.log('[calculateActivePath] Finished path calculation', {
     activeMessages: activeMessageIds.size,
-    activeNodes: activeNodeIds.size
+    activeNodes: activeNodeIds.size,
   })
 
   return { activeMessageIds, activeNodeIds }
@@ -390,7 +387,7 @@ export function getAllNodesInStoryOrder(nodes: Node[]): Node[] {
 
   // Build a map of parent to children
   const childrenMap = new Map<string | null, Node[]>()
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     const parentId = node.parentId || null
     if (!childrenMap.has(parentId)) {
       childrenMap.set(parentId, [])
@@ -425,9 +422,9 @@ export function findNextMessageInPath(
   currentMessageId: string,
   messages: Message[],
   nodes: Node[],
-  branchChoices: Record<string, string>
+  branchChoices: Record<string, string>,
 ): string | null {
-  const currentMessage = messages.find(m => m.id === currentMessageId)
+  const currentMessage = messages.find((m) => m.id === currentMessageId)
   if (!currentMessage || !currentMessage.nodeId) return null
 
   // If current message is a branch, follow the selected option
@@ -439,7 +436,7 @@ export function findNextMessageInPath(
       return null
     }
 
-    const selectedOption = currentMessage.options.find(opt => opt.id === selectedOptionId)
+    const selectedOption = currentMessage.options.find((opt) => opt.id === selectedOptionId)
     if (!selectedOption) {
       // Invalid option - no next message
       return null
@@ -450,11 +447,9 @@ export function findNextMessageInPath(
   }
 
   // Get all messages in the current node, sorted by order
-  const nodeMessages = messages
-    .filter(m => m.nodeId === currentMessage.nodeId)
-    .sort((a, b) => a.order - b.order)
+  const nodeMessages = messages.filter((m) => m.nodeId === currentMessage.nodeId).sort((a, b) => a.order - b.order)
 
-  const currentIndex = nodeMessages.findIndex(m => m.id === currentMessageId)
+  const currentIndex = nodeMessages.findIndex((m) => m.id === currentMessageId)
 
   // If there's a next message in the same node, return it
   if (currentIndex >= 0 && currentIndex < nodeMessages.length - 1) {
@@ -463,7 +458,7 @@ export function findNextMessageInPath(
 
   // Otherwise, move to the next node
   const nodesInOrder = getAllNodesInStoryOrder(nodes)
-  const currentNodeIndex = nodesInOrder.findIndex(n => n.id === currentMessage.nodeId)
+  const currentNodeIndex = nodesInOrder.findIndex((n) => n.id === currentMessage.nodeId)
 
   if (currentNodeIndex === -1) return null
 
@@ -472,9 +467,7 @@ export function findNextMessageInPath(
     const nextNode = nodesInOrder[i]
     if (nextNode.type !== 'chapter') continue
 
-    const nextNodeMessages = messages
-      .filter(m => m.nodeId === nextNode.id)
-      .sort((a, b) => a.order - b.order)
+    const nextNodeMessages = messages.filter((m) => m.nodeId === nextNode.id).sort((a, b) => a.order - b.order)
 
     if (nextNodeMessages.length > 0) {
       return nextNodeMessages[0].id
@@ -493,7 +486,7 @@ export function detectPathLoop(
   messages: Message[],
   nodes: Node[],
   branchChoices: Record<string, string>,
-  newChoice?: { branchMessageId: string, optionId: string }
+  newChoice?: { branchMessageId: string; optionId: string },
 ): boolean {
   // Create a copy of branch choices with the new choice applied
   const choicesToTest = { ...branchChoices }
@@ -509,7 +502,7 @@ export function detectPathLoop(
 
   // Build a map of messages by node
   const messagesByNode = new Map<string, Message[]>()
-  messages.forEach(msg => {
+  messages.forEach((msg) => {
     if (!msg.nodeId) return
     if (!messagesByNode.has(msg.nodeId)) {
       messagesByNode.set(msg.nodeId, [])
@@ -560,16 +553,16 @@ export function detectPathLoop(
           return false
         }
 
-        const selectedOption = message.options.find(opt => opt.id === selectedOptionId)
+        const selectedOption = message.options.find((opt) => opt.id === selectedOptionId)
         if (!selectedOption) {
           // Invalid option - path ends, no loop
           return false
         }
 
         // Jump to target
-        const targetNodeIndex = nodesInOrder.findIndex(n => n.id === selectedOption.targetNodeId)
+        const targetNodeIndex = nodesInOrder.findIndex((n) => n.id === selectedOption.targetNodeId)
         const targetNodeMessages = messagesByNode.get(selectedOption.targetNodeId) || []
-        const targetMessageIndex = targetNodeMessages.findIndex(m => m.id === selectedOption.targetMessageId)
+        const targetMessageIndex = targetNodeMessages.findIndex((m) => m.id === selectedOption.targetMessageId)
 
         if (targetNodeIndex === -1 || targetMessageIndex === -1) {
           // Invalid target - path ends, no loop
@@ -607,8 +600,8 @@ export function getPathPreview(
   optionId: string,
   messages: Message[],
   nodes: Node[],
-  currentBranchChoices: Record<string, string>
-): { activeMessageIds: Set<string>, activeNodeIds: Set<string> } {
+  currentBranchChoices: Record<string, string>,
+): { activeMessageIds: Set<string>; activeNodeIds: Set<string> } {
   // Create a copy with the new choice
   const previewChoices = { ...currentBranchChoices, [branchMessageId]: optionId }
 
@@ -619,11 +612,8 @@ export function getPathPreview(
 /**
  * Get the target message of a branch option.
  */
-export function getBranchTarget(
-  option: BranchOption,
-  messages: Message[]
-): Message | null {
-  return messages.find(m => m.id === option.targetMessageId) || null
+export function getBranchTarget(option: BranchOption, messages: Message[]): Message | null {
+  return messages.find((m) => m.id === option.targetMessageId) || null
 }
 
 /**
@@ -633,12 +623,10 @@ export function createBranchOptionToNode(
   label: string,
   targetNodeId: string,
   messages: Message[],
-  description?: string
+  description?: string,
 ): BranchOption | null {
   // Find the first message in the target node
-  const targetMessages = messages
-    .filter(m => m.nodeId === targetNodeId)
-    .sort((a, b) => a.order - b.order)
+  const targetMessages = messages.filter((m) => m.nodeId === targetNodeId).sort((a, b) => a.order - b.order)
 
   if (targetMessages.length === 0) {
     console.warn('[createBranchOptionToNode] No messages found in target node:', targetNodeId)
@@ -650,7 +638,7 @@ export function createBranchOptionToNode(
     label,
     targetNodeId,
     targetMessageId: targetMessages[0].id,
-    description
+    description,
   }
 }
 
@@ -661,13 +649,13 @@ export function createBranchOptionInChapter(
   label: string,
   targetMessageId: string,
   currentNodeId: string,
-  description?: string
+  description?: string,
 ): BranchOption {
   return {
     id: generateMessageId(),
     label,
     targetNodeId: currentNodeId,
     targetMessageId,
-    description
+    description,
   }
 }

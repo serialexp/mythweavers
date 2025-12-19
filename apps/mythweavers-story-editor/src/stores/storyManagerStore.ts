@@ -17,5 +17,5 @@ export const storyManagerStore = {
 
   toggle() {
     setShowStoryManager(!showStoryManager())
-  }
+  },
 }

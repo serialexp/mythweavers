@@ -1,6 +1,9 @@
+// @ts-expect-error virtual module id
+import * as generatedSetup from 'virtual:$histoire-generated-global-setup'
+// @ts-expect-error virtual module id
+import * as setup from 'virtual:$histoire-setup'
 import type { Story } from '@histoire/shared'
 import type { PropType as _PropType } from '@histoire/vendors/vue'
-import type { SolidStorySetupHandler } from '../helpers.js'
 import {
   defineComponent as _defineComponent,
   h as _h,
@@ -9,15 +12,12 @@ import {
   ref as _ref,
   watch as _watch,
 } from '@histoire/vendors/vue'
-// @ts-expect-error virtual module id
-import * as generatedSetup from 'virtual:$histoire-generated-global-setup'
-// @ts-expect-error virtual module id
-import * as setup from 'virtual:$histoire-setup'
-import { render } from 'solid-js/web'
-import { MountStory as MountStorySolid, MountVariant as MountVariantSolid, MountStoryWithContext } from './components'
-import { format } from 'prettier/standalone'
 import prettierBabel from 'prettier/plugins/babel'
 import prettierEstree from 'prettier/plugins/estree'
+import { format } from 'prettier/standalone'
+import { render } from 'solid-js/web'
+import type { SolidStorySetupHandler } from '../helpers.js'
+import { MountStory as MountStorySolid, MountStoryWithContext, MountVariant as MountVariantSolid } from './components'
 
 async function formatCode(code: string): Promise<string> {
   try {
@@ -69,10 +69,7 @@ async function extractVariantContent(source: string, variantTitle: string): Prom
   // Match <Hst.Variant title="Title"> or <Hst.Variant title='Title'>
   // Need to handle multiline and various formatting
   const escapedTitle = variantTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const openTagPattern = new RegExp(
-    `<Hst\\.Variant[^>]*title=["']${escapedTitle}["'][^>]*>`,
-    's'
-  )
+  const openTagPattern = new RegExp(`<Hst\\.Variant[^>]*title=["']${escapedTitle}["'][^>]*>`, 's')
 
   const match = source.match(openTagPattern)
   if (!match) return null
@@ -131,24 +128,21 @@ export default _defineComponent({
       // Extract variant source code from the story file
       await extractVariantSources(props.story)
 
-      dispose = render(
-        () => {
-          const Comp = props.story.file?.component
-          if (!Comp) return null
+      dispose = render(() => {
+        const Comp = props.story.file?.component
+        if (!Comp) return null
 
-          return (
-            <MountStoryWithContext story={props.story}>
-              <Comp
-                Hst={{
-                  Story: MountStorySolid,
-                  Variant: MountVariantSolid,
-                }}
-              />
-            </MountStoryWithContext>
-          )
-        },
-        target
-      )
+        return (
+          <MountStoryWithContext story={props.story}>
+            <Comp
+              Hst={{
+                Story: MountStorySolid,
+                Variant: MountVariantSolid,
+              }}
+            />
+          </MountStoryWithContext>
+        )
+      }, target)
 
       // Call setup functions
       if (typeof generatedSetup?.setupSolid === 'function') {
@@ -171,10 +165,13 @@ export default _defineComponent({
       }
     }
 
-    _watch(() => props.story.id, async () => {
-      unmountStory()
-      await mountStory()
-    })
+    _watch(
+      () => props.story.id,
+      async () => {
+        unmountStory()
+        await mountStory()
+      },
+    )
 
     _onMounted(async () => {
       await mountStory()

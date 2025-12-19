@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Node } from '../types/core'
 import { TreeNode } from './nodeStore'
 
@@ -8,22 +8,22 @@ vi.mock('../services/saveService', () => ({
     saveNode: vi.fn(),
     saveNodesBulk: vi.fn(),
     setCallbacks: vi.fn(),
-  }
+  },
 }))
 
 vi.mock('./currentStoryStore', () => ({
   currentStoryStore: {
     isInitialized: false,
     storageMode: 'local',
-    id: 'test-story-id'
-  }
+    id: 'test-story-id',
+  },
 }))
 
 vi.mock('./chaptersStore', () => ({
   chaptersStore: {
     selectChapter: vi.fn(),
     getSelectedChapterId: vi.fn(() => null),
-  }
+  },
 }))
 
 // Import nodeStore after mocking dependencies
@@ -38,10 +38,54 @@ describe('nodeStore', () => {
   describe('tree building', () => {
     it('should build a simple tree structure', () => {
       const nodes: Node[] = [
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch1', parentId: 'arc1', type: 'chapter', title: 'Chapter 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch2', parentId: 'arc1', type: 'chapter', title: 'Chapter 2', order: 1, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch1',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch2',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 2',
+          order: 1,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)
@@ -58,10 +102,54 @@ describe('nodeStore', () => {
 
     it('should handle multiple books', () => {
       const nodes: Node[] = [
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'book2', parentId: null, type: 'book', title: 'Book 2', order: 1, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc2', parentId: 'book2', type: 'arc', title: 'Arc 2', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'book2',
+          parentId: null,
+          type: 'book',
+          title: 'Book 2',
+          order: 1,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc2',
+          parentId: 'book2',
+          type: 'arc',
+          title: 'Arc 2',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)
@@ -76,11 +164,66 @@ describe('nodeStore', () => {
 
     it('should sort nodes by order', () => {
       const nodes: Node[] = [
-        { id: 'ch3', parentId: 'arc1', type: 'chapter', title: 'Chapter 3', order: 2, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch1', parentId: 'arc1', type: 'chapter', title: 'Chapter 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch2', parentId: 'arc1', type: 'chapter', title: 'Chapter 2', order: 1, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'ch3',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 3',
+          order: 2,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch1',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch2',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 2',
+          order: 1,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)
@@ -96,9 +239,42 @@ describe('nodeStore', () => {
   describe('node selection', () => {
     it('should select a node and auto-expand ancestors', () => {
       const nodes: Node[] = [
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: false, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: false, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch1', parentId: 'arc1', type: 'chapter', title: 'Chapter 1', order: 0, storyId: 'story1', expanded: false, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: false,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: false,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch1',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: false,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)
@@ -122,10 +298,54 @@ describe('nodeStore', () => {
   describe('insertNodeBefore', () => {
     it('should insert a node before another and reorder siblings', () => {
       const nodes: Node[] = [
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc2', parentId: 'book1', type: 'arc', title: 'Arc 2', order: 1, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc3', parentId: 'book1', type: 'arc', title: 'Arc 3', order: 2, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc2',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 2',
+          order: 1,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc3',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 3',
+          order: 2,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)
@@ -154,9 +374,42 @@ describe('nodeStore', () => {
 
     it('should insert at the beginning when inserting before first node', () => {
       const nodes: Node[] = [
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc2', parentId: 'book1', type: 'arc', title: 'Arc 2', order: 1, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc2',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 2',
+          order: 1,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)
@@ -177,8 +430,30 @@ describe('nodeStore', () => {
   describe('getNode', () => {
     it('should retrieve a node by ID', () => {
       const nodes: Node[] = [
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)
@@ -199,12 +474,78 @@ describe('nodeStore', () => {
   describe('node hierarchy and ordering', () => {
     it('should determine correct tree order for message filtering', () => {
       const nodes: Node[] = [
-        { id: 'book1', parentId: null, type: 'book', title: 'Book 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc1', parentId: 'book1', type: 'arc', title: 'Arc 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'arc2', parentId: 'book1', type: 'arc', title: 'Arc 2', order: 1, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch1', parentId: 'arc1', type: 'chapter', title: 'Chapter 1', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch2', parentId: 'arc1', type: 'chapter', title: 'Chapter 2', order: 1, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'ch3', parentId: 'arc2', type: 'chapter', title: 'Chapter 3', order: 0, storyId: 'story1', expanded: true, isOpen: false, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'book1',
+          parentId: null,
+          type: 'book',
+          title: 'Book 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc1',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'arc2',
+          parentId: 'book1',
+          type: 'arc',
+          title: 'Arc 2',
+          order: 1,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch1',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 1',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch2',
+          parentId: 'arc1',
+          type: 'chapter',
+          title: 'Chapter 2',
+          order: 1,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'ch3',
+          parentId: 'arc2',
+          type: 'chapter',
+          title: 'Chapter 3',
+          order: 0,
+          storyId: 'story1',
+          expanded: true,
+          isOpen: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ]
 
       nodeStore.setNodes(nodes)

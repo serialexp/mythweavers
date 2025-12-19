@@ -1,8 +1,8 @@
-import { style, keyframes } from '@vanilla-extract/css'
-import { recipe, type RecipeVariants } from '@vanilla-extract/recipes'
+import { keyframes, style } from '@vanilla-extract/css'
+import { type RecipeVariants, recipe } from '@vanilla-extract/recipes'
 import { tokens } from '../../theme/tokens.css'
 
-const scaleUp = keyframes({
+const _scaleUp = keyframes({
   '0%': { transform: 'scale(1)' },
   '100%': { transform: 'scale(1.1)' },
 })
@@ -119,11 +119,28 @@ export const iconButton = recipe({
         fontSize: tokens.font.size.lg,
       },
     },
+
+    active: {
+      true: {
+        color: tokens.color.text.inverse,
+        backgroundColor: tokens.color.accent.primary,
+        borderColor: tokens.color.accent.primary,
+        selectors: {
+          '&:hover:not(:disabled)': {
+            backgroundColor: tokens.color.accent.primaryHover,
+          },
+          '&:active:not(:disabled)': {
+            backgroundColor: tokens.color.accent.primaryActive,
+          },
+        },
+      },
+    },
   },
 
   defaultVariants: {
     variant: 'ghost',
     size: 'md',
+    active: false,
   },
 })
 

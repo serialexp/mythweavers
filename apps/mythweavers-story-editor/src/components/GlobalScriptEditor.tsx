@@ -1,7 +1,7 @@
-import { createSignal, Show } from 'solid-js'
+import { Alert, Button, Card, CardBody, Modal, Stack } from '@mythweavers/ui'
+import { Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { CodeEditor } from './CodeEditor'
-import styles from './GlobalScriptEditor.module.css'
 
 const DEFAULT_GLOBAL_SCRIPT = `(data) => {
   // Initialize story-wide variables here
@@ -68,10 +68,10 @@ const DEFAULT_GLOBAL_SCRIPT = `(data) => {
   };
   
   // For backward compatibility, you can still return just data
-}`;
+}`
 
 interface GlobalScriptEditorProps {
-  compact?: boolean;
+  compact?: boolean
 }
 
 export function GlobalScriptEditor(props: GlobalScriptEditorProps) {
@@ -121,95 +121,109 @@ export function GlobalScriptEditor(props: GlobalScriptEditorProps) {
     setIsEditing(true)
   }
 
-
   return (
     <>
       <Show when={props.compact}>
-        <button onClick={handleStartEditing} class={styles.compactEditButton}>
+        <Button variant="secondary" size="sm" onClick={handleStartEditing}>
           {currentStoryStore.globalScript ? 'Edit' : 'Add'} Script
-        </button>
-      </Show>
-      
-      <Show when={!props.compact}>
-        <div class={styles.container}>
-          <Show when={!isEditing()}>
-        <div class={styles.header}>
-          <h3>Global Script</h3>
-          <button onClick={handleStartEditing} class={styles.editButton}>
-            {currentStoryStore.globalScript ? 'Edit' : 'Add'} Script
-          </button>
-        </div>
-        <Show when={currentStoryStore.globalScript}>
-          <div class={styles.scriptPreview}>
-            <CodeEditor
-              value={currentStoryStore.globalScript || ''}
-              onChange={() => {}}
-              readOnly={true}
-              height="200px"
-            />
-          </div>
-        </Show>
+        </Button>
       </Show>
 
-          <Show when={isEditing()}>
-            <div class={styles.editor}>
-              <h3>Edit Global Script</h3>
-              <p class={styles.help}>
-                This script runs before every message script. It should be a function that takes a data object and returns it.
-              </p>
-              <CodeEditor
-                value={scriptContent()}
-                onChange={(value) => {
-                  setScriptContent(value)
-                  validateScript(value)
+      <Show when={!props.compact}>
+        <Card style={{ margin: '1rem 0' }}>
+          <CardBody>
+            <Show when={!isEditing()}>
+              <div
+                style={{
+                  display: 'flex',
+                  'justify-content': 'space-between',
+                  'align-items': 'center',
+                  'margin-bottom': '0.5rem',
                 }}
-                error={error()}
-                height="300px"
-              />
-              <Show when={error()}>
-                <div class={styles.error}>{error()}</div>
-              </Show>
-              <div class={styles.actions}>
-                <button onClick={handleSave} class={styles.saveButton}>Save</button>
-                <button onClick={handleCancel} class={styles.cancelButton}>Cancel</button>
+              >
+                <h3 style={{ margin: 0, 'font-size': '1.1rem', color: 'var(--text-primary)' }}>Global Script</h3>
+                <Button variant="primary" size="sm" onClick={handleStartEditing}>
+                  {currentStoryStore.globalScript ? 'Edit' : 'Add'} Script
+                </Button>
               </div>
-            </div>
-          </Show>
-        </div>
+              <Show when={currentStoryStore.globalScript}>
+                <div
+                  style={{ 'border-radius': '4px', overflow: 'hidden', 'max-height': '200px', 'overflow-y': 'auto' }}
+                >
+                  <CodeEditor
+                    value={currentStoryStore.globalScript || ''}
+                    onChange={() => {}}
+                    readOnly={true}
+                    height="200px"
+                  />
+                </div>
+              </Show>
+            </Show>
+
+            <Show when={isEditing()}>
+              <Stack gap="md">
+                <h3 style={{ margin: 0, 'font-size': '1.1rem', color: 'var(--text-primary)' }}>Edit Global Script</h3>
+                <p style={{ margin: 0, 'font-size': '0.9rem', color: 'var(--text-secondary)' }}>
+                  This script runs before every message script. It should be a function that takes a data object and
+                  returns it.
+                </p>
+                <CodeEditor
+                  value={scriptContent()}
+                  onChange={(value) => {
+                    setScriptContent(value)
+                    validateScript(value)
+                  }}
+                  error={error()}
+                  height="300px"
+                />
+                <Show when={error()}>
+                  <Alert variant="error">{error()}</Alert>
+                </Show>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Button variant="primary" onClick={handleSave}>
+                    Save
+                  </Button>
+                  <Button variant="secondary" onClick={handleCancel}>
+                    Cancel
+                  </Button>
+                </div>
+              </Stack>
+            </Show>
+          </CardBody>
+        </Card>
       </Show>
-      
+
       {/* Modal for compact mode */}
-      <Show when={props.compact && isEditing()}>
-        <div class="modal-overlay" onClick={handleCancel}>
-          <div class="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div class="modal-header">
-              <h3>Edit Global Script</h3>
-              <button class="modal-close" onClick={handleCancel}>×</button>
+      <Modal open={!!props.compact && isEditing()} onClose={handleCancel} title="Edit Global Script" size="xl">
+        <div style={{ padding: '1rem' }}>
+          <Stack gap="md">
+            <p style={{ margin: 0, 'font-size': '0.9rem', color: 'var(--text-secondary)' }}>
+              This script runs before every message script. It should be a function that takes a data object and returns
+              it.
+            </p>
+            <CodeEditor
+              value={scriptContent()}
+              onChange={(value) => {
+                setScriptContent(value)
+                validateScript(value)
+              }}
+              error={error()}
+              height="300px"
+            />
+            <Show when={error()}>
+              <Alert variant="error">{error()}</Alert>
+            </Show>
+            <div style={{ display: 'flex', gap: '0.5rem', 'justify-content': 'flex-end' }}>
+              <Button variant="ghost" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleSave}>
+                Save
+              </Button>
             </div>
-            <div class="modal-body">
-              <p class={styles.help}>
-                This script runs before every message script. It should be a function that takes a data object and returns it.
-              </p>
-              <CodeEditor
-                value={scriptContent()}
-                onChange={(value) => {
-                  setScriptContent(value)
-                  validateScript(value)
-                }}
-                error={error()}
-                height="300px"
-              />
-              <Show when={error()}>
-                <div class={styles.error}>{error()}</div>
-              </Show>
-              <div class={styles.actions}>
-                <button onClick={handleSave} class={styles.saveButton}>Save</button>
-                <button onClick={handleCancel} class={styles.cancelButton}>Cancel</button>
-              </div>
-            </div>
-          </div>
+          </Stack>
         </div>
-      </Show>
+      </Modal>
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { style, keyframes } from '@vanilla-extract/css'
+import { keyframes, style } from '@vanilla-extract/css'
 import { tokens } from '../../theme/tokens.css'
 
 const fadeIn = keyframes({
@@ -9,6 +9,12 @@ const fadeIn = keyframes({
 export const container = style({
   position: 'relative',
   display: 'inline-block',
+})
+
+// When using portal mode, use display:contents so the container
+// doesn't affect layout (allows buttons to be true siblings in ButtonGroup)
+export const containerPortal = style({
+  display: 'contents',
 })
 
 export const menu = style({
@@ -64,6 +70,21 @@ export const item = style({
       backgroundColor: 'transparent',
     },
   },
+})
+
+export const itemActive = style({
+  backgroundColor: tokens.color.surface.hover,
+})
+
+export const itemLabel = style({
+  flex: 1,
+})
+
+export const checkmark = style({
+  width: '16px',
+  height: '16px',
+  flexShrink: 0,
+  color: tokens.color.semantic.success,
 })
 
 export const itemDanger = style({

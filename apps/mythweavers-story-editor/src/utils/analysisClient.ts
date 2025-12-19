@@ -16,12 +16,12 @@ export const generateAnalysis = async (prompt: string): Promise<string> => {
   if (provider === 'ollama') {
     const client = createOllamaClient()
     return generateWithClient(client, prompt, model)
-  } else if (provider === 'openrouter') {
+  }
+  if (provider === 'openrouter') {
     const client = createOpenRouterClient()
     return generateWithClient(client, prompt, model)
-  } else {
-    throw new Error('Unknown provider')
   }
+  throw new Error('Unknown provider')
 }
 
 /**
@@ -39,7 +39,7 @@ interface AnalysisClient {
       top_p: number
       stop: string[]
     }
-  }): AsyncIterable<{response?: string}>
+  }): AsyncIterable<{ response?: string }>
 }
 
 async function generateWithClient(client: AnalysisClient, prompt: string, model: string): Promise<string> {
@@ -53,8 +53,8 @@ async function generateWithClient(client: AnalysisClient, prompt: string, model:
       num_ctx: 4096, // Smaller context for analysis tasks
       temperature: 0.3, // Lower temperature for more consistent analysis
       top_p: 0.9,
-      stop: [] // Let it finish naturally
-    }
+      stop: [], // Let it finish naturally
+    },
   })
 
   // Collect the streamed response

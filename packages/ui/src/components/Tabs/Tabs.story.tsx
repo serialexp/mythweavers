@@ -1,5 +1,5 @@
-import { Tabs, TabList, Tab, TabPanel } from './Tabs'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Tab, TabList, TabPanel, Tabs } from './Tabs'
 
 const UserIcon = () => (
   <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -73,9 +73,15 @@ export default (props: { Hst: any }) => {
         <ThemeComparison>
           <Tabs defaultTab="profile">
             <TabList aria-label="Settings tabs">
-              <Tab id="profile" icon={<UserIcon />}>Profile</Tab>
-              <Tab id="settings" icon={<SettingsIcon />}>Settings</Tab>
-              <Tab id="notifications" icon={<BellIcon />}>Notifications</Tab>
+              <Tab id="profile" icon={<UserIcon />}>
+                Profile
+              </Tab>
+              <Tab id="settings" icon={<SettingsIcon />}>
+                Settings
+              </Tab>
+              <Tab id="notifications" icon={<BellIcon />}>
+                Notifications
+              </Tab>
             </TabList>
             <TabPanel id="profile">
               <p>Profile settings content.</p>
@@ -95,7 +101,9 @@ export default (props: { Hst: any }) => {
           <Tabs defaultTab="tab1">
             <TabList aria-label="Example tabs">
               <Tab id="tab1">Active</Tab>
-              <Tab id="tab2" disabled>Disabled</Tab>
+              <Tab id="tab2" disabled>
+                Disabled
+              </Tab>
               <Tab id="tab3">Another</Tab>
             </TabList>
             <TabPanel id="tab1">

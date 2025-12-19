@@ -1,4 +1,4 @@
-import { createSignal, createEffect } from 'solid-js'
+import { createEffect, createSignal } from 'solid-js'
 
 // Initialize from localStorage, default to collapsed on mobile
 const savedState = localStorage.getItem('headerCollapsed')
@@ -15,5 +15,5 @@ createEffect(() => {
 export const headerStore = {
   isCollapsed: isHeaderCollapsed,
   setCollapsed: setIsHeaderCollapsed,
-  toggle: () => setIsHeaderCollapsed(!isHeaderCollapsed()),
+  toggle: () => setIsHeaderCollapsed((prev) => !prev),
 }

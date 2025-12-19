@@ -1,6 +1,5 @@
-import { Component, Show, For } from 'solid-js'
-import { BsX } from 'solid-icons/bs'
-import styles from './ContextPreviewModal.module.css'
+import { Badge, Modal, Stack } from '@mythweavers/ui'
+import { Component, For, Show } from 'solid-js'
 
 interface ContextMessage {
   role: 'system' | 'user' | 'assistant'
@@ -31,46 +30,51 @@ export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) 
   }
 
   return (
-    <Show when={props.show && props.data}>
-      <div class={styles.overlay}>
-        <div class={styles.modal}>
-          <div class={styles.header}>
-            <h2>Context Preview - {props.data?.type}</h2>
-            <button
-              onClick={props.onClose}
-              class={styles.closeButton}
-              title="Close"
-            >
-              <BsX />
-            </button>
-          </div>
-          <div class={styles.content}>
-            <For each={props.data?.messages}>
-              {(msg, index) => (
-                <div class={styles.section}>
-                  <div class={styles.messageHeader}>
-                    <h3>
-                      {msg.role === 'system' ? 'System' : 
-                       msg.role === 'user' ? 'User' : 
-                       'Assistant'} Message {index() + 1}
-                    </h3>
-                    <Show when={msg.cache_control}>
-                      <span class={styles.cacheIndicator} title={`Cache TTL: ${msg.cache_control?.ttl || '5m'}`}>
-                        🔒 Cached
-                      </span>
-                    </Show>
-                  </div>
-                  <pre class={styles.text}>
-                    {msg.content.length > 50000
-                      ? msg.content.substring(0, 50000) + '\n\n[Content truncated - too large to display]'
-                      : msg.content}
-                  </pre>
-                </div>
-              )}
-            </For>
-          </div>
-        </div>
-      </div>
-    </Show>
+    <Modal
+      open={props.show && !!props.data}
+      onClose={props.onClose}
+      title={`Context Preview - ${props.data?.type || ''}`}
+      size="xl"
+    >
+      <Stack direction="vertical" gap="lg" style={{ 'max-height': '70vh', 'overflow-y': 'auto', padding: '20px' }}>
+        <For each={props.data?.messages}>
+          {(msg, index) => (
+            <div>
+              <Stack direction="horizontal" justify="between" align="center" style={{ 'margin-bottom': '10px' }}>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)', 'font-size': '16px' }}>
+                  {msg.role === 'system' ? 'System' : msg.role === 'user' ? 'User' : 'Assistant'} Message {index() + 1}
+                </h3>
+                <Show when={msg.cache_control}>
+                  <span title={`Cache TTL: ${msg.cache_control?.ttl || '5m'}`}>
+                    <Badge variant="success">Cached</Badge>
+                  </span>
+                </Show>
+              </Stack>
+              <pre
+                style={{
+                  background: 'var(--bg-primary)',
+                  border: '1px solid var(--border-color)',
+                  'border-radius': '5px',
+                  padding: '15px',
+                  'white-space': 'pre-wrap',
+                  'word-wrap': 'break-word',
+                  'font-family': "'Courier New', monospace",
+                  'font-size': '13px',
+                  'line-height': '1.5',
+                  color: 'var(--text-secondary)',
+                  'max-height': '300px',
+                  'overflow-y': 'auto',
+                  margin: 0,
+                }}
+              >
+                {msg.content.length > 50000
+                  ? `${msg.content.substring(0, 50000)}\n\n[Content truncated - too large to display]`
+                  : msg.content}
+              </pre>
+            </div>
+          )}
+        </For>
+      </Stack>
+    </Modal>
   )
 }

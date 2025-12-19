@@ -23,7 +23,7 @@ function createNavigationStore(): NavigationStore {
       return selectedStorylineId()
     },
     setSelectedStorylineId,
-    clearStorylineFilter: () => setSelectedStorylineId(null)
+    clearStorylineFilter: () => setSelectedStorylineId(null),
   }
 }
 

@@ -1,18 +1,22 @@
 import { createStore } from 'solid-js/store'
 import { Model } from '../types/core'
-import { settingsStore } from './settingsStore'
-import { LLMClientFactory } from '../utils/llm'
 import { LLMModel } from '../types/llm'
+import { LLMClientFactory } from '../utils/llm'
+import { settingsStore } from './settingsStore'
 
 const [modelsState, setModelsState] = createStore({
   availableModels: [] as Model[],
-  isLoadingModels: false
+  isLoadingModels: false,
 })
 
 export const modelsStore = {
   // Getters
-  get availableModels() { return modelsState.availableModels },
-  get isLoadingModels() { return modelsState.isLoadingModels },
+  get availableModels() {
+    return modelsState.availableModels
+  },
+  get isLoadingModels() {
+    return modelsState.isLoadingModels
+  },
 
   // Actions
   setAvailableModels: (models: Model[]) => setModelsState('availableModels', models),
@@ -27,23 +31,23 @@ export const modelsStore = {
       const response = await client.list()
       console.log('Model response:', response)
       const llmModels: LLMModel[] = response.models || []
-      
+
       // Convert LLMModel to Model format
-      const models: Model[] = llmModels.map(llmModel => ({
+      const models: Model[] = llmModels.map((llmModel) => ({
         name: llmModel.name,
         size: llmModel.size || 0,
         digest: llmModel.digest || '',
         modified_at: llmModel.modified_at || new Date().toISOString(),
         context_length: llmModel.context_length,
         description: llmModel.description,
-        pricing: llmModel.pricing
+        pricing: llmModel.pricing,
       }))
-      
+
       setModelsState('availableModels', models)
-      
+
       // Restore saved model selection if it exists in the available models
       const savedModel = localStorage.getItem('story-model')
-      if (savedModel && models.some(model => model.name === savedModel)) {
+      if (savedModel && models.some((model) => model.name === savedModel)) {
         settingsStore.setModel(savedModel)
       } else if (models.length > 0 && !settingsStore.model) {
         // If no saved model or saved model not found, select the first available model
@@ -55,5 +59,5 @@ export const modelsStore = {
     } finally {
       setModelsState('isLoadingModels', false)
     }
-  }
+  },
 }

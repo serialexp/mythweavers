@@ -1,7 +1,7 @@
-import { tokens } from '../../theme/tokens.css'
+import type { ParentComponent } from 'solid-js'
 import { chronicleTheme } from '../../theme/chronicle.css'
 import { starlightTheme } from '../../theme/starlight.css'
-import type { ParentComponent } from 'solid-js'
+import { tokens } from '../../theme/tokens.css'
 
 const ColorSwatch = (props: { name: string; color: string }) => (
   <div style={{ display: 'flex', 'align-items': 'center', gap: '0.75rem' }}>
@@ -22,19 +22,19 @@ const ColorSwatch = (props: { name: string; color: string }) => (
 
 const ColorGroup = (props: { title: string; children: any }) => (
   <div style={{ 'margin-bottom': '1.5rem' }}>
-    <h3 style={{
-      margin: '0 0 0.75rem 0',
-      'font-size': '14px',
-      'font-weight': '600',
-      'text-transform': 'uppercase',
-      'letter-spacing': '0.05em',
-      opacity: 0.7,
-    }}>
+    <h3
+      style={{
+        margin: '0 0 0.75rem 0',
+        'font-size': '14px',
+        'font-weight': '600',
+        'text-transform': 'uppercase',
+        'letter-spacing': '0.05em',
+        opacity: 0.7,
+      }}
+    >
       {props.title}
     </h3>
-    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem' }}>
-      {props.children}
-    </div>
+    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem' }}>{props.children}</div>
   </div>
 )
 
@@ -49,9 +49,7 @@ const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => 
       'min-width': '280px',
     }}
   >
-    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>
-      {props.name}
-    </h2>
+    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>{props.name}</h2>
     {props.children}
   </div>
 )

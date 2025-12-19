@@ -16,16 +16,9 @@ export function HstSolid(): Plugin {
       }
     },
 
-    config() {
-      return {
-        vite: {
-          // Ensure solid-js resolves to client bundle, not server
-          resolve: {
-            conditions: ['development', 'browser'],
-          },
-        },
-      }
-    },
+    // Note: We don't set browser conditions here anymore because it breaks SSR
+    // during story collection. The preview phase runs in an actual browser
+    // so it doesn't need the condition override.
 
     supportPlugin: {
       id: 'solid',

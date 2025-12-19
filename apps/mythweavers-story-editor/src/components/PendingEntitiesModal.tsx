@@ -1,18 +1,19 @@
-import { Component, For, Show } from 'solid-js'
-import { pendingEntitiesStore } from '../stores/pendingEntitiesStore'
+import { Button, Card, CardBody, Input, Modal, Stack, Textarea } from '@mythweavers/ui'
+import { BsCheck, BsGeoAltFill, BsPersonFill, BsTagFill } from 'solid-icons/bs'
+import { Component, For } from 'solid-js'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
-import { BsX, BsCheck, BsPersonFill, BsGeoAltFill, BsTagFill } from 'solid-icons/bs'
+import { pendingEntitiesStore } from '../stores/pendingEntitiesStore'
 
 export const PendingEntitiesModal: Component = () => {
   const handleApprove = (batchId: string) => {
-    const batch = pendingEntitiesStore.batches.find(b => b.id === batchId)
+    const batch = pendingEntitiesStore.batches.find((b) => b.id === batchId)
     if (!batch) return
 
-    const selectedEntities = batch.entities.filter(e => e.isSelected)
-    
+    const selectedEntities = batch.entities.filter((e) => e.isSelected)
+
     // Add approved entities to their respective stores
-    selectedEntities.forEach(entity => {
+    selectedEntities.forEach((entity) => {
       if (entity.type === 'character') {
         charactersStore.addCharacter({
           id: crypto.randomUUID(),
@@ -26,12 +27,11 @@ export const PendingEntitiesModal: Component = () => {
           name: entity.name,
           description: entity.description,
           type: entity.type as 'theme' | 'location',
-          isGlobal: false  // Default new context items to not global
+          isGlobal: false,
         })
       }
     })
 
-    // Remove the batch
     pendingEntitiesStore.removeBatch(batchId)
   }
 
@@ -40,8 +40,8 @@ export const PendingEntitiesModal: Component = () => {
   }
 
   const handleToggleEntity = (batchId: string, entityId: string) => {
-    const batch = pendingEntitiesStore.batches.find(b => b.id === batchId)
-    const entity = batch?.entities.find(e => e.id === entityId)
+    const batch = pendingEntitiesStore.batches.find((b) => b.id === batchId)
+    const entity = batch?.entities.find((e) => e.id === entityId)
     if (entity) {
       pendingEntitiesStore.updateEntity(batchId, entityId, { isSelected: !entity.isSelected })
     }
@@ -57,94 +57,100 @@ export const PendingEntitiesModal: Component = () => {
 
   const getEntityIcon = (type: string) => {
     switch (type) {
-      case 'character': return <BsPersonFill />
-      case 'location': return <BsGeoAltFill />
-      case 'theme': return <BsTagFill />
-      default: return <BsTagFill />
+      case 'character':
+        return <BsPersonFill />
+      case 'location':
+        return <BsGeoAltFill />
+      case 'theme':
+        return <BsTagFill />
+      default:
+        return <BsTagFill />
     }
   }
 
   return (
-    <Show when={pendingEntitiesStore.isVisible && pendingEntitiesStore.hasPendingEntities}>
-      <div class="pending-entities-overlay">
-        <div class="pending-entities-modal">
-          <div class="pending-entities-header">
-            <h3>New Entities Discovered</h3>
-            <button 
-              class="close-button"
-              onClick={() => pendingEntitiesStore.setVisible(false)}
-            >
-              <BsX />
-            </button>
-          </div>
+    <Modal
+      open={pendingEntitiesStore.isVisible && pendingEntitiesStore.hasPendingEntities}
+      onClose={() => pendingEntitiesStore.setVisible(false)}
+      title="New Entities Discovered"
+      size="lg"
+    >
+      <Stack direction="vertical" gap="lg" style={{ padding: '1rem' }}>
+        <For each={pendingEntitiesStore.batches}>
+          {(batch) => (
+            <div>
+              <div style={{ 'margin-bottom': '1rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>From latest story segment</h4>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
+                  Select which entities to add to your story:
+                </p>
+              </div>
 
-          <div class="pending-entities-content">
-            <For each={pendingEntitiesStore.batches}>
-              {(batch) => (
-                <div class="entity-batch">
-                  <div class="batch-header">
-                    <h4>From latest story segment</h4>
-                    <p>Select which entities to add to your story:</p>
-                  </div>
-
-                  <div class="entity-list">
-                    <For each={batch.entities}>
-                      {(entity) => (
-                        <div class={`entity-item ${entity.isSelected ? 'selected' : ''}`}>
-                          <div class="entity-header">
-                            <label class="entity-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={entity.isSelected}
-                                onChange={() => handleToggleEntity(batch.id, entity.id)}
-                              />
-                              <span class="entity-icon">
-                                {getEntityIcon(entity.type)}
-                              </span>
-                              <input
-                                type="text"
-                                class="entity-name-input"
-                                value={entity.name}
-                                onInput={(e) => handleUpdateName(batch.id, entity.id, e.currentTarget.value)}
-                                placeholder="Entity name"
-                              />
-                              <span class="entity-type">({entity.type})</span>
-                            </label>
-                          </div>
-                          <div class="entity-description">
-                            <textarea
-                              class="entity-description-input"
-                              value={entity.description}
-                              onInput={(e) => handleUpdateDescription(batch.id, entity.id, e.currentTarget.value)}
-                              placeholder="Entity description"
-                              rows={3}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-
-                  <div class="batch-actions">
-                    <button
-                      class="reject-button"
-                      onClick={() => handleReject(batch.id)}
+              <Stack direction="vertical" gap="sm" style={{ 'margin-bottom': '1rem' }}>
+                <For each={batch.entities}>
+                  {(entity) => (
+                    <Card
+                      variant="outlined"
+                      style={{
+                        'border-color': entity.isSelected ? 'var(--accent-color)' : 'var(--border-color)',
+                        background: entity.isSelected ? 'var(--accent-bg)' : undefined,
+                      }}
                     >
-                      Skip All
-                    </button>
-                    <button
-                      class="approve-button"
-                      onClick={() => handleApprove(batch.id)}
-                    >
-                      <BsCheck /> Add Selected
-                    </button>
-                  </div>
-                </div>
-              )}
-            </For>
-          </div>
-        </div>
-      </div>
-    </Show>
+                      <CardBody padding="sm" gap="sm">
+                        <label
+                          style={{
+                            display: 'flex',
+                            'align-items': 'center',
+                            gap: '0.5rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={entity.isSelected}
+                            onChange={() => handleToggleEntity(batch.id, entity.id)}
+                          />
+                          <span style={{ color: 'var(--accent-color)', 'font-size': '1.1rem' }}>
+                            {getEntityIcon(entity.type)}
+                          </span>
+                          <Input
+                            value={entity.name}
+                            onInput={(e) => handleUpdateName(batch.id, entity.id, e.currentTarget.value)}
+                            placeholder="Entity name"
+                            size="sm"
+                            style={{ 'min-width': '150px', 'font-weight': '500' }}
+                          />
+                          <span
+                            style={{ color: 'var(--text-secondary)', 'font-size': '0.9rem', 'font-style': 'italic' }}
+                          >
+                            ({entity.type})
+                          </span>
+                        </label>
+                        <Textarea
+                          value={entity.description}
+                          onInput={(e) => handleUpdateDescription(batch.id, entity.id, e.currentTarget.value)}
+                          placeholder="Entity description"
+                          rows={3}
+                          size="sm"
+                        />
+                      </CardBody>
+                    </Card>
+                  )}
+                </For>
+              </Stack>
+
+              <Stack direction="horizontal" gap="sm" justify="end">
+                <Button variant="ghost" onClick={() => handleReject(batch.id)}>
+                  Skip All
+                </Button>
+                <Button onClick={() => handleApprove(batch.id)}>
+                  <BsCheck /> Add Selected
+                </Button>
+              </Stack>
+            </div>
+          )}
+        </For>
+      </Stack>
+    </Modal>
   )
 }

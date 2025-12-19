@@ -1,4 +1,4 @@
-import type { Paragraph } from '@story/shared'
+import type { Paragraph } from '@mythweavers/shared'
 
 /**
  * Character data needed by the editor
@@ -106,15 +106,32 @@ export interface SceneEditorProps {
   /** Callback to update selected paragraph */
   onSelectedParagraphChange: (paragraphId: string) => void
 
+  /** Callback when viewpoint character changes */
+  onViewpointChange?: (characterId: string | null) => void
+
+  /** Callback when active characters change */
+  onActiveCharactersChange?: (characterIds: string[]) => void
+
+  /** Callback when scene goal changes */
+  onGoalChange?: (goal: string | null) => void
+
   /** Callback to split scene at a paragraph */
   onSceneSplit?: (paragraphId: string) => void
 
-  /** Callback for AI assistance */
-  onAiRequest: (
-    type: AiHelpType,
-    paragraphId: string,
-    customInstructions?: string
-  ) => Promise<string | null>
+  /** Callback for AI help */
+  onAiHelp?: () => Promise<void>
+
+  /** Callback for AI rewrite */
+  onAiRewrite?: () => Promise<void>
+
+  /** Callback for AI translate */
+  onAiTranslate?: () => Promise<void>
+
+  /** Callback for AI generate between */
+  onAiBetween?: () => Promise<void>
+
+  /** Callback for AI assistance (legacy) */
+  onAiRequest?: (type: AiHelpType, paragraphId: string, customInstructions?: string) => Promise<string | null>
 
   /** Callback when generate between text is saved to UI state */
   onGenerateBetweenTextSave?: (text: string) => void

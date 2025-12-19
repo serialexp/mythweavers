@@ -37,7 +37,7 @@ export function getDisplayMessages(): Message[] {
   }
 
   // Filter messages based on selected node type
-  const filteredMessages = allMessages.filter(msg => {
+  const filteredMessages = allMessages.filter((msg) => {
     // For scenes: filter by sceneId
     if (selectedNode.type === 'scene') {
       return msg.sceneId === selectedNode.id
@@ -60,14 +60,23 @@ export function getDisplayMessages(): Message[] {
   // Sort messages by their order within the node
   const sortedMessages = filteredMessages.sort((a, b) => a.order - b.order)
 
-  console.log('[getDisplayMessages] Filtered messages for node', selectedNode.id, ':', sortedMessages.length, 'messages')
+  console.log(
+    '[getDisplayMessages] Filtered messages for node',
+    selectedNode.id,
+    ':',
+    sortedMessages.length,
+    'messages',
+  )
 
-  console.log('[getDisplayMessages] First few message IDs:', sortedMessages.slice(0, 3).map(m => ({
-    id: m.id,
-    nodeId: m.nodeId,
-    chapterId: m.chapterId,
-    order: m.order
-  })))
+  console.log(
+    '[getDisplayMessages] First few message IDs:',
+    sortedMessages.slice(0, 3).map((m) => ({
+      id: m.id,
+      nodeId: m.nodeId,
+      chapterId: m.chapterId,
+      order: m.order,
+    })),
+  )
 
   return sortedMessages
 }

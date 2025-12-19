@@ -1,8 +1,8 @@
-import { createSignal, For } from 'solid-js'
-import { Toast, ToastContainer } from './Toast'
-import { Button } from '../Button'
+import { For, createSignal } from 'solid-js'
 import { chronicleTheme } from '../../theme/chronicle.css'
 import { starlightTheme } from '../../theme/starlight.css'
+import { Button } from '../Button'
+import { Toast, ToastContainer } from './Toast'
 
 // Demo wrapper with toast state
 const ToastDemo = (props: { theme: string; themeName: string }) => {
@@ -30,20 +30,34 @@ const ToastDemo = (props: { theme: string; themeName: string }) => {
         position: 'relative',
       }}
     >
-      <div style={{ 'font-size': '12px', opacity: 0.7, 'margin-bottom': '1rem' }}>
-        {props.themeName}
-      </div>
+      <div style={{ 'font-size': '12px', opacity: 0.7, 'margin-bottom': '1rem' }}>{props.themeName}</div>
       <div style={{ display: 'flex', gap: '0.5rem', 'flex-wrap': 'wrap' }}>
-        <Button size="sm" variant="secondary" onClick={() => addToast('default', undefined, 'This is a default toast message.')}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => addToast('default', undefined, 'This is a default toast message.')}
+        >
           Default
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => addToast('success', 'Success!', 'Your changes have been saved.')}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => addToast('success', 'Success!', 'Your changes have been saved.')}
+        >
           Success
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => addToast('warning', 'Warning', 'Please review your input.')}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => addToast('warning', 'Warning', 'Please review your input.')}
+        >
           Warning
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => addToast('error', 'Error', 'Something went wrong. Please try again.')}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => addToast('error', 'Error', 'Something went wrong. Please try again.')}
+        >
           Error
         </Button>
         <Button size="sm" variant="secondary" onClick={() => addToast('info', 'Info', 'A new update is available.')}>
@@ -82,19 +96,34 @@ export default (props: { Hst: any }) => {
 
       <Hst.Variant title="Static Examples">
         <div style={{ display: 'flex', 'flex-direction': 'column', gap: '1rem', 'max-width': '400px' }}>
-          <div class={chronicleTheme} style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}>
+          <div
+            class={chronicleTheme}
+            style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}
+          >
             <Toast variant="default" message="This is a default toast." />
           </div>
-          <div class={chronicleTheme} style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}>
+          <div
+            class={chronicleTheme}
+            style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}
+          >
             <Toast variant="success" title="Success!" message="Your changes have been saved." />
           </div>
-          <div class={chronicleTheme} style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}>
+          <div
+            class={chronicleTheme}
+            style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}
+          >
             <Toast variant="warning" title="Warning" message="Please review your input." />
           </div>
-          <div class={chronicleTheme} style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}>
+          <div
+            class={chronicleTheme}
+            style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}
+          >
             <Toast variant="error" title="Error" message="Something went wrong." />
           </div>
-          <div class={chronicleTheme} style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}>
+          <div
+            class={chronicleTheme}
+            style={{ padding: '1rem', 'border-radius': '8px', 'background-color': 'var(--color-bg-base)' }}
+          >
             <Toast variant="info" title="Info" message="A new update is available." />
           </div>
         </div>

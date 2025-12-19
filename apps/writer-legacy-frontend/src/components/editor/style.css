@@ -1,0 +1,63 @@
+.editor {
+  display: flex;
+  align-items: flex-start;
+  padding-left: 80px; /* Make space for menus */
+}
+.editor .ProseMirror {
+  padding: 1em;
+  border: 1px dotted #ccc;
+  outline: none;
+}
+.inline-menu {
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.row {
+  padding: 1em;
+}
+.row:nth-child(odd) {
+  background-color: #eee;
+}
+
+.inline-menu button {
+  background-color: #ccc;
+  border: 1px solid #aaa;
+
+  border-radius: 3px;
+}
+
+.inline-menu button.active {
+  background-color: #efefef;
+  border: 1px solid #ccc;
+}
+
+.block-menu {
+  position: absolute; /* Stick with content */
+  display: flex;
+  gap: 2px;
+  max-width: 70px;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.block-menu button {
+  background-color: #ccc;
+  border: 1px solid #aaa;
+
+  border-radius: 3px;
+}
+
+blockquote {
+  border-left: 4px solid blue;
+  margin-left: 0;
+  padding-left: 10px;
+}
+
+heading {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 1em 0;
+}

@@ -1,166 +1,166 @@
-import { createSignal, onMount, Show } from 'solid-js';
-import { useSearchParams } from '@solidjs/router';
-import { apiClient } from '../utils/apiClient';
-import styles from './ResetPassword.module.css';
+import { Alert, Button, FormField, Input, Modal, Spinner } from '@mythweavers/ui'
+import { useSearchParams } from '@solidjs/router'
+import { Show, createSignal, onMount } from 'solid-js'
+import { apiClient } from '../utils/apiClient'
 
 interface ResetPasswordProps {
-  onClose: () => void;
-  onSuccess: () => void;
+  onClose: () => void
+  onSuccess: () => void
 }
 
 export function ResetPassword(props: ResetPasswordProps) {
-  const [searchParams] = useSearchParams();
-  const [newPassword, setNewPassword] = createSignal('');
-  const [confirmPassword, setConfirmPassword] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal('');
-  const [validating, setValidating] = createSignal(true);
-  const [tokenValid, setTokenValid] = createSignal(false);
-  const [userInfo, setUserInfo] = createSignal<{ email: string; username: string } | null>(null);
-  const [success, setSuccess] = createSignal(false);
+  const [searchParams] = useSearchParams()
+  const [newPassword, setNewPassword] = createSignal('')
+  const [confirmPassword, setConfirmPassword] = createSignal('')
+  const [loading, setLoading] = createSignal(false)
+  const [error, setError] = createSignal('')
+  const [validating, setValidating] = createSignal(true)
+  const [tokenValid, setTokenValid] = createSignal(false)
+  const [userInfo, setUserInfo] = createSignal<{ email: string; username: string } | null>(null)
+  const [success, setSuccess] = createSignal(false)
+
+  const getTitle = () => {
+    if (validating()) return 'Validating...'
+    if (!tokenValid()) return 'Invalid Reset Link'
+    if (success()) return 'Password Reset Successful!'
+    return 'Reset Password'
+  }
 
   onMount(async () => {
-    const token = Array.isArray(searchParams.token) ? searchParams.token[0] : searchParams.token;
+    const token = Array.isArray(searchParams.token) ? searchParams.token[0] : searchParams.token
     if (!token) {
-      setError('No reset token provided');
-      setValidating(false);
-      return;
+      setError('No reset token provided')
+      setValidating(false)
+      return
     }
 
     try {
-      const result = await apiClient.validateResetToken(token);
+      const result = await apiClient.validateResetToken(token)
 
       if (!result.valid) {
-        throw new Error(result.error || 'Invalid token');
+        throw new Error(result.error || 'Invalid token')
       }
 
-      setTokenValid(true);
-      setUserInfo({ email: result.email!, username: result.username! });
+      setTokenValid(true)
+      setUserInfo({ email: result.email!, username: result.username! })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid or expired token');
+      setError(err instanceof Error ? err.message : 'Invalid or expired token')
     } finally {
-      setValidating(false);
+      setValidating(false)
     }
-  });
+  })
 
   const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    setError('');
+    e.preventDefault()
+    setError('')
 
     if (newPassword() !== confirmPassword()) {
-      setError('Passwords do not match');
-      return;
+      setError('Passwords do not match')
+      return
     }
 
     if (newPassword().length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
+      setError('Password must be at least 8 characters long')
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
 
     try {
-      const token = Array.isArray(searchParams.token) ? searchParams.token[0] : searchParams.token;
+      const token = Array.isArray(searchParams.token) ? searchParams.token[0] : searchParams.token
       if (!token) {
-        throw new Error('No reset token provided');
+        throw new Error('No reset token provided')
       }
 
-      const result = await apiClient.resetPassword(token, newPassword());
+      const result = await apiClient.resetPassword(token, newPassword())
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to reset password');
+        throw new Error(result.error || 'Failed to reset password')
       }
 
-      setSuccess(true);
+      setSuccess(true)
       // Wait a bit to show success message before redirecting
       setTimeout(() => {
-        props.onSuccess();
-      }, 2000);
+        props.onSuccess()
+      }, 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div class={styles.overlay}>
-      <div class={styles.container}>
-        <button class={styles.closeButton} onClick={props.onClose}>×</button>
-        
-        <Show when={validating()}>
-          <div class={styles.loading}>Validating reset token...</div>
-        </Show>
+    <Modal open={true} onClose={props.onClose} title={getTitle()} size="sm">
+      <Show when={validating()}>
+        <div style={{ 'text-align': 'center', padding: '2rem' }}>
+          <Spinner size="lg" />
+          <p style={{ color: 'var(--text-secondary)', 'margin-top': '1rem' }}>Validating reset token...</p>
+        </div>
+      </Show>
 
-        <Show when={!validating() && !tokenValid()}>
-          <div class={styles.errorContainer}>
-            <h2>Invalid Reset Link</h2>
-            <p>{error()}</p>
-            <button class={styles.button} onClick={props.onClose}>
-              Back to Login
-            </button>
-          </div>
-        </Show>
+      <Show when={!validating() && !tokenValid()}>
+        <div style={{ 'text-align': 'center' }}>
+          <Alert variant="error" style={{ 'margin-bottom': '1.5rem' }}>
+            {error()}
+          </Alert>
+          <Button onClick={props.onClose}>Back to Login</Button>
+        </div>
+      </Show>
 
-        <Show when={!validating() && tokenValid() && !success()}>
-          <form onSubmit={handleSubmit} class={styles.form}>
-            <h2>Reset Password</h2>
-            
-            <Show when={userInfo()}>
-              <p class={styles.userInfo}>
-                Resetting password for: <strong>{userInfo()!.username}</strong>
-              </p>
-            </Show>
-            
-            <Show when={error()}>
-              <div class={styles.error}>{error()}</div>
-            </Show>
+      <Show when={!validating() && tokenValid() && !success()}>
+        <form onSubmit={handleSubmit}>
+          <Show when={userInfo()}>
+            <p style={{ color: 'var(--text-secondary)', 'margin-bottom': '1.5rem' }}>
+              Resetting password for: <strong style={{ color: 'var(--text-primary)' }}>{userInfo()!.username}</strong>
+            </p>
+          </Show>
 
-            <div class={styles.field}>
-              <label for="newPassword">New Password</label>
-              <input
-                type="password"
-                id="newPassword"
-                value={newPassword()}
-                onInput={(e) => setNewPassword(e.currentTarget.value)}
-                required
-                disabled={loading()}
-                placeholder="Enter new password (min. 8 characters)"
-                minLength={8}
-              />
-            </div>
+          <Show when={error()}>
+            <Alert variant="error" style={{ 'margin-bottom': '1rem' }}>
+              {error()}
+            </Alert>
+          </Show>
 
-            <div class={styles.field}>
-              <label for="confirmPassword">Confirm Password</label>
-              <input
-                type="password"
-                id="confirmPassword"
-                value={confirmPassword()}
-                onInput={(e) => setConfirmPassword(e.currentTarget.value)}
-                required
-                disabled={loading()}
-                placeholder="Confirm new password"
-              />
-            </div>
+          <FormField label="New Password" required>
+            <Input
+              type="password"
+              id="newPassword"
+              value={newPassword()}
+              onInput={(e) => setNewPassword(e.currentTarget.value)}
+              required
+              disabled={loading()}
+              placeholder="Enter new password (min. 8 characters)"
+              minLength={8}
+            />
+          </FormField>
 
-            <button 
-              type="submit" 
-              class={styles.submitButton}
-              disabled={loading() || !newPassword() || !confirmPassword()}
-            >
-              {loading() ? 'Resetting...' : 'Reset Password'}
-            </button>
-          </form>
-        </Show>
+          <FormField label="Confirm Password" required>
+            <Input
+              type="password"
+              id="confirmPassword"
+              value={confirmPassword()}
+              onInput={(e) => setConfirmPassword(e.currentTarget.value)}
+              required
+              disabled={loading()}
+              placeholder="Confirm new password"
+            />
+          </FormField>
 
-        <Show when={success()}>
-          <div class={styles.successContainer}>
-            <h2>Password Reset Successful!</h2>
-            <p>Your password has been reset successfully.</p>
-            <p>Redirecting to login page...</p>
-          </div>
-        </Show>
-      </div>
-    </div>
-  );
+          <Button type="submit" fullWidth disabled={loading() || !newPassword() || !confirmPassword()}>
+            {loading() ? 'Resetting...' : 'Reset Password'}
+          </Button>
+        </form>
+      </Show>
+
+      <Show when={success()}>
+        <div style={{ 'text-align': 'center', padding: '1rem 0' }}>
+          <Alert variant="success" style={{ 'margin-bottom': '1rem' }}>
+            Your password has been reset successfully.
+          </Alert>
+          <p style={{ color: 'var(--text-secondary)' }}>Redirecting to login page...</p>
+        </div>
+      </Show>
+    </Modal>
+  )
 }

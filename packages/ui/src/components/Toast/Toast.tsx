@@ -1,7 +1,9 @@
-import { type JSX, type ParentComponent, Show, For, createSignal, onCleanup } from 'solid-js'
+import { type JSX, type ParentComponent, Show, onCleanup } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import * as styles from './Toast.css'
-import type { ToastVariants } from './Toast.css'
+
+export type ToastVariant = 'default' | 'success' | 'warning' | 'error' | 'info'
+export type ToastPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center'
 
 // Icons for different variants
 const SuccessIcon = () => (
@@ -35,17 +37,24 @@ const InfoIcon = () => (
   </svg>
 )
 
-const getIcon = (variant: ToastVariants['variant']) => {
+const getIcon = (variant: ToastVariant) => {
   switch (variant) {
-    case 'success': return <SuccessIcon />
-    case 'warning': return <WarningIcon />
-    case 'error': return <ErrorIcon />
-    case 'info': return <InfoIcon />
-    default: return null
+    case 'success':
+      return <SuccessIcon />
+    case 'warning':
+      return <WarningIcon />
+    case 'error':
+      return <ErrorIcon />
+    case 'info':
+      return <InfoIcon />
+    default:
+      return null
   }
 }
 
-export interface ToastProps extends ToastVariants {
+export interface ToastProps {
+  /** Toast variant */
+  variant?: ToastVariant
   /** Toast title */
   title?: string
   /** Toast message */
@@ -72,9 +81,7 @@ export const Toast: ParentComponent<ToastProps> = (props) => {
   return (
     <div class={styles.toast({ variant: variant() })} role="alert">
       <Show when={icon()}>
-        <div class={styles.icon({ variant: variant() })}>
-          {icon()}
-        </div>
+        <div class={styles.icon({ variant: variant() })}>{icon()}</div>
       </Show>
       <div class={styles.content}>
         <Show when={props.title}>
@@ -96,15 +103,15 @@ export const Toast: ParentComponent<ToastProps> = (props) => {
 
 // Toast container for managing multiple toasts
 export interface ToastContainerProps {
+  /** Container position */
+  position?: ToastPosition
   children: JSX.Element
 }
 
 export const ToastContainer: ParentComponent<ToastContainerProps> = (props) => {
   return (
     <Portal>
-      <div class={styles.container}>
-        {props.children}
-      </div>
+      <div class={styles.container({ position: props.position })}>{props.children}</div>
     </Portal>
   )
 }

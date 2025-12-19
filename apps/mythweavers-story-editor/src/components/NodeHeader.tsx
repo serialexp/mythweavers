@@ -1,516 +1,504 @@
-import { Component, Show, For, createSignal, onMount, onCleanup, createEffect, createMemo } from "solid-js";
-import { Portal } from "solid-js/web";
-import { Node as StoryNode } from "../types/core";
 import {
-  BsChevronUp,
+  BsCheckCircle,
   BsChevronLeft,
   BsChevronRight,
-  BsPencil,
-  BsTrash,
-  BsFileText,
-  BsClipboard,
-  BsCheckCircle,
+  BsChevronUp,
   BsCircle,
-  BsFileEarmarkTextFill,
-  BsFileEarmarkText,
-  BsThreeDotsVertical,
+  BsClipboard,
   BsClock,
-  BsPeople,
+  BsFileEarmarkText,
+  BsFileEarmarkTextFill,
+  BsFileText,
   BsGlobe,
-} from "solid-icons/bs";
-import { nodeStore } from "../stores/nodeStore";
-import { charactersStore } from "../stores/charactersStore";
-import { contextItemsStore } from "../stores/contextItemsStore";
-import { useOllama } from "../hooks/useOllama";
-import { getChaptersInStoryOrder } from "../utils/nodeTraversal";
-import { NodeStatusMenu } from "./NodeStatusMenu";
-import { StoryTimePicker } from "./StoryTimePicker";
-import { ChapterContextManager } from "./ChapterContextManager";
-import { calendarStore } from "../stores/calendarStore";
-import { buildNodeMarkdown, buildPrecedingContextMarkdown } from "../utils/nodeContentExport";
-import { getCharacterDisplayName } from "../utils/character";
-import { copyPreviewStore } from "../stores/copyPreviewStore";
-import styles from "./NodeHeader.module.css";
+  BsPencil,
+  BsPeople,
+  BsThreeDotsVertical,
+  BsTrash,
+} from 'solid-icons/bs'
+import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
+import { Portal } from 'solid-js/web'
+import { useOllama } from '../hooks/useOllama'
+import { calendarStore } from '../stores/calendarStore'
+import { charactersStore } from '../stores/charactersStore'
+import { contextItemsStore } from '../stores/contextItemsStore'
+import { copyPreviewStore } from '../stores/copyPreviewStore'
+import { nodeStore } from '../stores/nodeStore'
+import { Node as StoryNode } from '../types/core'
+import { getCharacterDisplayName } from '../utils/character'
+import { buildNodeMarkdown, buildPrecedingContextMarkdown } from '../utils/nodeContentExport'
+import { getChaptersInStoryOrder } from '../utils/nodeTraversal'
+import { ChapterContextManager } from './ChapterContextManager'
+import * as styles from './NodeHeader.css'
+import { NodeStatusMenu } from './NodeStatusMenu'
+import { StoryTimePicker } from './StoryTimePicker'
 
 interface NodeHeaderProps {
-  node: StoryNode;
-  messageCount: number;
+  node: StoryNode
+  messageCount: number
 }
 
 export const NodeHeader: Component<NodeHeaderProps> = (props) => {
-  let headerRef: HTMLDivElement | undefined;
-  let anchorRef: HTMLDivElement | undefined;
-  let dropdownRef: HTMLDivElement | undefined;
-  let dropdownButtonRef: HTMLButtonElement | undefined;
-  const [showDropdown, setShowDropdown] = createSignal(false);
-  const [dropdownPosition, setDropdownPosition] = createSignal({ top: 0, left: 0 });
-  const [dropdownWidth, setDropdownWidth] = createSignal(200);
-  const [dropdownMaxHeight, setDropdownMaxHeight] = createSignal(320);
-  const [isSummaryExpanded, setIsSummaryExpanded] = createSignal(false);
-  const [isEditingTitle, setIsEditingTitle] = createSignal(false);
-  const [editTitle, setEditTitle] = createSignal(props.node.title);
-  const [isStatusMenuOpen, setIsStatusMenuOpen] = createSignal(false);
-  const [isEditingTime, setIsEditingTime] = createSignal(false);
-  const [isContextManagerOpen, setIsContextManagerOpen] = createSignal(false);
-  const [isSelectingViewpoint, setIsSelectingViewpoint] = createSignal(false);
-  const [isSelectingStorylines, setIsSelectingStorylines] = createSignal(false);
-  const [isEditingGoal, setIsEditingGoal] = createSignal(false);
-  const [editGoal, setEditGoal] = createSignal(props.node.goal || '');
+  let headerRef: HTMLDivElement | undefined
+  let dropdownRef: HTMLDivElement | undefined
+  let dropdownButtonRef: HTMLButtonElement | undefined
+  const [showDropdown, setShowDropdown] = createSignal(false)
+  const [dropdownPosition, setDropdownPosition] = createSignal({ top: 0, left: 0 })
+  const [dropdownWidth, setDropdownWidth] = createSignal(200)
+  const [dropdownMaxHeight, setDropdownMaxHeight] = createSignal(320)
+  const [isSummaryExpanded, setIsSummaryExpanded] = createSignal(false)
+  const [isEditingTitle, setIsEditingTitle] = createSignal(false)
+  const [editTitle, setEditTitle] = createSignal(props.node.title)
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = createSignal(false)
+  const [isEditingTime, setIsEditingTime] = createSignal(false)
+  const [isContextManagerOpen, setIsContextManagerOpen] = createSignal(false)
+  const [isSelectingViewpoint, setIsSelectingViewpoint] = createSignal(false)
+  const [isSelectingStorylines, setIsSelectingStorylines] = createSignal(false)
+  const [isEditingGoal, setIsEditingGoal] = createSignal(false)
+  const [editGoal, setEditGoal] = createSignal(props.node.goal || '')
 
-  const { generateNodeSummary } = useOllama();
+  const { generateNodeSummary } = useOllama()
 
   // Create a memoized dropdown style to ensure reactivity
   const dropdownStyle = createMemo(() => {
-    const pos = dropdownPosition();
-    const width = dropdownWidth();
-    const maxHeight = dropdownMaxHeight();
-    console.log('Computing dropdown style - position:', pos);
+    const pos = dropdownPosition()
+    const width = dropdownWidth()
+    const maxHeight = dropdownMaxHeight()
+    console.log('Computing dropdown style - position:', pos)
     return {
-      position: "fixed" as const,
+      position: 'fixed' as const,
       top: `${pos.top}px`,
       left: `${pos.left}px`,
       width: `${width}px`,
       'max-height': `${maxHeight}px`,
       'overflow-y': 'auto' as const,
-      "z-index": 1000,
-    };
-  });
+      'z-index': 1000,
+    }
+  })
 
-  const chaptersInOrder = createMemo(() => getChaptersInStoryOrder(nodeStore.nodesArray));
-  const currentChapterIndex = createMemo(() =>
-    chaptersInOrder().findIndex((chapter) => chapter.id === props.node.id)
-  );
+  const chaptersInOrder = createMemo(() => getChaptersInStoryOrder(nodeStore.nodesArray))
+  const currentChapterIndex = createMemo(() => chaptersInOrder().findIndex((chapter) => chapter.id === props.node.id))
   const previousChapter = createMemo(() => {
-    const chapters = chaptersInOrder();
-    const index = currentChapterIndex();
+    const chapters = chaptersInOrder()
+    const index = currentChapterIndex()
     if (index > 0) {
-      return chapters[index - 1];
+      return chapters[index - 1]
     }
-    return null;
-  });
+    return null
+  })
   const nextChapter = createMemo(() => {
-    const chapters = chaptersInOrder();
-    const index = currentChapterIndex();
+    const chapters = chaptersInOrder()
+    const index = currentChapterIndex()
     if (index >= 0 && index < chapters.length - 1) {
-      return chapters[index + 1];
+      return chapters[index + 1]
     }
-    return null;
-  });
+    return null
+  })
 
   const getPreviousChapterTitle = () => {
-    const chapter = previousChapter();
-    return chapter ? `Go to previous chapter: ${chapter.title}` : "Previous chapter unavailable";
-  };
+    const chapter = previousChapter()
+    return chapter ? `Go to previous chapter: ${chapter.title}` : 'Previous chapter unavailable'
+  }
 
   const getNextChapterTitle = () => {
-    const chapter = nextChapter();
-    return chapter ? `Go to next chapter: ${chapter.title}` : "Next chapter unavailable";
-  };
+    const chapter = nextChapter()
+    return chapter ? `Go to next chapter: ${chapter.title}` : 'Next chapter unavailable'
+  }
 
   // Handle click outside to close dropdown
   onMount(() => {
     const handleClickOutside = (e: MouseEvent) => {
       // Don't close if we're editing the time or selecting viewpoint/storylines
-      if (isEditingTime() || isSelectingViewpoint() || isSelectingStorylines()) return;
+      if (isEditingTime() || isSelectingViewpoint() || isSelectingStorylines()) return
 
-      if (dropdownRef && !dropdownRef.contains(e.target as HTMLElement) &&
-          dropdownButtonRef && !dropdownButtonRef.contains(e.target as HTMLElement)) {
-        setShowDropdown(false);
+      if (
+        dropdownRef &&
+        !dropdownRef.contains(e.target as HTMLElement) &&
+        dropdownButtonRef &&
+        !dropdownButtonRef.contains(e.target as HTMLElement)
+      ) {
+        setShowDropdown(false)
       }
-    };
-    document.addEventListener('click', handleClickOutside);
-    onCleanup(() => document.removeEventListener('click', handleClickOutside));
-  });
+    }
+    document.addEventListener('click', handleClickOutside)
+    onCleanup(() => document.removeEventListener('click', handleClickOutside))
+  })
 
   const updateDropdownLayout = () => {
-    if (!dropdownButtonRef) return;
+    if (!dropdownButtonRef) return
 
-    const rect = dropdownButtonRef.getBoundingClientRect();
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 768;
-    const horizontalMargin = 16;
-    const minBottomMargin = 10;
-    const minWidth = 200;
-    const maxWidth = 360;
+    const rect = dropdownButtonRef.getBoundingClientRect()
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 768
+    const horizontalMargin = 16
+    const minBottomMargin = 10
+    const minWidth = 200
+    const maxWidth = 360
 
     // Calculate width
-    const calculatedWidth = Math.min(Math.max(minWidth, viewportWidth - horizontalMargin * 2), maxWidth);
-    const maxLeft = viewportWidth - calculatedWidth - horizontalMargin;
-    const preferredLeft = rect.right - calculatedWidth;
-    const clampedLeft = Math.min(Math.max(preferredLeft, horizontalMargin), Math.max(horizontalMargin, maxLeft));
-    setDropdownWidth(calculatedWidth);
+    const calculatedWidth = Math.min(Math.max(minWidth, viewportWidth - horizontalMargin * 2), maxWidth)
+    const maxLeft = viewportWidth - calculatedWidth - horizontalMargin
+    const preferredLeft = rect.right - calculatedWidth
+    const clampedLeft = Math.min(Math.max(preferredLeft, horizontalMargin), Math.max(horizontalMargin, maxLeft))
+    setDropdownWidth(calculatedWidth)
 
     // Calculate available space
-    const spaceBelow = viewportHeight - rect.bottom - minBottomMargin;
-    const spaceAbove = rect.top - minBottomMargin;
-    const maxAvailableHeight = Math.max(120, viewportHeight - minBottomMargin * 2);
+    const spaceBelow = viewportHeight - rect.bottom - minBottomMargin
+    const spaceAbove = rect.top - minBottomMargin
+    const maxAvailableHeight = Math.max(120, viewportHeight - minBottomMargin * 2)
 
-    let maxHeight = Math.min(spaceBelow, maxAvailableHeight);
-    let top = rect.bottom + 4;
+    let maxHeight = Math.min(spaceBelow, maxAvailableHeight)
+    let top = rect.bottom + 4
 
     // THE STUPID SIMPLE FIX: If status menu is open, just move up by 100px
-    const statusOpen = isStatusMenuOpen();
-    console.log('updateDropdownLayout - status menu open:', statusOpen, 'initial top:', top);
+    const statusOpen = isStatusMenuOpen()
+    console.log('updateDropdownLayout - status menu open:', statusOpen, 'initial top:', top)
     if (statusOpen) {
-      top -= 100;
-      console.log('Shifted up by 100px, new top:', top);
+      top -= 100
+      console.log('Shifted up by 100px, new top:', top)
       // Make sure we don't go off the top of the screen
-      top = Math.max(minBottomMargin, top);
+      top = Math.max(minBottomMargin, top)
     }
 
     // If we're too close to the bottom, flip to above
     if (spaceBelow < 160 && spaceAbove > spaceBelow) {
-      maxHeight = Math.min(spaceAbove, maxAvailableHeight);
-      top = rect.top - 300 - 4;
+      maxHeight = Math.min(spaceAbove, maxAvailableHeight)
+      top = rect.top - 300 - 4
 
       // Again, if status menu is open, shift up a bit more
       if (isStatusMenuOpen()) {
-        top -= 50;
+        top -= 50
       }
 
-      top = Math.max(minBottomMargin, top);
+      top = Math.max(minBottomMargin, top)
     }
 
-    setDropdownMaxHeight(maxHeight);
+    setDropdownMaxHeight(maxHeight)
     setDropdownPosition({
       top,
-      left: clampedLeft
-    });
-  };
+      left: clampedLeft,
+    })
+  }
 
   // Update dropdown position when shown
   createEffect(() => {
     if (showDropdown()) {
-      updateDropdownLayout();
+      updateDropdownLayout()
       if (typeof window !== 'undefined') {
         window.requestAnimationFrame(() => {
-          updateDropdownLayout();
+          updateDropdownLayout()
           // Additional update after content settles
-          setTimeout(() => updateDropdownLayout(), 100);
-        });
+          setTimeout(() => updateDropdownLayout(), 100)
+        })
       } else {
-        setTimeout(() => updateDropdownLayout(), 0);
+        setTimeout(() => updateDropdownLayout(), 0)
       }
     }
-  });
+  })
 
   // Separate effect to track status menu changes
   createEffect(() => {
     // Access the signal to create dependency
-    const isOpen = isStatusMenuOpen();
-    console.log('Status menu open state changed:', isOpen);
+    const isOpen = isStatusMenuOpen()
+    console.log('Status menu open state changed:', isOpen)
 
     // Only update if dropdown is visible
     if (showDropdown()) {
-      console.log('Updating dropdown layout due to status menu change');
-      updateDropdownLayout();
+      console.log('Updating dropdown layout due to status menu change')
+      updateDropdownLayout()
     }
-  });
+  })
 
   onMount(() => {
     const handleResize = () => {
       if (showDropdown()) {
-        updateDropdownLayout();
+        updateDropdownLayout()
       }
-    };
+    }
 
-    window.addEventListener('resize', handleResize);
-    onCleanup(() => window.removeEventListener('resize', handleResize));
-  });
+    window.addEventListener('resize', handleResize)
+    onCleanup(() => window.removeEventListener('resize', handleResize))
+  })
 
   const toggleSummaryExpanded = (e: MouseEvent) => {
-    e.stopPropagation();
-    setIsSummaryExpanded(!isSummaryExpanded());
-  };
+    e.stopPropagation()
+    setIsSummaryExpanded(!isSummaryExpanded())
+  }
 
   const handleEditTitle = (e: MouseEvent) => {
-    e.stopPropagation();
-    setIsEditingTitle(true);
-    setEditTitle(props.node.title);
-    setShowDropdown(false);
-  };
+    e.stopPropagation()
+    setIsEditingTitle(true)
+    setEditTitle(props.node.title)
+    setShowDropdown(false)
+  }
 
   const handleSaveTitle = () => {
     if (editTitle().trim() && editTitle() !== props.node.title) {
-      nodeStore.updateNode(props.node.id, { title: editTitle().trim() });
+      nodeStore.updateNode(props.node.id, { title: editTitle().trim() })
     }
-    setIsEditingTitle(false);
-  };
+    setIsEditingTitle(false)
+  }
 
   const handleCancelEdit = () => {
-    setEditTitle(props.node.title);
-    setIsEditingTitle(false);
-  };
+    setEditTitle(props.node.title)
+    setIsEditingTitle(false)
+  }
 
   const handleEditGoal = (e: MouseEvent) => {
-    e.stopPropagation();
-    setIsEditingGoal(true);
-    setEditGoal(props.node.goal || '');
-    setShowDropdown(false);
-  };
+    e.stopPropagation()
+    setIsEditingGoal(true)
+    setEditGoal(props.node.goal || '')
+    setShowDropdown(false)
+  }
 
   const handleSaveGoal = () => {
-    const newGoal = editGoal().trim();
+    const newGoal = editGoal().trim()
     if (newGoal !== (props.node.goal || '')) {
-      nodeStore.updateNode(props.node.id, { goal: newGoal || undefined });
+      nodeStore.updateNode(props.node.id, { goal: newGoal || undefined })
     }
-    setIsEditingGoal(false);
-  };
+    setIsEditingGoal(false)
+  }
 
   const handleCancelGoalEdit = () => {
-    setEditGoal(props.node.goal || '');
-    setIsEditingGoal(false);
-  };
+    setEditGoal(props.node.goal || '')
+    setIsEditingGoal(false)
+  }
 
   const handleDelete = async (e: MouseEvent) => {
-    e.stopPropagation();
+    e.stopPropagation()
     if (confirm(`Delete ${props.node.type} "${props.node.title}" and all its contents?`)) {
-      nodeStore.deleteNode(props.node.id);
+      nodeStore.deleteNode(props.node.id)
     }
-    setShowDropdown(false);
-  };
+    setShowDropdown(false)
+  }
 
   const handleGenerateSummary = async (e: MouseEvent) => {
-    e.stopPropagation();
-    setShowDropdown(false);
+    e.stopPropagation()
+    setShowDropdown(false)
     try {
-      await nodeStore.generateNodeSummary(props.node.id, generateNodeSummary);
+      await nodeStore.generateNodeSummary(props.node.id, generateNodeSummary)
     } catch (error) {
-      console.error('Failed to generate summary:', error);
-      alert('Failed to generate summary: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Failed to generate summary:', error)
+      alert(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-  };
+  }
 
   const handleCopyNode = (e: MouseEvent) => {
-    e.stopPropagation();
+    e.stopPropagation()
     // TODO: Implement node copy functionality
-    alert('Copy functionality not yet implemented');
-    setShowDropdown(false);
-  };
+    alert('Copy functionality not yet implemented')
+    setShowDropdown(false)
+  }
 
   const handleCopyAsMarkdown = async (e: MouseEvent) => {
-    e.stopPropagation();
-    const markdown = buildNodeMarkdown(props.node.id);
+    e.stopPropagation()
+    const markdown = buildNodeMarkdown(props.node.id)
     if (!markdown) {
-      alert("No story content available to copy yet.");
-      return;
+      alert('No story content available to copy yet.')
+      return
     }
 
     if (!navigator.clipboard) {
-      alert("Clipboard access is not available in this browser.");
-      return;
+      alert('Clipboard access is not available in this browser.')
+      return
     }
 
     try {
-      await navigator.clipboard.writeText(markdown);
-      setShowDropdown(false);
+      await navigator.clipboard.writeText(markdown)
+      setShowDropdown(false)
     } catch (error) {
-      console.error("Failed to copy chapter as Markdown:", error);
-      alert("Failed to copy chapter to clipboard. Please try again.");
+      console.error('Failed to copy chapter as Markdown:', error)
+      alert('Failed to copy chapter to clipboard. Please try again.')
     }
-  };
+  }
 
   const handleCopyPreviousContext = async (e: MouseEvent) => {
-    e.stopPropagation();
+    e.stopPropagation()
     const summary = buildPrecedingContextMarkdown(props.node.id, {
       includeCurrentNode: false,
-      mode: "summary",
-    });
+      mode: 'summary',
+    })
 
     if (!summary) {
-      alert("No previous chapters with content were found to copy.");
-      return;
+      alert('No previous chapters with content were found to copy.')
+      return
     }
 
-    setShowDropdown(false);
-    await copyPreviewStore.requestCopy(summary);
-  };
+    setShowDropdown(false)
+    await copyPreviewStore.requestCopy(summary)
+  }
 
   const handleEditTime = (e: MouseEvent) => {
-    e.stopPropagation();
-    setIsEditingTime(true);
-  };
+    e.stopPropagation()
+    setIsEditingTime(true)
+  }
 
   const handleSaveTime = (time: number | null) => {
-    nodeStore.updateNode(props.node.id, { storyTime: time ?? undefined });
-    setIsEditingTime(false);
-    setShowDropdown(false);
-  };
+    nodeStore.updateNode(props.node.id, { storyTime: time ?? undefined })
+    setIsEditingTime(false)
+    setShowDropdown(false)
+  }
 
   const handleCancelTimeEdit = () => {
-    setIsEditingTime(false);
-  };
+    setIsEditingTime(false)
+  }
 
   const handleManageContext = (e: MouseEvent) => {
-    e.stopPropagation();
-    setIsContextManagerOpen(true);
-    setShowDropdown(false);
-  };
+    e.stopPropagation()
+    setIsContextManagerOpen(true)
+    setShowDropdown(false)
+  }
 
   const handleSelectViewpoint = (e: MouseEvent) => {
-    e.stopPropagation();
-    setIsSelectingViewpoint(true);
-  };
+    e.stopPropagation()
+    setIsSelectingViewpoint(true)
+  }
 
   const handleSetViewpointCharacter = (characterId: string | null) => {
-    nodeStore.updateNode(props.node.id, { viewpointCharacterId: characterId || undefined });
-    setIsSelectingViewpoint(false);
-    setShowDropdown(false);
-  };
+    nodeStore.updateNode(props.node.id, { viewpointCharacterId: characterId || undefined })
+    setIsSelectingViewpoint(false)
+    setShowDropdown(false)
+  }
 
   const handleToggleStoryline = (storylineId: string) => {
-    const currentIds = props.node.activeContextItemIds || [];
+    const currentIds = props.node.activeContextItemIds || []
 
     // Preserve non-plot items
-    const nonPlotIds = currentIds.filter(id => {
-      const item = contextItemsStore.contextItems.find(i => i.id === id);
-      return item && item.type !== 'plot';
-    });
+    const nonPlotIds = currentIds.filter((id) => {
+      const item = contextItemsStore.contextItems.find((i) => i.id === id)
+      return item && item.type !== 'plot'
+    })
 
     // Toggle the selected storyline
-    const plotIds = currentIds.filter(id => {
-      const item = contextItemsStore.contextItems.find(i => i.id === id);
-      return item && item.type === 'plot';
-    });
+    const plotIds = currentIds.filter((id) => {
+      const item = contextItemsStore.contextItems.find((i) => i.id === id)
+      return item && item.type === 'plot'
+    })
 
-    let newPlotIds: string[];
+    let newPlotIds: string[]
     if (plotIds.includes(storylineId)) {
-      newPlotIds = plotIds.filter(id => id !== storylineId);
+      newPlotIds = plotIds.filter((id) => id !== storylineId)
     } else {
-      newPlotIds = [...plotIds, storylineId];
+      newPlotIds = [...plotIds, storylineId]
     }
 
     nodeStore.updateNode(props.node.id, {
-      activeContextItemIds: [...nonPlotIds, ...newPlotIds]
-    });
-  };
+      activeContextItemIds: [...nonPlotIds, ...newPlotIds],
+    })
+  }
 
   const handleScrollToTop = () => {
-    if (anchorRef) {
-      anchorRef.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (headerRef) {
+      headerRef.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  };
+  }
 
   const handleNavigateToChapter = (chapterId: string | undefined) => {
-    if (!chapterId) return;
-    nodeStore.selectNode(chapterId);
-    setShowDropdown(false);
-  };
+    if (!chapterId) return
+    nodeStore.selectNode(chapterId)
+    setShowDropdown(false)
+  }
 
   // Get status icon
   const getStatusIcon = () => {
     switch (props.node.status) {
-      case "done":
-        return <BsCheckCircle color="#22c55e" />;
-      case "review":
-        return <BsFileEarmarkTextFill color="#3b82f6" />;
-      case "needs_work":
-        return <BsFileEarmarkText color="#f97316" />;
-      case "draft":
+      case 'done':
+        return <BsCheckCircle color="#22c55e" />
+      case 'review':
+        return <BsFileEarmarkTextFill color="#3b82f6" />
+      case 'needs_work':
+        return <BsFileEarmarkText color="#f97316" />
       default:
-        return <BsCircle color="#94a3b8" />;
+        return <BsCircle color="#94a3b8" />
     }
-  };
+  }
 
   // Get status text
   const getStatusText = () => {
     switch (props.node.status) {
-      case "done":
-        return "Done";
-      case "review":
-        return "Ready for Review";
-      case "needs_work":
-        return "Needs Work";
-      case "draft":
+      case 'done':
+        return 'Done'
+      case 'review':
+        return 'Ready for Review'
+      case 'needs_work':
+        return 'Needs Work'
       default:
-        return "Draft";
+        return 'Draft'
     }
-  };
+  }
 
   // Get active characters for this scene
   const activeCharacters = createMemo(() => {
     if (props.node.type !== 'scene' || !props.node.activeCharacterIds) {
-      return [];
+      return []
     }
-    const activeIds = new Set(props.node.activeCharacterIds);
-    return charactersStore.characters.filter(char => activeIds.has(char.id));
-  });
+    const activeIds = new Set(props.node.activeCharacterIds)
+    return charactersStore.characters.filter((char) => activeIds.has(char.id))
+  })
 
   // Get active context items for this scene (non-global, non-plot only)
   const activeContextItems = createMemo(() => {
     if (props.node.type !== 'scene' || !props.node.activeContextItemIds) {
-      return [];
+      return []
     }
-    const activeIds = new Set(props.node.activeContextItemIds);
-    return contextItemsStore.contextItems.filter(item =>
-      !item.isGlobal && item.type !== 'plot' && activeIds.has(item.id)
-    );
-  });
+    const activeIds = new Set(props.node.activeContextItemIds)
+    return contextItemsStore.contextItems.filter(
+      (item) => !item.isGlobal && item.type !== 'plot' && activeIds.has(item.id),
+    )
+  })
 
   // Get the protagonist character
-  const protagonist = createMemo(() =>
-    charactersStore.characters.find(char => char.isMainCharacter)
-  );
+  const protagonist = createMemo(() => charactersStore.characters.find((char) => char.isMainCharacter))
 
   // Get the viewpoint character for this scene (or default to protagonist)
   const viewpointCharacter = createMemo(() => {
-    if (props.node.type !== 'scene') return null;
+    if (props.node.type !== 'scene') return null
 
     // If a specific viewpoint character is set, use it
     if (props.node.viewpointCharacterId) {
-      return charactersStore.characters.find(
-        char => char.id === props.node.viewpointCharacterId
-      );
+      return charactersStore.characters.find((char) => char.id === props.node.viewpointCharacterId)
     }
 
     // Otherwise default to protagonist
-    return protagonist();
-  });
+    return protagonist()
+  })
 
   // Check if viewpoint is explicitly set (not defaulting to protagonist)
-  const hasExplicitViewpoint = createMemo(() =>
-    props.node.type === 'scene' && !!props.node.viewpointCharacterId
-  );
+  const hasExplicitViewpoint = createMemo(() => props.node.type === 'scene' && !!props.node.viewpointCharacterId)
 
   // Get all storylines (plot-type context items)
-  const storylines = createMemo(() =>
-    contextItemsStore.contextItems.filter(item => item.type === 'plot')
-  );
+  const storylines = createMemo(() => contextItemsStore.contextItems.filter((item) => item.type === 'plot'))
 
   // Get active storylines for this scene
   const activeStorylines = createMemo(() => {
     if (props.node.type !== 'scene' || !props.node.activeContextItemIds) {
-      return [];
+      return []
     }
-    const activeIds = new Set(props.node.activeContextItemIds);
-    return storylines().filter(s => activeIds.has(s.id));
-  });
+    const activeIds = new Set(props.node.activeContextItemIds)
+    return storylines().filter((s) => activeIds.has(s.id))
+  })
 
   // Get first 2 lines of summary or placeholder
   const getSummaryPreview = () => {
     if (props.node.isSummarizing) {
-      return "Generating summary...";
+      return 'Generating summary...'
     }
     if (!props.node.summary) {
-      return "No summary yet. Click to generate.";
+      return 'No summary yet. Click to generate.'
     }
-    const lines = props.node.summary.split("\n");
+    const lines = props.node.summary.split('\n')
     if (lines.length <= 2) {
-      return props.node.summary;
+      return props.node.summary
     }
-    return lines.slice(0, 2).join("\n") + "...";
-  };
+    return `${lines.slice(0, 2).join('\n')}...`
+  }
 
   return (
     <>
-      <div ref={anchorRef} class={styles.scrollAnchor} />
       <div ref={headerRef} class={styles.nodeHeader}>
         <div class={styles.nodeHeaderLeft}>
           <div class={styles.nodeTitleSection}>
             <Show when={!isEditingTitle()}>
-              <div class={styles.nodeTitle}>
-                {props.node.title}
-              </div>
+              <div class={styles.nodeTitle}>{props.node.title}</div>
             </Show>
             <Show when={isEditingTitle()}>
               <input
@@ -518,8 +506,8 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 value={editTitle()}
                 onInput={(e) => setEditTitle(e.currentTarget.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveTitle();
-                  if (e.key === 'Escape') handleCancelEdit();
+                  if (e.key === 'Enter') handleSaveTitle()
+                  if (e.key === 'Escape') handleCancelEdit()
                 }}
                 onBlur={handleSaveTitle}
                 autofocus
@@ -533,33 +521,42 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
           </div>
           <div class={styles.nodeMetadata}>
             <span class={styles.metaItem}>
-              {props.messageCount} {props.messageCount === 1 ? "message" : "messages"}
+              {props.messageCount} {props.messageCount === 1 ? 'message' : 'messages'}
             </span>
             <Show when={props.node.wordCount}>
-              <span class={styles.metaItem}>
-                {props.node.wordCount} words
-              </span>
+              <span class={styles.metaItem}>{props.node.wordCount} words</span>
             </Show>
             <Show when={props.node.storyTime !== undefined && props.node.storyTime !== null}>
               <span class={styles.metaItem} title={calendarStore.formatStoryTime(props.node.storyTime!)}>
-                <BsClock style={{ "font-size": "0.9em", "vertical-align": "middle" }} />
+                <BsClock style={{ 'font-size': '0.9em', 'vertical-align': 'middle' }} />
                 {calendarStore.formatStoryTime(props.node.storyTime!)}
               </span>
             </Show>
             <Show when={props.node.type === 'scene' && viewpointCharacter()}>
-              <span class={styles.metaItem} title={hasExplicitViewpoint() ? "Viewpoint character (custom)" : "Viewpoint character (protagonist)"}>
-                POV: {viewpointCharacter() ? getCharacterDisplayName(viewpointCharacter()!) : ''}{hasExplicitViewpoint() ? '' : ' (default)'}
+              <span
+                class={styles.metaItem}
+                title={hasExplicitViewpoint() ? 'Viewpoint character (custom)' : 'Viewpoint character (protagonist)'}
+              >
+                POV: {viewpointCharacter() ? getCharacterDisplayName(viewpointCharacter()!) : ''}
+                {hasExplicitViewpoint() ? '' : ' (default)'}
               </span>
             </Show>
           </div>
 
-          <Show when={props.node.type === 'scene' && (activeCharacters().length > 0 || activeContextItems().length > 0 || activeStorylines().length > 0)}>
+          <Show
+            when={
+              props.node.type === 'scene' &&
+              (activeCharacters().length > 0 || activeContextItems().length > 0 || activeStorylines().length > 0)
+            }
+          >
             <div class={styles.activeContext}>
               <Show when={activeCharacters().length > 0}>
                 <div class={styles.activeContextSection}>
                   <span class={styles.contextLabel}>Characters:</span>
                   <span class={styles.contextList}>
-                    {activeCharacters().map(char => getCharacterDisplayName(char)).join(', ')}
+                    {activeCharacters()
+                      .map((char) => getCharacterDisplayName(char))
+                      .join(', ')}
                   </span>
                 </div>
               </Show>
@@ -567,7 +564,9 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 <div class={styles.activeContextSection}>
                   <span class={styles.contextLabel}>Context:</span>
                   <span class={styles.contextList}>
-                    {activeContextItems().map(item => item.name).join(', ')}
+                    {activeContextItems()
+                      .map((item) => item.name)
+                      .join(', ')}
                   </span>
                 </div>
               </Show>
@@ -575,7 +574,9 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 <div class={styles.activeContextSection}>
                   <span class={styles.contextLabel}>Storylines:</span>
                   <span class={styles.contextList}>
-                    {activeStorylines().map(s => s.name).join(', ')}
+                    {activeStorylines()
+                      .map((s) => s.name)
+                      .join(', ')}
                   </span>
                 </div>
               </Show>
@@ -585,7 +586,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
 
         <div class={styles.nodeActions}>
           <button
-            class={styles.scrollButton}
+            class={styles.actionButton}
             onClick={() => handleNavigateToChapter(previousChapter()?.id)}
             disabled={!previousChapter()}
             title={getPreviousChapterTitle()}
@@ -595,7 +596,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
           </button>
 
           <button
-            class={styles.scrollButton}
+            class={styles.actionButton}
             onClick={() => handleNavigateToChapter(nextChapter()?.id)}
             disabled={!nextChapter()}
             title={getNextChapterTitle()}
@@ -608,43 +609,35 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
             ref={dropdownButtonRef}
             class={styles.actionButton}
             onClick={(e) => {
-              e.stopPropagation();
-              setShowDropdown(!showDropdown());
+              e.stopPropagation()
+              setShowDropdown(!showDropdown())
             }}
             title="More actions"
           >
             <BsThreeDotsVertical />
           </button>
 
-          <button
-            class={styles.scrollButton}
-            onClick={handleScrollToTop}
-            title="Scroll to top"
-          >
+          <button class={styles.actionButton} onClick={handleScrollToTop} title="Scroll to top">
             <BsChevronUp />
           </button>
         </div>
 
         <Portal>
           <Show when={showDropdown()}>
-            <div
-              ref={dropdownRef}
-              class={styles.dropdown}
-              style={dropdownStyle()}
-            >
-              <button onClick={handleEditTitle}>
+            <div ref={dropdownRef} class={styles.dropdown} style={dropdownStyle()}>
+              <button class={styles.dropdownButton} onClick={handleEditTitle}>
                 <BsPencil /> Edit Title
               </button>
 
-              <Show when={props.node.type === "scene"}>
-                <button onClick={handleEditGoal}>
+              <Show when={props.node.type === 'scene'}>
+                <button class={styles.dropdownButton} onClick={handleEditGoal}>
                   <BsFileText />
                   {props.node.goal ? 'Edit Goal' : 'Set Goal'}
                 </button>
               </Show>
 
-              <Show when={props.node.type === "scene" && !isEditingTime()}>
-                <button onClick={handleEditTime}>
+              <Show when={props.node.type === 'scene' && !isEditingTime()}>
+                <button class={styles.dropdownButton} onClick={handleEditTime}>
                   <BsClock />
                   {props.node.storyTime !== undefined && props.node.storyTime !== null
                     ? `Edit Time: ${calendarStore.formatStoryTime(props.node.storyTime)}`
@@ -661,14 +654,14 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 />
               </Show>
 
-              <Show when={props.node.type === "scene"}>
-                <button onClick={handleManageContext}>
+              <Show when={props.node.type === 'scene'}>
+                <button class={styles.dropdownButton} onClick={handleManageContext}>
                   <BsPeople /> Manage Active Context
                 </button>
               </Show>
 
-              <Show when={props.node.type === "scene" && !isSelectingViewpoint()}>
-                <button onClick={handleSelectViewpoint}>
+              <Show when={props.node.type === 'scene' && !isSelectingViewpoint()}>
+                <button class={styles.dropdownButton} onClick={handleSelectViewpoint}>
                   <BsPeople />
                   {viewpointCharacter()
                     ? `Viewpoint: ${getCharacterDisplayName(viewpointCharacter()!)}${hasExplicitViewpoint() ? '' : ' (default)'}`
@@ -680,30 +673,24 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 <div class={styles.viewpointSelector}>
                   <div class={styles.viewpointHeader}>Select Viewpoint Character:</div>
                   <Show when={protagonist()}>
-                    <button
-                      class={styles.viewpointOption}
-                      onClick={() => handleSetViewpointCharacter(null)}
-                    >
+                    <button class={styles.viewpointOption} onClick={() => handleSetViewpointCharacter(null)}>
                       {getCharacterDisplayName(protagonist()!)} (Protagonist - Default)
                     </button>
                   </Show>
                   <For each={activeCharacters()}>
                     {(char) => (
                       <Show when={char.id !== protagonist()?.id}>
-                        <button
-                          class={styles.viewpointOption}
-                          onClick={() => handleSetViewpointCharacter(char.id)}
-                        >
+                        <button class={styles.viewpointOption} onClick={() => handleSetViewpointCharacter(char.id)}>
                           {getCharacterDisplayName(char)}
                         </button>
                       </Show>
                     )}
                   </For>
                   <button
-                    class={styles.viewpointCancel}
+                    class={`${styles.dropdownButton} ${styles.viewpointCancel}`}
                     onClick={(e) => {
-                      e.stopPropagation();
-                      setIsSelectingViewpoint(false);
+                      e.stopPropagation()
+                      setIsSelectingViewpoint(false)
                     }}
                   >
                     Cancel
@@ -711,15 +698,16 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 </div>
               </Show>
 
-              <Show when={props.node.type === "scene" && !isSelectingStorylines()}>
-                <button onClick={(e) => {
-                  e.stopPropagation();
-                  setIsSelectingStorylines(true);
-                }}>
+              <Show when={props.node.type === 'scene' && !isSelectingStorylines()}>
+                <button
+                  class={styles.dropdownButton}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsSelectingStorylines(true)
+                  }}
+                >
                   <BsGlobe />
-                  {activeStorylines().length > 0
-                    ? `Storylines (${activeStorylines().length})`
-                    : 'Assign Storylines'}
+                  {activeStorylines().length > 0 ? `Storylines (${activeStorylines().length})` : 'Assign Storylines'}
                 </button>
               </Show>
 
@@ -728,9 +716,12 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                   <div class={styles.viewpointHeader}>Select Storylines:</div>
                   <For each={storylines()}>
                     {(storyline) => {
-                      const isActive = () => (props.node.activeContextItemIds || []).includes(storyline.id);
+                      const isActive = () => (props.node.activeContextItemIds || []).includes(storyline.id)
                       return (
-                        <label class={styles.viewpointOption} style={{ display: 'flex', 'align-items': 'center', cursor: 'pointer' }}>
+                        <label
+                          class={styles.viewpointOption}
+                          style={{ display: 'flex', 'align-items': 'center', cursor: 'pointer' }}
+                        >
                           <input
                             type="checkbox"
                             checked={isActive()}
@@ -739,7 +730,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                           />
                           {storyline.name}
                         </label>
-                      );
+                      )
                     }}
                   </For>
                   <Show when={storylines().length === 0}>
@@ -748,10 +739,10 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                     </p>
                   </Show>
                   <button
-                    class={styles.viewpointCancel}
+                    class={`${styles.dropdownButton} ${styles.viewpointCancel}`}
                     onClick={(e) => {
-                      e.stopPropagation();
-                      setIsSelectingStorylines(false);
+                      e.stopPropagation()
+                      setIsSelectingStorylines(false)
                     }}
                   >
                     Done
@@ -759,23 +750,23 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 </div>
               </Show>
 
-              <Show when={props.node.type === "scene"}>
-                <button onClick={handleCopyPreviousContext}>
+              <Show when={props.node.type === 'scene'}>
+                <button class={styles.dropdownButton} onClick={handleCopyPreviousContext}>
                   <BsFileEarmarkTextFill /> Copy Previous Context
                 </button>
-                <button onClick={handleCopyAsMarkdown}>
+                <button class={styles.dropdownButton} onClick={handleCopyAsMarkdown}>
                   <BsFileEarmarkText /> Copy as Markdown
                 </button>
               </Show>
 
-              <button onClick={handleCopyNode} disabled>
+              <button class={styles.dropdownButton} onClick={handleCopyNode} disabled>
                 <BsClipboard />
                 Copy Node (TODO)
               </button>
 
               <div class={styles.dropdownDivider} />
 
-              <Show when={props.node.type === "scene"}>
+              <Show when={props.node.type === 'scene'}>
                 <NodeStatusMenu
                   currentStatus={props.node.status}
                   onSelect={(status) => nodeStore.updateNode(props.node.id, { status })}
@@ -792,6 +783,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
               </Show>
 
               <button
+                class={styles.dropdownButton}
                 onClick={handleGenerateSummary}
                 title="Generate summary"
                 disabled={props.node.isSummarizing}
@@ -802,12 +794,12 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 <Show when={props.node.isSummarizing}>
                   <span class={styles.spinner}>⟳</span>
                 </Show>
-                {props.node.summary ? "Regenerate" : "Generate"} Summary
+                {props.node.summary ? 'Regenerate' : 'Generate'} Summary
               </button>
 
               <div class={styles.dropdownDivider} />
 
-              <button onClick={handleDelete} class={styles.deleteButton}>
+              <button class={`${styles.dropdownButton} ${styles.deleteButton}`} onClick={handleDelete}>
                 <BsTrash /> Delete Node
               </button>
             </div>
@@ -818,21 +810,21 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
       <Show when={props.node.summary || props.node.isSummarizing}>
         <div class={styles.summarySection}>
           <Show when={!isSummaryExpanded()}>
-            <div class={styles.summaryPreview} onClick={toggleSummaryExpanded}>
+            <div class={`${styles.summaryText} ${styles.summaryTextCollapsed}`} onClick={toggleSummaryExpanded}>
               {getSummaryPreview()}
             </div>
           </Show>
           <Show when={isSummaryExpanded()}>
-            <div class={styles.summaryFull} onClick={toggleSummaryExpanded}>
+            <div class={styles.summaryText} onClick={toggleSummaryExpanded}>
               {props.node.isSummarizing
-                ? "Generating summary..."
-                : props.node.summary || "No summary yet. Click to generate."}
+                ? 'Generating summary...'
+                : props.node.summary || 'No summary yet. Click to generate.'}
             </div>
           </Show>
         </div>
       </Show>
 
-      <Show when={props.node.type === "scene" && (isEditingGoal() || props.node.goal)}>
+      <Show when={props.node.type === 'scene' && (isEditingGoal() || props.node.goal)}>
         <div class={styles.goalSection}>
           <Show when={!isEditingGoal()}>
             <div class={styles.goalLabel}>Goal:</div>
@@ -845,8 +837,8 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
               value={editGoal()}
               onInput={(e) => setEditGoal(e.currentTarget.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') handleCancelGoalEdit();
-                if (e.key === 'Enter' && e.ctrlKey) handleSaveGoal();
+                if (e.key === 'Escape') handleCancelGoalEdit()
+                if (e.key === 'Enter' && e.ctrlKey) handleSaveGoal()
               }}
               onBlur={handleSaveGoal}
               placeholder="What are you trying to accomplish in this chapter?"
@@ -857,7 +849,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
         </div>
       </Show>
 
-      <Show when={props.node.type === "scene"}>
+      <Show when={props.node.type === 'scene'}>
         <ChapterContextManager
           isOpen={isContextManagerOpen()}
           onClose={() => setIsContextManagerOpen(false)}
@@ -865,5 +857,5 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
         />
       </Show>
     </>
-  );
-};
+  )
+}

@@ -1,4 +1,4 @@
-import { style, globalStyle } from '@vanilla-extract/css'
+import { globalStyle, style } from '@vanilla-extract/css'
 import { tokens } from '../../theme/tokens.css'
 
 /**
@@ -73,7 +73,7 @@ globalStyle(`${blockMenu} button`, {
 })
 
 // Blockquote styling
-globalStyle(`blockquote`, {
+globalStyle('blockquote', {
   borderLeft: `4px solid ${tokens.color.accent.primary}`,
   marginLeft: 0,
   paddingLeft: tokens.space['2.5'],
@@ -81,7 +81,7 @@ globalStyle(`blockquote`, {
 })
 
 // Heading styling
-globalStyle(`heading`, {
+globalStyle('heading', {
   fontSize: tokens.font.size.xl,
   fontWeight: tokens.font.weight.bold,
   margin: '1em 0',

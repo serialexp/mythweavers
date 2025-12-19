@@ -1,7 +1,7 @@
-import { tokens } from '../../theme/tokens.css'
+import { type ParentComponent, createSignal, onCleanup } from 'solid-js'
 import { chronicleTheme } from '../../theme/chronicle.css'
 import { starlightTheme } from '../../theme/starlight.css'
-import { createSignal, onCleanup, type ParentComponent } from 'solid-js'
+import { tokens } from '../../theme/tokens.css'
 
 const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => (
   <div
@@ -13,28 +13,26 @@ const ThemePanel: ParentComponent<{ theme: string; name: string }> = (props) => 
       'border-radius': '8px',
     }}
   >
-    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>
-      {props.name}
-    </h2>
+    <h2 style={{ margin: '0 0 1.5rem 0', 'font-size': '18px', 'font-weight': '600' }}>{props.name}</h2>
     {props.children}
   </div>
 )
 
 const TokenGroup = (props: { title: string; children: any }) => (
   <div style={{ 'margin-bottom': '2rem' }}>
-    <h3 style={{
-      margin: '0 0 1rem 0',
-      'font-size': '14px',
-      'font-weight': '600',
-      'text-transform': 'uppercase',
-      'letter-spacing': '0.05em',
-      opacity: 0.7,
-    }}>
+    <h3
+      style={{
+        margin: '0 0 1rem 0',
+        'font-size': '14px',
+        'font-weight': '600',
+        'text-transform': 'uppercase',
+        'letter-spacing': '0.05em',
+        opacity: 0.7,
+      }}
+    >
       {props.title}
     </h3>
-    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>
-      {props.children}
-    </div>
+    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>{props.children}</div>
   </div>
 )
 
@@ -42,7 +40,7 @@ const DurationSample = (props: { name: string; duration: string }) => {
   const [active, setActive] = createSignal(false)
 
   // Auto-animate every 2 seconds
-  const interval = setInterval(() => setActive(a => !a), 2000)
+  const interval = setInterval(() => setActive((a) => !a), 2000)
   onCleanup(() => clearInterval(interval))
 
   return (
@@ -66,13 +64,21 @@ const EasingSample = (props: { name: string; easing: string }) => {
   const [active, setActive] = createSignal(false)
 
   // Auto-animate every 2 seconds
-  const interval = setInterval(() => setActive(a => !a), 2000)
+  const interval = setInterval(() => setActive((a) => !a), 2000)
   onCleanup(() => clearInterval(interval))
 
   return (
     <div style={{ display: 'flex', 'align-items': 'center', gap: '1rem' }}>
       <span style={{ 'font-size': '12px', opacity: 0.6, 'min-width': '60px' }}>{props.name}</span>
-      <div style={{ width: '150px', height: '40px', position: 'relative', 'background-color': tokens.color.surface.default, 'border-radius': tokens.radius.default }}>
+      <div
+        style={{
+          width: '150px',
+          height: '40px',
+          position: 'relative',
+          'background-color': tokens.color.surface.default,
+          'border-radius': tokens.radius.default,
+        }}
+      >
         <div
           style={{
             position: 'absolute',

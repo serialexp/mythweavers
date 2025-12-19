@@ -1,5 +1,5 @@
-import { Stack, HStack, VStack } from './Stack'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { HStack, Stack, VStack } from './Stack'
 
 const Box = (props: { children?: string; style?: any }) => (
   <div

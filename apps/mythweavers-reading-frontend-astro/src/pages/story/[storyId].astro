@@ -1,0 +1,72 @@
+---
+import '../../styles/global.css'
+import { StoryPage } from '../../components/pages/StoryPage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { storiesApi, authApi, type StoryWithStructure, type User } from '../../lib/api'
+
+const { storyId } = Astro.params
+
+// Read theme from cookie for SSR
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+// Get user session from backend (pass cookie for SSR)
+let user: User | null = null
+try {
+  const cookieHeader = Astro.request.headers.get('cookie') || ''
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated && session.user) {
+    user = session.user
+  }
+} catch {
+  // Not authenticated
+}
+
+// Fetch story details with structure
+let story: StoryWithStructure | null = null
+let error: string | null = null
+
+try {
+  if (storyId) {
+    const result = await storiesApi.getWithStructure(storyId)
+    story = result.story
+  }
+} catch (e) {
+  console.error('Error fetching story:', e)
+  error = 'Failed to load story'
+}
+
+// Find the first chapter ID for "Start Reading" button
+const getFirstChapterId = (storyData: StoryWithStructure | null) => {
+  if (!storyData?.books?.length) return null
+  const firstBook = storyData.books[0]
+  if (!firstBook?.arcs?.length) return null
+  const firstArc = firstBook.arcs[0]
+  if (!firstArc?.chapters?.length) return null
+  return firstArc.chapters[0].id
+}
+
+const firstChapterId = story ? getFirstChapterId(story) : null
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{story?.name || 'Story'} - MythWeavers</title>
+    <meta name="description" content={story ? `Read ${story.name} on MythWeavers` : 'Story on MythWeavers'} />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <StoryPage
+      client:load
+      initialTheme={initialTheme}
+      user={user}
+      story={story}
+      storyId={storyId!}
+      firstChapterId={firstChapterId}
+      error={error}
+    />
+  </body>
+</html>

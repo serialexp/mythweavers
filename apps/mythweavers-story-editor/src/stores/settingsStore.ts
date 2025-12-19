@@ -1,16 +1,16 @@
-import { createStore } from 'solid-js/store'
 import { createEffect } from 'solid-js'
+import { createStore } from 'solid-js/store'
 import { DEFAULT_CHARS_PER_TOKEN, DEFAULT_CONTEXT_SIZE } from '../constants'
 
 // Initialize values from localStorage
 const getInitialContextSize = (): number => {
   const saved = localStorage.getItem('story-context-size')
-  return saved ? parseInt(saved) : DEFAULT_CONTEXT_SIZE
+  return saved ? Number.parseInt(saved) : DEFAULT_CONTEXT_SIZE
 }
 
 const getInitialCharsPerToken = (): number => {
   const saved = localStorage.getItem('story-chars-per-token')
-  return saved ? parseFloat(saved) : DEFAULT_CHARS_PER_TOKEN
+  return saved ? Number.parseFloat(saved) : DEFAULT_CHARS_PER_TOKEN
 }
 
 const [settingsState, setSettingsState] = createStore({
@@ -27,9 +27,9 @@ const [settingsState, setSettingsState] = createStore({
   person: localStorage.getItem('story-person') || 'third',
   tense: localStorage.getItem('story-tense') || 'past',
   autoGenerate: localStorage.getItem('story-auto-generate') === 'true',
-  paragraphsPerTurn: parseInt(localStorage.getItem('story-paragraphs-per-turn') || '3'),
+  paragraphsPerTurn: Number.parseInt(localStorage.getItem('story-paragraphs-per-turn') || '3'),
   showEventMessages: localStorage.getItem('story-show-event-messages') !== 'false', // Default to true
-  thinkingBudget: parseInt(localStorage.getItem('story-thinking-budget') || '0') // 0 = no budget
+  thinkingBudget: Number.parseInt(localStorage.getItem('story-thinking-budget') || '0'), // 0 = no budget
 })
 
 // Auto-save effects
@@ -98,22 +98,54 @@ createEffect(() => {
 
 export const settingsStore = {
   // Getters
-  get model() { return settingsState.model },
-  get storySetting() { return settingsState.storySetting },
-  get contextSize() { return settingsState.contextSize },
-  get charsPerToken() { return settingsState.charsPerToken },
-  get showSettings() { return settingsState.showSettings },
-  get provider() { return settingsState.provider },
-  get openrouterApiKey() { return settingsState.openrouterApiKey },
-  get anthropicApiKey() { return settingsState.anthropicApiKey },
-  get openaiApiKey() { return settingsState.openaiApiKey },
-  get useSmartContext() { return settingsState.useSmartContext },
-  get person() { return settingsState.person },
-  get tense() { return settingsState.tense },
-  get autoGenerate() { return settingsState.autoGenerate },
-  get paragraphsPerTurn() { return settingsState.paragraphsPerTurn },
-  get showEventMessages() { return settingsState.showEventMessages },
-  get thinkingBudget() { return settingsState.thinkingBudget },
+  get model() {
+    return settingsState.model
+  },
+  get storySetting() {
+    return settingsState.storySetting
+  },
+  get contextSize() {
+    return settingsState.contextSize
+  },
+  get charsPerToken() {
+    return settingsState.charsPerToken
+  },
+  get showSettings() {
+    return settingsState.showSettings
+  },
+  get provider() {
+    return settingsState.provider
+  },
+  get openrouterApiKey() {
+    return settingsState.openrouterApiKey
+  },
+  get anthropicApiKey() {
+    return settingsState.anthropicApiKey
+  },
+  get openaiApiKey() {
+    return settingsState.openaiApiKey
+  },
+  get useSmartContext() {
+    return settingsState.useSmartContext
+  },
+  get person() {
+    return settingsState.person
+  },
+  get tense() {
+    return settingsState.tense
+  },
+  get autoGenerate() {
+    return settingsState.autoGenerate
+  },
+  get paragraphsPerTurn() {
+    return settingsState.paragraphsPerTurn
+  },
+  get showEventMessages() {
+    return settingsState.showEventMessages
+  },
+  get thinkingBudget() {
+    return settingsState.thinkingBudget
+  },
 
   // Actions
   setModel: (model: string) => {
@@ -164,5 +196,5 @@ export const settingsStore = {
     if (model !== undefined) {
       setSettingsState('model', model || '')
     }
-  }
+  },
 }

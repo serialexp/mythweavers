@@ -1,6 +1,6 @@
-import { Component, createSignal, Show, onMount, onCleanup } from 'solid-js'
-import { BsChevronDown } from 'solid-icons/bs'
-import styles from './TokenSelector.module.css'
+import { Button } from '@mythweavers/ui'
+import { BsCheck, BsChevronDown } from 'solid-icons/bs'
+import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 
 interface TokenSelectorProps {
   onSubmit: (maxTokens: number) => void
@@ -48,34 +48,81 @@ export const TokenSelector: Component<TokenSelectorProps> = (props) => {
   })
 
   return (
-    <div class={styles.tokenSelector} ref={containerRef}>
-      <button
+    <div
+      ref={containerRef}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        gap: '0',
+      }}
+    >
+      <Button
+        size="sm"
         onClick={() => props.onSubmit(selectedTokens())}
         disabled={props.disabled}
-        class={styles.continueButton}
+        style={{
+          'border-radius': '5px 0 0 5px',
+          'border-right': '1px solid rgba(255, 255, 255, 0.2)',
+        }}
       >
         {getButtonText()}
-      </button>
-      <button
+      </Button>
+      <Button
+        size="sm"
+        iconOnly
         onClick={() => setShowPopover(!showPopover())}
         disabled={props.disabled}
-        class={styles.dropdownButton}
         title="Select response length"
+        style={{
+          'border-radius': '0 5px 5px 0',
+        }}
       >
         <BsChevronDown />
-      </button>
-      
+      </Button>
+
       <Show when={showPopover()}>
-        <div class={styles.popover}>
-          {tokenOptions.map(option => (
-            <button
-              class={`${styles.tokenOption} ${selectedTokens() === option.value ? styles.selected : ''}`}
-              onClick={() => handleSelect(option.value)}
-            >
-              <div class={styles.optionLabel}>{option.label}</div>
-              <div class={styles.optionDescription}>{option.description}</div>
-            </button>
-          ))}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '100%',
+            right: '0',
+            'margin-bottom': '8px',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
+            'border-radius': '4px',
+            'box-shadow': '0 2px 8px rgba(0, 0, 0, 0.15)',
+            'min-width': '200px',
+            'z-index': '1000',
+          }}
+        >
+          <For each={tokenOptions}>
+            {(option) => (
+              <button
+                style={{
+                  display: 'flex',
+                  'align-items': 'center',
+                  gap: '0.5rem',
+                  width: '100%',
+                  padding: '10px 16px',
+                  background: selectedTokens() === option.value ? 'var(--primary-color)' : 'none',
+                  border: 'none',
+                  'border-bottom': '1px solid var(--border-color)',
+                  color: selectedTokens() === option.value ? 'white' : 'var(--text-primary)',
+                  cursor: 'pointer',
+                  'text-align': 'left',
+                }}
+                onClick={() => handleSelect(option.value)}
+              >
+                <div style={{ flex: '1' }}>
+                  <div style={{ 'font-weight': '500', 'margin-bottom': '2px' }}>{option.label}</div>
+                  <div style={{ 'font-size': '12px', opacity: '0.7' }}>{option.description}</div>
+                </div>
+                <Show when={selectedTokens() === option.value}>
+                  <BsCheck size={16} />
+                </Show>
+              </button>
+            )}
+          </For>
         </div>
       </Show>
     </div>

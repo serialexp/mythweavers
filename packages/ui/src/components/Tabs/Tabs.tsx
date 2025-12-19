@@ -1,21 +1,14 @@
-import {
-  type JSX,
-  type ParentComponent,
-  createContext,
-  useContext,
-  createSignal,
-  createUniqueId,
-  Show,
-  For,
-} from 'solid-js'
+import { type JSX, type ParentComponent, Show, createContext, createSignal, useContext } from 'solid-js'
 import * as styles from './Tabs.css'
-import type { TabListVariants } from './Tabs.css'
+
+export type TabsVariant = 'underline' | 'pills'
 
 // Context for sharing state between Tabs components
 interface TabsContextValue {
   activeTab: () => string
   setActiveTab: (id: string) => void
-  variant: () => TabListVariants['variant']
+  variant: () => TabsVariant
+  toggleable: () => boolean
 }
 
 const TabsContext = createContext<TabsContextValue>()
@@ -27,15 +20,21 @@ const useTabsContext = () => {
 }
 
 // Main Tabs container
-export interface TabsProps extends TabListVariants {
+export interface TabsProps {
+  /** Tab style variant */
+  variant?: TabsVariant
   /** Default active tab ID */
   defaultTab?: string
   /** Controlled active tab ID */
   activeTab?: string
   /** Called when tab changes */
   onTabChange?: (tabId: string) => void
+  /** Allow clicking active tab to deselect it */
+  toggleable?: boolean
   /** Additional class */
   class?: string
+  /** Inline styles */
+  style?: JSX.CSSProperties
   children: JSX.Element
 }
 
@@ -51,10 +50,11 @@ export const Tabs: ParentComponent<TabsProps> = (props) => {
   }
 
   const variant = () => props.variant ?? 'underline'
+  const toggleable = () => props.toggleable ?? false
 
   return (
-    <TabsContext.Provider value={{ activeTab, setActiveTab, variant }}>
-      <div class={`${styles.container} ${props.class ?? ''}`}>
+    <TabsContext.Provider value={{ activeTab, setActiveTab, variant, toggleable }}>
+      <div class={`${styles.container} ${props.class ?? ''}`} style={props.style}>
         {props.children}
       </div>
     </TabsContext.Provider>
@@ -65,6 +65,8 @@ export const Tabs: ParentComponent<TabsProps> = (props) => {
 export interface TabListProps {
   /** Accessible label for the tab list */
   'aria-label'?: string
+  /** Inline styles */
+  style?: JSX.CSSProperties
   children: JSX.Element
 }
 
@@ -76,6 +78,7 @@ export const TabList: ParentComponent<TabListProps> = (props) => {
       class={styles.tabList({ variant: ctx.variant() })}
       role="tablist"
       aria-label={props['aria-label']}
+      style={props.style}
     >
       {props.children}
     </div>
@@ -99,6 +102,16 @@ export const Tab: ParentComponent<TabProps> = (props) => {
 
   const isSelected = () => ctx.activeTab() === props.id
 
+  const handleClick = () => {
+    if (props.disabled) return
+    // If toggleable and already selected, deselect
+    if (ctx.toggleable() && isSelected()) {
+      ctx.setActiveTab('')
+    } else {
+      ctx.setActiveTab(props.id)
+    }
+  }
+
   return (
     <button
       class={styles.tab({ variant: ctx.variant() })}
@@ -108,7 +121,7 @@ export const Tab: ParentComponent<TabProps> = (props) => {
       aria-controls={panelId}
       data-selected={isSelected()}
       disabled={props.disabled}
-      onClick={() => !props.disabled && ctx.setActiveTab(props.id)}
+      onClick={handleClick}
     >
       {props.icon}
       {props.children}
@@ -122,6 +135,8 @@ export interface TabPanelProps {
   id: string
   /** Additional class */
   class?: string
+  /** Inline styles */
+  style?: JSX.CSSProperties
   children: JSX.Element
 }
 
@@ -137,6 +152,7 @@ export const TabPanel: ParentComponent<TabPanelProps> = (props) => {
         role="tabpanel"
         id={panelId}
         aria-labelledby={tabId}
+        style={props.style}
       >
         {props.children}
       </div>

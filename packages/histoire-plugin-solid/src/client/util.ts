@@ -1,10 +1,7 @@
 /**
  * Synchronize state between Histoire's state object and Solid's reactive state
  */
-export function syncState(
-  histoireState: any,
-  onUpdate: (value: any) => void
-) {
+export function syncState(histoireState: any, onUpdate: (value: any) => void) {
   let stopped = false
 
   // Watch for changes to the Histoire state

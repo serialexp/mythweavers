@@ -1,8 +1,8 @@
-import { Component, Show, createSignal, createResource, For } from 'solid-js'
-import { BsTrash, BsArrowClockwise } from 'solid-icons/bs'
-import { apiClient } from '../utils/apiClient'
+import { Badge, Button, Card, CardBody, Modal, Spinner, Stack } from '@mythweavers/ui'
+import { BsArrowClockwise, BsTrash } from 'solid-icons/bs'
+import { Component, For, Show, createResource, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
-import styles from './DeletedTurnsModal.module.css'
+import { apiClient } from '../utils/apiClient'
 
 interface DeletedTurnsModalProps {
   show: boolean
@@ -18,7 +18,7 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
     async (storyId) => {
       if (!storyId) return []
       return apiClient.getDeletedMessages(storyId, 50)
-    }
+    },
   )
 
   const handleRestore = async (messageId: string) => {
@@ -43,94 +43,115 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
     return date.toLocaleString()
   }
 
-  const truncateContent = (content: string, maxLength: number = 200) => {
+  const truncateContent = (content: string, maxLength = 200) => {
     if (content.length <= maxLength) return content
-    return content.substring(0, maxLength) + '...'
+    return `${content.substring(0, maxLength)}...`
   }
 
   return (
-    <Show when={props.show}>
-      <div class="modal-overlay" onClick={props.onClose}>
-        <div 
-          class="modal-content"
-          onClick={(e) => e.stopPropagation()}
-          style="max-width: 800px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;"
+    <Modal
+      open={props.show}
+      onClose={props.onClose}
+      title={
+        <span style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
+          <BsTrash /> Deleted Story Turns
+        </span>
+      }
+      size="lg"
+    >
+      <div style={{ flex: 1, 'overflow-y': 'auto', padding: '1.5rem', 'max-height': 'calc(80vh - 120px)' }}>
+        <Show
+          when={!deletedMessages.loading}
+          fallback={
+            <div style={{ 'text-align': 'center', padding: '2rem' }}>
+              <Spinner size="md" />
+              <div style={{ color: 'var(--text-secondary)', 'margin-top': '0.5rem' }}>Loading deleted turns...</div>
+            </div>
+          }
         >
-          <div class="modal-header">
-            <h3 style="display: flex; align-items: center; gap: 0.5rem;">
-              <BsTrash /> Deleted Story Turns
-            </h3>
-            <button
-              class="modal-close"
-              onClick={props.onClose}
-            >
-              ×
-            </button>
-          </div>
-          
-          <div class={styles.modalBody}>
-            <Show
-              when={!deletedMessages.loading}
-              fallback={<div class={styles.loading}>Loading deleted turns...</div>}
-            >
-              <Show
-                when={deletedMessages() && deletedMessages()!.length > 0}
-                fallback={
-                  <div class={styles.emptyState}>
-                    No deleted story turns found
-                  </div>
-                }
+          <Show
+            when={deletedMessages() && deletedMessages()!.length > 0}
+            fallback={
+              <div
+                style={{
+                  'text-align': 'center',
+                  padding: '3rem 2rem',
+                  color: 'var(--text-secondary)',
+                  'font-size': '1.1rem',
+                }}
               >
-                <div class={styles.messageList}>
-                  <For each={deletedMessages()}>
-                    {(message) => (
-                      <div class={styles.messageItem}>
-                        <div class={styles.messageHeader}>
-                          <div class={styles.messageInfo}>
-                            <span class={styles.position}>
-                              Position #{message.order + 1}
+                No deleted story turns found
+              </div>
+            }
+          >
+            <Stack gap="md">
+              <For each={deletedMessages()}>
+                {(message) => (
+                  <Card interactive>
+                    <CardBody>
+                      <div
+                        style={{
+                          display: 'flex',
+                          'justify-content': 'space-between',
+                          'align-items': 'center',
+                          'margin-bottom': '0.75rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', 'align-items': 'center', gap: '1rem', 'flex-wrap': 'wrap' }}>
+                          <Badge variant="primary">Position #{message.order + 1}</Badge>
+                          <span style={{ color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
+                            {formatDate(message.timestamp)}
+                          </span>
+                          <Show when={message.model}>
+                            <Badge variant="secondary">{message.model}</Badge>
+                          </Show>
+                          <Show when={message.totalTokens}>
+                            <span style={{ color: 'var(--text-secondary)', 'font-size': '0.85rem' }}>
+                              {message.totalTokens} tokens
                             </span>
-                            <span class={styles.timestamp}>
-                              {formatDate(message.timestamp)}
-                            </span>
-                            <Show when={message.model}>
-                              <span class={styles.model}>
-                                {message.model}
-                              </span>
-                            </Show>
-                            <Show when={message.totalTokens}>
-                              <span class={styles.tokens}>
-                                {message.totalTokens} tokens
-                              </span>
-                            </Show>
-                          </div>
-                          <button
-                            class={styles.restoreButton}
-                            onClick={() => handleRestore(message.id)}
-                            disabled={restoringId() === message.id}
-                            title={`Restore this turn to position ${message.order + 1}`}
-                          >
-                            <BsArrowClockwise />
-                            {restoringId() === message.id ? 'Restoring...' : 'Restore'}
-                          </button>
+                          </Show>
                         </div>
-                        <Show when={message.instruction}>
-                          <div class={styles.instruction}>
-                            <strong>Instruction:</strong> {message.instruction}
-                          </div>
-                        </Show>
-                        <div class={styles.content}>
-                          {truncateContent(message.content)}
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRestore(message.id)}
+                          disabled={restoringId() === message.id}
+                          title={`Restore this turn to position ${message.order + 1}`}
+                        >
+                          <BsArrowClockwise />
+                          {restoringId() === message.id ? 'Restoring...' : 'Restore'}
+                        </Button>
                       </div>
-                    )}
-                  </For>
-                </div>
-              </Show>
-            </Show>
-          </div>
-        </div>
+                      <Show when={message.instruction}>
+                        <div
+                          style={{
+                            'margin-bottom': '0.5rem',
+                            color: 'var(--text-secondary)',
+                            'font-size': '0.9rem',
+                            'font-style': 'italic',
+                          }}
+                        >
+                          <strong>Instruction:</strong> {message.instruction}
+                        </div>
+                      </Show>
+                      <div
+                        style={{
+                          'line-height': '1.6',
+                          color: 'var(--text-primary)',
+                          'white-space': 'pre-wrap',
+                          'word-wrap': 'break-word',
+                        }}
+                      >
+                        {truncateContent(message.content)}
+                      </div>
+                    </CardBody>
+                  </Card>
+                )}
+              </For>
+            </Stack>
+          </Show>
+        </Show>
       </div>
-    </Show>
+    </Modal>
   )
 }

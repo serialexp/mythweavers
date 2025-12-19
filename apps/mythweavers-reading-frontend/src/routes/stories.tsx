@@ -1,49 +1,63 @@
-import { Title, Meta } from "@solidjs/meta";
-import { Layout } from "~/components/Layout";
-import { createResource, Show, For } from "solid-js";
-import { trpc } from "~/lib/trpc";
-import { useSearchParams } from "@solidjs/router";
-import StoryCard from "~/components/StoryCard";
+import { Meta, Title } from '@solidjs/meta'
+import { useSearchParams } from '@solidjs/router'
+import { For, Show, createResource } from 'solid-js'
+import { Layout } from '~/components/Layout'
+import StoryCard from '~/components/StoryCard'
+import { type PublicStory, storiesApi } from '~/lib/api'
+import * as pageStyles from '~/styles/pages.css'
 
 export default function Stories() {
-  const [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams()
+
+  // Get genre as string (take first if array)
+  const getGenre = () => {
+    const g = searchParams.genre
+    return Array.isArray(g) ? g[0] : g
+  }
+
+  // Get status filter
+  const getStatus = () => {
+    const s = searchParams.status
+    const status = Array.isArray(s) ? s[0] : s
+    if (status === 'COMPLETED' || status === 'ONGOING' || status === 'HIATUS') {
+      return status
+    }
+    return undefined
+  }
 
   // We'll use createResource to fetch data with SSR support
-  const [stories] = createResource(async () => {
+  const [storiesData] = createResource(async () => {
     try {
-      const genre = searchParams.genre;
-      // This would use the actual typed TRPC client when implemented
-      return await trpc.listStories.query({ genre: genre || undefined });
+      const result = await storiesApi.list({
+        status: getStatus(),
+        sortBy: 'recent',
+      })
+      return result?.stories || []
     } catch (error) {
-      console.error("Error fetching stories:", error);
-      return [];
+      console.error('Error fetching stories:', error)
+      return []
     }
-  });
+  })
 
   return (
     <Layout>
       <Title>Reader - Stories</Title>
-      <Meta
-        name="description"
-        content={`${searchParams.genre ? searchParams.genre : "All"} stories on Reader`}
-      />
+      <Meta name="description" content={`${getGenre() || 'All'} stories on Reader`} />
 
-      <h1 class="text-4xl font-bold mb-6">
-        {searchParams.genre
-          ? `${searchParams.genre.charAt(0).toUpperCase() + searchParams.genre.slice(1)} Stories`
-          : "All Stories"}
+      <h1 class={pageStyles.pageTitle}>
+        {getGenre() ? `${getGenre()!.charAt(0).toUpperCase() + getGenre()!.slice(1)} Stories` : 'All Stories'}
       </h1>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Show when={!stories.loading} fallback={<div>Loading stories...</div>}>
-          <Show when={stories()?.length} fallback={<div>No stories found</div>}>
-            <For each={stories()}>
-              {(story) => (
+      <div class={pageStyles.storyGrid}>
+        <Show when={!storiesData.loading} fallback={<div>Loading stories...</div>}>
+          <Show when={storiesData()?.length} fallback={<div>No stories found</div>}>
+            <For each={storiesData()}>
+              {(story: PublicStory) => (
                 <StoryCard
                   id={story.id}
-                  name={story.name || "Untitled"}
-                  summary={story.summary || "No summary available"}
-                  coverArtAsset={story.coverImage}
+                  name={story.name || 'Untitled'}
+                  summary={story.summary || 'No summary available'}
+                  coverArtAsset={undefined}
                   pages={story.pages || 0}
                   status={story.status}
                   canAddToLibrary={true}
@@ -54,5 +68,5 @@ export default function Stories() {
         </Show>
       </div>
     </Layout>
-  );
+  )
 }

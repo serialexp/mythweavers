@@ -16,4 +16,4 @@ export declare const Variant: ParentComponent<{
     iconColor?: string;
     source?: string;
 }>;
-export declare function run({ file, el, storyData }: ServerRunPayload): Promise<void>;
+export declare function run({ file, storyData }: ServerRunPayload): Promise<void>;

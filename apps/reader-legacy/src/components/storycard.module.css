@@ -1,0 +1,174 @@
+.card-container {
+  perspective: 1500px; /* Increase perspective for more depth */
+  margin: 0 3px;
+}
+
+@keyframes rotate {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+.card-glow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  position: absolute;
+  z-index: 0;
+  transform: translateZ(calc(var(--thickness, 30px) * -1));
+  left: -3px;
+  top: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 3px;
+  transition: transform 0.6s, opacity 0.6s;
+}
+
+.card-glow-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.card-glow-inner::before {
+  content: "";
+  display: block;
+  background: linear-gradient(
+    90deg,
+    hsla(197, 100%, 64%, 1) 0%,
+    hsla(339, 100%, 55%, 1) 50%,
+    hsla(197, 100%, 64%, 1) 100%
+  );
+  background-size: 400% 100%;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  animation: rotate 6s linear infinite;
+  z-index: 1;
+  border-radius: 3px;
+}
+
+.card-glow::after {
+  content: "";
+  display: block;
+  background: linear-gradient(
+    90deg,
+    hsla(197, 100%, 64%, 1) 0%,
+    hsla(339, 100%, 55%, 1) 50%,
+    hsla(197, 100%, 64%, 1) 100%
+  );
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  filter: blur(5px);
+  transform: translate3d(0, 0, 0);
+  animation: rotate 6s linear infinite;
+  z-index: 1;
+  opacity: 0.7;
+  border-radius: 3px;
+}
+
+.card {
+  width: 200px;
+  height: 300px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s;
+  transform: rotateY(7deg);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Add shadow for depth */
+}
+
+.card-container:hover .card {
+  transform: rotateY(180deg) translateZ(10px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); /* Increase shadow on hover */
+}
+.card-container:hover .card-glow {
+  opacity: 0;
+}
+
+.card-front,
+.card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+}
+
+.card-left {
+  position: absolute;
+  width: var(--thickness, 30px);
+  height: 100%;
+  backface-visibility: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background: linear-gradient(
+      90deg,
+      rgba(2, 0, 36, 1) 0%,
+      rgba(3, 1, 43, 0) 2%,
+      rgba(255, 255, 255, 0.15728298155199583) 37%,
+      rgba(255, 255, 255, 0.1600841020001751) 59%,
+      rgba(0, 0, 6, 0) 98%,
+      rgba(0, 0, 0, 1) 100%
+    ), var(--color, #666);
+  transform: rotateY(-90deg) translateX(calc(var(--half-thickness, -15px) * -1)) translateZ(var(--half-thickness, 15px));
+}
+
+.card-front {
+  box-shadow: inset 4px 0 10px rgba(0, 0, 0, 0.1);
+}
+.card-front {
+  z-index: 1;
+}
+.card-front:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 4px;
+  bottom: 0;
+  width: 3px;
+  background: rgba(0, 0, 0, 0.1);
+  box-shadow: 1px 0 3px rgba(255, 255, 255, 0.1);
+  z-index: 1;
+}
+
+.card-back {
+  transform: rotateY(180deg) translateZ(var(--thickness, 30px));
+  background: var(--color, #fff);
+  color: var(--textColor, #000);
+}
+.card-back:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 4px;
+  bottom: 0;
+  width: 3px;
+  background: rgba(0, 0, 0, 0.1);
+  box-shadow: 1px 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.card-title {
+  font-size: 1.5em;
+  margin-bottom: 10px;
+}
+
+.card-summary {
+  font-size: 1em;
+  color: #333;
+}

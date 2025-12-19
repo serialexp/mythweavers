@@ -1,28 +1,29 @@
 import type { ParentComponent } from 'solid-js'
+import { ThemeClassContext } from '../theme/ThemeClassContext'
 import { chronicleTheme } from '../theme/chronicle.css'
 import { starlightTheme } from '../theme/starlight.css'
 import { tokens } from '../theme/tokens.css'
 
 const ThemeWrapper: ParentComponent<{ theme: string; name: string }> = (props) => (
-  <div
-    class={props.theme}
-    style={{
-      padding: '1rem',
-      'background-color': tokens.color.bg.base,
-      color: tokens.color.text.primary,
-      'border-radius': '8px',
-      display: 'flex',
-      'flex-direction': 'column',
-      gap: '0.5rem',
-    }}
-  >
-    <div style={{ 'font-size': '12px', opacity: 0.7 }}>
-      {props.name}
+  <ThemeClassContext.Provider value={() => props.theme}>
+    <div
+      class={props.theme}
+      style={{
+        padding: '1rem',
+        'background-color': tokens.color.bg.base,
+        color: tokens.color.text.primary,
+        'border-radius': '8px',
+        display: 'flex',
+        'flex-direction': 'column',
+        gap: '0.5rem',
+      }}
+    >
+      <div style={{ 'font-size': '12px', opacity: 0.7 }}>{props.name}</div>
+      <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem', 'align-items': 'flex-start' }}>
+        {props.children}
+      </div>
     </div>
-    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem', 'align-items': 'flex-start' }}>
-      {props.children}
-    </div>
-  </div>
+  </ThemeClassContext.Provider>
 )
 
 /**

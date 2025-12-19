@@ -6,9 +6,9 @@
  * Works with both server and local storage modes.
  */
 
-import { generateMessageId } from './id'
-import { Node, Message } from '../types/core'
 import { saveService } from '../services/saveService'
+import { Message, Node } from '../types/core'
+import { generateMessageId } from './id'
 
 interface MigrationResult {
   scenesCreated: number
@@ -27,12 +27,12 @@ interface MigrationResult {
 export async function migrateChaptersToScenes(
   chapters: Node[],
   scenes: Node[],
-  messages: Message[]
+  messages: Message[],
 ): Promise<MigrationResult> {
   const result: MigrationResult = {
     scenesCreated: 0,
     messagesUpdated: 0,
-    chaptersProcessed: 0
+    chaptersProcessed: 0,
   }
 
   // Group scenes by chapter
@@ -57,7 +57,7 @@ export async function migrateChaptersToScenes(
   }
 
   // Process each chapter
-  for (const chapter of chapters.filter(n => n.type === 'chapter')) {
+  for (const chapter of chapters.filter((n) => n.type === 'chapter')) {
     const chapterScenes = scenesByChapter.get(chapter.id) || []
     const chapterMessages = messagesByChapter.get(chapter.id) || []
 
@@ -88,11 +88,11 @@ export async function migrateChaptersToScenes(
       // Metadata
       createdAt: new Date(),
       updatedAt: new Date(),
-      expanded: true
+      expanded: true,
     }
 
     // Save scene via saveService (works for both server and local mode)
-    await saveService.saveNode(defaultScene)
+    saveService.saveNode(chapter.storyId, defaultScene.id, defaultScene, 'insert')
     result.scenesCreated++
 
     // Update all messages to reference the new scene
@@ -126,8 +126,8 @@ export function needsSceneMigration(chapters: Node[], scenes: Node[], messages: 
     }
   }
 
-  for (const chapter of chapters.filter(n => n.type === 'chapter')) {
-    const hasMessages = messages.some(m => m.chapterId === chapter.id || m.nodeId === chapter.id)
+  for (const chapter of chapters.filter((n) => n.type === 'chapter')) {
+    const hasMessages = messages.some((m) => m.chapterId === chapter.id || m.nodeId === chapter.id)
     const hasScenes = (scenesByChapter.get(chapter.id) || 0) > 0
 
     if (hasMessages && !hasScenes) {

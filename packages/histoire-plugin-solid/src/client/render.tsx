@@ -1,6 +1,9 @@
+// @ts-expect-error virtual module id
+import * as generatedSetup from 'virtual:$histoire-generated-global-setup'
+// @ts-expect-error virtual module id
+import * as setup from 'virtual:$histoire-setup'
 import type { Story, Variant } from '@histoire/shared'
 import type { PropType as _PropType } from '@histoire/vendors/vue'
-import type { SolidStorySetupHandler } from '../helpers.js'
 import {
   defineComponent as _defineComponent,
   h as _h,
@@ -9,11 +12,8 @@ import {
   ref as _ref,
   watch as _watch,
 } from '@histoire/vendors/vue'
-// @ts-expect-error virtual module id
-import * as generatedSetup from 'virtual:$histoire-generated-global-setup'
-// @ts-expect-error virtual module id
-import * as setup from 'virtual:$histoire-setup'
 import { render } from 'solid-js/web'
+import type { SolidStorySetupHandler } from '../helpers.js'
 import { HstContext, RenderStory as RenderStorySolid, RenderVariant as RenderVariantSolid } from './components'
 import { syncState } from './util'
 
@@ -42,7 +42,11 @@ export default _defineComponent({
   },
 
   setup(props, { emit }) {
-    console.log('[histoire-plugin-solid] RenderStory setup() called!', { slotName: props.slotName, story: props.story?.title, variant: props.variant?.title })
+    console.log('[histoire-plugin-solid] RenderStory setup() called!', {
+      slotName: props.slotName,
+      story: props.story?.title,
+      variant: props.variant?.title,
+    })
 
     const el = _ref<HTMLDivElement>()
     let dispose: (() => void) | null = null
@@ -56,7 +60,7 @@ export default _defineComponent({
       el.value?.appendChild(target)
 
       // Set up state synchronization
-      const { stop } = syncState(props.variant.state, (value) => {
+      const { stop } = syncState(props.variant.state, (_value) => {
         // State updates will trigger Solid reactivity
       })
       stopSync = stop
@@ -70,21 +74,18 @@ export default _defineComponent({
         return
       }
 
-      dispose = render(
-        () => {
-          return (
-            <HstContext.Provider value={{ story: props.story, variant: props.variant, slotName: props.slotName }}>
-              <Comp
-                Hst={{
-                  Story: RenderStorySolid,
-                  Variant: RenderVariantSolid,
-                }}
-              />
-            </HstContext.Provider>
-          )
-        },
-        target
-      )
+      dispose = render(() => {
+        return (
+          <HstContext.Provider value={{ story: props.story, variant: props.variant, slotName: props.slotName }}>
+            <Comp
+              Hst={{
+                Story: RenderStorySolid,
+                Variant: RenderVariantSolid,
+              }}
+            />
+          </HstContext.Provider>
+        )
+      }, target)
 
       console.log('[histoire-plugin-solid] render() called, dispose:', dispose)
 
@@ -119,10 +120,13 @@ export default _defineComponent({
       }
     }
 
-    _watch(() => props.story.id, async () => {
-      unmountStory()
-      await mountStory()
-    })
+    _watch(
+      () => props.story.id,
+      async () => {
+        unmountStory()
+        await mountStory()
+      },
+    )
 
     _onMounted(async () => {
       console.log('[histoire-plugin-solid] onMounted - mounting story')

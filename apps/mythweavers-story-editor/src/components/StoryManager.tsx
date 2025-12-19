@@ -1,38 +1,44 @@
-import { Component, Show, createSignal, createEffect, createMemo } from 'solid-js'
-import { unwrap } from 'solid-js/store'
+import { Button, Modal } from '@mythweavers/ui'
 import { useNavigate } from '@solidjs/router'
-import { storyManager, StoryMetadata } from '../utils/storyManager'
-import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
-import { settingsStore } from '../stores/settingsStore'
-import { modelsStore } from '../stores/modelsStore'
+import { Component, Show, createEffect, createMemo, createSignal } from 'solid-js'
+import { unwrap } from 'solid-js/store'
+import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
-import { charactersStore } from '../stores/charactersStore'
+import { modelsStore } from '../stores/modelsStore'
+import { settingsStore } from '../stores/settingsStore'
 import { storyManagerStore } from '../stores/storyManagerStore'
+import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
 import { createSavePayload } from '../utils/savePayload'
-import { RefinementPreview, RefinementBatch } from './RefinementPreview'
-import { StoryList, StoryListItem } from './StoryList'
-import { BsServer } from 'solid-icons/bs'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
+import { StoryMetadata, storyManager } from '../utils/storyManager'
+import { RefinementBatch, RefinementPreview } from './RefinementPreview'
+import { StoryList, StoryListItem } from './StoryList'
+import * as styles from './StoryManager.css'
 
 export const StoryManager: Component = () => {
   const navigate = useNavigate()
   const [savedStories, setSavedStories] = createSignal<StoryMetadata[]>([])
   const [serverStories, setServerStories] = createSignal<ApiStoryMetadata[]>([])
-  const [storageInfo, setStorageInfo] = createSignal<{ usedKB: number; totalKB: number; storyCount: number; totalSizeKB: number } | null>(null)
+  const [storageInfo, setStorageInfo] = createSignal<{
+    usedKB: number
+    totalKB: number
+    storyCount: number
+    totalSizeKB: number
+  } | null>(null)
   const [serverAvailable, setServerAvailable] = createSignal(false)
   const [localFingerprints, setLocalFingerprints] = createSignal<Map<string, string>>(new Map())
   // Combined stories list for StoryList component
   const combinedStories = createMemo((): StoryListItem[] => {
     const fingerprints = localFingerprints()
-    
+
     // Create a Set of server story IDs for quick lookup
-    const serverStoryIds = new Set(serverStories().map(s => s.id))
-    
+    const serverStoryIds = new Set(serverStories().map((s) => s.id))
+
     // Process saved stories from the index, filtering out local duplicates of server stories
     const indexedStories: StoryListItem[] = savedStories()
-      .filter(story => !serverStoryIds.has(story.id)) // Exclude local stories that exist on server
-      .map(story => ({
+      .filter((story) => !serverStoryIds.has(story.id)) // Exclude local stories that exist on server
+      .map((story) => ({
         id: story.id,
         name: story.name,
         savedAt: story.savedAt,
@@ -42,20 +48,22 @@ export const StoryManager: Component = () => {
         chapterCount: story.chapterCount || 0,
         storySetting: story.storySetting,
         type: (story.storageMode || 'local') as 'local' | 'server',
-        isCurrentStory: currentStoryStore.id === story.id
+        isCurrentStory: currentStoryStore.id === story.id,
       }))
-    
+
     // Add server stories with fingerprint comparison
-    const serverStoriesWithType: StoryListItem[] = serverStories().map(story => {
+    const serverStoriesWithType: StoryListItem[] = serverStories().map((story) => {
       const localFingerprint = fingerprints.get(story.id)
       // Only show button if we actually have a local fingerprint (meaning local version exists)
       const hasLocalDifferences = !!localFingerprint
-      
+
       // Debug logging
       if (story.fingerprint) {
-        console.log(`[combinedStories] Story ${story.name} has server fingerprint: ${story.fingerprint}, local: ${localFingerprint || 'none'}`)
+        console.log(
+          `[combinedStories] Story ${story.name} has server fingerprint: ${story.fingerprint}, local: ${localFingerprint || 'none'}`,
+        )
       }
-      
+
       return {
         id: story.id,
         name: story.name,
@@ -69,19 +77,20 @@ export const StoryManager: Component = () => {
         isCurrentStory: story.id === currentStoryStore.id,
         fingerprint: story.fingerprint,
         localFingerprint,
-        hasLocalDifferences
+        hasLocalDifferences,
       }
     })
-    
+
     // Combine and sort by date (newest first)
-    return [...indexedStories, ...serverStoriesWithType]
-      .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime())
+    return [...indexedStories, ...serverStoriesWithType].sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime())
   })
   const [refining, setRefining] = createSignal<string | null>(null)
   const [refinementProgress, setRefinementProgress] = createSignal<Record<string, number>>({})
   const [showRefinementPreview, setShowRefinementPreview] = createSignal(false)
   const [refinementBatches, setRefinementBatches] = createSignal<RefinementBatch[]>([])
-  const [refinementStatus, setRefinementStatus] = createSignal<'not_started' | 'processing' | 'completed' | 'failed'>('not_started')
+  const [refinementStatus, setRefinementStatus] = createSignal<'not_started' | 'processing' | 'completed' | 'failed'>(
+    'not_started',
+  )
   const [currentRefinementStory, setCurrentRefinementStory] = createSignal<ApiStoryMetadata | null>(null)
   const [refinementPollInterval, setRefinementPollInterval] = createSignal<ReturnType<typeof setInterval> | null>(null)
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = createSignal<number | undefined>(undefined)
@@ -98,13 +107,13 @@ export const StoryManager: Component = () => {
       setSavedStories(stories)
       const info = await storyManager.getStorageInfo()
       setStorageInfo(info)
-      
+
       // Check server availability when modal opens
       console.log('[StoryManager] Checking server availability...')
       const available = await storyManager.isServerAvailable()
       console.log('[StoryManager] Server available:', available)
       setServerAvailable(available)
-      
+
       // Load server stories if available
       if (available) {
         loadServerStories()
@@ -119,10 +128,10 @@ export const StoryManager: Component = () => {
     try {
       const stories = await storyManager.getServerStories()
       console.log('[StoryManager] Loaded server stories:', stories)
-      
+
       // First, set the server stories so they show up with fingerprints
       setServerStories(stories)
-      
+
       // Then compute local fingerprints for server stories that have local versions
       const newFingerprints = new Map<string, string>()
       for (const serverStory of stories) {
@@ -145,79 +154,52 @@ export const StoryManager: Component = () => {
     }
   }
 
-  const handleSave = async () => {
-    try {
-      // If no story is loaded, prompt to use Save As instead
-      if (!currentStoryStore.id || currentStoryStore.id === 'new') {
-        alert('Please use "Save As" to save a new story')
-        setShowSaveAs(true)
-        return
-      }
-      if (currentStoryStore.storageMode === 'server') {
-        // Use the centralized save function
-        await messagesStore.saveManually()
-        alert('Story saved successfully!')
-      } else {
-        // Save to IndexedDB (though this happens automatically)
-        // Need to unwrap proxy objects before saving
-        await storyManager.saveStory(
-          currentStoryStore.name,
+  const handleSaveAs = async () => {
+    const name = saveAsName().trim()
+    if (!name) return
+
+    if (saveAsMode() === 'server' && serverAvailable()) {
+      try {
+        // Save to server
+        const response = await apiClient.createStory(createSavePayload({ name }))
+
+        // Update current story to the new server story
+        currentStoryStore.loadStory(response.id, name, 'server')
+        currentStoryStore.setLastKnownUpdatedAt(response.updatedAt)
+        currentStoryStore.updateAutoSaveTime()
+
+        // Refresh server stories list
+        await loadServerStories()
+      } catch (error) {
+        console.error('Failed to save as server story:', error)
+        // Fall back to local save
+        const id = await storyManager.saveStory(
+          name,
           unwrap(messagesStore.messages),
           unwrap(charactersStore.characters),
           messagesStore.input,
           currentStoryStore.storySetting,
           'local',
           currentStoryStore.person,
-          currentStoryStore.tense
+          currentStoryStore.tense,
         )
-        console.log('Story saved to IndexedDB')
-      }
-      
-      // Refresh the stories list
-      const stories = await storyManager.getSavedStories()
-      setSavedStories(stories)
-      if (serverAvailable()) {
-        await loadServerStories()
-      }
-      
-      // Show a brief success message (you could add a toast notification here)
-      console.log('Story saved successfully')
-    } catch (error) {
-      console.error('Failed to save story:', error)
-      alert('Failed to save story: ' + (error instanceof Error ? error.message : 'Unknown error'))
-    }
-  }
-
-  const handleSaveAs = async () => {
-    const name = saveAsName().trim()
-    if (!name) return
-    
-    if (saveAsMode() === 'server' && serverAvailable()) {
-      try {
-        // Save to server
-        const response = await apiClient.createStory(createSavePayload({ name }))
-        
-        // Update current story to the new server story
-        currentStoryStore.loadStory(response.id, name, 'server')
-        currentStoryStore.setLastKnownUpdatedAt(response.updatedAt)
-        currentStoryStore.updateAutoSaveTime()
-        
-        // Refresh server stories list
-        await loadServerStories()
-      } catch (error) {
-        console.error('Failed to save as server story:', error)
-        // Fall back to local save
-        const id = await storyManager.saveStory(name, unwrap(messagesStore.messages), unwrap(charactersStore.characters), messagesStore.input, currentStoryStore.storySetting, 'local', currentStoryStore.person, currentStoryStore.tense)
         currentStoryStore.loadStory(id, name, 'local')
       }
     } else {
       // Save to local
-      const id = await storyManager.saveStory(name, unwrap(messagesStore.messages), unwrap(charactersStore.characters), messagesStore.input, currentStoryStore.storySetting, 'local')
+      const id = await storyManager.saveStory(
+        name,
+        unwrap(messagesStore.messages),
+        unwrap(charactersStore.characters),
+        messagesStore.input,
+        currentStoryStore.storySetting,
+        'local',
+      )
       currentStoryStore.loadStory(id, name, 'local')
       const stories = await storyManager.getSavedStories()
       setSavedStories(stories)
     }
-    
+
     // Reset save as dialog
     setShowSaveAs(false)
     setSaveAsName('')
@@ -225,7 +207,6 @@ export const StoryManager: Component = () => {
     const info = await storyManager.getStorageInfo()
     setStorageInfo(info)
   }
-
 
   const handleDeleteStory = async (id: string) => {
     if (confirm('Are you sure you want to delete this story?')) {
@@ -236,8 +217,6 @@ export const StoryManager: Component = () => {
       setStorageInfo(info)
     }
   }
-
-
 
   // Handlers for StoryList component
   const handleLoadStoryWrapper = async (storyId: string, _type: 'local' | 'server') => {
@@ -264,14 +243,14 @@ export const StoryManager: Component = () => {
   }
 
   const handleExportPdf = async (storyId: string) => {
-    const story = serverStories().find(s => s.id === storyId)
+    const story = serverStories().find((s) => s.id === storyId)
     if (story) {
       await handleDownloadPdf(story)
     }
   }
 
   const handleRefineStoryWrapper = async (storyId: string) => {
-    const story = serverStories().find(s => s.id === storyId)
+    const story = serverStories().find((s) => s.id === storyId)
     if (story) {
       await handleRefineStory(story)
     }
@@ -284,8 +263,6 @@ export const StoryManager: Component = () => {
       await loadServerStories()
     }
   }
-
-
 
   const handleDownloadPdf = async (story: ApiStoryMetadata) => {
     try {
@@ -311,27 +288,22 @@ export const StoryManager: Component = () => {
   const startRefinement = async (model: string) => {
     const story = currentRefinementStory()
     if (!story) return
-    
+
     try {
       setRefining(story.id)
       setRefinementStatus('processing')
-      
-      const result = await apiClient.startRefinement(
-        story.id, 
-        model,
-        currentStoryStore.person,
-        currentStoryStore.tense
-      )
-      
+
+      const result = await apiClient.startRefinement(story.id, model, currentStoryStore.person, currentStoryStore.tense)
+
       if (result.success) {
         // Start polling for status
         const pollInterval = setInterval(async () => {
           try {
             const status = await apiClient.getRefinementStatus(story.id)
-            
+
             if (status.status === 'processing' && status.progress !== undefined) {
-              setRefinementProgress(prev => ({ ...prev, [story.id]: status.progress! }))
-              
+              setRefinementProgress((prev) => ({ ...prev, [story.id]: status.progress! }))
+
               // Update batches and timing
               if (status.batches) {
                 setRefinementBatches(status.batches)
@@ -346,31 +318,31 @@ export const StoryManager: Component = () => {
               clearInterval(pollInterval)
               setRefinementPollInterval(null)
               setRefining(null)
-              setRefinementProgress(prev => {
+              setRefinementProgress((prev) => {
                 const newProgress = { ...prev }
                 delete newProgress[story.id]
                 return newProgress
               })
               setRefinementStatus('completed')
-              
+
               // Update final batches
               if (status.batches) {
                 setRefinementBatches(status.batches)
               }
-              
+
               // Reload server stories to show the refined version
               await loadServerStories()
             } else if (status.status === 'failed') {
               clearInterval(pollInterval)
               setRefinementPollInterval(null)
               setRefining(null)
-              setRefinementProgress(prev => {
+              setRefinementProgress((prev) => {
                 const newProgress = { ...prev }
                 delete newProgress[story.id]
                 return newProgress
               })
               setRefinementStatus('failed')
-              
+
               // Update final batches
               if (status.batches) {
                 setRefinementBatches(status.batches)
@@ -380,7 +352,7 @@ export const StoryManager: Component = () => {
             console.error('Failed to check refinement status:', error)
           }
         }, 2000) // Poll every 2 seconds
-        
+
         setRefinementPollInterval(pollInterval)
       }
     } catch (error) {
@@ -394,7 +366,7 @@ export const StoryManager: Component = () => {
   const stopRefinement = async () => {
     const story = currentRefinementStory()
     if (!story) return
-    
+
     try {
       // Stop polling
       const pollInterval = refinementPollInterval()
@@ -402,13 +374,13 @@ export const StoryManager: Component = () => {
         clearInterval(pollInterval)
         setRefinementPollInterval(null)
       }
-      
+
       // Call stop endpoint
       await apiClient.stopRefinement(story.id)
-      
+
       setRefining(null)
       setRefinementStatus('failed')
-      setRefinementProgress(prev => {
+      setRefinementProgress((prev) => {
         const newProgress = { ...prev }
         delete newProgress[story.id]
         return newProgress
@@ -420,145 +392,110 @@ export const StoryManager: Component = () => {
 
   return (
     <>
-      <Show when={storyManagerStore.isOpen}>
-        <div class="modal-overlay" onClick={() => storyManagerStore.close()}>
-          <div class="modal-content story-modal" onClick={(e) => e.stopPropagation()}>
-            <div class="modal-header">
-              <h3>Story Manager</h3>
-              <button class="modal-close" onClick={() => storyManagerStore.close()}>×</button>
-            </div>
-            
-            <div class="modal-body">
-              {/* Current story info */}
-              <div class="current-story-section" style="padding: 1rem; background: var(--background-secondary); border-radius: 4px; margin-bottom: 1rem;">
-                <h4 style="margin-top: 0;">Current Story</h4>
-                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                  <div><strong>Name:</strong> {currentStoryStore.name || 'Untitled Story'}</div>
-                  <div><strong>ID:</strong> {currentStoryStore.id || 'New Story'}</div>
-                  <div><strong>Storage:</strong> {currentStoryStore.storageMode === 'server' ? '☁️ Server' : '💾 Local'}</div>
-                  <div><strong>Stats:</strong> {messagesStore.messages.length} messages, {charactersStore.characters.length} characters</div>
-                </div>
-                
-                {/* Save and Save As buttons */}
-                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                  <button
-                    onClick={handleSave}
-                    class="save-story-button"
-                    title={currentStoryStore.storageMode === 'local' ? 'Save to IndexedDB (auto-saves on changes)' : 'Save to server'}
-                  >
-                    Save
-                  </button>
-                  <Show when={!showSaveAs()}>
-                    <button 
-                      class="save-as-button"
-                      onClick={() => setShowSaveAs(true)}
-                      style="background: var(--background-secondary); border: 1px solid var(--primary-color); color: var(--primary-color);"
-                    >
-                      Save As...
-                    </button>
-                  </Show>
-                </div>
-                
-                {/* Save As form */}
-                <Show when={showSaveAs()}>
-                  <div class="save-as-form" style="margin-top: 1rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 4px;">
-                    <h5>Save As New Story</h5>
-                    <input
-                      type="text"
-                      placeholder="New story name..."
-                      value={saveAsName()}
-                      onInput={(e) => setSaveAsName(e.target.value)}
-                      class="story-name-input"
-                      style="margin-bottom: 0.5rem;"
-                    />
-                    <div style="margin-bottom: 0.5rem;">
-                      <label style="margin-right: 1rem;">
-                        <input
-                          type="radio"
-                          name="storage-mode"
-                          checked={saveAsMode() === 'local'}
-                          onChange={() => setSaveAsMode('local')}
-                        />
-                        💾 Local
-                      </label>
-                      <Show when={serverAvailable()}>
-                        <label>
-                          <input
-                            type="radio"
-                            name="storage-mode"
-                            checked={saveAsMode() === 'server'}
-                            onChange={() => setSaveAsMode('server')}
-                          />
-                          ☁️ Server
-                        </label>
-                      </Show>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                      <button
-                        onClick={handleSaveAs}
-                        disabled={!saveAsName().trim()}
-                        class="save-story-button"
-                      >
-                        Save As
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowSaveAs(false)
-                          setSaveAsName('')
-                        }}
-                        style="background: var(--background-secondary); color: var(--text-primary);"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </Show>
-              </div>
+      <Modal
+        open={storyManagerStore.isOpen}
+        onClose={() => storyManagerStore.close()}
+        title="Story Manager"
+        size="lg"
+      >
+        {/* Current story bar */}
+        <div class={styles.currentStoryBar}>
+          <div class={styles.currentStoryInfo}>
+            <span class={styles.storageIcon} title={currentStoryStore.storageMode === 'server' ? 'Server storage' : 'Local storage'}>
+              {currentStoryStore.storageMode === 'server' ? '☁️' : '💾'}
+            </span>
+            <span class={styles.storyName}>{currentStoryStore.name || 'Untitled Story'}</span>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => setShowSaveAs(!showSaveAs())}>
+            Save As...
+          </Button>
+        </div>
 
-              {/* Server status indicator */}
+        {/* Save As form */}
+        <Show when={showSaveAs()}>
+          <div class={styles.saveAsForm}>
+            <h5 class={styles.saveAsFormTitle}>Save As New Story</h5>
+            <input
+              type="text"
+              placeholder="New story name..."
+              value={saveAsName()}
+              onInput={(e) => setSaveAsName(e.target.value)}
+              class={styles.inputField}
+            />
+            <div class={styles.radioGroup}>
+              <label class={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="storage-mode"
+                  checked={saveAsMode() === 'local'}
+                  onChange={() => setSaveAsMode('local')}
+                />
+                💾 Local
+              </label>
               <Show when={serverAvailable()}>
-                <div class="server-status">
-                  <BsServer /> Server connected
-                </div>
-              </Show>
-
-              {/* Storage info */}
-              <Show when={storageInfo()}>
-                <div class="storage-info">
-                  <small>
-                    {storageInfo()!.storyCount} stories • {storageInfo()!.totalSizeKB}KB used
-                  </small>
-                </div>
-              </Show>
-
-              {/* All stories header */}
-              <div class="saved-stories-header">
-                <h4>Stories</h4>
-              </div>
-
-              {/* Unified stories list */}
-              <div class="saved-stories-section">
-                <Show when={combinedStories().length === 0} fallback={
-                  <StoryList
-                    stories={combinedStories()}
-                    onLoadStory={handleLoadStoryWrapper}
-                    onDeleteStory={handleDeleteStoryWrapper}
-                    onExportPdf={handleExportPdf}
-                    onRefineStory={handleRefineStoryWrapper}
-                    onRename={refreshStories}
-                    refining={refining()}
-                    editingEnabled={true}
-                    serverAvailable={serverAvailable()}
+                <label class={styles.radioLabel}>
+                  <input
+                    type="radio"
+                    name="storage-mode"
+                    checked={saveAsMode() === 'server'}
+                    onChange={() => setSaveAsMode('server')}
                   />
-                }>
-                  <div class="no-stories">No stories yet</div>
-                </Show>
-              </div>
+                  ☁️ Server
+                </label>
+              </Show>
+            </div>
+            <div class={styles.buttonRow}>
+              <Button variant="primary" onClick={handleSaveAs} disabled={!saveAsName().trim()}>
+                Save As
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowSaveAs(false)
+                  setSaveAsName('')
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </div>
+        </Show>
+
+        {/* Storage info */}
+        <Show when={storageInfo()}>
+          <div class={styles.storageInfo}>
+            {storageInfo()!.storyCount} stories • {storageInfo()!.totalSizeKB}KB used
+          </div>
+        </Show>
+
+        {/* All stories header */}
+        <div class={styles.storiesHeader}>
+          <h4 class={styles.storiesTitle}>Stories</h4>
         </div>
-      </Show>
-      
+
+        {/* Unified stories list */}
+        <div class={styles.storiesSection}>
+          <Show
+            when={combinedStories().length === 0}
+            fallback={
+              <StoryList
+                stories={combinedStories()}
+                onLoadStory={handleLoadStoryWrapper}
+                onDeleteStory={handleDeleteStoryWrapper}
+                onExportPdf={handleExportPdf}
+                onRefineStory={handleRefineStoryWrapper}
+                onRename={refreshStories}
+                refining={refining()}
+                editingEnabled={true}
+                serverAvailable={serverAvailable()}
+              />
+            }
+          >
+            <div class={styles.noStories}>No stories yet</div>
+          </Show>
+        </div>
+      </Modal>
+
       <RefinementPreview
         storyName={currentRefinementStory()?.name || ''}
         storyId={currentRefinementStory()?.id}

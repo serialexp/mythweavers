@@ -1,75 +1,63 @@
-import { type ParentComponent, onMount } from "solid-js";
-import { A, AccessorWithLatest } from "@solidjs/router";
-import {
-  colorMode,
-  initColorMode,
-  toggleColorMode,
-} from "../lib/stores/color-mode";
-import UserStatus from "./UserStatus";
-import type { UserSession } from "~/lib/session";
+import { IconButton, NavBar, NavBarActions, NavBarBrand, NavBarNav, NavLink, useTheme } from '@mythweavers/ui'
+import { AccessorWithLatest } from '@solidjs/router'
+import type { ParentComponent } from 'solid-js'
+import type { UserSession } from '~/lib/session'
+import * as styles from './Layout.css'
+import UserStatus from './UserStatus'
 
 export const Layout: ParentComponent<{
-  user: AccessorWithLatest<UserSession | undefined | null>;
+  user?: AccessorWithLatest<UserSession | undefined | null>
 }> = (props) => {
-  // Initialize color mode on mount
-  onMount(() => {
-    initColorMode();
-  });
+  const { resolvedTheme, setTheme } = useTheme()
+
+  const toggleTheme = () => {
+    setTheme(resolvedTheme() === 'starlight' ? 'chronicle' : 'starlight')
+  }
+
+  const isDark = () => resolvedTheme() === 'chronicle'
 
   return (
-    <div
-      class="flex flex-col min-h-screen"
-      data-theme={colorMode() === "light" ? "fantasy" : "forest"}
-    >
-      <nav class="sticky navbar top-0 bg-base-100 text-base-content dark:bg-gray-900 dark:text-gray-300 shadow-md z-50">
-        <div class="container flex justify-between m-auto">
-          <div>
-            <A href="/" class="btn btn-ghost text-xl">
-              Reader
-            </A>
-          </div>
-          <div class="flex-none">
-            <ul class="menu menu-horizontal px-1">
-              <li>
-                <A href="/">Home</A>
-              </li>
-              <li>
-                <A href="/stories">Stories</A>
-              </li>
-              <li>
-                <A href="/download">Download Writer</A>
-              </li>
-            </ul>
-          </div>
+    <div class={isDark() ? styles.darkTheme : styles.lightTheme}>
+      <div class={styles.pageWrapper}>
+        <NavBar variant="elevated" position="sticky">
+          <NavBarBrand href="/">
+            <img
+              src="/mythweavers.png"
+              alt="MythWeavers"
+              style={{ height: '32px', 'margin-right': '8px' }}
+            />
+            MythWeavers
+          </NavBarBrand>
 
-          <div class="flex gap-2">
+          <NavBarNav>
+            <NavLink href="/">Home</NavLink>
+            <NavLink href="/stories">Stories</NavLink>
+          </NavBarNav>
+
+          <NavBarActions>
             <UserStatus user={props.user} />
 
-            <div class="flex-none ml-2">
-              <button
-                type="button"
-                class="btn btn-ghost btn-circle"
-                onClick={() => toggleColorMode()}
-              >
-                {colorMode() === "light" ? "🌙" : "☀️"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-      <main
-        class="flex-grow overflow-hidden"
-        style={{
-          "background-image":
-            colorMode() === "dark" ? "url(/bg-dark.png)" : "url(/bg-light.png)",
-          "background-attachment": "fixed",
-          "background-size": "cover",
-        }}
-      >
-        <div class="container mx-auto flex-1">
-          <div class="bg-base-100 p-4 h-full">{props.children}</div>
-        </div>
-      </main>
+            <IconButton
+              variant="ghost"
+              onClick={toggleTheme}
+              aria-label={isDark() ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark() ? '☀️' : '🌙'}
+            </IconButton>
+          </NavBarActions>
+        </NavBar>
+
+        <main
+          class={styles.mainContent}
+          style={{
+            'background-image': isDark() ? 'url(/bg-dark.png)' : 'url(/bg-light.png)',
+            'background-attachment': 'fixed',
+            'background-size': 'cover',
+          }}
+        >
+          {props.children}
+        </main>
+      </div>
     </div>
-  );
-};
+  )
+}

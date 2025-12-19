@@ -1,6 +1,6 @@
 export {
   calculateOptimalPath,
   formatTravelTime,
-} from "@story/shared";
+} from '@mythweavers/shared'
 
-export type { PathSegment, PathfindingResult } from "@story/shared";
+export type { PathSegment, PathfindingResult } from '@mythweavers/shared'

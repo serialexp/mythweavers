@@ -1,35 +1,30 @@
+import { Alert } from '@mythweavers/ui'
 import { Component, Show, createSignal } from 'solid-js'
-import { serverStore } from '../stores/serverStore'
 import { authStore } from '../stores/authStore'
-import styles from './ServerStatusIndicator.module.css'
+import { serverStore } from '../stores/serverStore'
 
 export const ServerStatusIndicator: Component = () => {
   const [dismissed, setDismissed] = createSignal(false)
-  
+
   // Don't show if in offline mode or if dismissed
-  const shouldShow = () => 
-    !authStore.isOfflineMode && 
-    !serverStore.isAvailable && 
-    !serverStore.isChecking && 
-    !dismissed()
-  
+  const shouldShow = () =>
+    !authStore.isOfflineMode && !serverStore.isAvailable && !serverStore.isChecking && !dismissed()
+
   return (
     <Show when={shouldShow()}>
-      <div class={styles.serverStatus}>
-        <div class={styles.statusIcon}>⚠️</div>
-        <div class={styles.statusText}>
-          <div class={styles.statusTitle}>Server Unavailable</div>
-          <div class={styles.statusMessage}>
-            The backend server is not responding. Some features may be limited.
-          </div>
-        </div>
-        <button 
-          class={styles.dismissButton}
-          onClick={() => setDismissed(true)}
-          aria-label="Dismiss notification"
-        >
-          ✕
-        </button>
+      <div
+        style={{
+          position: 'fixed',
+          top: '10px',
+          right: '10px',
+          'z-index': '1000',
+          'max-width': '350px',
+          animation: 'slideInRight 0.3s ease-out',
+        }}
+      >
+        <Alert variant="warning" title="Server Unavailable" dismissible onDismiss={() => setDismissed(true)}>
+          The backend server is not responding. Some features may be limited.
+        </Alert>
       </div>
     </Show>
   )

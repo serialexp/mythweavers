@@ -1,6 +1,6 @@
 // Store-related types
 
-import { Message, Character, ContextItem, Chapter, Node } from './core'
+import { Chapter, Character, ContextItem, Message, Node } from './core'
 
 export interface CurrentStory {
   id: string
@@ -48,7 +48,12 @@ export interface PendingEntityBatch {
   sourceMessageId: string
 }
 
-export type GlobalOperationType = 'bulk-summarize' | 'migrate-instructions' | 'remove-user-messages' | 'cleanup-think-tags' | null
+export type GlobalOperationType =
+  | 'bulk-summarize'
+  | 'migrate-instructions'
+  | 'remove-user-messages'
+  | 'cleanup-think-tags'
+  | null
 
 export interface GlobalOperation {
   type: GlobalOperationType
@@ -67,7 +72,7 @@ export interface SavedStory {
   characters: Character[]
   contextItems?: ContextItem[]
   chapters?: Chapter[]
-  nodes?: Node[]  // New hierarchical structure
+  nodes?: Node[] // New hierarchical structure
   input: string
   storySetting: string
   person?: 'first' | 'second' | 'third'

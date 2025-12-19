@@ -1,6 +1,6 @@
 // Utility types used across the application
 
-import { Message, Character, ContextItem } from './core'
+import { Character, ContextItem, Message } from './core'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'

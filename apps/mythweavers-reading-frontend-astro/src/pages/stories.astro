@@ -1,0 +1,75 @@
+---
+import '../styles/global.css'
+import { StoriesPage } from '../components/pages/StoriesPage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { storiesApi, authApi, type User } from '../lib/api'
+
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+// Get user session from backend (pass cookie for SSR)
+let user: User | null = null
+try {
+  const cookieHeader = Astro.request.headers.get('cookie') || ''
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated && session.user) {
+    user = session.user
+  }
+} catch {
+  // Not authenticated
+}
+
+// Parse query params
+const url = new URL(Astro.request.url)
+const genre = url.searchParams.get('genre') || undefined
+const filterAbandoned = url.searchParams.get('filterAbandoned') === 'true'
+const page = parseInt(url.searchParams.get('page') || '1', 10)
+const pageSize = 20
+
+// Fetch stories
+let stories: any[] = []
+let pagination = { page: 1, pageSize, total: 0, totalPages: 1 }
+try {
+  const result = await storiesApi.list({
+    page,
+    pageSize,
+    sortBy: 'recent',
+    genre,
+    filterAbandoned,
+  })
+  stories = result.stories
+  pagination = result.pagination
+} catch (error) {
+  console.error('Error fetching stories:', error)
+}
+
+// Build pagination URLs
+const buildPageUrl = (newPage: number) => {
+  const newUrl = new URL(url)
+  newUrl.searchParams.set('page', newPage.toString())
+  return newUrl.pathname + newUrl.search
+}
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stories - MythWeavers</title>
+    <meta name="description" content="Browse stories on MythWeavers" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <StoriesPage
+      client:load
+      initialTheme={initialTheme}
+      user={user}
+      stories={stories}
+      pagination={pagination}
+      currentGenre={genre}
+      filterAbandoned={filterAbandoned}
+      buildPageUrl={buildPageUrl}
+    />
+  </body>
+</html>

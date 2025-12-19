@@ -1,16 +1,16 @@
-import { Component, createMemo, createSignal } from 'solid-js'
+import type { Paragraph } from '@mythweavers/shared'
 import { SceneEditor } from '@mythweavers/ui'
-import type { Paragraph } from '@story/shared'
-import type { EditorScene, EditorCharacter } from '@mythweavers/ui'
-import { messagesStore } from '../stores/messagesStore'
+import type { EditorCharacter, EditorScene } from '@mythweavers/ui'
+import { Component, createMemo, createSignal } from 'solid-js'
 import { charactersStore } from '../stores/charactersStore'
+import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { generateMessageId } from '../utils/id'
-import { getCharacterDisplayName } from '../utils/character'
+// getCharacterDisplayName available if needed for character name formatting
 
 interface SceneEditorWrapperProps {
   messageId: string
-  onParagraphsUpdate?: (paragraphs: Paragraph[]) => void  // Called when paragraphs change (doesn't save, just notifies parent)
+  onParagraphsUpdate?: (paragraphs: Paragraph[]) => void // Called when paragraphs change (doesn't save, just notifies parent)
 }
 
 /**
@@ -20,11 +20,11 @@ interface SceneEditorWrapperProps {
  * Displays paragraphs for a SINGLE message
  */
 export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) => {
-  const [selectedParagraphId, setSelectedParagraphId] = createSignal<string | null>(null)
+  const [_selectedParagraphId, setSelectedParagraphId] = createSignal<string | null>(null)
 
   // Get the message
   const message = createMemo(() => {
-    return messagesStore.messages.find(m => m.id === props.messageId)
+    return messagesStore.messages.find((m) => m.id === props.messageId)
   })
 
   // Get the scene node (if the message belongs to a scene)
@@ -64,7 +64,7 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     const s = scene()
     return {
       id: props.messageId, // Use message ID as scene ID
-      paragraphs: currentParagraphs(),  // Use current (editable) state
+      paragraphs: currentParagraphs(), // Use current (editable) state
       protagonistId: s?.viewpointCharacterId || undefined,
       characterIds: s?.activeCharacterIds || [],
       perspective: (s?.perspective?.toLowerCase() as 'first' | 'third') || undefined,
@@ -80,7 +80,7 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     props.onParagraphsUpdate?.(paragraphs)
   }
 
-  const handleParagraphCreate = (paragraph: Omit<Paragraph, 'id'>, afterId?: string): string => {
+  const handleParagraphCreate = (_paragraph: Omit<Paragraph, 'id'>, afterId?: string): string => {
     const newId = generateMessageId()
     console.log('[SceneEditorWrapper] Creating paragraph:', newId, afterId)
     // TODO: Create message in messagesStore
@@ -132,7 +132,6 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
       characters={editorCharacters()}
       locations={{}} // Empty record for now
       sceneId={props.messageId}
-
       // Callbacks
       onParagraphsChange={handleParagraphsChange}
       onParagraphCreate={handleParagraphCreate}
@@ -145,7 +144,6 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
       onViewpointChange={handleViewpointChange}
       onActiveCharactersChange={handleActiveCharactersChange}
       onGoalChange={handleGoalChange}
-
       // AI not connected yet
       onAiHelp={async () => {}}
       onAiRewrite={async () => {}}

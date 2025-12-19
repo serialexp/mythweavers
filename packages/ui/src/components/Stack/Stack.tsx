@@ -1,7 +1,17 @@
 import { JSX, splitProps } from 'solid-js'
-import { stack, type StackVariants } from './Stack.css'
+import { stack } from './Stack.css'
 
-export interface StackProps extends StackVariants {
+export interface StackProps {
+  /** Stack direction */
+  direction?: 'vertical' | 'horizontal'
+  /** Gap between items */
+  gap?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+  /** Cross-axis alignment */
+  align?: 'start' | 'center' | 'end' | 'stretch' | 'baseline'
+  /** Main-axis justification */
+  justify?: 'start' | 'center' | 'end' | 'between' | 'around' | 'evenly'
+  /** Allow wrapping */
+  wrap?: boolean
   /** Stack content */
   children?: JSX.Element
   /** Additional class */

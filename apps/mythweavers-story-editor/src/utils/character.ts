@@ -5,9 +5,7 @@ import type { Character } from '../types/core'
  * Combines firstName, middleName, and lastName
  */
 export function getCharacterDisplayName(character: Character): string {
-  return [character.firstName, character.middleName, character.lastName]
-    .filter(Boolean)
-    .join(' ') || 'Unnamed'
+  return [character.firstName, character.middleName, character.lastName].filter(Boolean).join(' ') || 'Unnamed'
 }
 
 /**

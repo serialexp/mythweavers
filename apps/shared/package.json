@@ -1,5 +1,5 @@
 {
-  "name": "@writer/shared",
+  "name": "@mythweavers/shared",
   "version": "1.0.0",
   "description": "",
   "main": "src/index.ts",
@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aeolun/dijkstra-calculator": "^1.4.3",
     "html-entities": "^2.6.0",
     "zod": "catalog:"
   },

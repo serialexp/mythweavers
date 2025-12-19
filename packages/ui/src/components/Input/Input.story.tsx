@@ -1,5 +1,5 @@
-import { Input } from './Input'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Input } from './Input'
 
 export default (props: { Hst: any }) => {
   const { Hst } = props

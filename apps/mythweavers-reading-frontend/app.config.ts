@@ -1,21 +1,20 @@
-import { defineConfig } from "@solidjs/start/config";
-import tailwindcss from "@tailwindcss/vite";
-import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
-import { join } from "node:path";
+import { join } from 'node:path'
+import { defineConfig } from '@solidjs/start/config'
+import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
 
 export default defineConfig({
   vite: {
-    plugins: [tailwindcss(), vanillaExtractPlugin()],
+    plugins: [vanillaExtractPlugin()],
     resolve: {
       alias: {
-        "~": join(process.cwd(), "src"),
+        '~': join(process.cwd(), 'src'),
       },
     },
     ssr: {
-      noExternal: ["@writer/shared", "@mythweavers/ui"],
+      noExternal: ['@mythweavers/shared', '@mythweavers/ui'],
     },
     server: {
       port: 3333,
     },
   },
-});
+})

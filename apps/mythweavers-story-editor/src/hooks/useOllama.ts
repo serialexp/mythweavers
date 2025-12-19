@@ -1,41 +1,43 @@
-import { messagesStore } from '../stores/messagesStore'
-import { settingsStore } from '../stores/settingsStore'
+import { cacheStore } from '../stores/cacheStore'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
-import { cacheStore } from '../stores/cacheStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
+import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
+import { settingsStore } from '../stores/settingsStore'
 import type { Character, Node } from '../types/core'
+import { LLMClient, LLMMessage, convertToTokenUsage } from '../types/llm'
+import { generateAnalysis } from '../utils/analysisClient'
+import { generateNextStoryBeatInstructions, isStoryReadyForGeneration } from '../utils/autoGeneration'
+import { getCharacterDisplayName } from '../utils/character'
+import { evaluateCharacterTemplates, getTemplatedActiveCharacters } from '../utils/contextTemplating'
+import { LLMClientFactory } from '../utils/llm'
+import {
+  analyzeStoryBeat,
+  detectNewEntities,
+  extractKnownEntities,
+  generateEntityDescriptions,
+} from '../utils/smartContext'
 import {
   getParagraphSummarizationPrompt,
   getSentenceSummarizationPrompt,
   getSummarizationPrompt,
 } from '../utils/storyUtils'
-import { LLMClientFactory } from '../utils/llm'
-import { LLMClient, LLMMessage, convertToTokenUsage } from '../types/llm'
-import { analyzeStoryBeat, detectNewEntities, generateEntityDescriptions, extractKnownEntities } from '../utils/smartContext'
-import { generateAnalysis } from '../utils/analysisClient'
-import { isStoryReadyForGeneration, generateNextStoryBeatInstructions } from '../utils/autoGeneration'
-import {
-  evaluateCharacterTemplates,
-  getTemplatedActiveCharacters,
-} from '../utils/contextTemplating'
-import { getCharacterDisplayName } from '../utils/character'
 
 export const useOllama = () => {
   let currentAbortController: AbortController | null = null
-  
+
   // Cache clients to avoid recreating them on every call
   let cachedClient: LLMClient | null = null
   let cachedProvider: string | null = null
-  
+
   const getClient = (): LLMClient => {
     // Return cached client if provider hasn't changed
     if (cachedClient && cachedProvider === settingsStore.provider) {
       return cachedClient
     }
-    
+
     // Getting client for provider
     cachedClient = LLMClientFactory.getClient(settingsStore.provider)
     cachedProvider = settingsStore.provider
@@ -60,15 +62,13 @@ export const useOllama = () => {
   const extractThinkTags = (content: string): { cleanedContent: string; thinkContent: string | undefined } => {
     const thinkRegex = /<think>([\s\S]*?)<\/think>/gi
     const matches = Array.from(content.matchAll(thinkRegex))
-    
+
     // Extract all think content
-    const thinkContent = matches.length > 0 
-      ? matches.map(match => match[1].trim()).join('\n\n')
-      : undefined
-    
+    const thinkContent = matches.length > 0 ? matches.map((match) => match[1].trim()).join('\n\n') : undefined
+
     // Remove think tags and their content from the main content
     let cleanedContent = content.replace(thinkRegex, '').trim()
-    
+
     // Clean up unwanted system tags (but keep orphaned think tags visible)
     cleanedContent = cleanedContent
       .replace(/<\/s>/g, '')
@@ -77,10 +77,10 @@ export const useOllama = () => {
       // Clean up multiple consecutive newlines
       .replace(/\n{3,}/g, '\n\n')
       .trim()
-    
-    return { 
-      cleanedContent, 
-      thinkContent
+
+    return {
+      cleanedContent,
+      thinkContent,
     }
   }
 
@@ -95,11 +95,9 @@ Story opening:
 ${content.substring(0, 1000)}
 
 Title:`
-      
-      const messages: LLMMessage[] = [
-        { role: 'user', content: prompt }
-      ]
-      
+
+      const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
+
       const response = client.generate({
         model: settingsStore.model,
         messages,
@@ -115,7 +113,8 @@ Title:`
       }
 
       // Clean up the title
-      name = name.trim()
+      name = name
+        .trim()
         .replace(/^["']|["']$/g, '') // Remove quotes
         .replace(/^Title:?\s*/i, '') // Remove "Title:" prefix if present
         .substring(0, 50) // Limit length
@@ -134,17 +133,14 @@ Title:`
     callType: string,
   ): Promise<string> => {
     const client = getClient()
-    let result = ""
+    let result = ''
 
     try {
       const response = client.generate({
         model: settingsStore.model,
         messages,
         stream: true,
-        providerOptions:
-          settingsStore.provider === "ollama"
-            ? { num_ctx: getEffectiveContextSize() }
-            : undefined,
+        providerOptions: settingsStore.provider === 'ollama' ? { num_ctx: getEffectiveContextSize() } : undefined,
         metadata: { callType },
       })
 
@@ -217,10 +213,7 @@ Title:`
 
     const composeContext = (activeCharacters: Character[], viewpointCharacter: Character | null): string => {
       const names: Character[] = [...activeCharacters]
-      if (
-        viewpointCharacter &&
-        !names.some((char) => char.id === viewpointCharacter.id)
-      ) {
+      if (viewpointCharacter && !names.some((char) => char.id === viewpointCharacter.id)) {
         names.push(viewpointCharacter)
       }
 
@@ -274,10 +267,7 @@ Title:`
         }))
     }
 
-    const evaluateViewpointCharacter = (
-      viewpointId: string,
-      targetMessageId: string,
-    ): Character | null => {
+    const evaluateViewpointCharacter = (viewpointId: string, targetMessageId: string): Character | null => {
       const original = characters.find((char) => char.id === viewpointId)
       if (!original) {
         return null
@@ -296,10 +286,7 @@ Title:`
         }
         return sanitizeCharacter(evaluated)
       } catch (error) {
-        console.error(
-          'Failed to render viewpoint character template for message summaries:',
-          error,
-        )
+        console.error('Failed to render viewpoint character template for message summaries:', error)
         return sanitizeCharacter(original)
       }
     }
@@ -311,7 +298,7 @@ Title:`
       }
 
       const chapterNode = targetMessage.nodeId
-        ? (nodeStore.getNode(targetMessage.nodeId) as Node | null) ?? undefined
+        ? ((nodeStore.getNode(targetMessage.nodeId) as Node | null) ?? undefined)
         : undefined
 
       const templatedActive = getTemplatedActiveCharacters(
@@ -331,8 +318,8 @@ Title:`
       const viewpointId = chapterNode?.viewpointCharacterId
       const viewpointCharacter =
         viewpointId != null
-          ? templatedActive.find((char) => char.id === viewpointId) ??
-            evaluateViewpointCharacter(viewpointId, targetMessageId)
+          ? (templatedActive.find((char) => char.id === viewpointId) ??
+            evaluateViewpointCharacter(viewpointId, targetMessageId))
           : null
 
       const templatedContext = composeContext(templatedActive, viewpointCharacter)
@@ -360,9 +347,7 @@ Title:`
       }
     }
 
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find((msg) => msg.role === 'assistant' && !msg.isQuery)
+    const lastAssistantMessage = [...messages].reverse().find((msg) => msg.role === 'assistant' && !msg.isQuery)
 
     if (lastAssistantMessage) {
       const context = tryRenderForMessage(lastAssistantMessage.id)
@@ -411,45 +396,31 @@ Title:`
     return messages
   }
 
-  const generateSentenceSummary = async (
-    content: string,
-    characterContext?: string,
-  ): Promise<string> => {
+  const generateSentenceSummary = async (content: string, characterContext?: string): Promise<string> => {
     const instructions = getSentenceSummarizationPrompt(content, characterContext)
     const messages = buildSummarizationMessages(content, characterContext, instructions)
     return runSummarizationPromptWithCache(
       messages,
-      "sentence summary",
-      "Sentence summary generation failed.",
-      "summary:sentence",
+      'sentence summary',
+      'Sentence summary generation failed.',
+      'summary:sentence',
     )
   }
 
-  const generateSummary = async (
-    content: string,
-    characterContext?: string,
-  ): Promise<string> => {
+  const generateSummary = async (content: string, characterContext?: string): Promise<string> => {
     const instructions = getSummarizationPrompt(content, characterContext)
     const messages = buildSummarizationMessages(content, characterContext, instructions)
-    return runSummarizationPromptWithCache(
-      messages,
-      "summary",
-      "Summary generation failed.",
-      "summary:multi",
-    )
+    return runSummarizationPromptWithCache(messages, 'summary', 'Summary generation failed.', 'summary:multi')
   }
 
-  const generateParagraphSummary = async (
-    content: string,
-    characterContext?: string,
-  ): Promise<string> => {
+  const generateParagraphSummary = async (content: string, characterContext?: string): Promise<string> => {
     const instructions = getParagraphSummarizationPrompt(content, characterContext)
     const messages = buildSummarizationMessages(content, characterContext, instructions)
     return runSummarizationPromptWithCache(
       messages,
-      "paragraph summary",
-      "Paragraph summary generation failed.",
-      "summary:paragraph",
+      'paragraph summary',
+      'Paragraph summary generation failed.',
+      'summary:paragraph',
     )
   }
 
@@ -468,10 +439,15 @@ Title:`
     return { sentenceSummary, summary, paragraphSummary }
   }
 
-  const generateResponse = async (promptOrMessages: string | LLMMessage[], assistantMessageId: string, shouldSummarize = false, maxTokens?: number) => {
+  const generateResponse = async (
+    promptOrMessages: string | LLMMessage[],
+    assistantMessageId: string,
+    shouldSummarize = false,
+    maxTokens?: number,
+  ) => {
     const client = getClient()
     let accumulatedContent = ''
-    let startTime = Date.now()
+    const startTime = Date.now()
     let tokenCount = 0
     let accumulatedUsage: any = null
 
@@ -480,19 +456,21 @@ Title:`
 
     try {
       // Convert string prompt to messages if needed
-      const messages: LLMMessage[] = typeof promptOrMessages === 'string' 
-        ? [{ role: 'user', content: promptOrMessages }]
-        : promptOrMessages
-      
+      const messages: LLMMessage[] =
+        typeof promptOrMessages === 'string' ? [{ role: 'user', content: promptOrMessages }] : promptOrMessages
+
       const response = client.generate({
         model: settingsStore.model,
         messages,
         stream: true,
         max_tokens: maxTokens,
         thinking_budget: settingsStore.thinkingBudget > 0 ? settingsStore.thinkingBudget : undefined,
-        providerOptions: settingsStore.provider === 'ollama' ? {
-          num_ctx: getEffectiveContextSize()
-        } : undefined,
+        providerOptions:
+          settingsStore.provider === 'ollama'
+            ? {
+                num_ctx: getEffectiveContextSize(),
+              }
+            : undefined,
         signal,
         metadata: {
           callType: shouldSummarize ? 'story:generate+summary' : 'story:generate',
@@ -503,7 +481,7 @@ Title:`
       // Don't track summaries as they use different prompts
       const isStoryOrQuery = messages.length > 2
       if (isStoryOrQuery) {
-        const cacheId = `story-context`  // Use consistent ID since the context is the same
+        const cacheId = 'story-context' // Use consistent ID since the context is the same
         const cacheContent = JSON.stringify(messages.slice(0, -1)) // Exclude last user message
         cacheStore.addCacheEntry(cacheId, cacheContent, messages.length - 1)
       }
@@ -512,13 +490,13 @@ Title:`
         if (signal.aborted) {
           throw new DOMException('Generation aborted', 'AbortError')
         }
-        
+
         if (part.response) {
           accumulatedContent += part.response
           tokenCount++
           messagesStore.updateMessage(assistantMessageId, { content: accumulatedContent })
         }
-        
+
         // Accumulate usage data from message_delta events
         if (part.usage) {
           if (!accumulatedUsage) {
@@ -526,9 +504,10 @@ Title:`
           } else {
             // Accumulate the token counts
             accumulatedUsage.prompt_tokens = (accumulatedUsage.prompt_tokens || 0) + (part.usage.prompt_tokens || 0)
-            accumulatedUsage.completion_tokens = (accumulatedUsage.completion_tokens || 0) + (part.usage.completion_tokens || 0)
+            accumulatedUsage.completion_tokens =
+              (accumulatedUsage.completion_tokens || 0) + (part.usage.completion_tokens || 0)
             accumulatedUsage.total_tokens = (accumulatedUsage.total_tokens || 0) + (part.usage.total_tokens || 0)
-            
+
             // For cache tokens, take the latest values (they're not cumulative)
             if (part.usage.cache_creation_input_tokens !== undefined) {
               accumulatedUsage.cache_creation_input_tokens = part.usage.cache_creation_input_tokens
@@ -538,7 +517,7 @@ Title:`
             }
           }
         }
-        
+
         if (part.done) {
           const endTime = Date.now()
           const duration = (endTime - startTime) / 1000
@@ -551,11 +530,11 @@ Title:`
 
           // Calculate characters per token ratio using standardized token usage
           const tokenUsageForRatio = convertToTokenUsage(usage)
-          
+
           if (tokenUsageForRatio && tokenUsageForRatio.input_normal > 0) {
             // Get total character count of visible story messages (what was actually sent)
             const visibleMessages = messagesStore.getVisibleMessages()
-            const storyMessages = visibleMessages.filter(msg => !msg.isQuery)
+            const storyMessages = visibleMessages.filter((msg) => !msg.isQuery)
             const totalChars = storyMessages.reduce((sum, msg) => sum + msg.content.length, 0)
 
             if (totalChars > 0) {
@@ -577,25 +556,25 @@ Title:`
           const outputTokens = usage?.completion_tokens || 0
           const cacheReadTokens = usage?.cache_read_input_tokens || 0
           const cacheWriteTokens = usage?.cache_creation_input_tokens || 0
-          
+
           // Calculate non-cached input tokens
           const regularInputTokens = Math.max(0, inputTokens - cacheReadTokens - cacheWriteTokens)
-          
+
           // Get pricing from the model data
           let inputBasePrice = 0.000003 // Default fallback price (per token)
           let outputBasePrice = 0.000015 // Default fallback price (per token)
-          
-          const currentModel = modelsStore.availableModels.find(m => m.name === settingsStore.model)
+
+          const currentModel = modelsStore.availableModels.find((m) => m.name === settingsStore.model)
           if (currentModel?.pricing) {
             // All providers now store prices as numbers per million tokens
             inputBasePrice = currentModel.pricing.input / 1_000_000
             outputBasePrice = currentModel.pricing.output / 1_000_000
-            
+
             // Using API pricing
           } else {
             // Using default pricing
           }
-          
+
           // Update token statistics
           // Update token statistics
           cacheStore.updateTokenStats({
@@ -604,12 +583,12 @@ Title:`
             cacheWriteTokens,
             cacheReadTokens,
             inputBasePrice,
-            outputBasePrice
+            outputBasePrice,
           })
-          
+
           // Convert to standardized token usage
           const tokenUsage = convertToTokenUsage(usage)
-          
+
           messagesStore.updateMessage(assistantMessageId, {
             content: cleanedContent,
             think: thinkContent,
@@ -621,7 +600,7 @@ Title:`
             cacheReadTokens: cacheReadTokens || undefined,
             // Add new standardized token usage
             tokenUsage,
-            model: settingsStore.model
+            model: settingsStore.model,
           })
 
           // Check if we got an API error (like overloaded_error) and skip summarization
@@ -629,33 +608,30 @@ Title:`
           if (hasApiError) {
             // API error detected, skipping summarization
           }
-          
+
           // Generate summaries if requested and this is a story message (and no API error)
           if (shouldSummarize && cleanedContent.trim() && !hasApiError) {
             // Generating summaries
-            
+
             // Set summarizing flag before starting
             messagesStore.setSummarizing(assistantMessageId, true)
-            
+
             try {
               // Check if this is the first story turn and we have a placeholder name
-              const storyMessages = messagesStore.messages.filter(msg => !msg.isQuery && msg.role === 'assistant')
+              const storyMessages = messagesStore.messages.filter((msg) => !msg.isQuery && msg.role === 'assistant')
               const isFirstTurn = storyMessages.length === 1
               const summariesPromise = generateSummaries(assistantMessageId, cleanedContent)
-              
+
               if (isFirstTurn && currentStoryStore.isPlaceholderName) {
                 // Generate story name along with summaries
-                const [summaries, storyName] = await Promise.all([
-                  summariesPromise,
-                  generateStoryName(cleanedContent)
-                ])
-                
+                const [summaries, storyName] = await Promise.all([summariesPromise, generateStoryName(cleanedContent)])
+
                 messagesStore.updateMessage(assistantMessageId, {
                   sentenceSummary: summaries.sentenceSummary,
                   summary: summaries.summary,
-                  paragraphSummary: summaries.paragraphSummary
+                  paragraphSummary: summaries.paragraphSummary,
                 })
-                
+
                 // Update story name if we got a good one
                 if (storyName && storyName !== 'Untitled Story') {
                   currentStoryStore.setName(storyName, false)
@@ -664,11 +640,11 @@ Title:`
               } else {
                 // Just generate summaries as usual
                 const summaries = await summariesPromise
-                
+
                 messagesStore.updateMessage(assistantMessageId, {
                   sentenceSummary: summaries.sentenceSummary,
                   summary: summaries.summary,
-                  paragraphSummary: summaries.paragraphSummary
+                  paragraphSummary: summaries.paragraphSummary,
                 })
               }
             } catch (error) {
@@ -682,58 +658,58 @@ Title:`
           // Generate scene analysis and discover entities if this is a story message and smart context is enabled (and no API error)
           if (shouldSummarize && cleanedContent.trim() && settingsStore.useSmartContext && !hasApiError) {
             // Starting scene analysis
-            
+
             // Set analyzing flag before starting
             messagesStore.setAnalyzing(assistantMessageId, true)
-            
+
             try {
               // Create a message object for analysis
-              const messageForAnalysis = messagesStore.messages.find(msg => msg.id === assistantMessageId)
+              const messageForAnalysis = messagesStore.messages.find((msg) => msg.id === assistantMessageId)
               if (!messageForAnalysis) {
                 throw new Error('Message not found for analysis')
               }
               // Found message for analysis
-              
+
               // Get known entities for consistency
               // Getting known entities
               const knownEntities = extractKnownEntities(
-                charactersStore.characters || [], 
-                contextItemsStore.contextItems || []
+                charactersStore.characters || [],
+                contextItemsStore.contextItems || [],
               )
               // Extracted known entities
-              
+
               if (!knownEntities) {
                 throw new Error('Failed to extract known entities')
               }
-              
+
               // Analyze the story beat for scene information
               // Analyzing story beat
-              const sceneAnalysis = await analyzeStoryBeat(
-                messageForAnalysis,
-                knownEntities,
-                generateAnalysis
-              )
+              const sceneAnalysis = await analyzeStoryBeat(messageForAnalysis, knownEntities, generateAnalysis)
               // Scene analysis completed
-              
+
               // Update message with scene analysis
               messagesStore.updateMessage(assistantMessageId, { sceneAnalysis })
-              
+
               // Detect new entities in the story beat
               const newEntities = detectNewEntities(sceneAnalysis, knownEntities)
-              
-              if (newEntities.newCharacters.length > 0 || newEntities.newThemes.length > 0 || newEntities.newLocations.length > 0) {
+
+              if (
+                newEntities.newCharacters.length > 0 ||
+                newEntities.newThemes.length > 0 ||
+                newEntities.newLocations.length > 0
+              ) {
                 // Discovered new entities
-                
+
                 // Generate descriptions for discovered entities
                 const entityDescriptions = await generateEntityDescriptions(
                   newEntities,
                   cleanedContent,
-                  generateAnalysis
+                  generateAnalysis,
                 )
-                
+
                 // Import pendingEntitiesStore here to avoid circular dependency
                 const { pendingEntitiesStore } = await import('../stores/pendingEntitiesStore')
-                
+
                 // Create pending entities for user confirmation
                 const pendingEntities = [
                   ...Object.entries(entityDescriptions.characterDescriptions).map(([name, description]) => ({
@@ -742,7 +718,7 @@ Title:`
                     name: name,
                     description: description,
                     originalName: name,
-                    isSelected: true // Default to selected
+                    isSelected: true, // Default to selected
                   })),
                   ...Object.entries(entityDescriptions.themeDescriptions).map(([name, description]) => ({
                     id: crypto.randomUUID(),
@@ -750,7 +726,7 @@ Title:`
                     name: name,
                     description: description,
                     originalName: name,
-                    isSelected: true
+                    isSelected: true,
                   })),
                   ...Object.entries(entityDescriptions.locationDescriptions).map(([name, description]) => ({
                     id: crypto.randomUUID(),
@@ -758,15 +734,15 @@ Title:`
                     name: name,
                     description: description,
                     originalName: name,
-                    isSelected: true
-                  }))
+                    isSelected: true,
+                  })),
                 ]
-                
+
                 // Add batch to pending entities store
                 pendingEntitiesStore.addBatch({
                   id: crypto.randomUUID(),
                   entities: pendingEntities,
-                  messageId: assistantMessageId
+                  messageId: assistantMessageId,
                 })
               }
             } catch (error) {
@@ -781,21 +757,22 @@ Title:`
           if (shouldSummarize && cleanedContent.trim()) {
             checkForAutoGeneration()
           }
-          
+
           // Message updates during generation already trigger saves via messagesStore.updateMessage
           // The final state is automatically saved with debouncing
         }
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        messagesStore.updateMessage(assistantMessageId, { content: accumulatedContent + '\n\n[Generation aborted]' })
+        messagesStore.updateMessage(assistantMessageId, { content: `${accumulatedContent}\n\n[Generation aborted]` })
       } else {
         let errorMessage = 'Unknown error'
         if (error instanceof Error) {
           errorMessage = error.message
           // Add more context for common errors
           if (error.message.includes('fetch')) {
-            errorMessage += '\n\nPossible causes:\n- Network connection issues\n- Provider service is down\n- CORS/firewall blocking the request'
+            errorMessage +=
+              '\n\nPossible causes:\n- Network connection issues\n- Provider service is down\n- CORS/firewall blocking the request'
           } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
             errorMessage += '\n\nPlease check your API key in settings.'
           } else if (error.message.includes('429')) {
@@ -832,7 +809,7 @@ Title:`
     if (settingsStore.provider !== 'ollama') {
       return false
     }
-    
+
     try {
       // For Ollama, we'll need to check using a different method
       // Since the unified interface doesn't expose ps(), we'll just return false
@@ -855,15 +832,15 @@ Title:`
     const pollForReadiness = async (maxAttempts = 60, interval = 1000) => {
       let attempt = 0
       const { pendingEntitiesStore } = await import('../stores/pendingEntitiesStore')
-      
+
       while (attempt < maxAttempts) {
         try {
           // If pending entities dialog is visible, pause polling until it's resolved
           if (pendingEntitiesStore.isVisible && pendingEntitiesStore.hasPendingEntities) {
             // Auto-generation paused - waiting for user input
-            
+
             // Wait for user to handle entities (don't increment attempt counter)
-            await new Promise(resolve => setTimeout(resolve, interval))
+            await new Promise((resolve) => setTimeout(resolve, interval))
             continue
           }
 
@@ -872,29 +849,31 @@ Title:`
             // Story ready for auto-generation
 
             // Generate next story beat instructions
-            const nextInstructions = await generateNextStoryBeatInstructions(generateAnalysis, settingsStore.paragraphsPerTurn)
+            const nextInstructions = await generateNextStoryBeatInstructions(
+              generateAnalysis,
+              settingsStore.paragraphsPerTurn,
+            )
             // Generated auto-instructions
 
             // Dispatch event to trigger generation
             const autoGenerateEvent = new CustomEvent('auto-generate-story', {
-              detail: { instructions: nextInstructions }
+              detail: { instructions: nextInstructions },
             })
             window.dispatchEvent(autoGenerateEvent)
             return
           }
 
           // Auto-generation waiting
-          
-          // Wait before next check and increment attempt counter
-          await new Promise(resolve => setTimeout(resolve, interval))
-          attempt++
 
+          // Wait before next check and increment attempt counter
+          await new Promise((resolve) => setTimeout(resolve, interval))
+          attempt++
         } catch (error) {
           console.error('Auto-generation failed:', error)
           return
         }
       }
-      
+
       // Auto-generation timed out
     }
 
@@ -919,11 +898,7 @@ Title:`
 
     try {
       const nodeMessages = messagesStore.messages.filter(
-        msg =>
-          msg.nodeId === nodeId &&
-          msg.role === 'assistant' &&
-          !msg.isQuery &&
-          msg.type !== 'chapter'
+        (msg) => msg.nodeId === nodeId && msg.role === 'assistant' && !msg.isQuery && msg.type !== 'chapter',
       )
       const lastNodeMessageId = nodeMessages[nodeMessages.length - 1]?.id
 
@@ -948,16 +923,12 @@ Title:`
         return charactersStore.characters.find(predicate)
       }
 
-      const protagonist = findCharacter(char => char.isMainCharacter)
+      const protagonist = findCharacter((char) => char.isMainCharacter)
       const viewpointCharacter = viewpointCharacterId
-        ? findCharacter(char => char.id === viewpointCharacterId)
+        ? findCharacter((char) => char.id === viewpointCharacterId)
         : undefined
 
-      const formatCharacterNote = (
-        label: string,
-        character: Character | undefined,
-        extraNote?: string
-      ): string => {
+      const formatCharacterNote = (label: string, character: Character | undefined, extraNote?: string): string => {
         if (!character) return ''
         const description = character.description?.trim()
         const charName = getCharacterDisplayName(character)
@@ -969,7 +940,7 @@ Title:`
       const viewpointNote = formatCharacterNote(
         'Viewpoint Character',
         viewpointCharacter,
-        '(this chapter is written from their perspective)'
+        '(this chapter is written from their perspective)',
       )
 
       // Create a prompt for content summarization
@@ -980,18 +951,19 @@ Title:`
 Title: ${title}${protagonistNote}${viewpointNote}
 
 ${content}`
-      
-      const messages: LLMMessage[] = [
-        { role: 'user', content: prompt }
-      ]
-      
+
+      const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
+
       const response = client.generate({
         model: settingsStore.model,
         messages,
         stream: true,
-        providerOptions: settingsStore.provider === 'ollama' ? {
-          num_ctx: getEffectiveContextSize()
-        } : undefined,
+        providerOptions:
+          settingsStore.provider === 'ollama'
+            ? {
+                num_ctx: getEffectiveContextSize(),
+              }
+            : undefined,
         metadata: { callType: 'summary:node' },
       })
 
@@ -1018,6 +990,6 @@ ${content}`
     abortGeneration,
     isGenerating,
     checkIfOllamaIsBusy,
-    pingCache
+    pingCache,
   }
 }

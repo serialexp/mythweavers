@@ -1,0 +1,110 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "build": {
+    "beforeBuildCommand": "pnpm run build",
+    "beforeDevCommand": "pnpm run dev",
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "../dist"
+  },
+  "identifier": "com.serial-experiments.writer",
+  "productName": "writer",
+  "version": "1.0.1",
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "",
+    "externalBin": ["binaries/typst"],
+    "resources": ["migrations/*"],
+    "icon": ["icons/128x128@2x.png", "icons/128x128.png", "icons/32x32.png", "icons/icon.icns", "icons/icon.ico"],
+    "longDescription": "",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": "1CFB1406AEB3CBB9266E43569EDC1BF7F545DCE3"
+    },
+    "shortDescription": "",
+    "targets": "all",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "app": {
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$HOME/**/*"]
+      },
+      "capabilities": [
+        {
+          "identifier": "my-capability",
+          "description": "My application capability used for all windows",
+          "windows": ["*"],
+          "permissions": [
+            "fs:allow-app-write-recursive",
+            "fs:allow-app-read-recursive",
+            "fs:allow-appcache-read-recursive",
+            "fs:allow-appcache-write-recursive",
+            "fs:allow-home-write-recursive",
+            "fs:allow-home-read-recursive",
+            "dialog:allow-open",
+            "dialog:allow-save",
+            "dialog:allow-message",
+            "sql:allow-load",
+            "sql:allow-select",
+            "sql:allow-execute",
+            "sql:allow-close",
+            "core:path:default",
+            "core:window:default",
+            "core:window:allow-set-title",
+            "store:allow-get",
+            "store:allow-delete",
+            "store:allow-set",
+            "store:allow-entries",
+            "store:allow-save",
+            "store:allow-load",
+            "clipboard-manager:allow-write-text",
+            {
+              "identifier": "shell:allow-execute",
+              "allow": [
+                {
+                  "args": [
+                    "compile",
+                    {
+                      "validator": "\\S+"
+                    }
+                  ],
+                  "name": "binaries/typst",
+                  "sidecar": true
+                }
+              ]
+            },
+            {
+              "identifier": "http:default",
+              "allow": [
+                { "url": "https://*.serial-experiments.com" },
+                { "url": "https://*.openai.com" },
+                { "url": "https://*.googleapis.com" }
+              ]
+            },
+            "shell:allow-open"
+          ]
+        }
+      ]
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 600,
+        "resizable": true,
+        "title": "Writer",
+        "width": 800,
+        "dragDropEnabled": false
+      }
+    ]
+  }
+}

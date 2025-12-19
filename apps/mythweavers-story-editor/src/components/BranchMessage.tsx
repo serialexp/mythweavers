@@ -1,13 +1,13 @@
-import { Component, createSignal, For, Show } from 'solid-js'
-import { BranchOption, Message } from '../types/core'
-import { messagesStore } from '../stores/messagesStore'
-import { currentStoryStore } from '../stores/currentStoryStore'
-import { uiStore } from '../stores/uiStore'
-import { nodeStore } from '../stores/nodeStore'
-import { generateMessageId } from '../utils/id'
-import { BsPlus, BsTrash, BsCheckCircle, BsCircle, BsArrowRight, BsPencil } from 'solid-icons/bs'
+import { Button, IconButton, Input, Stack, Textarea } from '@mythweavers/ui'
+import { BsArrowRight, BsCheckCircle, BsCircle, BsPencil, BsPlus, BsTrash } from 'solid-icons/bs'
 import { ImTarget } from 'solid-icons/im'
-import styles from './BranchMessage.module.css'
+import { Component, For, Show, createSignal } from 'solid-js'
+import { currentStoryStore } from '../stores/currentStoryStore'
+import { messagesStore } from '../stores/messagesStore'
+import { nodeStore } from '../stores/nodeStore'
+import { uiStore } from '../stores/uiStore'
+import { BranchOption, Message } from '../types/core'
+import { generateMessageId } from '../utils/id'
 
 interface BranchMessageProps {
   message: Message
@@ -30,9 +30,9 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
     const newOption: BranchOption = {
       id: generateMessageId(),
       label: 'New option',
-      targetNodeId: '',  // Will be set when user targets
+      targetNodeId: '', // Will be set when user targets
       targetMessageId: '', // Will be set when user targets
-      description: undefined
+      description: undefined,
     }
 
     const updatedMessage: Message = {
@@ -51,7 +51,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
   const handleDeleteOption = (optionId: string) => {
     const updatedMessage: Message = {
       ...props.message,
-      options: (props.message.options || []).filter(opt => opt.id !== optionId),
+      options: (props.message.options || []).filter((opt) => opt.id !== optionId),
     }
 
     messagesStore.updateMessage(props.message.id, updatedMessage)
@@ -74,8 +74,8 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
 
     const description = editingDescription().trim()
 
-    const updatedOptions = (props.message.options || []).map(opt =>
-      opt.id === optionId ? { ...opt, label, description: description || undefined } : opt
+    const updatedOptions = (props.message.options || []).map((opt) =>
+      opt.id === optionId ? { ...opt, label, description: description || undefined } : opt,
     )
 
     const updatedMessage: Message = {
@@ -113,12 +113,23 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
   }
 
   return (
-    <div class={styles.branchContainer}>
-      <div class={styles.branchQuestion}>
+    <div>
+      <div
+        style={{
+          'font-size': '1.1rem',
+          'font-weight': '600',
+          color: 'var(--text-primary)',
+          'margin-bottom': 'var(--spacing-md)',
+          display: 'flex',
+          'align-items': 'center',
+          gap: 'var(--spacing-sm)',
+        }}
+      >
+        <span style={{ 'font-size': '1.3rem' }}>🔀</span>
         {props.message.content}
       </div>
 
-      <div class={styles.optionsList}>
+      <Stack gap="sm" style={{ 'margin-bottom': 'var(--spacing-md)' }}>
         <For each={props.message.options || []}>
           {(option) => {
             const isSelected = () => selectedOptionId() === option.id
@@ -128,49 +139,80 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
             const getTargetInfo = () => {
               if (!hasTarget) return null
 
-              const targetNode = nodeStore.nodesArray.find(n => n.id === option.targetNodeId)
-              const targetMessage = messagesStore.messages.find(m => m.id === option.targetMessageId)
+              const targetNode = nodeStore.nodesArray.find((n) => n.id === option.targetNodeId)
+              const targetMessage = messagesStore.messages.find((m) => m.id === option.targetMessageId)
 
               return {
                 nodeName: targetNode?.title || 'Unknown',
-                messageOrder: targetMessage?.order ?? '?'
+                messageOrder: targetMessage?.order ?? '?',
               }
             }
 
             return (
-              <div class={`${styles.optionItem} ${isSelected() ? styles.optionSelected : ''}`}>
-                <button
-                  class={styles.selectButton}
+              <div
+                style={{
+                  display: 'flex',
+                  'align-items': 'center',
+                  gap: 'var(--spacing-sm)',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
+                  background: 'var(--bg-primary)',
+                  border: `1px solid ${isSelected() ? 'var(--success-color)' : 'var(--border-color)'}`,
+                  'border-radius': 'var(--radius-sm)',
+                  transition: 'all var(--transition-fast)',
+                  ...(isSelected()
+                    ? { background: 'color-mix(in srgb, var(--success-color) 10%, var(--bg-primary))' }
+                    : {}),
+                }}
+              >
+                <IconButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleSelectOption(option.id)}
-                  title={isSelected() ? 'Selected' : 'Click to select this option'}
+                  aria-label={isSelected() ? 'Selected' : 'Click to select this option'}
+                  style={{ color: isSelected() ? 'var(--success-color)' : 'var(--text-secondary)' }}
                 >
                   {isSelected() ? <BsCheckCircle size={20} /> : <BsCircle size={20} />}
-                </button>
+                </IconButton>
 
-                <div class={styles.optionContent}>
-                  <Show when={isEditing()} fallback={
-                    <div class={styles.optionLabelContainer}>
-                      <div class={styles.optionLabel}>
-                        {option.label}
-                      </div>
-                      <Show when={option.description}>
-                        <div class={styles.optionDescription}>
-                          {option.description}
+                <div style={{ flex: 1, display: 'flex', 'flex-direction': 'column', gap: 'var(--spacing-xs)' }}>
+                  <Show
+                    when={isEditing()}
+                    fallback={
+                      <div style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--spacing-xs)' }}>
+                        <div style={{ 'font-size': '1rem', color: 'var(--text-primary)', 'font-weight': '500' }}>
+                          {option.label}
                         </div>
-                      </Show>
-                      <Show when={hasTarget} fallback={
-                        <span class={styles.noTarget}>No target set</span>
-                      }>
-                        <span class={styles.hasTarget}>
-                          Target: {getTargetInfo()?.nodeName} (msg #{getTargetInfo()?.messageOrder})
-                        </span>
-                      </Show>
-                    </div>
-                  }>
-                    <div class={styles.editFields}>
-                      <input
-                        type="text"
-                        class={styles.optionInput}
+                        <Show when={option.description}>
+                          <div
+                            style={{
+                              'font-size': '0.9rem',
+                              color: 'var(--text-secondary)',
+                              'font-style': 'italic',
+                              'margin-top': 'var(--spacing-xs)',
+                            }}
+                          >
+                            {option.description}
+                          </div>
+                        </Show>
+                        <Show
+                          when={hasTarget}
+                          fallback={
+                            <span
+                              style={{ 'font-size': '0.85rem', color: 'var(--danger-color)', 'font-style': 'italic' }}
+                            >
+                              No target set
+                            </span>
+                          }
+                        >
+                          <span style={{ 'font-size': '0.85rem', color: 'var(--success-color)' }}>
+                            Target: {getTargetInfo()?.nodeName} (msg #{getTargetInfo()?.messageOrder})
+                          </span>
+                        </Show>
+                      </div>
+                    }
+                  >
+                    <Stack gap="xs" style={{ width: '100%' }}>
+                      <Input
                         value={editingLabel()}
                         onInput={(e) => setEditingLabel(e.currentTarget.value)}
                         onKeyDown={(e) => {
@@ -184,8 +226,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                         placeholder="Option label"
                         ref={(el) => el && setTimeout(() => el.focus(), 0)}
                       />
-                      <textarea
-                        class={styles.optionTextarea}
+                      <Textarea
                         value={editingDescription()}
                         onInput={(e) => setEditingDescription(e.currentTarget.value)}
                         onKeyDown={(e) => {
@@ -199,54 +240,67 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                         placeholder="Optional description"
                         rows={2}
                       />
-                    </div>
+                    </Stack>
                   </Show>
                 </div>
 
                 <Show when={!isEditing()}>
-                  <button
-                    class={styles.optionButton}
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleStartEditLabel(option)}
-                    title="Edit option text"
+                    aria-label="Edit option text"
                   >
                     <BsPencil size={16} />
-                  </button>
+                  </IconButton>
                 </Show>
 
-                <button
-                  class={styles.optionButton}
+                <IconButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleStartTargeting(option.id)}
-                  title="Set target message"
+                  aria-label="Set target message"
                 >
                   <ImTarget size={16} />
-                </button>
+                </IconButton>
 
                 <Show when={hasTarget}>
-                  <button
-                    class={`${styles.optionButton} ${styles.success}`}
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleGoToTarget(option)}
-                    title="Go to target message"
+                    aria-label="Go to target message"
+                    style={{ color: 'var(--success-color)' }}
                   >
                     <BsArrowRight size={18} />
-                  </button>
+                  </IconButton>
                 </Show>
 
-                <button
-                  class={`${styles.optionButton} ${styles.danger}`}
+                <IconButton
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleDeleteOption(option.id)}
-                  title="Delete option"
+                  aria-label="Delete option"
                 >
                   <BsTrash size={18} />
-                </button>
+                </IconButton>
               </div>
             )
           }}
         </For>
-      </div>
+      </Stack>
 
-      <button class={styles.addOptionButton} onClick={handleAddOption}>
+      <Button
+        variant="secondary"
+        onClick={handleAddOption}
+        style={{
+          width: '100%',
+          border: '1px dashed var(--border-color)',
+          background: 'var(--bg-primary)',
+        }}
+      >
         <BsPlus size={20} /> Add Option
-      </button>
+      </Button>
     </div>
   )
 }

@@ -1,6 +1,6 @@
-import { Spinner } from './Spinner'
-import { Button } from '../Button'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
+import { Button } from '../Button'
+import { Spinner } from './Spinner'
 
 export default (props: { Hst: any }) => {
   const { Hst } = props

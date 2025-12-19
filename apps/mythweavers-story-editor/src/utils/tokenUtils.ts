@@ -8,22 +8,22 @@ export function getTokenUsage(message: Message): TokenUsage | undefined {
   if (message.tokenUsage) {
     return message.tokenUsage
   }
-  
+
   // Fall back to legacy fields
   if (message.promptTokens || message.totalTokens) {
     const totalPromptTokens = message.promptTokens || 0
     const cacheReadTokens = message.cacheReadTokens || 0
     const cacheWriteTokens = message.cacheCreationTokens || 0
     const regularInputTokens = Math.max(0, totalPromptTokens - cacheReadTokens - cacheWriteTokens)
-    
+
     return {
       input_normal: regularInputTokens,
       input_cache_read: cacheReadTokens,
       input_cache_write: cacheWriteTokens,
-      output_normal: message.totalTokens || 0
+      output_normal: message.totalTokens || 0,
     }
   }
-  
+
   return undefined
 }
 
@@ -37,13 +37,13 @@ export function calculateTokenCost(
     output: number // Price per million tokens
     input_cache_read?: number // Cache read price per million tokens
     input_cache_write?: number // Cache write price per million tokens
-  }
+  },
 ): number {
   const inputPrice = pricing.input / 1_000_000
   const outputPrice = pricing.output / 1_000_000
   const cacheReadPrice = pricing.input_cache_read ? pricing.input_cache_read / 1_000_000 : inputPrice * 0.1
   const cacheWritePrice = pricing.input_cache_write ? pricing.input_cache_write / 1_000_000 : inputPrice * 1.25
-  
+
   return (
     tokenUsage.input_normal * inputPrice +
     tokenUsage.input_cache_read * cacheReadPrice +

@@ -45,8 +45,8 @@ export const chronicleColors = {
   semantic: {
     success: '#4a7c59',
     successSubtle: '#1e2d22',
-    warning: '#c9a227',
-    warningSubtle: '#2d2815',
+    warning: '#d97706', // Amber-orange, distinct from gold accent
+    warningSubtle: '#2d2015',
     error: '#a63d40',
     errorSubtle: '#2d1a1b',
     info: '#5c7a99',

@@ -1,7 +1,7 @@
-import type { Paragraph, ContentNode } from "@story/shared"
-import type { Node } from "prosemirror-model"
-import { contentSchema } from "../schema"
-import shortUUID from "short-uuid"
+import type { ContentNode, Paragraph } from '@mythweavers/shared'
+import type { Node } from 'prosemirror-model'
+import shortUUID from 'short-uuid'
+import { contentSchema } from '../schema'
 
 /**
  * Convert an array of Paragraphs to a single ProseMirror document
@@ -11,9 +11,7 @@ import shortUUID from "short-uuid"
 export function paragraphsToDoc(paragraphs: Paragraph[]): Node {
   // Handle empty paragraphs array
   if (!paragraphs || paragraphs.length === 0) {
-    return contentSchema.node("doc", null, [
-      contentSchema.node("paragraph", { id: shortUUID.generate() }, []),
-    ])
+    return contentSchema.node('doc', null, [contentSchema.node('paragraph', { id: shortUUID.generate() }, [])])
   }
 
   const paragraphNodes = paragraphs
@@ -27,39 +25,39 @@ export function paragraphsToDoc(paragraphs: Paragraph[]): Node {
             if (fullDoc.content.childCount > 0) {
               const firstParagraph = fullDoc.content.child(0)
               return contentSchema.node(
-                "paragraph",
+                'paragraph',
                 {
                   id: paragraph.id || shortUUID.generate(),
                   extra: paragraph.extra || null,
-                  extraLoading: paragraph.extraLoading ? "true" : null,
+                  extraLoading: paragraph.extraLoading ? 'true' : null,
                 },
                 firstParagraph.content,
               )
             }
           } catch (error) {
-            console.warn("Failed to parse contentSchema, falling back to body:", error)
+            console.warn('Failed to parse contentSchema, falling back to body:', error)
           }
         }
 
         // Fall back to body (plain text)
-        const textContent = (paragraph.body || "").trim()
+        const textContent = (paragraph.body || '').trim()
         return contentSchema.node(
-          "paragraph",
+          'paragraph',
           {
             id: paragraph.id || shortUUID.generate(),
             extra: paragraph.extra || null,
-            extraLoading: paragraph.extraLoading ? "true" : null,
+            extraLoading: paragraph.extraLoading ? 'true' : null,
           },
           textContent ? [contentSchema.text(textContent)] : [],
         )
       } catch (error) {
-        console.warn("Failed to create paragraph node for:", paragraph, error)
+        console.warn('Failed to create paragraph node for:', paragraph, error)
         return contentSchema.node(
-          "paragraph",
+          'paragraph',
           {
             id: paragraph.id || shortUUID.generate(),
             extra: paragraph.extra || null,
-            extraLoading: paragraph.extraLoading ? "true" : null,
+            extraLoading: paragraph.extraLoading ? 'true' : null,
           },
           [],
         )
@@ -68,16 +66,14 @@ export function paragraphsToDoc(paragraphs: Paragraph[]): Node {
     .filter(Boolean)
 
   try {
-    return contentSchema.node("doc", null, paragraphNodes)
+    return contentSchema.node('doc', null, paragraphNodes)
   } catch (error) {
-    console.error("Error creating document:", error)
-    console.error("Paragraph nodes:", paragraphNodes)
-    console.error("Original paragraphs:", paragraphs)
+    console.error('Error creating document:', error)
+    console.error('Paragraph nodes:', paragraphNodes)
+    console.error('Original paragraphs:', paragraphs)
 
     // Fallback: create empty document
-    return contentSchema.node("doc", null, [
-      contentSchema.node("paragraph", { id: shortUUID.generate() }, []),
-    ])
+    return contentSchema.node('doc', null, [contentSchema.node('paragraph', { id: shortUUID.generate() }, [])])
   }
 }
 
@@ -99,7 +95,7 @@ export function docToParagraphs(
   const paragraphs: Paragraph[] = []
 
   doc.content.forEach((node) => {
-    if (node.type.name !== "paragraph") return
+    if (node.type.name !== 'paragraph') return
 
     const paragraphId = node.attrs.id || shortUUID.generate()
 
@@ -107,12 +103,12 @@ export function docToParagraphs(
     const plainText = node.textContent
 
     // Build ContentNode structure
-    const textNodes: Array<{ type: "text"; text: string; marks?: Array<{ type: string; attrs: unknown }> }> = []
+    const textNodes: Array<{ type: 'text'; text: string; marks?: Array<{ type: string; attrs: unknown }> }> = []
     node.content.forEach((child) => {
-      if (child.type.name === "text") {
-        const textNode: { type: "text"; text: string; marks?: Array<{ type: string; attrs: unknown }> } = {
-          type: "text",
-          text: child.text || "",
+      if (child.type.name === 'text') {
+        const textNode: { type: 'text'; text: string; marks?: Array<{ type: string; attrs: unknown }> } = {
+          type: 'text',
+          text: child.text || '',
         }
         if (child.marks && child.marks.length > 0) {
           textNode.marks = child.marks.map((mark) => ({
@@ -129,8 +125,8 @@ export function docToParagraphs(
     // Build contentSchema only if there are marks (formatting)
     const contentSchemaValue = hasMarks
       ? JSON.stringify({
-          type: "doc",
-          content: [{ type: "paragraph", content: textNodes }],
+          type: 'doc',
+          content: [{ type: 'paragraph', content: textNodes }],
         })
       : null
 
@@ -141,7 +137,7 @@ export function docToParagraphs(
       const textChanged = existingParagraph.body !== plainText
       const attrsChanged =
         (node.attrs.extra || null) !== (existingParagraph.extra || null) ||
-        (node.attrs.extraLoading === "true") !== (existingParagraph.extraLoading || false)
+        (node.attrs.extraLoading === 'true') !== (existingParagraph.extraLoading || false)
       const schemaChanged = existingParagraph.contentSchema !== contentSchemaValue
 
       if (textChanged || attrsChanged || schemaChanged) {
@@ -153,7 +149,7 @@ export function docToParagraphs(
         body: plainText,
         contentSchema: contentSchemaValue,
         extra: node.attrs.extra || existingParagraph.extra,
-        extraLoading: node.attrs.extraLoading === "true" || existingParagraph.extraLoading,
+        extraLoading: node.attrs.extraLoading === 'true' || existingParagraph.extraLoading,
       })
     } else {
       // New paragraph
@@ -162,10 +158,10 @@ export function docToParagraphs(
         id: paragraphId,
         body: plainText,
         contentSchema: contentSchemaValue,
-        state: "draft",
+        state: 'draft',
         comments: [],
         extra: node.attrs.extra || undefined,
-        extraLoading: node.attrs.extraLoading === "true" || undefined,
+        extraLoading: node.attrs.extraLoading === 'true' || undefined,
       })
     }
   })
@@ -182,7 +178,7 @@ export function getParagraphIdAtPos(doc: Node, pos: number): string | null {
   // Walk up the tree to find a paragraph with an ID
   for (let depth = resolved.depth; depth >= 0; depth--) {
     const node = resolved.node(depth)
-    if (node.type.name === "paragraph" && node.attrs.id) {
+    if (node.type.name === 'paragraph' && node.attrs.id) {
       return node.attrs.id
     }
   }
@@ -193,14 +189,11 @@ export function getParagraphIdAtPos(doc: Node, pos: number): string | null {
 /**
  * Get the document position range for a paragraph by ID
  */
-export function getParagraphRange(
-  doc: Node,
-  paragraphId: string,
-): { from: number; to: number } | null {
+export function getParagraphRange(doc: Node, paragraphId: string): { from: number; to: number } | null {
   let result: { from: number; to: number } | null = null
 
   doc.descendants((node, pos) => {
-    if (node.type.name === "paragraph" && node.attrs.id === paragraphId) {
+    if (node.type.name === 'paragraph' && node.attrs.id === paragraphId) {
       result = { from: pos, to: pos + node.nodeSize }
       return false // Stop iteration
     }
