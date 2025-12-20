@@ -12,6 +12,7 @@ export interface CurrentStory {
   person: 'first' | 'second' | 'third'
   tense: 'present' | 'past'
   storySetting: string // genre/setting
+  paragraphsPerTurn: number // Target paragraphs per AI generation turn
   lastKnownUpdatedAt?: string // Track server version for conflict detection
   globalScript?: string // Global script to execute before message scripts
   branchChoices: Record<string, string> // branchMessageId -> selectedOptionId
@@ -75,6 +76,7 @@ export interface SavedStory {
   nodes?: Node[] // New hierarchical structure
   input: string
   storySetting: string
+  paragraphsPerTurn?: number // Target paragraphs per AI generation turn
   person?: 'first' | 'second' | 'third'
   tense?: 'present' | 'past'
   syncedAt?: Date

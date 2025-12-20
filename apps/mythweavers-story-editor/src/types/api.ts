@@ -239,14 +239,6 @@ export interface ApiStoryMetadata {
   fingerprint?: string // Hash of message content for change detection
 }
 
-export interface ApiRefinementStatus {
-  storyId: string
-  status: 'processing' | 'completed' | 'failed'
-  progress?: number
-  result?: string
-  error?: string
-}
-
 export interface ApiError {
   error: string
   message?: string

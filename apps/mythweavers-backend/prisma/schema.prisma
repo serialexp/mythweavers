@@ -48,7 +48,13 @@ enum ParagraphCommentType {
 
 enum Perspective {
   FIRST
+  SECOND
   THIRD
+}
+
+enum Tense {
+  PAST
+  PRESENT
 }
 
 enum ParagraphState {
@@ -137,6 +143,9 @@ model Story {
   coverTextColor         String            @default("#FFFFFF")
   coverFontFamily        String            @default("Georgia")
   defaultPerspective     Perspective?      @default(THIRD)
+  defaultTense           Tense?            @default(PAST)
+  genre                  String?           // Story genre (fantasy, sci-fi, etc.)
+  paragraphsPerTurn      Int               @default(3) // Target paragraphs per AI generation
   defaultProtagonistId   String?
   defaultProtagonist     Character?        @relation("DefaultProtagonist", fields: [defaultProtagonistId], references: [id], onDelete: SetNull)
   sortOrder              Int               @default(0)

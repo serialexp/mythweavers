@@ -1,8 +1,8 @@
-import { ApiRefinementStatus, ApiStory, ApiStoryMetadata, VersionConflictError } from '../types/api'
+import { ApiStory, ApiStoryMetadata, VersionConflictError } from '../types/api'
 import { Node } from '../types/core'
 
 // Re-export for backward compatibility
-export type { ApiStory, ApiStoryMetadata, ApiRefinementStatus }
+export type { ApiStory, ApiStoryMetadata }
 
 // OLD API CLIENT - Should not be used anymore
 // Hardcoded to port 3001 (old story-backend) to make it obvious when old endpoints are called
@@ -224,51 +224,6 @@ class ApiClient {
     a.click()
     window.URL.revokeObjectURL(url)
     document.body.removeChild(a)
-  }
-
-  async startRefinement(
-    id: string,
-    model?: string,
-    person?: string,
-    tense?: string,
-  ): Promise<{ success: boolean; message: string; jobId: string }> {
-    const response = await this.fetch(`/stories/${id}/refine`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ model, person, tense }),
-    })
-    if (!response.ok) {
-      throw new Error('Failed to start refinement')
-    }
-    return response.json()
-  }
-
-  async getRefinementStatus(id: string): Promise<{
-    status: 'not_found' | 'pending' | 'processing' | 'completed' | 'failed'
-    progress?: number
-    error?: string
-    newStoryId?: string
-    batches?: any[]
-    averageBatchTime?: number
-    estimatedTimeRemaining?: number
-  }> {
-    const response = await this.fetch(`/stories/${id}/refine/status`)
-    if (!response.ok) {
-      throw new Error('Failed to get refinement status')
-    }
-    return response.json()
-  }
-
-  async stopRefinement(id: string): Promise<{ success: boolean; message: string }> {
-    const response = await this.fetch(`/stories/${id}/refine`, {
-      method: 'DELETE',
-    })
-    if (!response.ok) {
-      throw new Error('Failed to stop refinement')
-    }
-    return response.json()
   }
 
   async deleteStory(id: string): Promise<{ success: boolean }> {

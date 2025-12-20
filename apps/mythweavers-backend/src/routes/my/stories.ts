@@ -16,9 +16,14 @@ const storyTypeSchema = z.enum(['FANFICTION', 'ORIGINAL']).meta({
   example: 'ORIGINAL',
 })
 
-const perspectiveSchema = z.enum(['FIRST', 'THIRD']).meta({
+const perspectiveSchema = z.enum(['FIRST', 'SECOND', 'THIRD']).meta({
   description: 'Narrative perspective',
   example: 'THIRD',
+})
+
+const tenseSchema = z.enum(['PAST', 'PRESENT']).meta({
+  description: 'Narrative tense',
+  example: 'PAST',
 })
 
 // Light schema for list endpoint - only fields needed for display
@@ -110,6 +115,15 @@ const storySchema = z.strictObject({
     example: 'clx1234567890',
   }),
   defaultPerspective: perspectiveSchema.nullable(),
+  defaultTense: tenseSchema.nullable(),
+  genre: z.string().nullable().meta({
+    description: 'Story genre (fantasy, sci-fi, etc.)',
+    example: 'fantasy',
+  }),
+  paragraphsPerTurn: z.number().meta({
+    description: 'Target paragraphs per AI generation turn',
+    example: 3,
+  }),
   defaultProtagonistId: z.string().nullable().meta({
     description: 'Default protagonist character ID',
     example: 'clx1234567890',
@@ -183,6 +197,15 @@ const createStoryBodySchema = z.strictObject({
   }),
   type: storyTypeSchema.optional(),
   defaultPerspective: perspectiveSchema.optional(),
+  defaultTense: tenseSchema.optional(),
+  genre: z.string().optional().meta({
+    description: 'Story genre (fantasy, sci-fi, etc.)',
+    example: 'fantasy',
+  }),
+  paragraphsPerTurn: z.number().optional().meta({
+    description: 'Target paragraphs per AI generation turn',
+    example: 3,
+  }),
   provider: z.string().optional().meta({
     description: 'LLM provider',
     example: 'anthropic',
@@ -210,6 +233,27 @@ const updateStoryBodySchema = z.strictObject({
   status: storyStatusSchema.optional(),
   type: storyTypeSchema.optional(),
   defaultPerspective: perspectiveSchema.nullable().optional(),
+  defaultTense: tenseSchema.nullable().optional(),
+  genre: z.string().nullable().optional().meta({
+    description: 'Story genre (fantasy, sci-fi, etc.)',
+    example: 'fantasy',
+  }),
+  paragraphsPerTurn: z.number().optional().meta({
+    description: 'Target paragraphs per AI generation turn',
+    example: 3,
+  }),
+  timelineStartTime: z.number().nullable().optional().meta({
+    description: 'Timeline start time in minutes from epoch',
+    example: -525600,
+  }),
+  timelineEndTime: z.number().nullable().optional().meta({
+    description: 'Timeline end time in minutes from epoch',
+    example: 525600,
+  }),
+  timelineGranularity: z.string().optional().meta({
+    description: 'Timeline granularity (hour or day)',
+    example: 'hour',
+  }),
   provider: z.string().optional().meta({
     description: 'LLM provider',
     example: 'anthropic',
@@ -484,7 +528,8 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     async (request, reply) => {
       try {
         const userId = request.user!.id
-        const { name, summary, type, defaultPerspective, provider, model } = request.body
+        const { name, summary, type, defaultPerspective, defaultTense, genre, paragraphsPerTurn, provider, model } =
+          request.body
 
         const story = await prisma.story.create({
           data: {
@@ -493,6 +538,9 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             ownerId: userId,
             type: type || 'ORIGINAL',
             defaultPerspective: defaultPerspective || 'THIRD',
+            defaultTense: defaultTense || 'PAST',
+            genre: genre || null,
+            paragraphsPerTurn: paragraphsPerTurn ?? 3,
             provider: provider || 'ollama',
             model: model || null,
           },

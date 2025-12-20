@@ -74,6 +74,9 @@ export const currentStoryStore = {
   get model() {
     return storyState.story?.model
   },
+  get paragraphsPerTurn() {
+    return storyState.story?.paragraphsPerTurn ?? 3
+  },
 
   // Actions
   setName: (name: string, isPlaceholder = false) => {
@@ -156,6 +159,13 @@ export const currentStoryStore = {
     saveService.saveStorySettings(storyState.story.id, { model })
   },
 
+  setParagraphsPerTurn: (paragraphs: number) => {
+    if (!storyState.story) return
+    setStoryState('story', 'paragraphsPerTurn', paragraphs)
+    // Save through saveService (handles local vs server)
+    saveService.saveStorySettings(storyState.story.id, { paragraphsPerTurn: paragraphs })
+  },
+
   setBranchChoice: (branchMessageId: string, optionId: string | null) => {
     if (!storyState.story) return
 
@@ -204,6 +214,7 @@ export const currentStoryStore = {
       person: 'third',
       tense: 'past',
       storySetting: '',
+      paragraphsPerTurn: 3,
       globalScript: undefined,
       branchChoices: {},
       timelineStartTime: undefined,
@@ -232,6 +243,7 @@ export const currentStoryStore = {
     person?: 'first' | 'second' | 'third',
     tense?: 'present' | 'past',
     storySetting?: string,
+    paragraphsPerTurn?: number,
     globalScript?: string,
     timelineStartTime?: number | null,
     timelineEndTime?: number | null,
@@ -248,6 +260,7 @@ export const currentStoryStore = {
       person: person || 'third',
       tense: tense || 'past',
       storySetting: storySetting || '',
+      paragraphsPerTurn: paragraphsPerTurn ?? 3,
       globalScript: globalScript,
       branchChoices: {}, // Start with empty, set later after data loads
       timelineStartTime: timelineStartTime ?? undefined,

@@ -36,7 +36,7 @@ export const storyManager = {
     input: string,
     storySetting: string,
     storageMode: 'server' | 'local' = 'local',
-    person: 'first' | 'second' | 'third' = 'second',
+    person: 'first' | 'second' | 'third' = 'third',
     tense: 'present' | 'past' = 'present',
   ): Promise<string> => {
     const id = generateMessageId()
@@ -274,7 +274,7 @@ export const storyManager = {
         chapters: apiStory.chapters,
         input: apiStory.input,
         storySetting: apiStory.storySetting,
-        person: apiStory.person || 'second',
+        person: apiStory.person || 'third',
         tense: apiStory.tense || 'present',
         globalScript: apiStory.globalScript,
         // serverId removed - server stories use server ID as primary ID,
@@ -401,7 +401,7 @@ export const storyManager = {
         const story = await storyManager.loadStory(metadata.id)
         if (story && (!story.person || !story.tense)) {
           // Add default values for missing fields
-          story.person = story.person || 'second'
+          story.person = story.person || 'third'
           story.tense = story.tense || 'present'
           story.storySetting = story.storySetting || ''
 
