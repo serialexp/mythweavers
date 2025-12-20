@@ -18,8 +18,8 @@ import {
 } from 'solid-icons/bs'
 import { FaRegularCircle, FaSolidBookOpen, FaSolidCircleCheck, FaSolidCircleHalfStroke } from 'solid-icons/fa'
 import { VsCode } from 'solid-icons/vs'
-import { Component, For, type JSX, Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
-import { Portal } from 'solid-js/web'
+import { Dropdown, DropdownItem } from '@mythweavers/ui'
+import { Component, For, Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { useOllama } from '../hooks/useOllama'
 import { copyPreviewStore } from '../stores/copyPreviewStore'
 import { messagesStore } from '../stores/messagesStore'
@@ -32,259 +32,6 @@ import { buildNodeMarkdown, buildPrecedingContextMarkdown, buildTreeMarkdown } f
 import { NodeStatusMenu } from './NodeStatusMenu'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
-
-// Inline styles for StoryNavigation
-const navStyles = {
-  navigation: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    'flex-direction': 'column',
-    overflow: 'hidden',
-    background: 'var(--bg-secondary)',
-  } as JSX.CSSProperties,
-
-  treeContainer: {
-    flex: '1',
-    'overflow-y': 'auto',
-    padding: '0.5rem',
-    'min-height': '0',
-  } as JSX.CSSProperties,
-
-  nodeItem: {
-    'user-select': 'none',
-  } as JSX.CSSProperties,
-
-  nodeHeader: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.25rem',
-    color: 'var(--text-primary)',
-    padding: '0.125rem 0.25rem',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    position: 'relative',
-    'border-left': '3px solid transparent',
-  } as JSX.CSSProperties,
-
-  nodeHeaderSelected: {
-    'background-color': 'var(--accent-bg)',
-    'border-left': '3px solid var(--accent-color)',
-  } as JSX.CSSProperties,
-
-  nodeHeaderIncludeInFull: {
-    'background-color': 'rgba(255, 235, 59, 0.2)',
-    'border-left': '3px solid #ffc107',
-  } as JSX.CSSProperties,
-
-  nodeHeaderSelectedIncludeInFull: {
-    'background-color': 'rgba(255, 235, 59, 0.3)',
-    'border-left': '3px solid var(--accent-color)',
-  } as JSX.CSSProperties,
-
-  nodeHeaderInactive: {
-    opacity: '0.4',
-    filter: 'grayscale(0.3)',
-  } as JSX.CSSProperties,
-
-  nodeHeaderMultiSelected: {
-    'background-color': 'rgba(59, 130, 246, 0.12)',
-    'border-left': '3px solid rgba(59, 130, 246, 0.45)',
-  } as JSX.CSSProperties,
-
-  nodeHeaderDropBefore: {
-    'box-shadow': 'inset 0 2px 0 var(--accent-color)',
-  } as JSX.CSSProperties,
-
-  nodeHeaderDropAfter: {
-    'box-shadow': 'inset 0 -2px 0 var(--accent-color)',
-  } as JSX.CSSProperties,
-
-  nodeHeaderDropInside: {
-    'background-color': 'rgba(59, 130, 246, 0.15)',
-    'border-left-color': 'var(--accent-color)',
-  } as JSX.CSSProperties,
-
-  dragging: {
-    opacity: '0.6',
-  } as JSX.CSSProperties,
-
-  expandButton: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '0',
-    width: '20px',
-    height: '20px',
-    display: 'flex',
-    'align-items': 'center',
-    'justify-content': 'center',
-    color: 'var(--text-secondary)',
-    transition: 'color 0.2s',
-  } as JSX.CSSProperties,
-
-  expandPlaceholder: {
-    width: '20px',
-    height: '20px',
-  } as JSX.CSSProperties,
-
-  nodeIcon: {
-    display: 'flex',
-    'align-items': 'center',
-    'font-size': '1.1rem',
-    width: '20px',
-  } as JSX.CSSProperties,
-
-  nodeTitle: {
-    flex: '1',
-    'font-size': '0.9rem',
-    'white-space': 'nowrap',
-    overflow: 'hidden',
-    'text-overflow': 'ellipsis',
-  } as JSX.CSSProperties,
-
-  indicatorIcon: {
-    display: 'inline-flex',
-    'align-items': 'center',
-    'margin-left': '4px',
-    'font-size': '0.9em',
-    opacity: '0.8',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease, opacity 0.2s ease',
-  } as JSX.CSSProperties,
-
-  nodeActions: {
-    display: 'flex',
-    gap: '0.25rem',
-    opacity: '0',
-    transition: 'opacity 0.2s',
-  } as JSX.CSSProperties,
-
-  nodeActionsVisible: {
-    opacity: '1',
-  } as JSX.CSSProperties,
-
-  actionButton: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '0.25rem',
-    color: 'var(--text-secondary)',
-    display: 'flex',
-    'align-items': 'center',
-    'border-radius': '4px',
-    transition: 'all 0.2s',
-  } as JSX.CSSProperties,
-
-  menuContainer: {
-    position: 'relative',
-  } as JSX.CSSProperties,
-
-  dropdownMenu: {
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '4px',
-    'box-shadow': '0 2px 8px rgba(0, 0, 0, 0.15)',
-    padding: '0.25rem',
-  } as JSX.CSSProperties,
-
-  dropdownButton: {
-    display: 'flex',
-    'align-items': 'center',
-    color: 'var(--text-primary)',
-    gap: '0.5rem',
-    width: '100%',
-    padding: '0.5rem',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    'text-align': 'left',
-    'border-radius': '4px',
-    transition: 'background-color 0.2s',
-    'white-space': 'nowrap',
-  } as JSX.CSSProperties,
-
-  deleteButton: {
-    color: 'var(--error-color)',
-  } as JSX.CSSProperties,
-
-  editInput: {
-    flex: '1',
-    padding: '0.25rem',
-    border: '1px solid var(--accent-color)',
-    'border-radius': '4px',
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
-    'font-size': '0.9rem',
-  } as JSX.CSSProperties,
-
-  emptyState: {
-    display: 'flex',
-    'flex-direction': 'column',
-    'align-items': 'center',
-    'justify-content': 'center',
-    padding: '1rem',
-    color: 'var(--text-secondary)',
-    'min-height': '100px',
-  } as JSX.CSSProperties,
-
-  footer: {
-    padding: '0.5rem',
-    'border-top': '1px solid var(--border-color)',
-    background: 'var(--bg-tertiary)',
-  } as JSX.CSSProperties,
-
-  footerButtons: {
-    display: 'flex',
-    gap: '0.5rem',
-    'flex-wrap': 'wrap',
-  } as JSX.CSSProperties,
-
-  addButton: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-    flex: '1',
-    padding: '0.5rem',
-    background: 'var(--bg-secondary)',
-    border: '1px dashed var(--border-color)',
-    'border-radius': '4px',
-    cursor: 'pointer',
-    color: 'var(--text-secondary)',
-    transition: 'all 0.2s',
-  } as JSX.CSSProperties,
-
-  loadingIndicator: {
-    display: 'inline-flex',
-    'align-items': 'center',
-    'margin-left': '0.5rem',
-    color: 'var(--accent-color)',
-  } as JSX.CSSProperties,
-
-  spinner: {
-    display: 'inline-block',
-    animation: 'spin 1s linear infinite',
-    'font-size': '1.2rem',
-  } as JSX.CSSProperties,
-
-  dragPreview: {
-    position: 'fixed',
-    top: '0',
-    left: '0',
-    'pointer-events': 'none',
-    padding: '0.35rem 0.6rem',
-    'border-radius': '8px',
-    background: 'rgba(30, 41, 59, 0.92)',
-    color: 'var(--text-primary)',
-    'box-shadow': '0 10px 30px rgba(15, 23, 42, 0.35)',
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '0.125rem',
-    'font-size': '0.8rem',
-    'z-index': 2000,
-  } as JSX.CSSProperties,
-}
 
 interface NodeItemProps {
   treeNode: TreeNode
@@ -411,13 +158,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     setDropTarget,
     endDrag,
   } = useTreeDragDrop()
-  const [showMenu, setShowMenu] = createSignal(false)
   const [isEditing, setIsEditing] = createSignal(false)
-  const [menuPosition, setMenuPosition] = createSignal({ top: 0, left: 0 })
-  const [menuWidth, setMenuWidth] = createSignal(220)
-  const [menuMaxHeight, setMenuMaxHeight] = createSignal(320)
-  let menuButtonRef: HTMLButtonElement | undefined
-  let menuRef: HTMLDivElement | undefined
   let dragPreviewEl: HTMLDivElement | null = null
 
   // Get the Ollama hook for summary generation
@@ -655,17 +396,14 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     nodeStore.addNode(props.treeNode.id, childType)
   }
 
-  const handleEdit = (e: MouseEvent) => {
-    e.stopPropagation()
+  const handleEdit = () => {
     const n = node()
     if (!n) return
     setIsEditing(true)
     setEditTitle(n.title)
-    setShowMenu(false)
   }
 
-  const handleCopyAsMarkdown = async (e: MouseEvent) => {
-    e.stopPropagation()
+  const handleCopyAsMarkdown = async () => {
     const n = node()
     if (!n) return
 
@@ -677,21 +415,18 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
     if (!navigator.clipboard) {
       copyPreviewStore.showFallbackDialog(markdown)
-      setShowMenu(false)
       return
     }
 
     try {
       await navigator.clipboard.writeText(markdown)
-      setShowMenu(false)
     } catch (error) {
       console.error('Failed to copy node as Markdown:', error)
       copyPreviewStore.showFallbackDialog(markdown)
     }
   }
 
-  const handleCopyPreviousContext = async (e: MouseEvent) => {
-    e.stopPropagation()
+  const handleCopyPreviousContext = async () => {
     const n = node()
     if (!n) return
 
@@ -705,7 +440,6 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       return
     }
 
-    setShowMenu(false)
     await copyPreviewStore.requestCopy(summary)
   }
 
@@ -723,124 +457,6 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     setEditTitle(n.title)
   }
 
-  const updateMenuLayout = () => {
-    if (!menuButtonRef || !menuRef) return
-
-    const rect = menuButtonRef.getBoundingClientRect()
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 768
-    const isMobile = viewportWidth <= 640 // Mobile breakpoint
-    const horizontalMargin = 16
-    const minBottomMargin = 10 // Ensure at least 10px from bottom
-    const minWidth = 220
-    const maxWidth = 360
-
-    // Calculate width
-    const calculatedWidth = Math.min(Math.max(minWidth, viewportWidth - horizontalMargin * 2), maxWidth)
-    const maxLeft = viewportWidth - calculatedWidth - horizontalMargin
-    const preferredLeft = rect.right - calculatedWidth
-    const clampedLeft = Math.min(Math.max(preferredLeft, horizontalMargin), Math.max(horizontalMargin, maxLeft))
-    setMenuWidth(calculatedWidth)
-
-    // Get both actual content height (scrollHeight) and rendered height (offsetHeight)
-    const dropdownElement = menuRef
-    const scrollHeight = dropdownElement?.scrollHeight ?? 0
-    const offsetHeight = dropdownElement?.offsetHeight ?? 0
-
-    // Use scrollHeight to determine true content size (important when max-height limits display)
-    const actualContentHeight = scrollHeight > 0 ? scrollHeight : offsetHeight
-
-    // Calculate available space
-    const spaceBelow = viewportHeight - rect.bottom - minBottomMargin
-    const spaceAbove = rect.top - minBottomMargin
-    const maxAvailableHeight = Math.max(120, viewportHeight - minBottomMargin * 2)
-
-    let maxHeight: number
-    let top: number
-
-    // On mobile, account for potentially larger content due to static positioning of NodeStatusMenu
-    const estimatedHeight = isMobile && actualContentHeight > 0 ? actualContentHeight : actualContentHeight || 200
-
-    // Check if content fits below
-    const fitsBelow = spaceBelow >= estimatedHeight
-    const fitsAbove = spaceAbove >= estimatedHeight
-
-    if (fitsBelow || (!fitsAbove && spaceBelow >= spaceAbove)) {
-      // Place below the button
-      top = rect.bottom + 4
-      maxHeight = Math.min(spaceBelow, maxAvailableHeight)
-
-      // If using actual measurements, ensure we don't fall off screen
-      if (actualContentHeight > 0) {
-        const dropdownBottom = top + Math.min(actualContentHeight, maxHeight)
-        const maxAllowedBottom = viewportHeight - minBottomMargin
-
-        if (dropdownBottom > maxAllowedBottom) {
-          // Adjust top to keep dropdown on screen
-          const adjustment = dropdownBottom - maxAllowedBottom
-          top = Math.max(rect.bottom + 4, top - adjustment)
-
-          // If we can't keep it attached to button, consider flipping
-          if (top > rect.bottom + 4 && spaceAbove > spaceBelow) {
-            // Flip to above
-            maxHeight = Math.min(spaceAbove, maxAvailableHeight)
-            top = rect.top - Math.min(actualContentHeight, maxHeight) - 4
-            top = Math.max(minBottomMargin, top)
-          }
-        }
-      }
-    } else {
-      // Place above the button
-      maxHeight = Math.min(spaceAbove, maxAvailableHeight)
-      const dropdownHeight = Math.min(estimatedHeight, maxHeight)
-      top = rect.top - dropdownHeight - 4
-      top = Math.max(minBottomMargin, top)
-    }
-
-    // Final safety check: ensure dropdown doesn't extend past viewport bottom
-    if (actualContentHeight > 0) {
-      const finalBottom = top + Math.min(actualContentHeight, maxHeight)
-      const maxBottom = viewportHeight - minBottomMargin
-
-      if (finalBottom > maxBottom) {
-        // Force adjust top to maintain bottom margin
-        top = Math.min(top, maxBottom - Math.min(actualContentHeight, maxHeight))
-        top = Math.max(minBottomMargin, top)
-      }
-    }
-
-    setMenuMaxHeight(maxHeight)
-    setMenuPosition({
-      top,
-      left: clampedLeft,
-    })
-  }
-
-  createEffect(() => {
-    if (showMenu()) {
-      updateMenuLayout()
-      if (typeof window !== 'undefined') {
-        window.requestAnimationFrame(() => {
-          updateMenuLayout()
-          // Additional update after content settles
-          setTimeout(() => updateMenuLayout(), 100)
-        })
-      } else {
-        setTimeout(() => updateMenuLayout(), 0)
-      }
-    }
-  })
-
-  onMount(() => {
-    const handleResize = () => {
-      if (showMenu()) {
-        updateMenuLayout()
-      }
-    }
-    window.addEventListener('resize', handleResize)
-    onCleanup(() => window.removeEventListener('resize', handleResize))
-  })
-
   onCleanup(() => {
     if (dragPreviewEl?.parentNode) {
       dragPreviewEl.parentNode.removeChild(dragPreviewEl)
@@ -848,18 +464,15 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     dragPreviewEl = null
   })
 
-  const handleDelete = (e: MouseEvent) => {
-    e.stopPropagation()
+  const handleDelete = () => {
     const n = node()
     if (!n) return
     if (confirm(`Delete ${n.type} "${n.title}" and all its contents?`)) {
       nodeStore.deleteNode(props.treeNode.id)
     }
-    setShowMenu(false)
   }
 
-  const handleMoveUp = (e: MouseEvent) => {
-    e.stopPropagation()
+  const handleMoveUp = () => {
     const n = node()
     if (!n) return
     const siblings = Object.values(nodeStore.nodes)
@@ -871,11 +484,9 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       // Swap with previous sibling
       nodeStore.moveNode(props.treeNode.id, n.parentId ?? null, currentIndex - 1)
     }
-    setShowMenu(false)
   }
 
-  const handleMoveDown = (e: MouseEvent) => {
-    e.stopPropagation()
+  const handleMoveDown = () => {
     const n = node()
     if (!n) return
     const siblings = Object.values(nodeStore.nodes)
@@ -887,7 +498,6 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       // Swap with next sibling
       nodeStore.moveNode(props.treeNode.id, n.parentId ?? null, currentIndex + 1)
     }
-    setShowMenu(false)
   }
 
   const handleDragStart = (event: DragEvent) => {
@@ -1137,10 +747,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     endDrag()
   }
 
-  const handleGenerateSummary = async (e: MouseEvent) => {
-    e.stopPropagation()
-    setShowMenu(false)
-
+  const handleGenerateSummary = async () => {
     try {
       await nodeStore.generateNodeSummary(props.treeNode.id, generateNodeSummary)
     } catch (error) {
@@ -1174,48 +781,48 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     return currentIndex >= 0 && currentIndex < siblings.length - 1
   }
 
-  // Compute header style based on state
-  const getNodeHeaderStyle = (): JSX.CSSProperties => {
-    let style: JSX.CSSProperties = { ...navStyles.nodeHeader, 'padding-left': `${props.level * 16 + 4}px` }
+  // Compute header classes based on state
+  const getNodeHeaderClasses = (): string => {
+    const classes = [styles.nodeHeader]
 
     if (isSelected() && node()?.includeInFull === 2) {
-      style = { ...style, ...navStyles.nodeHeaderSelectedIncludeInFull }
+      classes.push(styles.nodeHeaderSelectedIncludeInFull)
     } else if (isSelected()) {
-      style = { ...style, ...navStyles.nodeHeaderSelected }
+      classes.push(styles.nodeHeaderSelected)
     } else if (node()?.includeInFull === 2) {
-      style = { ...style, ...navStyles.nodeHeaderIncludeInFull }
+      classes.push(styles.nodeHeaderIncludeInFull)
     }
 
     if (!isActive()) {
-      style = { ...style, ...navStyles.nodeHeaderInactive }
+      classes.push(styles.nodeHeaderInactive)
     }
 
     if (isDragging()) {
-      style = { ...style, ...navStyles.dragging }
+      classes.push(styles.nodeItemDragging)
     }
 
     if (isMultiSelected()) {
-      style = { ...style, ...navStyles.nodeHeaderMultiSelected }
+      classes.push(styles.nodeHeaderMultiSelected)
     }
 
     if (isDropTarget()) {
       if (dropPosition() === 'before') {
-        style = { ...style, ...navStyles.nodeHeaderDropBefore }
+        classes.push(styles.nodeHeaderDropBefore)
       } else if (dropPosition() === 'after') {
-        style = { ...style, ...navStyles.nodeHeaderDropAfter }
+        classes.push(styles.nodeHeaderDropAfter)
       } else if (dropPosition() === 'inside') {
-        style = { ...style, ...navStyles.nodeHeaderDropInside }
+        classes.push(styles.nodeHeaderDropInside)
       }
     }
 
-    return style
+    return classes.join(' ')
   }
 
   return (
-    <div style={isDragging() ? { ...navStyles.nodeItem, ...navStyles.dragging } : navStyles.nodeItem}>
+    <div class={isDragging() ? `${styles.nodeItem} ${styles.nodeItemDragging}` : styles.nodeItem}>
       <div
-        class={styles.nodeHeader}
-        style={getNodeHeaderStyle()}
+        class={getNodeHeaderClasses()}
+        style={{ 'padding-left': `${props.level * 16 + 4}px` }}
         data-selected={isSelected() ? 'true' : undefined}
         onClick={handleSelect}
         draggable={!isEditing()}
@@ -1231,28 +838,25 @@ const NodeItem: Component<NodeItemProps> = (props) => {
           </button>
         </Show>
         <Show when={!hasChildren()}>
-          <div style={navStyles.expandPlaceholder} />
+          <div class={styles.expandPlaceholder} />
         </Show>
 
-        <span style={navStyles.nodeIcon}>{getIcon()}</span>
+        <span class={styles.nodeIcon}>{getIcon()}</span>
 
         <Show when={!isEditing()}>
           <span
-            style={{
-              ...navStyles.nodeTitle,
-              color: matchesStorylineFilter() ? 'var(--primary-color)' : getStatusColor(),
-            }}
+            class={styles.nodeTitle}
+            style={{ color: matchesStorylineFilter() ? 'var(--primary-color)' : getStatusColor() }}
             title={`ID: ${props.treeNode.id}`}
           >
             {node()?.title}{' '}
             <span style={{ opacity: 0.5, 'font-size': '0.8em' }}>({props.treeNode.id.slice(0, 8)})</span>
           </span>
-
         </Show>
 
         <Show when={isEditing()}>
           <input
-            style={navStyles.editInput}
+            class={styles.editInput}
             value={editTitle()}
             onInput={(e) => setEditTitle(e.currentTarget.value)}
             onClick={(e) => e.stopPropagation()}
@@ -1269,11 +873,9 @@ const NodeItem: Component<NodeItemProps> = (props) => {
           <div class={styles.nodeIndicators}>
             <Show when={hasScriptChanges()}>
               <span
+                class={styles.indicatorIcon}
                 title={getScriptChangesTooltip()}
-                style={{
-                  ...navStyles.indicatorIcon,
-                  color: '#9333ea',
-                }}
+                style={{ color: '#9333ea' }}
               >
                 <VsCode />
               </span>
@@ -1281,11 +883,9 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
             <Show when={hasBranches()}>
               <span
+                class={styles.indicatorIcon}
                 title="This chapter contains branch points"
-                style={{
-                  ...navStyles.indicatorIcon,
-                  color: '#06b6d4',
-                }}
+                style={{ color: '#06b6d4' }}
               >
                 <BsDiagram3 />
               </span>
@@ -1293,11 +893,9 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
             <Show when={needsStoryTime()}>
               <span
+                class={styles.indicatorIcon}
                 title="This scene doesn't have a storyTime set"
-                style={{
-                  ...navStyles.indicatorIcon,
-                  color: '#ef4444',
-                }}
+                style={{ color: '#ef4444' }}
               >
                 <BsClock />
               </span>
@@ -1305,11 +903,9 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
             <Show when={needsSummary()}>
               <span
+                class={styles.indicatorIcon}
                 title="This chapter has content but no summary"
-                style={{
-                  ...navStyles.indicatorIcon,
-                  color: '#f59e0b',
-                }}
+                style={{ color: '#f59e0b' }}
               >
                 <BsExclamationTriangle />
               </span>
@@ -1317,12 +913,9 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
             <Show when={node()?.type === 'chapter'}>
               <span
+                class={styles.indicatorIcon}
                 title={getIncludeTooltip()}
-                style={{
-                  ...navStyles.indicatorIcon,
-                  color: getWordCountColor(),
-                  'font-size': '1em',
-                }}
+                style={{ color: getWordCountColor(), 'font-size': '1em' }}
                 onClick={handleCycleInclude}
               >
                 {getIncludeIcon()}
@@ -1330,8 +923,8 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             </Show>
 
             <Show when={node()?.isSummarizing}>
-              <span style={navStyles.loadingIndicator} title="Generating summary...">
-                <span style={navStyles.spinner}>⟳</span>
+              <span class={styles.loadingIndicator} title="Generating summary...">
+                <span class={styles.spinner}>⟳</span>
               </span>
             </Show>
           </div>
@@ -1347,147 +940,86 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             </button>
           </Show>
 
-          <div style={navStyles.menuContainer}>
-            <button
-              class={styles.actionButton}
-              ref={menuButtonRef}
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowMenu((prev) => !prev)
+          <Dropdown
+            portal
+            alignRight
+            trigger={
+              <button class={styles.actionButton}>
+                <BsThreeDots />
+              </button>
+            }
+          >
+            <DropdownItem icon={<BsPencil />} onClick={handleEdit}>
+              Edit Title
+            </DropdownItem>
+            <Show when={node()?.type === 'book' || node()?.type === 'arc' || node()?.type === 'chapter'}>
+              <DropdownItem icon={<BsFileEarmarkText />} onClick={handleCopyAsMarkdown}>
+                Copy as Markdown
+              </DropdownItem>
+            </Show>
+            <Show when={node()?.type === 'chapter'}>
+              <DropdownItem icon={<BsFileEarmarkTextFill />} onClick={handleCopyPreviousContext}>
+                Copy Previous Context
+              </DropdownItem>
+              <DropdownItem
+                icon={
+                  node()?.isSummarizing ? undefined : node()?.summary ? <BsCheckCircle /> : <BsFileText />
+                }
+                onClick={handleGenerateSummary}
+                disabled={node()?.isSummarizing}
+              >
+                {node()?.isSummarizing
+                  ? 'Generating...'
+                  : node()?.summary
+                    ? 'Regenerate Summary'
+                    : 'Generate Summary'}
+              </DropdownItem>
+              <NodeStatusMenu
+                currentStatus={node()?.status}
+                onSelect={(status) => nodeStore.updateNode(props.treeNode.id, { status })}
+              />
+              <DropdownItem
+                icon={<FaSolidCircleHalfStroke />}
+                onClick={() => nodeStore.setIncludeForPrecedingChapters(props.treeNode.id, 1)}
+              >
+                Use Summaries Before
+              </DropdownItem>
+              <DropdownItem
+                icon={<FaRegularCircle />}
+                onClick={() => nodeStore.setIncludeForPrecedingChapters(props.treeNode.id, 0)}
+              >
+                Exclude All Before
+              </DropdownItem>
+            </Show>
+            <DropdownItem
+              icon={<BsPlusCircle />}
+              onClick={() => {
+                const n = node()
+                if (n) nodeStore.insertNodeBefore(props.treeNode.id, n.type)
               }}
             >
-              <BsThreeDots />
-            </button>
-
-            <Portal>
-              <Show when={showMenu()}>
-                <div
-                  class={styles.dropdownMenu}
-                  style={{
-                    position: 'fixed',
-                    top: `${menuPosition().top}px`,
-                    left: `${menuPosition().left}px`,
-                    width: `${menuWidth()}px`,
-                    'max-height': `${menuMaxHeight()}px`,
-                    'overflow-y': 'auto',
-                    'z-index': 1000,
-                  }}
-                  ref={(el) => {
-                    menuRef = el
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button class={styles.dropdownButton} onClick={handleEdit}>
-                    <BsPencil /> Edit Title
-                  </button>
-                  <Show when={node()?.type === 'book' || node()?.type === 'arc' || node()?.type === 'chapter'}>
-                    <button class={styles.dropdownButton} onClick={handleCopyAsMarkdown}>
-                      <BsFileEarmarkText /> Copy as Markdown
-                    </button>
-                  </Show>
-                  <Show when={node()?.type === 'chapter'}>
-                    <button class={styles.dropdownButton} onClick={handleCopyPreviousContext}>
-                      <BsFileEarmarkTextFill /> Copy Previous Context
-                    </button>
-                    <button
-                      class={styles.dropdownButton}
-                      onClick={(e) => {
-                        console.log('[StoryNavigation] Summary button clicked')
-                        handleGenerateSummary(e)
-                      }}
-                      disabled={node()?.isSummarizing}
-                      title={node()?.summary ? 'Regenerate summary' : 'Generate summary'}
-                    >
-                      <Show when={!node()?.isSummarizing}>
-                        <Show
-                          when={node()?.summary}
-                          fallback={
-                            <>
-                              <BsFileText /> Generate Summary
-                            </>
-                          }
-                        >
-                          <BsCheckCircle /> Regenerate Summary
-                        </Show>
-                      </Show>
-                      <Show when={node()?.isSummarizing}>
-                        <span>Generating...</span>
-                      </Show>
-                    </button>
-                    <div>
-                      <NodeStatusMenu
-                        currentStatus={node()?.status}
-                        onSelect={(status) => nodeStore.updateNode(props.treeNode.id, { status })}
-                        onOptionSelected={() => setShowMenu(false)}
-                        parentMenuOpen={showMenu}
-                        onLayoutChange={updateMenuLayout}
-                      />
-                    </div>
-                    <button
-                      class={styles.dropdownButton}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        nodeStore.setIncludeForPrecedingChapters(props.treeNode.id, 1)
-                        setShowMenu(false)
-                      }}
-                      title="Set all chapters before this one to use summaries in context"
-                    >
-                      <FaSolidCircleHalfStroke /> Use Summaries Before
-                    </button>
-                    <button
-                      class={styles.dropdownButton}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        nodeStore.setIncludeForPrecedingChapters(props.treeNode.id, 0)
-                        setShowMenu(false)
-                      }}
-                      title="Exclude all chapters before this one from context"
-                    >
-                      <FaRegularCircle /> Exclude All Before
-                    </button>
-                  </Show>
-                  <button
-                    class={styles.dropdownButton}
-                    onClick={() => {
-                      const n = node()
-                      if (!n) return
-                      nodeStore.insertNodeBefore(props.treeNode.id, n.type)
-                      setShowMenu(false)
-                    }}
-                  >
-                    <BsPlusCircle /> Insert{' '}
-                    {node()?.type === 'book'
-                      ? 'Book'
-                      : node()?.type === 'arc'
-                        ? 'Arc'
-                        : node()?.type === 'chapter'
-                          ? 'Chapter'
-                          : 'Scene'}{' '}
-                    Before
-                  </button>
-                  <Show when={canMoveUp()}>
-                    <button class={styles.dropdownButton} onClick={handleMoveUp}>
-                      <BsArrowUp /> Move Up
-                    </button>
-                  </Show>
-                  <Show when={canMoveDown()}>
-                    <button class={styles.dropdownButton} onClick={handleMoveDown}>
-                      <BsArrowDown /> Move Down
-                    </button>
-                  </Show>
-                  <button class={`${styles.dropdownButton} ${styles.deleteButton}`} onClick={handleDelete}>
-                    <BsTrash /> Delete
-                  </button>
-                </div>
-              </Show>
-            </Portal>
-          </div>
+              Insert {node()?.type === 'book' ? 'Book' : node()?.type === 'arc' ? 'Arc' : node()?.type === 'chapter' ? 'Chapter' : 'Scene'} Before
+            </DropdownItem>
+            <Show when={canMoveUp()}>
+              <DropdownItem icon={<BsArrowUp />} onClick={handleMoveUp}>
+                Move Up
+              </DropdownItem>
+            </Show>
+            <Show when={canMoveDown()}>
+              <DropdownItem icon={<BsArrowDown />} onClick={handleMoveDown}>
+                Move Down
+              </DropdownItem>
+            </Show>
+            <DropdownItem icon={<BsTrash />} onClick={handleDelete} danger>
+              Delete
+            </DropdownItem>
+          </Dropdown>
         </div>
         </div>
       </div>
 
       <Show when={isExpanded() && hasChildren()}>
-        <div style={{ 'margin-left': '8px' }}>
+        <div class={styles.childrenContainer}>
           <For each={props.treeNode.children}>
             {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} />}
           </For>
@@ -1551,16 +1083,16 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
 
   return (
     <TreeDragDropProvider>
-      <div style={navStyles.navigation}>
-        <div style={navStyles.treeContainer} ref={treeContainerRef}>
+      <div class={styles.navigation}>
+        <div class={styles.treeContainer} ref={treeContainerRef}>
           <For each={nodeStore.tree}>
             {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} />}
           </For>
 
           <Show when={nodeStore.tree.length === 0}>
-            <div style={navStyles.emptyState}>
+            <div class={styles.emptyState}>
               <p>No books yet</p>
-              <button style={navStyles.addButton} onClick={handleAddBook}>
+              <button class={styles.addButton} onClick={handleAddBook}>
                 <BsPlusCircle /> Add Book
               </button>
             </div>
@@ -1568,12 +1100,12 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
         </div>
 
         <Show when={nodeStore.tree.length > 0}>
-          <div style={navStyles.footer}>
-            <div style={navStyles.footerButtons}>
-              <button style={navStyles.addButton} onClick={handleCopyTreeMarkdown}>
+          <div class={styles.footer}>
+            <div class={styles.footerButtons}>
+              <button class={styles.addButton} onClick={handleCopyTreeMarkdown}>
                 <BsDiagram3 /> Copy Tree as Markdown
               </button>
-              <button style={navStyles.addButton} onClick={handleAddBook}>
+              <button class={styles.addButton} onClick={handleAddBook}>
                 <BsPlusCircle /> Add Book
               </button>
             </div>
