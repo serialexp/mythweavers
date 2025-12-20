@@ -2,6 +2,7 @@ import { Component, Show, createMemo } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { settingsStore } from '../stores/settingsStore'
 import { GlobalScriptEditor } from './GlobalScriptEditor'
+import * as styles from './StoryStats.css'
 
 export const StoryStats: Component = () => {
   const stats = createMemo(() => {
@@ -19,26 +20,11 @@ export const StoryStats: Component = () => {
 
   return (
     <Show when={messagesStore.hasStoryMessages}>
-      <div
-        style={{
-          padding: '0.5rem 1rem',
-          background: 'var(--bg-secondary)',
-          'border-bottom': '1px solid var(--border-color)',
-          'font-size': '0.85rem',
-          color: 'var(--text-secondary)',
-          display: 'flex',
-          'align-items': 'center',
-          'justify-content': 'center',
-          gap: '0.5rem',
-          position: 'relative',
-          transition: 'all 0.3s ease',
-          overflow: 'hidden',
-        }}
-      >
+      <div class={styles.container}>
         <span>
           {stats().wordCount} words • ~{stats().estimatedTokens} tokens
           <Show when={isClaudeModel()}>
-            <span style={{ opacity: '0.7', 'font-style': 'italic' }} title="Anthropic models cache full content">
+            <span class={styles.cachedNote} title="Anthropic models cache full content">
               &nbsp;(cached)
             </span>
           </Show>

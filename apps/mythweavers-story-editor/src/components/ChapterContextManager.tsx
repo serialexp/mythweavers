@@ -9,6 +9,7 @@ import { contextItemsStore } from '../stores/contextItemsStore'
 import { nodeStore } from '../stores/nodeStore'
 import { Node } from '../types/core'
 import { getCharacterDisplayName } from '../utils/character'
+import * as styles from './ChapterContextManager.css'
 
 interface ChapterContextManagerProps {
   isOpen: boolean
@@ -80,16 +81,6 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
     return currentIndex > 0
   }
 
-  const itemStyle = {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-    padding: '0.5rem',
-    'border-radius': 'var(--radius-sm)',
-    cursor: 'pointer',
-    transition: 'background var(--transition-fast)',
-  }
-
   return (
     <Modal
       open={props.isOpen}
@@ -105,27 +96,17 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
         </Show>
 
         <div>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Characters</h4>
-          <div
-            style={{
-              display: 'flex',
-              'flex-direction': 'column',
-              gap: '0.25rem',
-              'max-height': '200px',
-              'overflow-y': 'auto',
-            }}
-          >
+          <h4 class={styles.sectionHeader}>Characters</h4>
+          <div class={styles.listContainer}>
             <For each={charactersStore.characters}>
               {(character) => (
-                <label style={itemStyle}>
+                <label class={styles.itemLabel}>
                   <input
                     type="checkbox"
                     checked={selectedCharacterIds().includes(character.id)}
                     onChange={() => toggleCharacter(character.id)}
                   />
-                  <span
-                    style={{ color: 'var(--text-primary)', display: 'flex', 'align-items': 'center', gap: '0.5rem' }}
-                  >
+                  <span class={styles.itemText}>
                     {getCharacterDisplayName(character)}
                     <Show when={character.isMainCharacter}>
                       <Badge variant="primary" size="sm">
@@ -137,33 +118,23 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
               )}
             </For>
             <Show when={charactersStore.characters.length === 0}>
-              <p style={{ color: 'var(--text-muted)', 'font-style': 'italic', margin: 0 }}>No characters defined yet</p>
+              <p class={styles.emptyMessage}>No characters defined yet</p>
             </Show>
           </div>
         </div>
 
         <div>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Context Items</h4>
-          <div
-            style={{
-              display: 'flex',
-              'flex-direction': 'column',
-              gap: '0.25rem',
-              'max-height': '200px',
-              'overflow-y': 'auto',
-            }}
-          >
+          <h4 class={styles.sectionHeader}>Context Items</h4>
+          <div class={styles.listContainer}>
             <For each={contextItemsStore.contextItems.filter((item) => !item.isGlobal && item.type !== 'plot')}>
               {(item) => (
-                <label style={itemStyle}>
+                <label class={styles.itemLabel}>
                   <input
                     type="checkbox"
                     checked={selectedContextItemIds().includes(item.id)}
                     onChange={() => toggleContextItem(item.id)}
                   />
-                  <span
-                    style={{ color: 'var(--text-primary)', display: 'flex', 'align-items': 'center', gap: '0.5rem' }}
-                  >
+                  <span class={styles.itemText}>
                     {item.name}
                     <Badge variant="secondary" size="sm">
                       {item.type}
@@ -177,35 +148,16 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
                 contextItemsStore.contextItems.filter((item) => !item.isGlobal && item.type !== 'plot').length === 0
               }
             >
-              <p style={{ color: 'var(--text-muted)', 'font-style': 'italic', margin: 0 }}>
-                No non-global context items defined yet
-              </p>
+              <p class={styles.emptyMessage}>No non-global context items defined yet</p>
             </Show>
           </div>
           <Show when={contextItemsStore.contextItems.filter((item) => item.isGlobal).length > 0}>
-            <p
-              style={{
-                'margin-top': '0.5rem',
-                'font-size': '0.85rem',
-                color: 'var(--text-muted)',
-                'font-style': 'italic',
-              }}
-            >
-              Note: Global context items are always active and don't need to be selected.
-            </p>
+            <p class={styles.globalNote}>Note: Global context items are always active and don't need to be selected.</p>
           </Show>
         </div>
       </Stack>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          'justify-content': 'flex-end',
-          padding: '1rem',
-          'border-top': '1px solid var(--border-color)',
-        }}
-      >
+      <div class={styles.footer}>
         <Button variant="secondary" onClick={props.onClose}>
           Cancel
         </Button>

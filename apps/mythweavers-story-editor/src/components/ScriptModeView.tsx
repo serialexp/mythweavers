@@ -9,6 +9,7 @@ import { InsertControls } from './InsertControls'
 import { MessageScriptModal } from './MessageScriptModal'
 import { NodeHeader } from './NodeHeader'
 import { ScriptDataDiff } from './ScriptDataDiff'
+import * as styles from './ScriptModeView.css'
 import * as viewStyles from './ViewStyles.css'
 
 interface ScriptModeViewProps {
@@ -75,29 +76,12 @@ export function ScriptModeView(_props: ScriptModeViewProps) {
       <For each={scriptMessages()}>
         {(message) => (
           <>
-            <Card style={{ 'margin-bottom': 'var(--spacing-md)' }}>
+            <Card class={styles.scriptCard}>
               <CardBody>
                 <Stack gap="md">
                   {/* Header with summary and edit button */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      'justify-content': 'space-between',
-                      'align-items': 'flex-start',
-                      gap: 'var(--spacing-md)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        flex: 1,
-                        color: 'var(--text-secondary)',
-                        'font-size': '0.9rem',
-                        'line-height': '1.6',
-                        padding: 'var(--spacing-sm)',
-                        background: 'var(--bg-tertiary)',
-                        'border-radius': 'var(--radius-sm)',
-                      }}
-                    >
+                  <div class={styles.scriptHeader}>
+                    <div class={styles.summaryPreview}>
                       {message.summary ||
                         message.paragraphSummary ||
                         message.content.slice(0, 200) + (message.content.length > 200 ? '...' : '')}
@@ -115,33 +99,11 @@ export function ScriptModeView(_props: ScriptModeViewProps) {
                   {/* Show script code */}
                   <Show when={message.script}>
                     <div>
-                      <div
-                        style={{
-                          'font-weight': '600',
-                          color: 'var(--text-primary)',
-                          'margin-bottom': 'var(--spacing-xs)',
-                          'font-size': '0.875rem',
-                          'text-transform': 'uppercase',
-                          'letter-spacing': '0.5px',
-                        }}
-                      >
+                      <div class={styles.codeHeading}>
                         Script Code:
                       </div>
-                      <pre
-                        style={{
-                          background: 'var(--bg-primary)',
-                          border: '1px solid var(--border-color)',
-                          'border-radius': 'var(--radius-sm)',
-                          padding: 'var(--spacing-sm)',
-                          'overflow-x': 'auto',
-                          'font-family': "'Monaco', 'Courier New', monospace",
-                          'font-size': '0.875rem',
-                          'line-height': '1.5',
-                          color: 'var(--text-primary)',
-                          margin: 0,
-                        }}
-                      >
-                        <code style={{ 'white-space': 'pre' }}>
+                      <pre class={styles.codeBlock}>
+                        <code class={styles.codeContent}>
                           {message
                             .script!.split('\n')
                             .filter((line) => {
@@ -157,13 +119,7 @@ export function ScriptModeView(_props: ScriptModeViewProps) {
                   {/* Show script data changes */}
                   <Show when={scriptDataStore.getDataStateForMessage(message.id)}>
                     {(dataState) => (
-                      <div
-                        style={{
-                          'margin-top': 'var(--spacing-md)',
-                          'padding-top': 'var(--spacing-md)',
-                          'border-top': '1px solid var(--border-color)',
-                        }}
-                      >
+                      <div class={styles.dataStateDivider}>
                         <ScriptDataDiff before={dataState().before} after={dataState().after} messageId={message.id} />
                       </div>
                     )}

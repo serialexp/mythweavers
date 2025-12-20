@@ -8,6 +8,7 @@ import { nodeStore } from '../stores/nodeStore'
 import { uiStore } from '../stores/uiStore'
 import { BranchOption, Message } from '../types/core'
 import { generateMessageId } from '../utils/id'
+import * as styles from './BranchMessage.css'
 
 interface BranchMessageProps {
   message: Message
@@ -114,22 +115,12 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
 
   return (
     <div>
-      <div
-        style={{
-          'font-size': '1.1rem',
-          'font-weight': '600',
-          color: 'var(--text-primary)',
-          'margin-bottom': 'var(--spacing-md)',
-          display: 'flex',
-          'align-items': 'center',
-          gap: 'var(--spacing-sm)',
-        }}
-      >
-        <span style={{ 'font-size': '1.3rem' }}>🔀</span>
+      <div class={styles.branchTitle}>
+        <span class={styles.branchTitleIcon}>🔀</span>
         {props.message.content}
       </div>
 
-      <Stack gap="sm" style={{ 'margin-bottom': 'var(--spacing-md)' }}>
+      <Stack gap="sm" class={styles.optionsContainer}>
         <For each={props.message.options || []}>
           {(option) => {
             const isSelected = () => selectedOptionId() === option.id
@@ -150,61 +141,40 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
 
             return (
               <div
-                style={{
-                  display: 'flex',
-                  'align-items': 'center',
-                  gap: 'var(--spacing-sm)',
-                  padding: 'var(--spacing-sm) var(--spacing-md)',
-                  background: 'var(--bg-primary)',
-                  border: `1px solid ${isSelected() ? 'var(--success-color)' : 'var(--border-color)'}`,
-                  'border-radius': 'var(--radius-sm)',
-                  transition: 'all var(--transition-fast)',
-                  ...(isSelected()
-                    ? { background: 'color-mix(in srgb, var(--success-color) 10%, var(--bg-primary))' }
-                    : {}),
-                }}
+                class={`${styles.optionRow} ${isSelected() ? styles.optionRowSelected : ''}`}
               >
                 <IconButton
                   variant="ghost"
                   size="sm"
                   onClick={() => handleSelectOption(option.id)}
                   aria-label={isSelected() ? 'Selected' : 'Click to select this option'}
-                  style={{ color: isSelected() ? 'var(--success-color)' : 'var(--text-secondary)' }}
+                  class={isSelected() ? styles.selectButtonSelected : styles.selectButtonDefault}
                 >
                   {isSelected() ? <BsCheckCircle size={20} /> : <BsCircle size={20} />}
                 </IconButton>
 
-                <div style={{ flex: 1, display: 'flex', 'flex-direction': 'column', gap: 'var(--spacing-xs)' }}>
+                <div class={styles.optionContent}>
                   <Show
                     when={isEditing()}
                     fallback={
-                      <div style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--spacing-xs)' }}>
-                        <div style={{ 'font-size': '1rem', color: 'var(--text-primary)', 'font-weight': '500' }}>
+                      <div class={styles.optionDisplayContent}>
+                        <div class={styles.optionLabel}>
                           {option.label}
                         </div>
                         <Show when={option.description}>
-                          <div
-                            style={{
-                              'font-size': '0.9rem',
-                              color: 'var(--text-secondary)',
-                              'font-style': 'italic',
-                              'margin-top': 'var(--spacing-xs)',
-                            }}
-                          >
+                          <div class={styles.optionDescription}>
                             {option.description}
                           </div>
                         </Show>
                         <Show
                           when={hasTarget}
                           fallback={
-                            <span
-                              style={{ 'font-size': '0.85rem', color: 'var(--danger-color)', 'font-style': 'italic' }}
-                            >
+                            <span class={styles.noTargetText}>
                               No target set
                             </span>
                           }
                         >
-                          <span style={{ 'font-size': '0.85rem', color: 'var(--success-color)' }}>
+                          <span class={styles.targetText}>
                             Target: {getTargetInfo()?.nodeName} (msg #{getTargetInfo()?.messageOrder})
                           </span>
                         </Show>
@@ -270,7 +240,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                     size="sm"
                     onClick={() => handleGoToTarget(option)}
                     aria-label="Go to target message"
-                    style={{ color: 'var(--success-color)' }}
+                    class={styles.goToTargetButton}
                   >
                     <BsArrowRight size={18} />
                   </IconButton>
@@ -293,11 +263,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
       <Button
         variant="secondary"
         onClick={handleAddOption}
-        style={{
-          width: '100%',
-          border: '1px dashed var(--border-color)',
-          background: 'var(--bg-primary)',
-        }}
+        class={styles.addOptionButton}
       >
         <BsPlus size={20} /> Add Option
       </Button>

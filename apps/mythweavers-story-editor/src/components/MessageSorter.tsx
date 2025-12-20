@@ -4,6 +4,7 @@ import { Component, For, JSX, createEffect, createSignal } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
+import * as styles from './MessageSorter.css'
 
 interface MessageSorterProps {
   isOpen: boolean
@@ -287,12 +288,7 @@ export const MessageSorter: Component<MessageSorterProps> = (props) => {
         </ul>
       </div>
 
-      <Stack
-        direction="horizontal"
-        gap="sm"
-        justify="end"
-        style={{ 'padding-top': '16px', 'border-top': '1px solid var(--border-color)' }}
-      >
+      <Stack direction="horizontal" gap="sm" justify="end" class={styles.footer}>
         <Button variant="secondary" onClick={props.onClose}>
           Cancel
         </Button>

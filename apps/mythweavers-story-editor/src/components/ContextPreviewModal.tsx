@@ -1,5 +1,6 @@
 import { Badge, Modal, Stack } from '@mythweavers/ui'
 import { Component, For, Show } from 'solid-js'
+import * as styles from './ContextPreviewModal.css'
 
 interface ContextMessage {
   role: 'system' | 'user' | 'assistant'
@@ -41,7 +42,7 @@ export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) 
           {(msg, index) => (
             <div>
               <Stack direction="horizontal" justify="between" align="center" style={{ 'margin-bottom': '10px' }}>
-                <h3 style={{ margin: 0, color: 'var(--text-primary)', 'font-size': '16px' }}>
+                <h3 class={styles.messageTitle}>
                   {msg.role === 'system' ? 'System' : msg.role === 'user' ? 'User' : 'Assistant'} Message {index() + 1}
                 </h3>
                 <Show when={msg.cache_control}>
@@ -50,23 +51,7 @@ export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) 
                   </span>
                 </Show>
               </Stack>
-              <pre
-                style={{
-                  background: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  'border-radius': '5px',
-                  padding: '15px',
-                  'white-space': 'pre-wrap',
-                  'word-wrap': 'break-word',
-                  'font-family': "'Courier New', monospace",
-                  'font-size': '13px',
-                  'line-height': '1.5',
-                  color: 'var(--text-secondary)',
-                  'max-height': '300px',
-                  'overflow-y': 'auto',
-                  margin: 0,
-                }}
-              >
+              <pre class={styles.codeBlock}>
                 {msg.content.length > 50000
                   ? `${msg.content.substring(0, 50000)}\n\n[Content truncated - too large to display]`
                   : msg.content}

@@ -30,7 +30,7 @@ export const CodeEditor: Component<CodeEditorProps> = (props) => {
   const readOnlyCompartment = new Compartment()
 
   onMount(() => {
-    // Detect if user prefers dark mode
+    // Detect if user prefers dark mode for CodeMirror syntax theme
     const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
 
     // Create a basic setup similar to the official one but more minimal
@@ -62,30 +62,15 @@ export const CodeEditor: Component<CodeEditorProps> = (props) => {
           }
         }),
         readOnlyCompartment.of(EditorState.readOnly.of(props.readOnly || false)),
-        EditorView.theme({
-          '&': {
-            fontSize: '14px',
-            height: props.height || 'auto',
-          },
-          '.cm-content': {
-            padding: '12px',
-            minHeight: props.height || '200px',
-          },
-          '.cm-focused .cm-cursor': {
-            borderLeftColor: 'var(--primary-color)',
-          },
-          '.cm-placeholder': {
-            color: 'var(--text-secondary)',
-            fontStyle: 'italic',
-          },
-          '&.cm-editor.cm-focused': {
-            outline: '2px solid var(--primary-color)',
-          },
-          '.cm-gutters': {
-            backgroundColor: isDarkMode ? '#1e1e1e' : '#f5f5f5',
-            borderRight: '1px solid var(--border-color)',
-          },
-        }),
+        // Dynamic height handling - other styles are in CodeEditor.css.ts
+        ...(props.height
+          ? [
+              EditorView.theme({
+                '&': { height: props.height },
+                '.cm-content': { minHeight: props.height },
+              }),
+            ]
+          : []),
       ],
     })
 

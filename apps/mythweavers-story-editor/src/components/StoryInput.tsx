@@ -1,10 +1,11 @@
 import { Button, IconButton, Textarea } from '@mythweavers/ui'
 import { BsEye, BsStopFill, BsX } from 'solid-icons/bs'
-import { Component, JSX, Show, createMemo } from 'solid-js'
+import { Component, Show, createMemo } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { settingsStore } from '../stores/settingsStore'
 import { viewModeStore } from '../stores/viewModeStore'
+import * as styles from './StoryInput.css'
 import { TokenSelector } from './TokenSelector'
 
 interface StoryInputProps {
@@ -32,70 +33,10 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
     }
   }
 
-  // Inline styles for component-specific layout
-  const inputContainerStyle: JSX.CSSProperties = {
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '10px',
-    padding: '20px',
-    background: 'var(--bg-secondary)',
-    'border-top': '1px solid var(--border-color)',
-  }
-
-  const inputWithClearStyle: JSX.CSSProperties = {
-    position: 'relative',
-    display: 'flex',
-    'align-items': 'flex-start',
-    gap: '10px',
-  }
-
-  const inputActionsStyle: JSX.CSSProperties = {
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '5px',
-  }
-
-  const buttonsStyle: JSX.CSSProperties = {
-    display: 'flex',
-    gap: '10px',
-    'justify-content': 'flex-end',
-    'flex-wrap': 'wrap',
-    'align-items': 'center',
-  }
-
-  const paragraphSelectorStyle: JSX.CSSProperties = {
-    'margin-right': 'auto',
-    display: 'flex',
-    'align-items': 'center',
-    gap: '6px',
-    padding: '4px 8px',
-    background: 'var(--bg-tertiary)',
-    'border-radius': '5px',
-    border: '1px solid var(--border-color)',
-  }
-
-  const paragraphLabelStyle: JSX.CSSProperties = {
-    'font-size': '13px',
-    color: 'var(--text-secondary)',
-    'margin-right': '4px',
-  }
-
-  const paragraphButtonStyle = (isActive: boolean): JSX.CSSProperties => ({
-    padding: '4px 10px',
-    background: isActive ? 'var(--primary-color)' : 'var(--bg-primary)',
-    border: `1px solid ${isActive ? 'var(--primary-color)' : 'var(--border-color)'}`,
-    'border-radius': '4px',
-    color: isActive ? 'white' : 'var(--text-secondary)',
-    'font-size': '13px',
-    'font-weight': '500',
-    cursor: 'pointer',
-    'min-width': '28px',
-  })
-
   return (
     <Show when={!viewModeStore.isReadMode()}>
-      <div style={inputContainerStyle}>
-        <div style={inputWithClearStyle}>
+      <div class={styles.container}>
+        <div class={styles.inputWithClear}>
           <Textarea
             value={messagesStore.input}
             onInput={(e) => messagesStore.setInput(e.currentTarget.value)}
@@ -105,7 +46,7 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
             rows={3}
             style={{ flex: '1', 'min-height': '60px', 'max-height': '200px', resize: 'vertical' }}
           />
-          <div style={inputActionsStyle}>
+          <div class={styles.inputActions}>
             <IconButton
               onClick={(e) => {
                 console.log('[StoryInput] Context preview button clicked')
@@ -133,12 +74,12 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
             </Show>
           </div>
         </div>
-        <div style={buttonsStyle}>
-          <div style={paragraphSelectorStyle}>
-            <span style={paragraphLabelStyle}>Paragraphs:</span>
+        <div class={styles.buttons}>
+          <div class={styles.paragraphSelector}>
+            <span class={styles.paragraphLabel}>Paragraphs:</span>
             {[1, 2, 3, 4, 5, 6, 0].map((count) => (
               <button
-                style={paragraphButtonStyle(settingsStore.paragraphsPerTurn === count)}
+                class={settingsStore.paragraphsPerTurn === count ? styles.paragraphButtonActive : styles.paragraphButton}
                 onClick={() => settingsStore.setParagraphsPerTurn(count)}
                 title={count === 0 ? 'No paragraph limit' : `Generate ${count} paragraph${count !== 1 ? 's' : ''}`}
               >
@@ -146,8 +87,8 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
               </button>
             ))}
           </div>
-          <div style={{ ...paragraphSelectorStyle, 'margin-right': '0' }}>
-            <span style={paragraphLabelStyle}>Thinking:</span>
+          <div class={styles.paragraphSelectorNoMargin}>
+            <span class={styles.paragraphLabel}>Thinking:</span>
             {[
               { value: 0, label: 'Off' },
               { value: 1024, label: 'Low' },
@@ -155,7 +96,7 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
               { value: 4096, label: 'High' },
             ].map((option) => (
               <button
-                style={paragraphButtonStyle(settingsStore.thinkingBudget === option.value)}
+                class={settingsStore.thinkingBudget === option.value ? styles.paragraphButtonActive : styles.paragraphButton}
                 onClick={() => settingsStore.setThinkingBudget(option.value)}
                 title={option.value === 0 ? 'No extended thinking' : `Thinking budget: ${option.value} tokens`}
               >

@@ -1,103 +1,7 @@
-import { Component, For, type JSX, Show, createEffect, createMemo, onCleanup, onMount } from 'solid-js'
+import { Component, For, Show, createEffect, createMemo, onCleanup, onMount } from 'solid-js'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
 import MessageListItems from './MessageListItems'
-
-// Inline styles for MessageList
-const listStyles = {
-  messages: {
-    flex: '1',
-    overflow: 'auto',
-    padding: '0',
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '0',
-    'scroll-behavior': 'smooth',
-  } as JSX.CSSProperties,
-
-  loadingMessage: {
-    padding: '1rem',
-    'background-color': 'var(--bg-secondary)',
-    'border-radius': '8px',
-    'border-left': '3px solid var(--accent-color)',
-  } as JSX.CSSProperties,
-
-  loadingMessageContent: {
-    color: 'var(--text-secondary)',
-    'font-style': 'italic',
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-  } as JSX.CSSProperties,
-
-  orphanedChaptersSection: {
-    'margin-bottom': '1rem',
-    padding: '1rem',
-    'background-color': 'var(--bg-secondary)',
-    'border-radius': '8px',
-    border: '1px solid var(--warning-color)',
-  } as JSX.CSSProperties,
-
-  orphanedChaptersTitle: {
-    margin: '0 0 0.75rem 0',
-    color: 'var(--warning-color)',
-    'font-size': '0.95rem',
-    'font-weight': '600',
-  } as JSX.CSSProperties,
-
-  orphanedChapterItem: {
-    display: 'flex',
-    'justify-content': 'space-between',
-    'align-items': 'center',
-    padding: '0.5rem',
-    'background-color': 'var(--bg-primary)',
-    'border-radius': '4px',
-    'margin-bottom': '0.5rem',
-  } as JSX.CSSProperties,
-
-  orphanedChapterInfo: {
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '0.25rem',
-  } as JSX.CSSProperties,
-
-  orphanedChapterTitle: {
-    'font-weight': '500',
-    color: 'var(--text-primary)',
-  } as JSX.CSSProperties,
-
-  orphanedChapterId: {
-    'font-size': '0.8rem',
-    color: 'var(--text-secondary)',
-    'font-family': 'monospace',
-  } as JSX.CSSProperties,
-
-  orphanedChapterActions: {
-    display: 'flex',
-    gap: '0.5rem',
-  } as JSX.CSSProperties,
-
-  createMarkerButton: {
-    padding: '0.375rem 0.75rem',
-    'font-size': '0.85rem',
-    background: 'var(--accent-color)',
-    color: 'white',
-    border: 'none',
-    'border-radius': '4px',
-    cursor: 'pointer',
-    transition: 'background 0.2s',
-  } as JSX.CSSProperties,
-
-  deleteOrphanedButton: {
-    padding: '0.375rem 0.75rem',
-    'font-size': '0.85rem',
-    background: 'transparent',
-    color: 'var(--error-color)',
-    border: '1px solid var(--error-color)',
-    'border-radius': '4px',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  } as JSX.CSSProperties,
-}
+import * as styles from './MessageList.css'
 
 interface MessageListProps {
   isLoading: boolean
@@ -413,28 +317,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   return (
     <>
-      <div class="message-list-container" style={listStyles.messages} ref={messagesRef}>
+      <div class={styles.messages} ref={messagesRef}>
         {/* Orphaned chapters section removed - chapters are now nodes */}
         <Show when={false}>
-          <div style={listStyles.orphanedChaptersSection}>
-            <h3 style={listStyles.orphanedChaptersTitle}>Orphaned Chapters (missing markers)</h3>
+          <div class={styles.orphanedChaptersSection}>
+            <h3 class={styles.orphanedChaptersTitle}>Orphaned Chapters (missing markers)</h3>
             <For each={[]}>
               {(_chapter) => (
-                <div style={listStyles.orphanedChapterItem}>
-                  <div style={listStyles.orphanedChapterInfo}>
-                    <span style={listStyles.orphanedChapterTitle}>{'Untitled Chapter'}</span>
-                    <span style={listStyles.orphanedChapterId}>ID: {'unknown'}...</span>
+                <div class={styles.orphanedChapterItem}>
+                  <div class={styles.orphanedChapterInfo}>
+                    <span class={styles.orphanedChapterTitle}>{'Untitled Chapter'}</span>
+                    <span class={styles.orphanedChapterId}>ID: {'unknown'}...</span>
                   </div>
-                  <div style={listStyles.orphanedChapterActions}>
+                  <div class={styles.orphanedChapterActions}>
                     <button
-                      style={listStyles.createMarkerButton}
+                      class={styles.createMarkerButton}
                       onClick={() => console.log('Chapters are now nodes')}
                       title="Create marker for this chapter"
                     >
                       Create Marker
                     </button>
                     <button
-                      style={listStyles.deleteOrphanedButton}
+                      class={styles.deleteOrphanedButton}
                       onClick={() => console.log('Chapters are now nodes')}
                       title="Delete this orphaned chapter"
                     >
@@ -451,8 +355,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
           // Chapter handlers removed - chapters are now managed through nodes
         />
         <Show when={props.isLoading}>
-          <div style={listStyles.loadingMessage}>
-            <div style={listStyles.loadingMessageContent}>Thinking...</div>
+          <div class={styles.loadingMessage}>
+            <div class={styles.loadingMessageContent}>Thinking...</div>
           </div>
         </Show>
       </div>

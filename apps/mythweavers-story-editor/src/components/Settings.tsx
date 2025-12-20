@@ -23,6 +23,7 @@ import type { Model } from '../types/core'
 import { DeletedTurnsModal } from './DeletedTurnsModal'
 import { ModelSelector } from './ModelSelector'
 import * as styles from './Settings.css'
+import { StoryTimePicker } from './StoryTimePicker'
 
 interface SettingsSection {
   id: string
@@ -67,16 +68,10 @@ interface SettingsProps {
   setAnthropicApiKey: (value: string) => void
   openaiApiKey: string
   setOpenaiApiKey: (value: string) => void
-  useSmartContext: boolean
-  setUseSmartContext: (value: boolean) => void
-  autoGenerate: boolean
-  setAutoGenerate: (value: boolean) => void
   person: string
   setPerson: (value: string) => void
   tense: string
   setTense: (value: string) => void
-  paragraphsPerTurn: number
-  setParagraphsPerTurn: (value: number) => void
 }
 
 export const Settings: Component<SettingsProps> = (props) => {
@@ -303,8 +298,8 @@ export const Settings: Component<SettingsProps> = (props) => {
       <div class={styles.settingRow}>
         <label class={styles.label}>Paragraphs per Turn</label>
         <select
-          value={props.paragraphsPerTurn}
-          onChange={(e) => props.setParagraphsPerTurn(Number.parseInt(e.target.value))}
+          value={currentStoryStore.paragraphsPerTurn}
+          onChange={(e) => currentStoryStore.setParagraphsPerTurn(Number.parseInt(e.target.value))}
           class={styles.select}
         >
           <option value="0">No limit</option>
@@ -320,8 +315,10 @@ export const Settings: Component<SettingsProps> = (props) => {
   )
 
   const renderTimelineSection = () => {
-    const positiveEra = () => calendarStore.config?.eras.positive ?? 'positive era'
-    const negativeEra = () => calendarStore.config?.eras.negative ?? 'negative era'
+    const [showStartPicker, setShowStartPicker] = createSignal(false)
+    const [showEndPicker, setShowEndPicker] = createSignal(false)
+    const startTimeFormatted = () => calendarStore.formatStoryTime(currentStoryStore.timelineStartTime)
+    const endTimeFormatted = () => calendarStore.formatStoryTime(currentStoryStore.timelineEndTime)
 
     return (
       <div class={styles.section}>
@@ -334,7 +331,7 @@ export const Settings: Component<SettingsProps> = (props) => {
           }
         >
           <div class={styles.settingRow}>
-            <label class={styles.label}>Timeline Granularity</label>
+            <label class={styles.label}>Map Timeline Granularity</label>
             <select
               value={currentStoryStore.timelineGranularity || 'hour'}
               onChange={(e) => currentStoryStore.setTimelineGranularity(e.target.value as 'hour' | 'day')}
@@ -343,35 +340,42 @@ export const Settings: Component<SettingsProps> = (props) => {
               <option value="hour">Hour (60 min increments)</option>
               <option value="day">Day (1440 min increments)</option>
             </select>
+            <span class={styles.infoText}>
+              Controls the step size for the map timeline slider. Story scenes can still be placed at any minute.
+            </span>
           </div>
 
           <div class={styles.settingRow}>
             <label class={styles.label}>Timeline Start Time</label>
-            <input
-              type="number"
-              value={currentStoryStore.timelineStartTime ?? ''}
-              onChange={(e) => {
-                const val = e.target.value.trim()
-                currentStoryStore.setTimelineStartTime(val === '' ? null : Number.parseInt(val))
+            <button class={styles.button} onClick={() => setShowStartPicker(true)}>
+              {startTimeFormatted() ?? 'Not set (auto-calculate from earliest chapter)'}
+            </button>
+            <StoryTimePicker
+              modal
+              open={showStartPicker()}
+              currentTime={currentStoryStore.timelineStartTime}
+              onSave={(time) => {
+                currentStoryStore.setTimelineStartTime(time)
+                setShowStartPicker(false)
               }}
-              class={styles.input}
-              placeholder={`Minutes from year 0 (negative = ${negativeEra()}, positive = ${positiveEra()})`}
-              title="Leave empty to auto-calculate from earliest chapter"
+              onCancel={() => setShowStartPicker(false)}
             />
           </div>
 
           <div class={styles.settingRow}>
             <label class={styles.label}>Timeline End Time</label>
-            <input
-              type="number"
-              value={currentStoryStore.timelineEndTime ?? ''}
-              onChange={(e) => {
-                const val = e.target.value.trim()
-                currentStoryStore.setTimelineEndTime(val === '' ? null : Number.parseInt(val))
+            <button class={styles.button} onClick={() => setShowEndPicker(true)}>
+              {endTimeFormatted() ?? 'Not set (auto-calculate from latest chapter)'}
+            </button>
+            <StoryTimePicker
+              modal
+              open={showEndPicker()}
+              currentTime={currentStoryStore.timelineEndTime}
+              onSave={(time) => {
+                currentStoryStore.setTimelineEndTime(time)
+                setShowEndPicker(false)
               }}
-              class={styles.input}
-              placeholder={`Minutes from year 0 (negative = ${negativeEra()}, positive = ${positiveEra()})`}
-              title="Leave empty to auto-calculate from latest chapter"
+              onCancel={() => setShowEndPicker(false)}
             />
           </div>
         </Show>

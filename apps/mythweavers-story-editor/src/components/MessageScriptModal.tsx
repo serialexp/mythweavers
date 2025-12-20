@@ -8,6 +8,7 @@ import { Message } from '../types/core'
 import { getAllNodesUpToNode, getMessagesInStoryOrder } from '../utils/nodeTraversal'
 import { executeScript, executeScriptsUpToMessage } from '../utils/scriptEngine'
 import { CodeEditor } from './CodeEditor'
+import * as styles from './MessageScriptModal.css'
 
 interface MessageScriptModalProps {
   message: Message
@@ -228,7 +229,7 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
   return (
     <Modal open={true} onClose={props.onClose} title="Edit Turn Script" size="xl">
       <div style={{ padding: '1.5rem', 'overflow-y': 'auto', flex: 1 }}>
-        <p style={{ margin: '0 0 1rem 0', 'font-size': '0.9rem', color: 'var(--text-secondary)' }}>
+        <p class={styles.description}>
           This script runs when generating context for this turn. It receives the data object after all previous scripts
           have run, and should return the modified data object.
         </p>
@@ -259,40 +260,14 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
             <Grid cols={2} gap="md" style={{ 'margin-top': '1rem' }}>
               <Card variant="flat">
                 <CardBody>
-                  <h4 style={{ margin: '0 0 0.5rem 0', 'font-size': '0.9rem', color: 'var(--text-secondary)' }}>
-                    Data Before This Turn
-                  </h4>
-                  <pre
-                    style={{
-                      margin: 0,
-                      'font-family': "'Monaco', 'Consolas', monospace",
-                      'font-size': '0.8rem',
-                      color: 'var(--text-primary)',
-                      'white-space': 'pre-wrap',
-                      'word-break': 'break-word',
-                    }}
-                  >
-                    {JSON.stringify(previewData().before, null, 2)}
-                  </pre>
+                  <h4 class={styles.previewHeader}>Data Before This Turn</h4>
+                  <pre class={styles.previewContent}>{JSON.stringify(previewData().before, null, 2)}</pre>
                 </CardBody>
               </Card>
               <Card variant="flat">
                 <CardBody>
-                  <h4 style={{ margin: '0 0 0.5rem 0', 'font-size': '0.9rem', color: 'var(--text-secondary)' }}>
-                    Data After This Turn
-                  </h4>
-                  <pre
-                    style={{
-                      margin: 0,
-                      'font-family': "'Monaco', 'Consolas', monospace",
-                      'font-size': '0.8rem',
-                      color: 'var(--text-primary)',
-                      'white-space': 'pre-wrap',
-                      'word-break': 'break-word',
-                    }}
-                  >
-                    {JSON.stringify(previewData().after, null, 2)}
-                  </pre>
+                  <h4 class={styles.previewHeader}>Data After This Turn</h4>
+                  <pre class={styles.previewContent}>{JSON.stringify(previewData().after, null, 2)}</pre>
                 </CardBody>
               </Card>
             </Grid>
@@ -300,15 +275,7 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
         </Stack>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          'justify-content': 'flex-end',
-          padding: '1rem 1.5rem',
-          'border-top': '1px solid var(--border-color)',
-        }}
-      >
+      <div class={styles.footer}>
         <Button variant="ghost" onClick={props.onClose}>
           Cancel
         </Button>

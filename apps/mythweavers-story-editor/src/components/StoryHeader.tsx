@@ -1,4 +1,4 @@
-import { Button, Dropdown, DropdownDivider, DropdownItem, IconButton } from '@mythweavers/ui'
+import { Button, Dropdown, DropdownDivider, DropdownItem, IconButton, useTheme } from '@mythweavers/ui'
 import { useNavigate } from '@solidjs/router'
 import {
   BsArrowsMove,
@@ -13,15 +13,16 @@ import {
   BsFilm,
   BsGear,
   BsGlobe,
-  BsInfoCircle,
   BsMap,
+  BsMoon,
   BsPeople,
   BsPlus,
   BsSearch,
+  BsSun,
   BsThreeDots,
 } from 'solid-icons/bs'
 import * as styles from './StoryHeader.css'
-import { Component, For, type JSX, Show, createEffect, createMemo, createSignal } from 'solid-js'
+import { Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js'
 import { authStore } from '../stores/authStore'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
@@ -52,58 +53,6 @@ import { StoryNavigation } from './StoryNavigation'
 import { StoryStats } from './StoryStats'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
 
-// Inline styles for StoryHeader
-const headerStyles = {
-  headerWrapper: {
-    position: 'relative',
-  } as JSX.CSSProperties,
-
-  header: {
-    display: 'flex',
-    'align-items': 'stretch',
-    'justify-content': 'flex-start',
-    padding: '0',
-    background: 'var(--bg-secondary)',
-    'border-bottom': '1px solid var(--border-color)',
-    position: 'relative',
-    transition: 'all 0.3s ease',
-    overflow: 'visible',
-    height: '52px',
-    'min-height': '52px',
-  } as JSX.CSSProperties,
-
-  headerCollapsed: {
-    height: '0',
-    'min-height': '0',
-    'max-height': '0',
-    padding: '0',
-    'border-bottom': 'none',
-    opacity: '0',
-    overflow: 'hidden',
-  } as JSX.CSSProperties,
-
-  config: {
-    display: 'flex',
-    gap: '8px',
-    'align-items': 'center',
-    'flex-wrap': 'wrap',
-    flex: '1',
-    padding: '0 15px',
-    height: '100%',
-    overflow: 'visible',
-  } as JSX.CSSProperties,
-
-  statsWrapper: {
-    transition: 'all 0.3s ease',
-    overflow: 'hidden',
-  } as JSX.CSSProperties,
-
-  statsWrapperCollapsed: {
-    'max-height': '0',
-    opacity: '0',
-  } as JSX.CSSProperties,
-}
-
 interface StoryHeaderProps {
   onLoadStory: (
     messages: Message[],
@@ -127,6 +76,7 @@ interface StoryHeaderProps {
 
 export const StoryHeader: Component<StoryHeaderProps> = (props) => {
   const navigate = useNavigate()
+  const { resolvedTheme, setTheme } = useTheme()
   const [showNewStoryModal, setShowNewStoryModal] = createSignal(false)
   const [serverAvailable, setServerAvailable] = createSignal(false)
   const [activeSection, setActiveSection] = createSignal<
@@ -174,7 +124,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
 
   return (
     <>
-      <div style={headerStyles.headerWrapper}>
+      <div class={styles.headerWrapper}>
         <IconButton
           class={styles.headerToggle}
           variant="primary"
@@ -198,7 +148,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           </Show>
         </IconButton>
         <header
-          style={isCollapsed() ? { ...headerStyles.header, ...headerStyles.headerCollapsed } : headerStyles.header}
+          class={isCollapsed() ? `${styles.header} ${styles.headerCollapsed}` : styles.header}
         >
           {/* Only show navigation button on mobile */}
           <Show when={isMobile()}>
@@ -222,7 +172,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               <BsBookHalf />
             </button>
           </Show>
-          <div style={headerStyles.config}>
+          <div class={styles.config}>
             <HeaderButton
               onClick={() => {
                 const newSection = activeSection() === 'characters' ? null : 'characters'
@@ -418,8 +368,11 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                 </DropdownItem>
               </Show>
               <DropdownDivider />
-              <DropdownItem icon={<BsInfoCircle />} onClick={() => window.open('/', '_blank')}>
-                About
+              <DropdownItem
+                icon={resolvedTheme() === 'chronicle' ? <BsSun /> : <BsMoon />}
+                onClick={() => setTheme(resolvedTheme() === 'chronicle' ? 'starlight' : 'chronicle')}
+              >
+                {resolvedTheme() === 'chronicle' ? 'Light Theme' : 'Dark Theme'}
               </DropdownItem>
               <DropdownItem icon={<BsBoxArrowRight />} onClick={() => authStore.logout()}>
                 Logout
@@ -430,11 +383,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           </div>
         </header>
         <div
-          style={
-            isCollapsed()
-              ? { ...headerStyles.statsWrapper, ...headerStyles.statsWrapperCollapsed }
-              : headerStyles.statsWrapper
-          }
+          class={isCollapsed() ? `${styles.statsWrapper} ${styles.statsWrapperCollapsed}` : styles.statsWrapper}
         >
           <StoryStats />
         </div>
@@ -478,16 +427,10 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           setAnthropicApiKey={settingsStore.setAnthropicApiKey}
           openaiApiKey={settingsStore.openaiApiKey}
           setOpenaiApiKey={settingsStore.setOpenaiApiKey}
-          useSmartContext={settingsStore.useSmartContext}
-          setUseSmartContext={settingsStore.setUseSmartContext}
-          autoGenerate={settingsStore.autoGenerate}
-          setAutoGenerate={settingsStore.setAutoGenerate}
           person={currentStoryStore.person}
           setPerson={(value: string) => currentStoryStore.setPerson(value as 'first' | 'second' | 'third')}
           tense={currentStoryStore.tense}
           setTense={(value: string) => currentStoryStore.setTense(value as 'present' | 'past')}
-          paragraphsPerTurn={settingsStore.paragraphsPerTurn}
-          setParagraphsPerTurn={settingsStore.setParagraphsPerTurn}
         />
       </OverlayPanel>
 

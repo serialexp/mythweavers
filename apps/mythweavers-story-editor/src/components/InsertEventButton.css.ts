@@ -200,3 +200,9 @@ export const cancelButton = style({
     background: tokens.color.surface.hover,
   },
 })
+
+export const editorWrapper = style({
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.default,
+  overflow: 'hidden',
+})

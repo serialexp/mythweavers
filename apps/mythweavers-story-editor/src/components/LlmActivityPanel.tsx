@@ -2,6 +2,7 @@ import { Alert, Badge, Button, Card, CardBody, Grid, Stack } from '@mythweavers/
 import { Component, For, Show, createMemo } from 'solid-js'
 import { llmActivityStore } from '../stores/llmActivityStore'
 import type { TokenUsage } from '../types/core'
+import * as styles from './LlmActivityPanel.css'
 
 const formatTimestamp = (timestamp: number) => {
   const date = new Date(timestamp)
@@ -33,13 +34,11 @@ export const LlmActivityPanel: Component = () => {
   const entries = createMemo(() => [...llmActivityStore.entries].sort((a, b) => b.timestamp - a.timestamp))
 
   return (
-    <Stack gap="md" style={{ height: '100%' }}>
-      <div style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'space-between', gap: '0.75rem' }}>
+    <Stack gap="md" class={styles.container}>
+      <div class={styles.header}>
         <div>
           <strong>LLM Activity</strong>
-          <span style={{ 'margin-left': '0.5rem', color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
-            {entries().length} call(s)
-          </span>
+          <span class={styles.callCount}>{entries().length} call(s)</span>
         </div>
         <Button
           variant="secondary"
@@ -51,47 +50,24 @@ export const LlmActivityPanel: Component = () => {
         </Button>
       </div>
 
-      <Show
-        when={entries().length > 0}
-        fallback={
-          <div
-            style={{
-              padding: '2rem',
-              'text-align': 'center',
-              color: 'var(--text-secondary)',
-              border: '1px dashed var(--border-color)',
-              'border-radius': '8px',
-            }}
-          >
-            No LLM calls logged yet.
-          </div>
-        }
-      >
-        <div style={{ flex: '1', 'overflow-y': 'auto', display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>
+      <Show when={entries().length > 0} fallback={<div class={styles.emptyState}>No LLM calls logged yet.</div>}>
+        <div class={styles.entriesList}>
           <For each={entries()}>
             {(entry) => (
               <Card>
                 <details>
-                  <summary style={{ cursor: 'pointer', padding: '0.75rem' }}>
-                    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.35rem' }}>
-                      <div style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem', 'font-weight': '600' }}>
+                  <summary class={styles.summary}>
+                    <div class={styles.summaryContent}>
+                      <div class={styles.summaryHeader}>
                         <Badge variant="info" size="sm">
                           {entry.type}
                         </Badge>
-                        <span style={{ 'font-size': '0.85rem', color: 'var(--text-secondary)' }}>
+                        <span class={styles.summaryModel}>
                           {entry.model ?? 'unknown model'}
                           {entry.provider ? ` · ${entry.provider}` : ''}
                         </span>
                       </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          'flex-wrap': 'wrap',
-                          gap: '0.75rem',
-                          'font-size': '0.8rem',
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
+                      <div class={styles.summaryMeta}>
                         <span>{formatTimestamp(entry.timestamp)}</span>
                         <span>{formatTokens(entry.usage)}</span>
                         <span>{formatDuration(entry.durationMs)}</span>
@@ -108,38 +84,12 @@ export const LlmActivityPanel: Component = () => {
                   <CardBody>
                     <Stack gap="md">
                       <div>
-                        <div
-                          style={{
-                            'font-size': '0.85rem',
-                            'text-transform': 'uppercase',
-                            'letter-spacing': '0.05em',
-                            color: 'var(--text-secondary)',
-                            'margin-bottom': '0.5rem',
-                          }}
-                        >
-                          Input Messages
-                        </div>
+                        <div class={styles.sectionLabel}>Input Messages</div>
                         <Stack gap="sm">
                           <For each={entry.requestMessages}>
                             {(message, index) => (
-                              <div
-                                style={{
-                                  border: '1px solid var(--border-color)',
-                                  'border-radius': '6px',
-                                  padding: '0.5rem',
-                                  background: 'var(--bg-tertiary)',
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    'font-size': '0.75rem',
-                                    color: 'var(--text-secondary)',
-                                    'margin-bottom': '0.25rem',
-                                    display: 'flex',
-                                    'align-items': 'center',
-                                    gap: '0.5rem',
-                                  }}
-                                >
+                              <div class={styles.messageBox}>
+                                <div class={styles.messageHeader}>
                                   #{index() + 1} · {message.role}
                                   <Show when={message.cache_control}>
                                     {(cache) => (
@@ -150,16 +100,7 @@ export const LlmActivityPanel: Component = () => {
                                     )}
                                   </Show>
                                 </div>
-                                <pre
-                                  style={{
-                                    margin: '0',
-                                    'font-family': 'var(--mono-font, monospace)',
-                                    'font-size': '0.85rem',
-                                    'white-space': 'pre-wrap',
-                                  }}
-                                >
-                                  {message.content}
-                                </pre>
+                                <pre class={styles.preformatted}>{message.content}</pre>
                               </div>
                             )}
                           </For>
@@ -167,87 +108,30 @@ export const LlmActivityPanel: Component = () => {
                       </div>
 
                       <div>
-                        <div
-                          style={{
-                            'font-size': '0.85rem',
-                            'text-transform': 'uppercase',
-                            'letter-spacing': '0.05em',
-                            color: 'var(--text-secondary)',
-                            'margin-bottom': '0.5rem',
-                          }}
-                        >
-                          Output
-                        </div>
-                        <pre
-                          style={{
-                            margin: '0',
-                            padding: '0.5rem',
-                            border: '1px solid var(--border-color)',
-                            'border-radius': '6px',
-                            background: 'var(--bg-tertiary)',
-                            'font-family': 'var(--mono-font, monospace)',
-                            'font-size': '0.85rem',
-                            'white-space': 'pre-wrap',
-                          }}
-                        >
-                          {entry.response || '<empty response>'}
-                        </pre>
+                        <div class={styles.sectionLabel}>Output</div>
+                        <pre class={styles.outputBox}>{entry.response || '<empty response>'}</pre>
                       </div>
 
                       <Show when={entry.usage}>
                         {(usage) => (
                           <div>
-                            <div
-                              style={{
-                                'font-size': '0.85rem',
-                                'text-transform': 'uppercase',
-                                'letter-spacing': '0.05em',
-                                color: 'var(--text-secondary)',
-                                'margin-bottom': '0.5rem',
-                              }}
-                            >
-                              Token Usage
-                            </div>
+                            <div class={styles.sectionLabel}>Token Usage</div>
                             <Grid cols={4} gap="sm">
                               <div>
-                                <span
-                                  style={{ display: 'block', 'font-size': '0.75rem', color: 'var(--text-secondary)' }}
-                                >
-                                  Input
-                                </span>
-                                <span style={{ 'font-weight': '600', 'font-size': '0.95rem' }}>
-                                  {usage().input_normal ?? 0}
-                                </span>
+                                <span class={styles.statLabel}>Input</span>
+                                <span class={styles.statValue}>{usage().input_normal ?? 0}</span>
                               </div>
                               <div>
-                                <span
-                                  style={{ display: 'block', 'font-size': '0.75rem', color: 'var(--text-secondary)' }}
-                                >
-                                  Cache Read
-                                </span>
-                                <span style={{ 'font-weight': '600', 'font-size': '0.95rem' }}>
-                                  {usage().input_cache_read ?? 0}
-                                </span>
+                                <span class={styles.statLabel}>Cache Read</span>
+                                <span class={styles.statValue}>{usage().input_cache_read ?? 0}</span>
                               </div>
                               <div>
-                                <span
-                                  style={{ display: 'block', 'font-size': '0.75rem', color: 'var(--text-secondary)' }}
-                                >
-                                  Cache Write
-                                </span>
-                                <span style={{ 'font-weight': '600', 'font-size': '0.95rem' }}>
-                                  {usage().input_cache_write ?? 0}
-                                </span>
+                                <span class={styles.statLabel}>Cache Write</span>
+                                <span class={styles.statValue}>{usage().input_cache_write ?? 0}</span>
                               </div>
                               <div>
-                                <span
-                                  style={{ display: 'block', 'font-size': '0.75rem', color: 'var(--text-secondary)' }}
-                                >
-                                  Output
-                                </span>
-                                <span style={{ 'font-weight': '600', 'font-size': '0.95rem' }}>
-                                  {usage().output_normal ?? 0}
-                                </span>
+                                <span class={styles.statLabel}>Output</span>
+                                <span class={styles.statValue}>{usage().output_normal ?? 0}</span>
                               </div>
                             </Grid>
                           </div>
@@ -257,33 +141,13 @@ export const LlmActivityPanel: Component = () => {
                       <Show when={entry.rawUsage?.cache_creation}>
                         {(cache) => (
                           <div>
-                            <div
-                              style={{
-                                'font-size': '0.8rem',
-                                'text-transform': 'uppercase',
-                                'letter-spacing': '0.06em',
-                                color: 'var(--text-secondary)',
-                                'margin-bottom': '0.5rem',
-                              }}
-                            >
-                              Cache Breakdown
-                            </div>
+                            <div class={styles.sectionLabel}>Cache Breakdown</div>
                             <Stack gap="xs">
                               <For each={Object.entries(cache())}>
                                 {([ttl, value]) => (
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      'align-items': 'center',
-                                      'justify-content': 'space-between',
-                                      padding: '0.25rem 0',
-                                      'border-bottom': '1px dashed rgba(148, 163, 184, 0.4)',
-                                    }}
-                                  >
-                                    <span style={{ 'font-size': '0.75rem', color: 'var(--text-secondary)' }}>
-                                      {ttl}
-                                    </span>
-                                    <span style={{ 'font-size': '0.85rem', 'font-weight': '600' }}>{value ?? 0}</span>
+                                  <div class={styles.cacheRow}>
+                                    <span class={styles.cacheTtl}>{ttl}</span>
+                                    <span class={styles.cacheValue}>{value ?? 0}</span>
                                   </div>
                                 )}
                               </For>
@@ -294,17 +158,8 @@ export const LlmActivityPanel: Component = () => {
 
                       <Show when={entry.error}>
                         <Alert variant="error">
-                          <div style={{ 'font-weight': '600', 'margin-bottom': '0.25rem' }}>Error</div>
-                          <pre
-                            style={{
-                              margin: '0',
-                              'font-family': 'var(--mono-font, monospace)',
-                              'font-size': '0.85rem',
-                              'white-space': 'pre-wrap',
-                            }}
-                          >
-                            {entry.error}
-                          </pre>
+                          <div class={styles.errorTitle}>Error</div>
+                          <pre class={styles.preformatted}>{entry.error}</pre>
                         </Alert>
                       </Show>
                     </Stack>

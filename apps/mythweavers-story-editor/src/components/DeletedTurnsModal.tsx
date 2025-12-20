@@ -3,6 +3,7 @@ import { BsArrowClockwise, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createResource, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { apiClient } from '../utils/apiClient'
+import * as styles from './DeletedTurnsModal.css'
 
 interface DeletedTurnsModalProps {
   show: boolean
@@ -63,52 +64,30 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
         <Show
           when={!deletedMessages.loading}
           fallback={
-            <div style={{ 'text-align': 'center', padding: '2rem' }}>
+            <div class={styles.loadingContainer}>
               <Spinner size="md" />
-              <div style={{ color: 'var(--text-secondary)', 'margin-top': '0.5rem' }}>Loading deleted turns...</div>
+              <div class={styles.loadingText}>Loading deleted turns...</div>
             </div>
           }
         >
           <Show
             when={deletedMessages() && deletedMessages()!.length > 0}
-            fallback={
-              <div
-                style={{
-                  'text-align': 'center',
-                  padding: '3rem 2rem',
-                  color: 'var(--text-secondary)',
-                  'font-size': '1.1rem',
-                }}
-              >
-                No deleted story turns found
-              </div>
-            }
+            fallback={<div class={styles.emptyMessage}>No deleted story turns found</div>}
           >
             <Stack gap="md">
               <For each={deletedMessages()}>
                 {(message) => (
                   <Card interactive>
                     <CardBody>
-                      <div
-                        style={{
-                          display: 'flex',
-                          'justify-content': 'space-between',
-                          'align-items': 'center',
-                          'margin-bottom': '0.75rem',
-                        }}
-                      >
-                        <div style={{ display: 'flex', 'align-items': 'center', gap: '1rem', 'flex-wrap': 'wrap' }}>
+                      <div class={styles.messageHeader}>
+                        <div class={styles.messageMetaContainer}>
                           <Badge variant="primary">Position #{message.order + 1}</Badge>
-                          <span style={{ color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
-                            {formatDate(message.timestamp)}
-                          </span>
+                          <span class={styles.messageMeta}>{formatDate(message.timestamp)}</span>
                           <Show when={message.model}>
                             <Badge variant="secondary">{message.model}</Badge>
                           </Show>
                           <Show when={message.totalTokens}>
-                            <span style={{ color: 'var(--text-secondary)', 'font-size': '0.85rem' }}>
-                              {message.totalTokens} tokens
-                            </span>
+                            <span class={styles.messageTokens}>{message.totalTokens} tokens</span>
                           </Show>
                         </div>
                         <Button
@@ -123,27 +102,11 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
                         </Button>
                       </div>
                       <Show when={message.instruction}>
-                        <div
-                          style={{
-                            'margin-bottom': '0.5rem',
-                            color: 'var(--text-secondary)',
-                            'font-size': '0.9rem',
-                            'font-style': 'italic',
-                          }}
-                        >
+                        <div class={styles.messageInstruction}>
                           <strong>Instruction:</strong> {message.instruction}
                         </div>
                       </Show>
-                      <div
-                        style={{
-                          'line-height': '1.6',
-                          color: 'var(--text-primary)',
-                          'white-space': 'pre-wrap',
-                          'word-wrap': 'break-word',
-                        }}
-                      >
-                        {truncateContent(message.content)}
-                      </div>
+                      <div class={styles.messageContent}>{truncateContent(message.content)}</div>
                     </CardBody>
                   </Card>
                 )}

@@ -2,6 +2,7 @@ import { Badge, Button, Modal, Spinner } from '@mythweavers/ui'
 import { BsArrowRepeat, BsClockHistory, BsPencil } from 'solid-icons/bs'
 import { Component, For, Show, createSignal, onMount } from 'solid-js'
 import { getMyMessagesByMessageIdRevisions } from '../client/config'
+import * as styles from './MessageVersionHistory.css'
 
 interface MessageVersionHistoryProps {
   messageId: string
@@ -121,7 +122,7 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
       open={true}
       onClose={props.onClose}
       title={
-        <div style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
+        <div class={styles.titleRow}>
           <BsClockHistory />
           <span>Version History</span>
         </div>
@@ -129,56 +130,25 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
       size="xl"
     >
       <Show when={loading()}>
-        <div style={{ padding: '2rem', 'text-align': 'center', color: 'var(--text-secondary)' }}>
+        <div class={styles.loadingContainer}>
           <Spinner size="md" />
-          <div style={{ 'margin-top': '0.5rem' }}>Loading version history...</div>
+          <div class={styles.loadingText}>Loading version history...</div>
         </div>
       </Show>
 
       <Show when={!loading() && versionData()}>
-        <div
-          style={{
-            display: 'flex',
-            height: '60vh',
-            overflow: 'hidden',
-          }}
-        >
+        <div class={styles.container}>
           {/* Version List Sidebar */}
-          <div
-            style={{
-              width: '300px',
-              'border-right': '1px solid var(--border-color)',
-              'overflow-y': 'auto',
-              background: 'var(--bg-secondary)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                'justify-content': 'space-between',
-                'align-items': 'center',
-                padding: '1rem',
-                'border-bottom': '1px solid var(--border-color)',
-                position: 'sticky',
-                top: '0',
-                background: 'var(--bg-secondary)',
-              }}
-            >
-              <h4 style={{ margin: '0', 'font-size': '1rem' }}>Revisions</h4>
-              <span style={{ 'font-size': '0.875rem', color: 'var(--text-secondary)' }}>
+          <div class={styles.sidebar}>
+            <div class={styles.sidebarHeader}>
+              <h4 class={styles.sidebarTitle}>Revisions</h4>
+              <span class={styles.revisionCount}>
                 {versionData()!.revisions.length} revision{versionData()!.revisions.length !== 1 ? 's' : ''}
               </span>
             </div>
 
             <Show when={versionData()!.revisions.length === 0}>
-              <div
-                style={{
-                  padding: '1rem',
-                  'text-align': 'center',
-                  color: 'var(--text-secondary)',
-                  'font-size': '0.9rem',
-                }}
-              >
+              <div class={styles.emptyMessage}>
                 No revisions available. Revisions are created when you regenerate or edit messages.
               </div>
             </Show>
@@ -186,57 +156,24 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
             <For each={versionData()!.revisions}>
               {(version) => (
                 <div
-                  style={{
-                    padding: '0.75rem 1rem',
-                    'border-bottom': '1px solid var(--border-color)',
-                    cursor: 'pointer',
-                    background: selectedVersion()?.id === version.id ? 'var(--accent-bg)' : 'transparent',
-                    'border-left':
-                      selectedVersion()?.id === version.id ? '3px solid var(--primary-color)' : '3px solid transparent',
-                  }}
+                  class={`${styles.versionItem} ${selectedVersion()?.id === version.id ? styles.versionItemSelected : ''}`}
                   onClick={() => setSelectedVersion(version)}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      'align-items': 'center',
-                      gap: '0.5rem',
-                      'margin-bottom': '0.25rem',
-                    }}
-                  >
-                    <span style={{ display: 'flex', 'align-items': 'center', color: 'var(--text-secondary)' }}>
-                      {getVersionIcon(version.versionType || 'edit')}
-                    </span>
-                    <span style={{ 'font-weight': '600', color: 'var(--text-primary)' }}>v{version.version}</span>
+                  <div class={styles.versionItemHeader}>
+                    <span class={styles.versionIcon}>{getVersionIcon(version.versionType || 'edit')}</span>
+                    <span class={styles.versionNumber}>v{version.version}</span>
                     <Badge size="sm">{getVersionTypeLabel(version.versionType || 'edit')}</Badge>
                   </div>
-                  <div style={{ 'font-size': '0.85rem', color: 'var(--text-secondary)' }}>
-                    {formatDate(version.createdAt)}
-                  </div>
+                  <div class={styles.versionDate}>{formatDate(version.createdAt)}</div>
                 </div>
               )}
             </For>
           </div>
 
           {/* Content Area */}
-          <div
-            style={{
-              flex: '1',
-              display: 'flex',
-              'flex-direction': 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                'justify-content': 'space-between',
-                'align-items': 'center',
-                padding: '1rem',
-                'border-bottom': '1px solid var(--border-color)',
-              }}
-            >
-              <h4 style={{ margin: '0', 'font-size': '1rem' }}>
+          <div class={styles.contentArea}>
+            <div class={styles.contentHeader}>
+              <h4 class={styles.contentTitle}>
                 {selectedVersion() ? `Version ${selectedVersion()!.version}` : 'Current Version'}
               </h4>
               <Show when={versionData()!.revisions.length > 0}>
@@ -246,78 +183,26 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
               </Show>
             </div>
 
-            <div
-              style={{
-                flex: '1',
-                'overflow-y': 'auto',
-                padding: '1rem',
-              }}
-            >
+            <div class={styles.contentBody}>
               <Show when={selectedVersion()}>
                 <Show when={selectedVersion()!.instruction}>
-                  <div
-                    style={{
-                      padding: '0.75rem',
-                      background: 'var(--bg-secondary)',
-                      'border-radius': '4px',
-                      'margin-bottom': '1rem',
-                      'font-size': '0.9rem',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    <strong style={{ color: 'var(--text-primary)' }}>Instruction:</strong>{' '}
-                    {selectedVersion()!.instruction}
+                  <div class={styles.instructionBox}>
+                    <strong class={styles.instructionLabel}>Instruction:</strong> {selectedVersion()!.instruction}
                   </div>
                 </Show>
-                <div
-                  style={{
-                    'white-space': 'pre-wrap',
-                    'word-wrap': 'break-word',
-                    'line-height': '1.6',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  {selectedVersion()!.content}
-                </div>
+                <div class={styles.contentText}>{selectedVersion()!.content}</div>
               </Show>
 
               <Show when={!selectedVersion() && versionData()?.current}>
-                <div
-                  style={{
-                    padding: '1rem',
-                    background: 'var(--accent-bg)',
-                    'border-radius': '4px',
-                    color: 'var(--text-primary)',
-                    'margin-bottom': '1rem',
-                  }}
-                >
+                <div class={styles.currentVersionNotice}>
                   This is the current version of the message. Select a version from the list to view it.
                 </div>
                 <Show when={versionData()?.current?.instruction}>
-                  <div
-                    style={{
-                      padding: '0.75rem',
-                      background: 'var(--bg-secondary)',
-                      'border-radius': '4px',
-                      'margin-bottom': '1rem',
-                      'font-size': '0.9rem',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    <strong style={{ color: 'var(--text-primary)' }}>Instruction:</strong>{' '}
-                    {versionData()?.current?.instruction}
+                  <div class={styles.instructionBox}>
+                    <strong class={styles.instructionLabel}>Instruction:</strong> {versionData()?.current?.instruction}
                   </div>
                 </Show>
-                <div
-                  style={{
-                    'white-space': 'pre-wrap',
-                    'word-wrap': 'break-word',
-                    'line-height': '1.6',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  {versionData()?.current?.content}
-                </div>
+                <div class={styles.contentText}>{versionData()?.current?.content}</div>
               </Show>
             </div>
           </div>

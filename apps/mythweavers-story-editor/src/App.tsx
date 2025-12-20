@@ -1,7 +1,8 @@
 import { Route, useNavigate, useParams } from '@solidjs/router'
-import { Component, JSX, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from 'solid-js'
+import { Component, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from 'solid-js'
 import './styles/variables.css'
 import './App.css'
+import * as styles from './App.css.ts'
 import { Spinner } from '@mythweavers/ui'
 import { ConflictResolutionDialog } from './components/ConflictResolutionDialog'
 import { ContextPreviewModal } from './components/ContextPreviewModal'
@@ -47,167 +48,13 @@ import { Chapter, Character, ContextItem, Message, Node } from './types/core'
 import { migrateChaptersToScenes, needsSceneMigration } from './utils/scenesMigration'
 import { storyManager } from './utils/storyManager'
 
-// App layout styles
-const appStyles = {
-  app: {
-    display: 'flex',
-    'flex-direction': 'column',
-    height: '100vh',
-    width: '100%',
-    background: 'var(--bg-primary)',
-  } as JSX.CSSProperties,
-
-  mainContent: {
-    display: 'flex',
-    'flex-direction': 'row',
-    flex: '1',
-    overflow: 'hidden',
-    position: 'relative',
-  } as JSX.CSSProperties,
-
-  desktopNavigation: {
-    width: '400px',
-    'flex-shrink': '0',
-    height: '100%',
-    'border-right': '1px solid var(--border-color)',
-    background: 'var(--bg-secondary)',
-    overflow: 'hidden',
-  } as JSX.CSSProperties,
-
-  // Mobile navigation overlay
-  mobileNavigation: {
-    position: 'fixed',
-    top: '0',
-    left: '0',
-    width: '85vw',
-    'max-width': '400px',
-    height: '100vh',
-    background: 'var(--bg-secondary)',
-    'z-index': '900',
-    'box-shadow': '4px 0 20px rgba(0, 0, 0, 0.3)',
-    overflow: 'hidden',
-    animation: 'slideInFromLeft 0.2s ease-out',
-  } as JSX.CSSProperties,
-
-  mobileNavBackdrop: {
-    position: 'fixed',
-    top: '0',
-    left: '0',
-    right: '0',
-    bottom: '0',
-    background: 'rgba(0, 0, 0, 0.5)',
-    'z-index': '899',
-  } as JSX.CSSProperties,
-
-  desktopEpisodeViewer: {
-    width: '400px',
-    'flex-shrink': '0',
-    height: '100%',
-    background: 'var(--bg-secondary)',
-    overflow: 'hidden',
-  } as JSX.CSSProperties,
-
-  chatContainer: {
-    flex: '1',
-    display: 'flex',
-    'flex-direction': 'column',
-    overflow: 'hidden',
-    background: 'var(--bg-primary)',
-    'max-width': '60rem',
-    margin: '0 auto',
-  } as JSX.CSSProperties,
-
-  authLoadingOverlay: {
-    position: 'fixed',
-    top: '0',
-    left: '0',
-    right: '0',
-    bottom: '0',
-    background: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    'align-items': 'center',
-    'justify-content': 'center',
-    'z-index': '9999',
-  } as JSX.CSSProperties,
-
-  authLoadingContent: {
-    display: 'flex',
-    'flex-direction': 'column',
-    'align-items': 'center',
-    gap: '1.5rem',
-    background: 'var(--bg-primary)',
-    padding: '2rem 3rem',
-    'border-radius': 'var(--radius-lg)',
-    'box-shadow': 'var(--shadow-lg)',
-  } as JSX.CSSProperties,
-
-  loadingContainer: {
-    display: 'flex',
-    'flex-direction': 'column',
-    'align-items': 'center',
-    'justify-content': 'center',
-    height: '100vh',
-    gap: '1.5rem',
-  } as JSX.CSSProperties,
-
-  loadingText: {
-    color: 'var(--text-secondary)',
-    'font-size': '1.125rem',
-    'font-weight': '500',
-  } as JSX.CSSProperties,
-
-  errorText: {
-    color: 'var(--error-color, #ef4444)',
-    'font-size': '1.125rem',
-    'text-align': 'center',
-    'max-width': '400px',
-    'line-height': '1.5',
-  } as JSX.CSSProperties,
-
-  errorContainer: {
-    display: 'flex',
-    'flex-direction': 'column',
-    'align-items': 'center',
-    gap: '1rem',
-    padding: '2rem',
-    background: 'var(--bg-secondary)',
-    'border-radius': 'var(--radius-md)',
-    border: '1px solid var(--border-color)',
-  } as JSX.CSSProperties,
-
-  errorTitle: {
-    'font-size': '1.25rem',
-    'font-weight': '600',
-    color: 'var(--error-color, #ef4444)',
-  } as JSX.CSSProperties,
-
-  errorDetails: {
-    'margin-top': '1rem',
-    'font-size': '0.875rem',
-    color: 'var(--text-secondary)',
-    'max-width': '100%',
-    overflow: 'auto',
-  } as JSX.CSSProperties,
-
-  retryButton: {
-    'margin-top': '1rem',
-    padding: '0.5rem 1rem',
-    background: 'var(--primary-color)',
-    color: 'white',
-    border: 'none',
-    'border-radius': 'var(--radius-sm)',
-    cursor: 'pointer',
-    'font-size': '1rem',
-  } as JSX.CSSProperties,
-}
-
 // Component to redirect to login
 const RedirectToLogin: Component = () => {
   const navigate = useNavigate()
   onMount(() => {
     navigate('/login', { replace: true })
   })
-  return <div style={appStyles.app}>Redirecting...</div>
+  return <div class={styles.app}>Redirecting...</div>
 }
 
 const App: Component = () => {
@@ -327,17 +174,28 @@ const App: Component = () => {
       })
 
       console.log('[loadServerStoryData] Calling currentStoryStore.loadStory...')
+      // Map backend enum values to frontend format
+      const perspectiveMap: Record<string, 'first' | 'second' | 'third'> = {
+        FIRST: 'first',
+        SECOND: 'second',
+        THIRD: 'third',
+      }
+      const tenseMap: Record<string, 'past' | 'present'> = {
+        PAST: 'past',
+        PRESENT: 'present',
+      }
       currentStoryStore.loadStory(
         storyId,
         story.name,
         'server',
-        story.defaultPerspective || 'THIRD',
-        'past', // TODO: We removed tense from the schema - need to decide what to do
-        '', // TODO: We removed storySetting from the schema
-        undefined, // TODO: We removed globalScript from the schema
-        undefined, // TODO: We removed timelineStartTime from the schema
-        undefined, // TODO: We removed timelineEndTime from the schema
-        'hour', // TODO: We removed timelineGranularity from the schema
+        perspectiveMap[story.defaultPerspective || 'THIRD'],
+        tenseMap[story.defaultTense || 'PAST'],
+        story.genre || '', // genre is the storySetting field
+        story.paragraphsPerTurn ?? 3,
+        undefined, // globalScript - not in new schema
+        story.timelineStartTime ?? undefined,
+        story.timelineEndTime ?? undefined,
+        story.timelineGranularity || 'hour',
         story.provider || 'ollama',
         story.model,
       )
@@ -621,6 +479,7 @@ const App: Component = () => {
         story.person,
         story.tense,
         story.storySetting,
+        story.paragraphsPerTurn,
         story.globalScript,
         story.timelineStartTime,
         story.timelineEndTime,
@@ -1093,10 +952,10 @@ const App: Component = () => {
     <>
       {/* Auth loading indicator */}
       <Show when={authStore.isLoading}>
-        <div style={appStyles.authLoadingOverlay}>
-          <div style={appStyles.authLoadingContent}>
+        <div class={styles.authLoadingOverlay}>
+          <div class={styles.authLoadingContent}>
             <Spinner size="lg" />
-            <div style={appStyles.loadingText}>Checking authentication...</div>
+            <div class={styles.loadingText}>Checking authentication...</div>
           </div>
         </div>
       </Show>
@@ -1147,7 +1006,7 @@ const App: Component = () => {
         component={() => {
           const navigate = useNavigate()
           return (
-            <Show when={!authStore.isLoading} fallback={<div style={appStyles.app}>Loading...</div>}>
+            <Show when={!authStore.isLoading} fallback={<div class={styles.app}>Loading...</div>}>
               <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
                 <StoryLandingPage
                   onSelectStory={(storyId: string) => {
@@ -1166,7 +1025,7 @@ const App: Component = () => {
         component={() => {
           const navigate = useNavigate()
           return (
-            <Show when={!authStore.isLoading} fallback={<div style={appStyles.app}>Loading...</div>}>
+            <Show when={!authStore.isLoading} fallback={<div class={styles.app}>Loading...</div>}>
               <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
                 <StoryLandingPage
                   onSelectStory={(storyId: string) => {
@@ -1237,9 +1096,9 @@ const App: Component = () => {
             <Show
               when={!authStore.isLoading}
               fallback={
-                <div style={appStyles.loadingContainer}>
+                <div class={styles.loadingContainer}>
                   <Spinner size="lg" />
-                  <div style={appStyles.loadingText}>Loading...</div>
+                  <div class={styles.loadingText}>Loading...</div>
                 </div>
               }
             >
@@ -1247,35 +1106,35 @@ const App: Component = () => {
                 <Show
                   when={!loadingStory()}
                   fallback={
-                    <div style={appStyles.loadingContainer}>
+                    <div class={styles.loadingContainer}>
                       <Spinner size="lg" />
-                      <div style={appStyles.loadingText}>Loading story...</div>
+                      <div class={styles.loadingText}>Loading story...</div>
                     </div>
                   }
                 >
                   <Show
                     when={!storyLoadError() && !storyNotFound()}
                     fallback={
-                      <div style={appStyles.loadingContainer}>
+                      <div class={styles.loadingContainer}>
                         <Show when={storyLoadError()}>
                           {(error) => (
-                            <div style={appStyles.errorContainer}>
-                              <div style={appStyles.errorTitle}>Server Error ({error().status})</div>
-                              <div style={appStyles.errorText}>{error().message}</div>
+                            <div class={styles.errorContainer}>
+                              <div class={styles.errorTitle}>Server Error ({error().status})</div>
+                              <div class={styles.errorText}>{error().message}</div>
                               <Show when={error().details}>
-                                <details style={appStyles.errorDetails}>
+                                <details class={styles.errorDetails}>
                                   <summary>Technical Details</summary>
                                   <pre>{JSON.stringify(error().details, null, 2)}</pre>
                                 </details>
                               </Show>
-                              <button style={appStyles.retryButton} onClick={() => window.location.reload()}>
+                              <button class={styles.retryButton} onClick={() => window.location.reload()}>
                                 Retry
                               </button>
                             </div>
                           )}
                         </Show>
                         <Show when={storyNotFound()}>
-                          <div style={appStyles.errorText}>Story not found. Redirecting to stories page...</div>
+                          <div class={styles.errorText}>Story not found. Redirecting to stories page...</div>
                         </Show>
                       </div>
                     }
@@ -1283,13 +1142,13 @@ const App: Component = () => {
                     <Show
                       when={storyLoaded()}
                       fallback={
-                        <div style={appStyles.loadingContainer}>
+                        <div class={styles.loadingContainer}>
                           <Spinner size="lg" />
-                          <div style={appStyles.loadingText}>Preparing story...</div>
+                          <div class={styles.loadingText}>Preparing story...</div>
                         </div>
                       }
                     >
-                      <div style={appStyles.app}>
+                      <div class={styles.app}>
                         <GlobalStatusIndicator />
 
                         <StoryHeader
@@ -1307,10 +1166,10 @@ const App: Component = () => {
                           charsPerToken={settingsStore.charsPerToken}
                         />
 
-                        <div style={appStyles.mainContent}>
+                        <div class={styles.mainContent}>
                           {/* Desktop: Fixed inline sidebar - visible when header is visible */}
                           <Show when={!isMobile() && !headerStore.isCollapsed()}>
-                            <div style={appStyles.desktopNavigation}>
+                            <div class={styles.desktopNavigation}>
                               <StoryNavigation />
                             </div>
                           </Show>
@@ -1318,10 +1177,10 @@ const App: Component = () => {
                           {/* Mobile: Overlay sidebar - controlled independently by navigationStore */}
                           <Show when={isMobile() && navigationStore.showNavigation}>
                             <div
-                              style={appStyles.mobileNavBackdrop}
+                              class={styles.mobileNavBackdrop}
                               onClick={() => navigationStore.setShowNavigation(false)}
                             />
-                            <div style={appStyles.mobileNavigation}>
+                            <div class={styles.mobileNavigation}>
                               <StoryNavigation
                                 onSelectChapter={() => {
                                   // Auto-close sidebar on mobile when selecting a scene
@@ -1330,17 +1189,13 @@ const App: Component = () => {
                               />
                             </div>
                           </Show>
-                          <main style={appStyles.chatContainer}>
+                          <main class={styles.chatContainer}>
                             <Show
                               when={(() => {
                                 const selectedNode = nodeStore.getSelectedNode()
                                 return selectedNode?.type === 'scene'
                               })()}
-                              fallback={
-                                <div style={{ padding: '2rem', 'text-align': 'center', color: '#666' }}>
-                                  Select a scene to edit content
-                                </div>
-                              }
+                              fallback={<div class={styles.noSceneMessage}>Select a scene to edit content</div>}
                             >
                               <MessageList
                                 isLoading={messagesStore.isLoading}
@@ -1365,7 +1220,7 @@ const App: Component = () => {
 
                           {/* Right sidebar: Docked Episode Viewer on wide screens */}
                           <Show when={episodeViewerStore.isDocked && episodeViewerStore.isOpen}>
-                            <div style={appStyles.desktopEpisodeViewer}>
+                            <div class={styles.desktopEpisodeViewer}>
                               <EpisodeViewer isOpen={true} onClose={() => episodeViewerStore.hide()} mode="docked" />
                             </div>
                           </Show>
@@ -1403,28 +1258,28 @@ const App: Component = () => {
                         />
 
                         <Show when={serverDataConflict()}>
-                          <div class="modal-overlay" onClick={(e) => e.stopPropagation()}>
-                            <div class="modal-content" style="max-width: 500px;">
-                              <div class="modal-header">
+                          <div class={styles.modalOverlay} onClick={(e) => e.stopPropagation()}>
+                            <div class={styles.modalContent}>
+                              <div class={styles.modalHeader}>
                                 <h3>Local Changes Detected</h3>
                               </div>
-                              <div class="modal-body">
-                                <p style="margin-bottom: 1rem;">
+                              <div class={styles.modalBody}>
+                                <p style={{ 'margin-bottom': '1rem' }}>
                                   You have local messages that don't exist on the server. Loading the server version
                                   will lose these changes.
                                 </p>
-                                <p style="margin-bottom: 1rem;">
+                                <p style={{ 'margin-bottom': '1rem' }}>
                                   <strong>Server story:</strong> {serverDataConflict()!.serverStory.messages.length}{' '}
                                   messages
                                   <br />
                                   <strong>Local story:</strong> {serverDataConflict()!.localMessages.length} messages
                                 </p>
-                                <p style="margin-bottom: 1.5rem;">
+                                <p style={{ 'margin-bottom': '1.5rem' }}>
                                   Do you want to load the server version and lose your local changes?
                                 </p>
-                                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                                <div class={styles.modalButtons}>
                                   <button
-                                    class="secondary-button"
+                                    class={styles.secondaryButton}
                                     onClick={() => {
                                       // Keep local version
                                       setServerDataConflict(null)
@@ -1435,7 +1290,7 @@ const App: Component = () => {
                                     Keep Local Version
                                   </button>
                                   <button
-                                    class="primary-button"
+                                    class={styles.primaryButton}
                                     onClick={async () => {
                                       const conflict = serverDataConflict()
                                       if (conflict) {
@@ -1475,7 +1330,7 @@ const App: Component = () => {
           onMount(() => {
             navigate('/stories', { replace: true })
           })
-          return <div style={appStyles.app}>Redirecting to stories...</div>
+          return <div class={styles.app}>Redirecting to stories...</div>
         }}
       />
     </>

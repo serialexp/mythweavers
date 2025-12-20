@@ -1,6 +1,7 @@
 import { Button } from '@mythweavers/ui'
 import { BsCheck, BsChevronDown, BsEraser } from 'solid-icons/bs'
 import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import * as styles from './RegenerateButton.css'
 
 interface RegenerateButtonProps {
   onRegenerate: (maxTokens: number) => void | Promise<void>
@@ -50,13 +51,7 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
   })
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        display: 'flex',
-        position: 'relative',
-      }}
-    >
+    <div ref={containerRef} class={styles.container}>
       <Button
         onClick={async (e) => {
           e.stopPropagation()
@@ -71,15 +66,7 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
         }}
         disabled={props.disabled || isRegenerating()}
         title="Regenerate the last response with current input"
-        style={{
-          'border-radius': '5px 0 0 5px',
-          'border-right': '1px solid rgba(255, 255, 255, 0.2)',
-          display: 'flex',
-          'align-items': 'center',
-          gap: '5px',
-          background: 'var(--warning-color)',
-          color: 'white',
-        }}
+        class={styles.mainButton}
       >
         <BsEraser /> Regenerate
       </Button>
@@ -87,47 +74,17 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
         onClick={() => setShowPopover(!showPopover())}
         disabled={props.disabled || isRegenerating()}
         title="Select response length"
-        style={{
-          'border-radius': '0 5px 5px 0',
-          padding: '0.5rem 0.75rem',
-          background: 'var(--warning-color)',
-          color: 'white',
-        }}
+        class={styles.dropdownButton}
       >
         <BsChevronDown />
       </Button>
 
       <Show when={showPopover()}>
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 'calc(100% + 8px)',
-            right: '0',
-            background: 'var(--bg-secondary)',
-            'border-radius': '8px',
-            'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
-            padding: '8px',
-            'min-width': '200px',
-            'z-index': '1000',
-            border: '1px solid var(--border-color)',
-          }}
-        >
+        <div class={styles.popover}>
           <For each={tokenOptions}>
             {(option) => (
               <button
-                style={{
-                  display: 'flex',
-                  'align-items': 'center',
-                  gap: '0.5rem',
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: 'none',
-                  background: selectedTokens() === option.value ? 'var(--primary-color)' : 'none',
-                  color: selectedTokens() === option.value ? 'white' : 'var(--text-primary)',
-                  'text-align': 'left',
-                  cursor: 'pointer',
-                  'border-radius': '4px',
-                }}
+                class={`${styles.optionButton} ${selectedTokens() === option.value ? styles.optionButtonSelected : styles.optionButtonUnselected}`}
                 onClick={(e) => handleSelect(option.value, e)}
               >
                 <div style={{ flex: '1' }}>

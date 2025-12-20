@@ -3,6 +3,7 @@ import { Component, For, Show, createEffect, createSignal } from 'solid-js'
 import { mapsStore } from '../stores/mapsStore'
 import { apiClient } from '../utils/apiClient'
 import { type PathSegment, calculateOptimalPath, formatTravelTime } from '../utils/maps/pathfinding'
+import * as styles from './TravelTimeCalculator.css'
 
 interface Landmark {
   id: string
@@ -192,7 +193,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
             label={
               <>
                 Hyperdrive Rating:{' '}
-                <span style={{ color: 'var(--primary-color)', 'font-weight': '600' }}>{hyperdriveRating()}</span>
+                <span class={styles.ratingValue}>{hyperdriveRating()}</span>
               </>
             }
             hint="Lower is faster (0.1 = very fast, 10 = very slow)"
@@ -214,16 +215,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
         </Show>
 
         <Show when={isLoading()}>
-          <div
-            style={{
-              display: 'flex',
-              'align-items': 'center',
-              'justify-content': 'center',
-              gap: '0.5rem',
-              padding: '1rem',
-              color: 'var(--text-secondary)',
-            }}
-          >
+          <div class={styles.loadingContainer}>
             <Spinner size="sm" />
             <span>Loading map data...</span>
           </div>
@@ -235,18 +227,18 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
 
         <Show when={result()}>
           {(r) => (
-            <Stack gap="md" style={{ 'padding-top': '1rem', 'border-top': '1px solid var(--border-color)' }}>
+            <Stack gap="md" class={styles.resultDivider}>
               <Card>
                 <CardBody>
                   <strong>Total Travel Time:</strong>{' '}
-                  <span style={{ color: 'var(--primary-color)', 'font-weight': '600' }}>
+                  <span class={styles.totalTime}>
                     {r().totalTime} minutes ({formatTravelTime(r().totalTime)})
                   </span>
                 </CardBody>
               </Card>
 
               <Show when={r().segments.length > 0}>
-                <div style={{ 'font-weight': '600', 'font-size': '0.875rem' }}>Route Segments:</div>
+                <div class={styles.segmentsHeading}>Route Segments:</div>
                 <Stack gap="sm">
                   <For each={r().segments}>
                     {(segment, index) => {
@@ -258,25 +250,16 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
                       const to = getLandmarkLabel(segment.endLandmarkId, segment.endX, segment.endY)
 
                       return (
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '0.5rem',
-                            padding: '0.5rem',
-                            background: 'var(--bg-tertiary)',
-                            'border-radius': 'var(--radius-sm)',
-                            'font-size': '0.875rem',
-                          }}
-                        >
-                          <div style={{ 'font-weight': '600', color: 'var(--text-secondary)', 'min-width': '1.5rem' }}>
+                        <div class={styles.segmentCard}>
+                          <div class={styles.segmentIndex}>
                             {index() + 1}.
                           </div>
-                          <div style={{ flex: '1' }}>
-                            <div style={{ 'font-weight': '500' }}>{typeLabel}</div>
-                            <div style={{ color: 'var(--text-secondary)', 'margin-bottom': '0.25rem' }}>
+                          <div class={styles.segmentContent}>
+                            <div class={styles.segmentType}>{typeLabel}</div>
+                            <div class={styles.segmentRoute}>
                               {from} → {to}
                             </div>
-                            <div style={{ color: 'var(--primary-color)', 'font-size': '0.8125rem' }}>
+                            <div class={styles.segmentTime}>
                               {segment.travelTime} minutes ({formatTravelTime(segment.travelTime)})
                             </div>
                           </div>
@@ -288,15 +271,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
               </Show>
 
               <Show when={r().segments.length === 0}>
-                <div
-                  style={{
-                    padding: '1rem',
-                    'text-align': 'center',
-                    color: 'var(--text-secondary)',
-                    'font-style': 'italic',
-                    'font-size': '0.875rem',
-                  }}
-                >
+                <div class={styles.noSegments}>
                   No segments found (start and end are at the same location).
                 </div>
               </Show>

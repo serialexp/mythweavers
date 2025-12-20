@@ -4,6 +4,7 @@ import { Component, For } from 'solid-js'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { pendingEntitiesStore } from '../stores/pendingEntitiesStore'
+import * as styles from './PendingEntitiesModal.css'
 
 export const PendingEntitiesModal: Component = () => {
   const handleApprove = (batchId: string) => {
@@ -80,39 +81,22 @@ export const PendingEntitiesModal: Component = () => {
           {(batch) => (
             <div>
               <div style={{ 'margin-bottom': '1rem' }}>
-                <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>From latest story segment</h4>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
-                  Select which entities to add to your story:
-                </p>
+                <h4 class={styles.sectionHeader}>From latest story segment</h4>
+                <p class={styles.sectionDescription}>Select which entities to add to your story:</p>
               </div>
 
               <Stack direction="vertical" gap="sm" style={{ 'margin-bottom': '1rem' }}>
                 <For each={batch.entities}>
                   {(entity) => (
-                    <Card
-                      variant="outlined"
-                      style={{
-                        'border-color': entity.isSelected ? 'var(--accent-color)' : 'var(--border-color)',
-                        background: entity.isSelected ? 'var(--accent-bg)' : undefined,
-                      }}
-                    >
+                    <Card variant="outlined" class={entity.isSelected ? styles.entityCardSelected : undefined}>
                       <CardBody padding="sm" gap="sm">
-                        <label
-                          style={{
-                            display: 'flex',
-                            'align-items': 'center',
-                            gap: '0.5rem',
-                            cursor: 'pointer',
-                          }}
-                        >
+                        <label class={styles.entityLabel}>
                           <input
                             type="checkbox"
                             checked={entity.isSelected}
                             onChange={() => handleToggleEntity(batch.id, entity.id)}
                           />
-                          <span style={{ color: 'var(--accent-color)', 'font-size': '1.1rem' }}>
-                            {getEntityIcon(entity.type)}
-                          </span>
+                          <span class={styles.entityIcon}>{getEntityIcon(entity.type)}</span>
                           <Input
                             value={entity.name}
                             onInput={(e) => handleUpdateName(batch.id, entity.id, e.currentTarget.value)}
@@ -120,11 +104,7 @@ export const PendingEntitiesModal: Component = () => {
                             size="sm"
                             style={{ 'min-width': '150px', 'font-weight': '500' }}
                           />
-                          <span
-                            style={{ color: 'var(--text-secondary)', 'font-size': '0.9rem', 'font-style': 'italic' }}
-                          >
-                            ({entity.type})
-                          </span>
+                          <span class={styles.entityType}>({entity.type})</span>
                         </label>
                         <Textarea
                           value={entity.description}

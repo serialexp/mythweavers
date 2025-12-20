@@ -3,6 +3,7 @@ import { BsExclamationTriangle, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createSignal } from 'solid-js'
 import { storage } from '../utils/storage'
 import { storyManager } from '../utils/storyManager'
+import * as styles from './StorageFullModal.css'
 
 interface StorageFullModalProps {
   isOpen: boolean
@@ -79,99 +80,37 @@ export const StorageFullModal: Component<StorageFullModalProps> = (props) => {
     >
       <Stack gap="md">
         {/* Warning Icon */}
-        <div style={{ display: 'flex', 'justify-content': 'center' }}>
+        <div class={styles.warningIconContainer}>
           <BsExclamationTriangle size={48} color="#f59e0b" />
         </div>
 
         {/* Message */}
-        <p
-          style={{
-            margin: '0',
-            color: 'var(--text-secondary)',
-            'line-height': '1.5',
-            'text-align': 'center',
-          }}
-        >
+        <p class={styles.message}>
           Your browser's storage is full ({formatSize(storageInfo().total)} limit reached). Please delete some items to
           continue saving your story. Note: The story will continue to save to the server if available.
         </p>
 
         {/* Storage Bar */}
-        <div
-          style={{
-            position: 'relative',
-            height: '24px',
-            background: 'var(--bg-tertiary)',
-            'border-radius': '12px',
-            overflow: 'hidden',
-          }}
-        >
+        <div class={styles.storageBar}>
           <div
-            style={{
-              position: 'absolute',
-              top: '0',
-              left: '0',
-              height: '100%',
-              background: 'linear-gradient(90deg, #f59e0b, #ef4444)',
-              transition: 'width 0.3s ease',
-              width: `${(storageInfo().used / storageInfo().total) * 100}%`,
-            }}
+            class={styles.storageBarFill}
+            style={{ width: `${(storageInfo().used / storageInfo().total) * 100}%` }}
           />
-          <span
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              'font-size': '0.875rem',
-              'font-weight': '500',
-              color: 'var(--text-primary)',
-              'z-index': '1',
-            }}
-          >
+          <span class={styles.storageBarLabel}>
             {formatSize(storageInfo().used)} / {formatSize(storageInfo().total)} used
           </span>
         </div>
 
         {/* Saved Stories Section */}
         <div>
-          <h3 style={{ margin: '0 0 12px 0', 'font-size': '1.125rem', color: 'var(--text-primary)' }}>Saved Stories</h3>
-          <div
-            style={{
-              display: 'flex',
-              'flex-direction': 'column',
-              gap: '8px',
-              'max-height': '300px',
-              'overflow-y': 'auto',
-              padding: '4px',
-            }}
-          >
+          <h3 class={styles.sectionHeader}>Saved Stories</h3>
+          <div class={styles.storyListContainer}>
             <For each={savedStories().filter((s) => !deletedIds().has(s.id))}>
               {(story) => (
-                <div
-                  style={{
-                    display: 'flex',
-                    'align-items': 'center',
-                    'justify-content': 'space-between',
-                    padding: '12px',
-                    background: 'var(--bg-secondary)',
-                    'border-radius': '8px',
-                    border: '1px solid var(--border-color)',
-                  }}
-                >
-                  <div style={{ display: 'flex', 'flex-direction': 'column', gap: '4px', 'min-width': '0' }}>
-                    <span
-                      style={{
-                        'font-weight': '500',
-                        color: 'var(--text-primary)',
-                        overflow: 'hidden',
-                        'text-overflow': 'ellipsis',
-                        'white-space': 'nowrap',
-                      }}
-                    >
-                      {story.name}
-                    </span>
-                    <span style={{ 'font-size': '0.75rem', color: 'var(--text-secondary)' }}>
+                <div class={styles.storyItem}>
+                  <div class={styles.storyItemContent}>
+                    <span class={styles.storyName}>{story.name}</span>
+                    <span class={styles.storyMeta}>
                       {story.messageCount} messages • {new Date(story.savedAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -187,17 +126,15 @@ export const StorageFullModal: Component<StorageFullModalProps> = (props) => {
               )}
             </For>
             <Show when={savedStories().filter((s) => !deletedIds().has(s.id)).length === 0}>
-              <p style={{ 'text-align': 'center', color: 'var(--text-secondary)', padding: '20px' }}>
-                No saved stories to delete
-              </p>
+              <p class={styles.emptyMessage}>No saved stories to delete</p>
             </Show>
           </div>
         </div>
 
         {/* Other Data Section */}
         <div>
-          <h3 style={{ margin: '0 0 12px 0', 'font-size': '1.125rem', color: 'var(--text-primary)' }}>Other Data</h3>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <h3 class={styles.sectionHeader}>Other Data</h3>
+          <div class={styles.otherDataButtons}>
             <Button variant="secondary" onClick={handleClearCharacters}>
               Clear Characters
             </Button>

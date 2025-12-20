@@ -1,5 +1,6 @@
 import { Card, CardBody } from '@mythweavers/ui'
 import { Component, For, Show } from 'solid-js'
+import * as styles from './ScriptDataDiff.css'
 
 type ScriptDataValue = string | number | boolean | null | undefined | ScriptDataObject | ScriptDataValue[]
 type ScriptDataObject = { [key: string]: ScriptDataValue }
@@ -72,29 +73,12 @@ export const ScriptDataDiff: Component<ScriptDataDiffProps> = (props) => {
     <Show when={changes.length > 0}>
       <Card variant="outlined" style={{ margin: '0.5rem 0', 'font-size': '0.85rem' }}>
         <CardBody padding="sm">
-          <div
-            style={{
-              'font-weight': 'bold',
-              color: 'var(--text-secondary)',
-              'margin-bottom': '0.5rem',
-              display: 'flex',
-              'align-items': 'center',
-              gap: '0.5rem',
-            }}
-          >
-            Script Data Changes:
-          </div>
-          <div style={{ 'font-family': 'monospace', 'font-size': '0.8rem' }}>
+          <div class={styles.header}>Script Data Changes:</div>
+          <div class={styles.changesContainer}>
             <For each={changes}>
               {(change, index) => (
-                <div
-                  style={{
-                    padding: '0.25rem 0',
-                    color: 'var(--text-primary)',
-                    'border-bottom': index() < changes.length - 1 ? '1px solid var(--border-color)' : 'none',
-                  }}
-                >
-                  <span style={{ color: 'var(--primary-color)', 'font-weight': 'bold' }}>• </span>
+                <div class={index() < changes.length - 1 ? styles.changeRowWithBorder : styles.changeRow}>
+                  <span class={styles.bulletPoint}>• </span>
                   {change}
                 </div>
               )}

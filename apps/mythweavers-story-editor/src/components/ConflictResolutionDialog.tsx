@@ -1,5 +1,6 @@
 import { Button, Card, CardBody, Modal, Stack } from '@mythweavers/ui'
 import { Component } from 'solid-js'
+import * as styles from './ConflictResolutionDialog.css'
 
 interface ConflictResolutionDialogProps {
   isOpen: boolean
@@ -33,30 +34,24 @@ export const ConflictResolutionDialog: Component<ConflictResolutionDialogProps> 
       }
     >
       <Stack direction="vertical" gap="md">
-        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+        <p class={styles.description}>
           The story on the server has been updated more recently than your local version.
         </p>
 
         <Card variant="flat">
           <CardBody padding="sm" gap="sm">
             <Stack direction="horizontal" justify="between">
-              <span style={{ 'font-weight': '500', color: 'var(--text-secondary)' }}>Server version:</span>
-              <span style={{ color: 'var(--text-primary)', 'font-family': 'monospace', 'font-size': '0.9rem' }}>
-                {formatDate(props.serverUpdatedAt)}
-              </span>
+              <span class={styles.versionLabel}>Server version:</span>
+              <span class={styles.versionValue}>{formatDate(props.serverUpdatedAt)}</span>
             </Stack>
             <Stack direction="horizontal" justify="between">
-              <span style={{ 'font-weight': '500', color: 'var(--text-secondary)' }}>Your version:</span>
-              <span style={{ color: 'var(--text-primary)', 'font-family': 'monospace', 'font-size': '0.9rem' }}>
-                {formatDate(props.clientUpdatedAt)}
-              </span>
+              <span class={styles.versionLabel}>Your version:</span>
+              <span class={styles.versionValue}>{formatDate(props.clientUpdatedAt)}</span>
             </Stack>
           </CardBody>
         </Card>
 
-        <p style={{ margin: 0, color: 'var(--warning-color)', 'font-weight': '500' }}>
-          Do you want to overwrite the server version with your changes?
-        </p>
+        <p class={styles.warningText}>Do you want to overwrite the server version with your changes?</p>
       </Stack>
     </Modal>
   )

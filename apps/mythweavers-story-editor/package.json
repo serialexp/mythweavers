@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tsc": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "generate:client": "openapi-ts -i http://localhost:3001/docs/openapi.json -o src/api-client",
+    "generate:client": "openapi-ts -i http://localhost:3201/docs/openapi.json -o src/api-client",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",

@@ -1,228 +1,17 @@
 import { Button, ListDetailPanel, type ListDetailPanelRef, Stack } from '@mythweavers/ui'
 import { BsArrowLeft, BsCalendar, BsCheck, BsPencil, BsPlus, BsStar, BsStarFill, BsX } from 'solid-icons/bs'
-import { type Component, type JSX, Show, batch, createSignal } from 'solid-js'
+import { type Component, Show, batch, createSignal } from 'solid-js'
 import { calendarStore } from '../stores/calendarStore'
 import { charactersStore } from '../stores/charactersStore'
 import type { Character } from '../types/core'
 import { getCharacterDisplayName, parseCharacterName } from '../utils/character'
 import { generateMessageId } from '../utils/id'
+import * as styles from './Characters.css'
 import { EJSCodeEditor } from './EJSCodeEditor'
-import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { EJSRenderer } from './EJSRenderer'
+import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { StoryTimePicker } from './StoryTimePicker'
 import { TemplateChangeRequest } from './TemplateChangeRequest'
-
-// Styles
-const styles = {
-  listItemContent: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.75rem',
-    flex: '1',
-    'min-width': '0',
-  } as JSX.CSSProperties,
-
-  listItemAvatar: {
-    width: '32px',
-    height: '32px',
-    'border-radius': '50%',
-    overflow: 'hidden',
-    'flex-shrink': '0',
-  } as JSX.CSSProperties,
-
-  listItemAvatarImage: {
-    width: '100%',
-    height: '100%',
-    'object-fit': 'cover',
-  } as JSX.CSSProperties,
-
-  listItemAvatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    'align-items': 'center',
-    'justify-content': 'center',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-secondary)',
-    'font-weight': '500',
-    'font-size': '0.85rem',
-  } as JSX.CSSProperties,
-
-  listItemName: {
-    flex: '1',
-    'min-width': '0',
-    'white-space': 'nowrap',
-    overflow: 'hidden',
-    'text-overflow': 'ellipsis',
-    'font-size': '0.95rem',
-  } as JSX.CSSProperties,
-
-  protagonistIcon: {
-    color: 'var(--warning-color)',
-    'font-size': '0.9rem',
-  } as JSX.CSSProperties,
-
-  form: {
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '0.75rem',
-  } as JSX.CSSProperties,
-
-  input: {
-    padding: '0.625rem 0.875rem',
-    background: 'var(--bg-primary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '6px',
-    color: 'var(--text-primary)',
-    'font-size': '0.95rem',
-    transition: 'border-color 0.2s ease',
-  } as JSX.CSSProperties,
-
-  imageSection: {
-    display: 'flex',
-    gap: '1rem',
-    'align-items': 'flex-start',
-  } as JSX.CSSProperties,
-
-  imagePreview: {
-    width: '80px',
-    height: '80px',
-    'border-radius': '50%',
-    overflow: 'hidden',
-    'flex-shrink': '0',
-    border: '2px solid var(--border-color)',
-  } as JSX.CSSProperties,
-
-  imagePreviewImage: {
-    width: '100%',
-    height: '100%',
-    'object-fit': 'cover',
-  } as JSX.CSSProperties,
-
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    'align-items': 'center',
-    'justify-content': 'center',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-secondary)',
-    'font-size': '2rem',
-    'font-weight': '500',
-  } as JSX.CSSProperties,
-
-  imageControls: {
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '0.5rem',
-  } as JSX.CSSProperties,
-
-  imageUploadButton: {
-    display: 'inline-flex',
-    'align-items': 'center',
-    gap: '0.25rem',
-    padding: '0.5rem 0.75rem',
-    background: 'var(--bg-secondary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '6px',
-    cursor: 'pointer',
-    'font-size': '0.85rem',
-    color: 'var(--text-primary)',
-    transition: 'all 0.2s ease',
-  } as JSX.CSSProperties,
-
-  imageRemoveButton: {
-    display: 'inline-flex',
-    'align-items': 'center',
-    gap: '0.25rem',
-    padding: '0.375rem 0.625rem',
-    background: 'transparent',
-    border: 'none',
-    'border-radius': '4px',
-    cursor: 'pointer',
-    'font-size': '0.8rem',
-    color: 'var(--error-color)',
-  } as JSX.CSSProperties,
-
-  quickInsertButtons: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-    'flex-wrap': 'wrap',
-  } as JSX.CSSProperties,
-
-  quickInsertLabel: {
-    'font-size': '0.8rem',
-    color: 'var(--text-secondary)',
-  } as JSX.CSSProperties,
-
-  quickInsertButton: {
-    padding: '0.25rem 0.5rem',
-    'font-size': '0.75rem',
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '4px',
-    cursor: 'pointer',
-    color: 'var(--text-primary)',
-    transition: 'all 0.2s ease',
-  } as JSX.CSSProperties,
-
-  detailView: {
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: '1rem',
-  } as JSX.CSSProperties,
-
-  detailAvatar: {
-    width: '100px',
-    height: '100px',
-    'border-radius': '50%',
-    overflow: 'hidden',
-    'flex-shrink': '0',
-    border: '3px solid var(--border-color)',
-    'align-self': 'center',
-  } as JSX.CSSProperties,
-
-  detailAvatarImage: {
-    width: '100%',
-    height: '100%',
-    'object-fit': 'cover',
-  } as JSX.CSSProperties,
-
-  detailAvatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    'align-items': 'center',
-    'justify-content': 'center',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-secondary)',
-    'font-size': '2.5rem',
-    'font-weight': '500',
-  } as JSX.CSSProperties,
-
-  characterDescription: {
-    'line-height': '1.6',
-    color: 'var(--text-primary)',
-  } as JSX.CSSProperties,
-
-  characterBirthdate: {
-    'font-size': '0.9rem',
-    color: 'var(--text-secondary)',
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-  } as JSX.CSSProperties,
-
-  detailActions: {
-    display: 'flex',
-    gap: '0.5rem',
-    'flex-wrap': 'wrap',
-    'margin-top': '0.5rem',
-    'padding-top': '1rem',
-    'border-top': '1px solid var(--border-color)',
-  } as JSX.CSSProperties,
-}
 
 export interface CharactersRef {
   addNew: () => void
@@ -402,29 +191,29 @@ export const Characters: Component<CharactersProps> = (props) => {
         backIcon={<BsArrowLeft />}
         renderListItem={(character) => (
           <>
-            <div style={styles.listItemContent}>
-              <div style={styles.listItemAvatar}>
+            <div class={styles.listItemContent}>
+              <div class={styles.listItemAvatar}>
                 <Show when={character.profileImageData}>
                   {(image) => (
                     <img
                       src={image()}
                       alt={`${getCharacterDisplayName(character)} avatar`}
-                      style={styles.listItemAvatarImage}
+                      class={styles.listItemAvatarImage}
                     />
                   )}
                 </Show>
                 <Show when={!character.profileImageData}>
-                  <div style={styles.listItemAvatarPlaceholder}>
+                  <div class={styles.listItemAvatarPlaceholder}>
                     {getAvatarInitial(getCharacterDisplayName(character))}
                   </div>
                 </Show>
               </div>
-              <div style={styles.listItemName}>
+              <div class={styles.listItemName}>
                 <EJSRenderer template={getCharacterDisplayName(character)} mode="inline" />
               </div>
             </div>
             <Show when={character.isMainCharacter}>
-              <BsStarFill style={styles.protagonistIcon} />
+              <BsStarFill class={styles.protagonistIcon} />
             </Show>
           </>
         )}
@@ -434,7 +223,7 @@ export const Characters: Component<CharactersProps> = (props) => {
               <EJSRenderer template={getCharacterDisplayName(char)} mode="inline" />
             </span>
             <Show when={char.isMainCharacter}>
-              <BsStarFill style={{ color: 'var(--warning-color)' }} />
+              <BsStarFill class={styles.protagonistIcon} />
             </Show>
           </Stack>
         )}
@@ -442,35 +231,35 @@ export const Characters: Component<CharactersProps> = (props) => {
           <Show
             when={editingId() !== char.id}
             fallback={
-              <div style={styles.form}>
+              <div class={styles.form}>
                 <input
                   type="text"
                   value={editName()}
                   onInput={(e) => setEditName(e.target.value)}
                   onKeyDown={(e) => handleKeyPress(e, saveEdit)}
                   placeholder="Character name"
-                  style={styles.input}
+                  class={styles.input}
                 />
-                <div style={styles.imageSection}>
-                  <div style={styles.imagePreview}>
+                <div class={styles.imageSection}>
+                  <div class={styles.imagePreview}>
                     <Show when={editProfileImagePreview()}>
-                      {(image) => <img src={image()} alt="Character preview" style={styles.imagePreviewImage} />}
+                      {(image) => <img src={image()} alt="Character preview" class={styles.imagePreviewImage} />}
                     </Show>
                     <Show when={!editProfileImagePreview()}>
-                      <div style={styles.imagePlaceholder}>
+                      <div class={styles.imagePlaceholder}>
                         {getAvatarInitial(editName() || getCharacterDisplayName(char))}
                       </div>
                     </Show>
                   </div>
-                  <div style={styles.imageControls}>
-                    <label style={styles.imageUploadButton}>
+                  <div class={styles.imageControls}>
+                    <label class={styles.imageUploadButton}>
                       Upload Image
                       <input type="file" accept="image/*" onChange={handleEditImageSelect} style={{ display: 'none' }} />
                     </label>
                     <Show when={editProfileImagePreview()}>
                       <button
                         type="button"
-                        style={styles.imageRemoveButton}
+                        class={styles.imageRemoveButton}
                         onClick={clearEditImage}
                         title="Remove profile image"
                       >
@@ -486,10 +275,10 @@ export const Characters: Component<CharactersProps> = (props) => {
                   minHeight="80px"
                   ref={(methods) => (editEditorRef = methods)}
                 />
-                <div style={styles.quickInsertButtons}>
-                  <span style={styles.quickInsertLabel}>Quick Insert:</span>
+                <div class={styles.quickInsertButtons}>
+                  <span class={styles.quickInsertLabel}>Quick Insert:</span>
                   <button
-                    style={styles.quickInsertButton}
+                    class={styles.quickInsertButton}
                     onClick={() => insertAgeScript(editName(), editEditorRef)}
                     title="Insert age script"
                     type="button"
@@ -503,19 +292,9 @@ export const Characters: Component<CharactersProps> = (props) => {
                   placeholder="Describe how you want to change this character's description"
                 />
                 <EJSRenderer template={editDescription()} mode="preview-always" />
-                <div style={{ 'margin-top': '0.5rem' }}>
+                <div class={styles.marginTop}>
                   <Show when={!showEditBirthdatePicker()}>
-                    <button
-                      style={{
-                        ...styles.input,
-                        width: '100%',
-                        'text-align': 'left',
-                        display: 'flex',
-                        'align-items': 'center',
-                        gap: '0.5rem',
-                      }}
-                      onClick={() => setShowEditBirthdatePicker(true)}
-                    >
+                    <button class={styles.birthdateButton} onClick={() => setShowEditBirthdatePicker(true)}>
                       <BsCalendar />
                       {editBirthdate() !== undefined
                         ? `Birthdate: ${calendarStore.formatStoryTime(editBirthdate()!)}`
@@ -534,7 +313,7 @@ export const Characters: Component<CharactersProps> = (props) => {
                   </Show>
                 </div>
                 <ScriptHelpTabs />
-                <Stack direction="horizontal" gap="sm" style={{ 'margin-top': '0.5rem' }}>
+                <Stack direction="horizontal" gap="sm" class={styles.marginTop}>
                   <Button variant="primary" onClick={saveEdit}>
                     <BsCheck /> Save
                   </Button>
@@ -545,28 +324,28 @@ export const Characters: Component<CharactersProps> = (props) => {
               </div>
             }
           >
-            <div style={styles.detailView}>
-              <div style={styles.detailAvatar}>
+            <div class={styles.detailView}>
+              <div class={styles.detailAvatar}>
                 <Show when={char.profileImageData}>
                   {(image) => (
                     <img
                       src={image()}
                       alt={`${getCharacterDisplayName(char)} portrait`}
-                      style={styles.detailAvatarImage}
+                      class={styles.detailAvatarImage}
                     />
                   )}
                 </Show>
                 <Show when={!char.profileImageData}>
-                  <div style={styles.detailAvatarPlaceholder}>{getAvatarInitial(getCharacterDisplayName(char))}</div>
+                  <div class={styles.detailAvatarPlaceholder}>{getAvatarInitial(getCharacterDisplayName(char))}</div>
                 </Show>
               </div>
-              <div style={styles.characterDescription}>
+              <div class={styles.characterDescription}>
                 <EJSRenderer template={char.description ?? ''} mode="inline" />
               </div>
               <Show when={char.birthdate !== undefined}>
-                <div style={styles.characterBirthdate}>Born: {calendarStore.formatStoryTime(char.birthdate!)}</div>
+                <div class={styles.characterBirthdate}>Born: {calendarStore.formatStoryTime(char.birthdate!)}</div>
               </Show>
-              <div style={styles.detailActions}>
+              <div class={styles.detailActions}>
                 <Button
                   variant={char.isMainCharacter ? 'primary' : 'secondary'}
                   onClick={() => charactersStore.updateCharacter(char.id, { isMainCharacter: !char.isMainCharacter })}
@@ -596,33 +375,33 @@ export const Characters: Component<CharactersProps> = (props) => {
         )}
         newItemTitle="Add New Character"
         renderNewForm={() => (
-          <div style={styles.form}>
+          <div class={styles.form}>
             <input
               type="text"
               value={newCharacterName()}
               onInput={(e) => setNewCharacterName(e.target.value)}
               onKeyDown={(e) => handleKeyPress(e, addCharacter)}
               placeholder="Character name"
-              style={styles.input}
+              class={styles.input}
             />
-            <div style={styles.imageSection}>
-              <div style={styles.imagePreview}>
+            <div class={styles.imageSection}>
+              <div class={styles.imagePreview}>
                 <Show when={newCharacterImageData()}>
-                  {(image) => <img src={image()} alt="New character preview" style={styles.imagePreviewImage} />}
+                  {(image) => <img src={image()} alt="New character preview" class={styles.imagePreviewImage} />}
                 </Show>
                 <Show when={!newCharacterImageData()}>
-                  <div style={styles.imagePlaceholder}>{getAvatarInitial(newCharacterName() || '?')}</div>
+                  <div class={styles.imagePlaceholder}>{getAvatarInitial(newCharacterName() || '?')}</div>
                 </Show>
               </div>
-              <div style={styles.imageControls}>
-                <label style={styles.imageUploadButton}>
+              <div class={styles.imageControls}>
+                <label class={styles.imageUploadButton}>
                   Upload Image
                   <input type="file" accept="image/*" onChange={handleNewImageSelect} style={{ display: 'none' }} />
                 </label>
                 <Show when={newCharacterImageData()}>
                   <button
                     type="button"
-                    style={styles.imageRemoveButton}
+                    class={styles.imageRemoveButton}
                     onClick={clearNewImage}
                     title="Remove profile image"
                   >
@@ -638,10 +417,10 @@ export const Characters: Component<CharactersProps> = (props) => {
               minHeight="80px"
               ref={(methods) => (newEditorRef = methods)}
             />
-            <div style={styles.quickInsertButtons}>
-              <span style={styles.quickInsertLabel}>Quick Insert:</span>
+            <div class={styles.quickInsertButtons}>
+              <span class={styles.quickInsertLabel}>Quick Insert:</span>
               <button
-                style={styles.quickInsertButton}
+                class={styles.quickInsertButton}
                 onClick={() => insertAgeScript(newCharacterName(), newEditorRef)}
                 title="Insert age script"
                 type="button"
@@ -655,19 +434,9 @@ export const Characters: Component<CharactersProps> = (props) => {
               placeholder="Describe how you want to change this character's description"
             />
             <EJSRenderer template={newCharacterDescription()} mode="preview-always" />
-            <div style={{ 'margin-top': '0.5rem' }}>
+            <div class={styles.marginTop}>
               <Show when={!showNewBirthdatePicker()}>
-                <button
-                  style={{
-                    ...styles.input,
-                    width: '100%',
-                    'text-align': 'left',
-                    display: 'flex',
-                    'align-items': 'center',
-                    gap: '0.5rem',
-                  }}
-                  onClick={() => setShowNewBirthdatePicker(true)}
-                >
+                <button class={styles.birthdateButton} onClick={() => setShowNewBirthdatePicker(true)}>
                   <BsCalendar />
                   {newCharacterBirthdate() !== undefined
                     ? `Birthdate: ${calendarStore.formatStoryTime(newCharacterBirthdate()!)}`
@@ -690,7 +459,7 @@ export const Characters: Component<CharactersProps> = (props) => {
               variant="primary"
               onClick={addCharacter}
               disabled={!newCharacterName().trim() || !newCharacterDescription().trim()}
-              style={{ 'margin-top': '0.5rem' }}
+              class={styles.marginTop}
             >
               <BsPlus /> Add Character
             </Button>

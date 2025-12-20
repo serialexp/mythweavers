@@ -4,6 +4,7 @@ import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { ReplacePreview, SearchResult, SearchSnippet, searchModalStore } from '../stores/searchModalStore'
 import { Message } from '../types/core'
+import * as styles from './SearchModal.css'
 
 interface MessageWithContext extends Message {
   chapterName: string
@@ -376,30 +377,12 @@ export function SearchModal() {
     const after = preview.context.substring(preview.contextStart + preview.originalText.length)
 
     return (
-      <div
-        style={{ 'font-family': 'monospace', 'font-size': '0.9em', 'line-height': '1.5', color: 'var(--text-primary)' }}
-      >
+      <div class={styles.replacePreviewText}>
         <span>{before}</span>
-        <span
-          style={{
-            background: 'rgba(255, 0, 0, 0.2)',
-            color: '#ff4444',
-            'text-decoration': 'line-through',
-            padding: '2px 4px',
-            'border-radius': '2px',
-          }}
-        >
+        <span class={styles.deleteHighlight}>
           {preview.originalText}
         </span>
-        <span
-          style={{
-            background: 'rgba(0, 255, 0, 0.2)',
-            color: '#44ff44',
-            padding: '2px 4px',
-            'border-radius': '2px',
-            'font-weight': '500',
-          }}
-        >
+        <span class={styles.insertHighlight}>
           {preview.replacementText}
         </span>
         <span>{after}</span>
@@ -470,15 +453,7 @@ export function SearchModal() {
         <For each={parts}>
           {(part) => (
             <Show when={part.isHighlight} fallback={<span>{part.text}</span>}>
-              <mark
-                style={{
-                  background: 'var(--warning-color)',
-                  color: 'var(--bg-primary)',
-                  padding: '1px 2px',
-                  'border-radius': '2px',
-                  'font-weight': '500',
-                }}
-              >
+              <mark class={styles.searchHighlight}>
                 {part.text}
               </mark>
             </Show>
@@ -523,15 +498,6 @@ export function SearchModal() {
 
   const hasMoreResults = () => {
     return !searchModalStore.showAllResults && searchModalStore.searchResults.length > 20
-  }
-
-  const checkboxLabelStyle = {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '6px',
-    color: 'var(--text-secondary)',
-    'font-size': '0.9em',
-    cursor: 'pointer',
   }
 
   return (
@@ -605,10 +571,8 @@ export function SearchModal() {
           <Alert variant="warning">Multi-word search is disabled in replace mode. Use single words only.</Alert>
         </Show>
 
-        <div
-          style={{ 'margin-top': '10px', display: 'flex', gap: '15px', 'align-items': 'center', 'flex-wrap': 'wrap' }}
-        >
-          <label style={checkboxLabelStyle}>
+        <div class={styles.optionsRow}>
+          <label class={styles.checkboxLabel}>
             <input
               type="checkbox"
               checked={searchModalStore.searchInContent}
@@ -617,7 +581,7 @@ export function SearchModal() {
             />
             Content
           </label>
-          <label style={checkboxLabelStyle}>
+          <label class={styles.checkboxLabel}>
             <input
               type="checkbox"
               checked={searchModalStore.searchInInstruction}
@@ -626,7 +590,7 @@ export function SearchModal() {
             />
             Instructions
           </label>
-          <label style={checkboxLabelStyle}>
+          <label class={styles.checkboxLabel}>
             <input
               type="checkbox"
               checked={searchModalStore.searchInThink}
@@ -635,13 +599,7 @@ export function SearchModal() {
             />
             Think sections
           </label>
-          <label
-            style={{
-              ...checkboxLabelStyle,
-              opacity: searchTokens().length <= 1 ? 0.6 : 1,
-              cursor: searchTokens().length <= 1 ? 'not-allowed' : 'pointer',
-            }}
-          >
+          <label class={searchTokens().length <= 1 ? styles.checkboxLabelDisabled : styles.checkboxLabel}>
             <input
               type="checkbox"
               checked={searchTokens().length > 1 && searchModalStore.requireAllTerms}
@@ -662,17 +620,7 @@ export function SearchModal() {
         </Card>
       </Show>
 
-      <div
-        style={{
-          display: 'flex',
-          'justify-content': 'space-between',
-          'align-items': 'center',
-          'padding-bottom': '10px',
-          'border-bottom': '1px solid var(--border-color)',
-          color: 'var(--text-secondary)',
-          'font-size': '0.9em',
-        }}
-      >
+      <div class={styles.resultsHeader}>
         <span>
           {searchModalStore.showAllResults || searchModalStore.searchResults.length <= 20
             ? `${searchModalStore.searchResults.length} results`
@@ -681,31 +629,13 @@ export function SearchModal() {
         </span>
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          'overflow-y': 'auto',
-          'max-height': '50vh',
-          display: 'flex',
-          'flex-direction': 'column',
-          gap: '8px',
-          'margin-top': '8px',
-        }}
-      >
+      <div class={styles.resultsContainer}>
         <For each={displayedResults()}>
           {(result) => (
             <Card interactive onClick={() => handleResultClick(result)} style={{ cursor: 'pointer' }}>
               <CardBody padding="sm">
-                <div
-                  style={{
-                    display: 'flex',
-                    'justify-content': 'space-between',
-                    'align-items': 'center',
-                    'margin-bottom': '8px',
-                    'font-size': '0.9em',
-                  }}
-                >
-                  <span style={{ color: 'var(--text-primary)', 'font-weight': '500' }}>
+                <div class={styles.resultHeader}>
+                  <span class={styles.resultTitle}>
                     {result.chapterName} • Message {result.messageIndex}
                   </span>
                   <Badge variant="secondary" size="sm">
@@ -719,19 +649,11 @@ export function SearchModal() {
                     <Stack gap="xs">
                       <For each={result.snippets}>
                         {(snippet) => (
-                          <div style={{ display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
-                            <div
-                              style={{
-                                color: 'var(--text-secondary)',
-                                'font-size': '0.8em',
-                                'font-weight': '500',
-                                'text-transform': 'uppercase',
-                                'letter-spacing': '0.5px',
-                              }}
-                            >
+                          <div class={styles.snippetContainer}>
+                            <div class={styles.sectionLabel}>
                               {getSectionLabel(snippet.section)}:
                             </div>
-                            <div style={{ color: 'var(--text-primary)', 'line-height': '1.4', 'font-size': '0.9em' }}>
+                            <div class={styles.snippetText}>
                               {renderSnippet(snippet, searchTokens())}
                             </div>
                           </div>
@@ -743,30 +665,13 @@ export function SearchModal() {
                   <Stack gap="sm">
                     <For each={result.replacements}>
                       {(preview) => (
-                        <div
-                          style={{
-                            display: 'flex',
-                            'flex-direction': 'column',
-                            gap: '6px',
-                            padding: '8px',
-                            background: 'var(--bg-tertiary)',
-                            'border-radius': '4px',
-                          }}
-                        >
-                          <div
-                            style={{
-                              color: 'var(--text-secondary)',
-                              'font-size': '0.8em',
-                              'font-weight': '500',
-                              'text-transform': 'uppercase',
-                              'letter-spacing': '0.5px',
-                            }}
-                          >
+                        <div class={styles.replacePreviewContainer}>
+                          <div class={styles.sectionLabel}>
                             {getSectionLabel(preview.section)}:
                           </div>
                           {renderReplacePreview(preview)}
                           <Show when={!isSectionReplaced(result.messageId, preview.section)}>
-                            <div style={{ display: 'flex', gap: '8px', 'margin-top': '4px' }}>
+                            <div class={styles.buttonRow}>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -794,13 +699,7 @@ export function SearchModal() {
                         !result.replacements.every((r) => isSectionReplaced(result.messageId, r.section))
                       }
                     >
-                      <div
-                        style={{
-                          'margin-top': '8px',
-                          'padding-top': '8px',
-                          'border-top': '1px solid var(--border-color)',
-                        }}
-                      >
+                      <div class={styles.replaceAllDivider}>
                         <Button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -825,29 +724,14 @@ export function SearchModal() {
       </div>
 
       <Show when={hasMoreResults()}>
-        <div
-          style={{
-            display: 'flex',
-            'justify-content': 'center',
-            padding: '10px 0',
-            'border-top': '1px solid var(--border-color)',
-          }}
-        >
+        <div class={styles.showMoreRow}>
           <Button onClick={() => searchModalStore.setShowAllResults(true)} variant="secondary">
             Show All {searchModalStore.searchResults.length} Results
           </Button>
         </div>
       </Show>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '10px',
-          'justify-content': 'flex-end',
-          'padding-top': '10px',
-          'border-top': '1px solid var(--border-color)',
-        }}
-      >
+      <div class={styles.footerActions}>
         <Show
           when={
             searchModalStore.isReplaceMode &&

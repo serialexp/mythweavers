@@ -3,6 +3,7 @@ import { BsCalendarEvent, BsCodeSlash } from 'solid-icons/bs'
 import { Component, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { CodeEditor } from './CodeEditor'
+import * as styles from './InsertEventButton.css'
 
 interface InsertEventButtonProps {
   afterMessageId?: string | null
@@ -95,13 +96,7 @@ export const InsertEventButton: Component<InsertEventButtonProps> = (props) => {
             }
             hint="JavaScript code to execute when this event is reached"
           >
-            <div
-              style={{
-                border: '1px solid var(--border-color)',
-                'border-radius': '4px',
-                overflow: 'hidden',
-              }}
-            >
+            <div class={styles.editorWrapper}>
               <CodeEditor value={eventScript()} onChange={setEventScript} height="300px" />
             </div>
           </FormField>

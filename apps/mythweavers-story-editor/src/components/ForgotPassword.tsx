@@ -1,6 +1,7 @@
 import { Alert, Button, FormField, Input, Modal } from '@mythweavers/ui'
 import { Show, createSignal } from 'solid-js'
 import { apiClient } from '../utils/apiClient'
+import * as styles from './ForgotPassword.css'
 
 interface ForgotPasswordProps {
   onClose: () => void
@@ -43,15 +44,13 @@ export function ForgotPassword(props: ForgotPasswordProps) {
               If an account exists with the email address you provided, we've sent password reset instructions to that
               email.
             </Alert>
-            <p style={{ color: 'var(--text-secondary)', 'margin-bottom': '1.5rem' }}>
-              Please check your inbox and follow the link to reset your password.
-            </p>
+            <p class={styles.description}>Please check your inbox and follow the link to reset your password.</p>
             <Button onClick={props.onBackToLogin}>Back to Login</Button>
           </div>
         }
       >
         <form onSubmit={handleSubmit}>
-          <p style={{ color: 'var(--text-secondary)', 'margin-bottom': '1.5rem' }}>
+          <p class={styles.description}>
             Enter your email address and we'll send you a link to reset your password.
           </p>
 

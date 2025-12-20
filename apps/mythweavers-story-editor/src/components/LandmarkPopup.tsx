@@ -3,6 +3,7 @@ import { BsCheck, BsPencil, BsTrash, BsX } from 'solid-icons/bs'
 import { Component, Show } from 'solid-js'
 import type { Landmark } from '../types/core'
 import { EJSRenderer } from './EJSRenderer'
+import * as styles from './LandmarkPopup.css'
 
 interface LandmarkPopupProps {
   selectedLandmark: Landmark | null
@@ -25,85 +26,6 @@ interface LandmarkPopupProps {
   ref?: (el: HTMLDivElement) => void
 }
 
-const popupStyles = {
-  container: {
-    position: 'absolute' as const,
-    background: 'var(--bg-primary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '6px',
-    padding: '0.75rem',
-    'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.3)',
-    'z-index': '1000',
-    width: '280px',
-    'max-width': 'calc(100vw - 20px)',
-    'max-height': '400px',
-    'overflow-y': 'auto' as const,
-  },
-  name: {
-    'font-weight': '600',
-    color: 'var(--text-primary)',
-    'margin-bottom': '0.25rem',
-  },
-  description: {
-    color: 'var(--text-secondary)',
-    'font-size': '0.9rem',
-    'line-height': '1.4',
-  },
-  label: {
-    color: 'var(--text-secondary)',
-    'font-size': '0.9rem',
-    'flex-shrink': '0',
-  },
-  colorInput: {
-    width: '60px',
-    'flex-shrink': '0',
-    padding: '0.25rem',
-    background: 'var(--bg-secondary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '4px',
-    cursor: 'pointer',
-  },
-  colorGrid: {
-    display: 'grid',
-    'grid-template-columns': 'repeat(4, 1fr)',
-    gap: '0.25rem',
-    width: '100%',
-    'max-width': '100%',
-  },
-  colorButton: {
-    width: '100%',
-    'aspect-ratio': '1',
-    'border-radius': '50%',
-    cursor: 'pointer',
-    'max-width': '40px',
-    border: '2px solid transparent',
-    transition: 'all 0.2s',
-  },
-  colorButtonSelected: {
-    'border-color': 'var(--accent-color)',
-    'box-shadow': '0 0 0 2px var(--bg-primary)',
-  },
-  colorButtonWhite: {
-    border: '2px solid var(--border-color)',
-  },
-  sizeButton: {
-    flex: '1',
-    padding: '0.4rem 0.6rem',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-primary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '4px',
-    cursor: 'pointer',
-    'font-size': '0.85rem',
-    transition: 'all 0.2s',
-  },
-  sizeButtonSelected: {
-    background: 'var(--accent-bg)',
-    color: 'var(--accent-color)',
-    'border-color': 'var(--accent-border)',
-  },
-}
-
 export const LandmarkPopup: Component<LandmarkPopupProps> = (props) => {
   const colorOptions = [
     '#e74c3c', // Red
@@ -121,8 +43,8 @@ export const LandmarkPopup: Component<LandmarkPopupProps> = (props) => {
     <Show when={props.selectedLandmark || props.isAddingNew}>
       <div
         ref={props.ref}
+        class={styles.container}
         style={{
-          ...popupStyles.container,
           left: `${props.position.x}px`,
           top: `${props.position.y}px`,
         }}
@@ -131,20 +53,16 @@ export const LandmarkPopup: Component<LandmarkPopupProps> = (props) => {
           <Show
             when={props.isEditing}
             fallback=<Show when={props.selectedLandmark}>
-              <div style={popupStyles.name}>
+              <div class={styles.name}>
                 <EJSRenderer template={props.selectedLandmark!.name} mode="inline" />
               </div>
-              <div style={popupStyles.description}>
+              <div class={styles.description}>
                 <EJSRenderer template={props.selectedLandmark!.description || ''} mode="inline" />
               </div>
               <Stack
                 direction="horizontal"
                 gap="sm"
-                style={{
-                  'margin-top': '0.5rem',
-                  'padding-top': '0.5rem',
-                  'border-top': '1px solid var(--border-color)',
-                }}
+                class={styles.actionRow}
               >
                 <Button variant="secondary" size="sm" onClick={props.onStartEdit} style={{ flex: '1' }}>
                   <BsPencil /> Edit
@@ -155,7 +73,7 @@ export const LandmarkPopup: Component<LandmarkPopupProps> = (props) => {
               </Stack>
             </Show>
           >
-            <Stack gap="sm" style={{ width: '100%' }}>
+            <Stack gap="sm" class={styles.formContainer}>
               <Input
                 type="text"
                 placeholder="Landmark name"
@@ -172,23 +90,19 @@ export const LandmarkPopup: Component<LandmarkPopupProps> = (props) => {
               {/* Color picker */}
               <Stack gap="sm">
                 <Stack direction="horizontal" gap="sm" style={{ 'align-items': 'center' }}>
-                  <span style={popupStyles.label}>Color:</span>
+                  <span class={styles.label}>Color:</span>
                   <input
                     type="color"
-                    style={popupStyles.colorInput}
+                    class={styles.colorInput}
                     value={props.editColor}
                     onInput={(e) => props.onEditColor(e.currentTarget.value)}
                   />
                 </Stack>
-                <div style={popupStyles.colorGrid}>
+                <div class={styles.colorGrid}>
                   {colorOptions.map((color) => (
                     <button
-                      style={{
-                        ...popupStyles.colorButton,
-                        'background-color': color,
-                        ...(props.editColor === color ? popupStyles.colorButtonSelected : {}),
-                        ...(color === '#ffffff' ? popupStyles.colorButtonWhite : {}),
-                      }}
+                      class={`${styles.colorButton} ${props.editColor === color ? styles.colorButtonSelected : ''} ${color === '#ffffff' ? styles.colorButtonWhite : ''}`}
+                      style={{ 'background-color': color }}
                       onClick={() => props.onEditColor(color)}
                     />
                   ))}
@@ -197,31 +111,22 @@ export const LandmarkPopup: Component<LandmarkPopupProps> = (props) => {
 
               {/* Size picker */}
               <Stack gap="xs">
-                <span style={popupStyles.label}>Size:</span>
+                <span class={styles.label}>Size:</span>
                 <Stack direction="horizontal" gap="xs">
                   <button
-                    style={{
-                      ...popupStyles.sizeButton,
-                      ...(props.editSize === 'small' ? popupStyles.sizeButtonSelected : {}),
-                    }}
+                    class={`${styles.sizeButton} ${props.editSize === 'small' ? styles.sizeButtonSelected : ''}`}
                     onClick={() => props.onEditSize('small')}
                   >
                     Small
                   </button>
                   <button
-                    style={{
-                      ...popupStyles.sizeButton,
-                      ...(props.editSize === 'medium' ? popupStyles.sizeButtonSelected : {}),
-                    }}
+                    class={`${styles.sizeButton} ${props.editSize === 'medium' ? styles.sizeButtonSelected : ''}`}
                     onClick={() => props.onEditSize('medium')}
                   >
                     Medium
                   </button>
                   <button
-                    style={{
-                      ...popupStyles.sizeButton,
-                      ...(props.editSize === 'large' ? popupStyles.sizeButtonSelected : {}),
-                    }}
+                    class={`${styles.sizeButton} ${props.editSize === 'large' ? styles.sizeButtonSelected : ''}`}
                     onClick={() => props.onEditSize('large')}
                   >
                     Large
@@ -229,7 +134,7 @@ export const LandmarkPopup: Component<LandmarkPopupProps> = (props) => {
                 </Stack>
               </Stack>
 
-              <Stack direction="horizontal" gap="sm" style={{ 'margin-top': '0.5rem' }}>
+              <Stack direction="horizontal" gap="sm" class={styles.buttonRow}>
                 <Button
                   variant="primary"
                   size="sm"

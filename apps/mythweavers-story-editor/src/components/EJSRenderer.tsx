@@ -6,6 +6,7 @@ import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { getTemplatePreview } from '../utils/scriptEngine'
+import * as styles from './EJSRenderer.css'
 
 export type EJSRendererMode = 'inline' | 'preview-toggle' | 'preview-always'
 
@@ -90,35 +91,11 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
     }
   })
 
-  const dataDetailsStyle = {
-    'margin-top': '0.75rem',
-    background: 'var(--bg-tertiary)',
-    'border-radius': 'var(--radius-sm)',
-    padding: '0.5rem',
-  }
-
-  const dataSummaryStyle = {
-    cursor: 'pointer',
-    'font-size': '0.85rem',
-    color: 'var(--text-secondary)',
-    'font-weight': '500',
-  }
-
-  const dataContentStyle = {
-    'margin-top': '0.5rem',
-    'font-family': 'monospace',
-    'font-size': '0.8rem',
-    'white-space': 'pre-wrap' as const,
-    color: 'var(--text-primary)',
-    'max-height': '200px',
-    'overflow-y': 'auto' as const,
-  }
-
   // Inline mode - just display the evaluated text
   if (mode() === 'inline') {
     const result = evaluationResult()
     return (
-      <span class={props.fallbackClassName} style={{ color: 'var(--text-primary)' }}>
+      <span class={`${props.fallbackClassName || ''} ${styles.inlineText}`}>
         {result?.error ? props.template : result?.result}
       </span>
     )
@@ -128,7 +105,7 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
   if (mode() === 'preview-toggle') {
     return (
       <Show when={hasEJS()}>
-        <div style={{ 'margin-top': '0.5rem' }}>
+        <div class={styles.toggleContainer}>
           <Button
             variant="ghost"
             size="sm"
@@ -142,29 +119,29 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
           </Button>
 
           <Show when={showPreview() && evaluationResult()}>
-            <Card style={{ 'margin-top': '0.5rem' }}>
+            <Card class={styles.cardMargin}>
               <CardBody padding="sm">
                 <Show when={evaluationResult()!.error}>
-                  <Alert variant="error" style={{ 'margin-bottom': '0.5rem' }}>
+                  <Alert variant="error" class={styles.alertMargin}>
                     <BsExclamationTriangle /> {evaluationResult()!.error}
                   </Alert>
                 </Show>
 
                 <div>
-                  <div style={{ 'font-size': '0.85rem', color: 'var(--text-secondary)', 'margin-bottom': '0.25rem' }}>
+                  <div class={styles.previewLabel}>
                     Preview:
                   </div>
-                  <div style={{ color: 'var(--text-primary)', 'line-height': '1.5' }}>{evaluationResult()!.result}</div>
+                  <div class={styles.previewText}>{evaluationResult()!.result}</div>
                 </div>
 
-                <details style={dataDetailsStyle}>
-                  <summary style={dataSummaryStyle}>
+                <details class={styles.dataDetails}>
+                  <summary class={styles.dataSummary}>
                     Available Data{' '}
-                    <span style={{ color: 'var(--text-muted)', 'font-size': '0.8rem' }}>
+                    <span class={styles.evalTime}>
                       (evaluated in {evaluationResult()!.evaluationTime.toFixed(2)}ms)
                     </span>
                   </summary>
-                  <pre style={dataContentStyle}>{JSON.stringify(evaluationResult()!.data, null, 2)}</pre>
+                  <pre class={styles.dataContent}>{JSON.stringify(evaluationResult()!.data, null, 2)}</pre>
                 </details>
               </CardBody>
             </Card>
@@ -176,39 +153,32 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
 
   // Preview always mode - always show preview (for edit forms)
   return (
-    <div style={{ 'margin-top': '0.75rem' }}>
+    <div class={styles.previewAlwaysContainer}>
       <Show when={props.template !== undefined}>
         <Card variant="flat">
           <CardBody padding="sm">
-            <div
-              style={{
-                display: 'flex',
-                'justify-content': 'space-between',
-                'align-items': 'center',
-                'margin-bottom': '0.5rem',
-              }}
-            >
-              <span style={{ 'font-weight': '600', color: 'var(--text-primary)', 'font-size': '0.9rem' }}>
+            <div class={styles.previewHeader}>
+              <span class={styles.previewTitle}>
                 {hasEJS() ? 'EJS Preview' : 'Preview'}
               </span>
               <Show when={hasEJS() && evaluationResult()}>
-                <span style={{ color: 'var(--text-muted)', 'font-size': '0.8rem' }}>
+                <span class={styles.evalTime}>
                   ({evaluationResult()!.evaluationTime.toFixed(2)}ms)
                 </span>
               </Show>
             </div>
 
             <Show when={evaluationResult()?.error}>
-              <Alert variant="error" style={{ 'margin-bottom': '0.5rem' }}>
+              <Alert variant="error" class={styles.alertMargin}>
                 <BsExclamationTriangle /> {evaluationResult()!.error}
               </Alert>
             </Show>
 
-            <div style={{ color: 'var(--text-primary)', 'line-height': '1.5', 'min-height': '1.5em' }}>
+            <div class={styles.previewContent}>
               {evaluationResult()?.result !== undefined && evaluationResult()?.result !== '' ? (
                 evaluationResult()?.result
               ) : (
-                <span style={{ color: 'var(--text-muted)', 'font-style': 'italic' }}>Empty description</span>
+                <span class={styles.emptyPlaceholder}>Empty description</span>
               )}
             </div>
 
@@ -219,9 +189,9 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
                 (props.showDataByDefault || Object.keys(evaluationResult()?.data || {}).length > 0)
               }
             >
-              <details style={dataDetailsStyle} open={props.showDataByDefault}>
-                <summary style={dataSummaryStyle}>Available Data</summary>
-                <pre style={dataContentStyle}>{JSON.stringify(evaluationResult()?.data, null, 2)}</pre>
+              <details class={styles.dataDetails} open={props.showDataByDefault}>
+                <summary class={styles.dataSummary}>Available Data</summary>
+                <pre class={styles.dataContent}>{JSON.stringify(evaluationResult()?.data, null, 2)}</pre>
               </details>
             </Show>
           </CardBody>

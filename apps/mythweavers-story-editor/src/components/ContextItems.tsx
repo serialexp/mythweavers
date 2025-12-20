@@ -10,10 +10,11 @@ import {
   Tabs,
 } from '@mythweavers/ui'
 import { BsArrowLeft, BsCheck, BsPencil, BsPlus, BsX } from 'solid-icons/bs'
-import { type Component, type JSX, Show, batch, createMemo, createSignal } from 'solid-js'
+import { type Component, Show, batch, createMemo, createSignal } from 'solid-js'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import type { ContextItem } from '../types/core'
 import { generateMessageId } from '../utils/id'
+import * as styles from './ContextItems.css'
 import { EJSCodeEditor } from './EJSCodeEditor'
 import { EJSRenderer } from './EJSRenderer'
 import { ScriptHelpTabs } from './ScriptHelpTabs'
@@ -133,64 +134,6 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
     return type === 'theme' ? 'info' : type === 'location' ? 'success' : 'warning'
   }
 
-  // Styles
-  const listItemNameStyle: JSX.CSSProperties = {
-    'font-size': '0.875rem',
-    'font-weight': '500',
-    color: 'var(--text-primary)',
-    overflow: 'hidden',
-    'text-overflow': 'ellipsis',
-    'white-space': 'nowrap',
-    flex: '1',
-  }
-
-  const formStyle: JSX.CSSProperties = {
-    display: 'flex',
-    'flex-direction': 'column',
-    gap: 'var(--spacing-md)',
-  }
-
-  const fieldLabelStyle: JSX.CSSProperties = {
-    display: 'block',
-    'font-size': '0.75rem',
-    'font-weight': '600',
-    color: 'var(--text-secondary)',
-    'text-transform': 'uppercase',
-    'letter-spacing': '0.5px',
-    'margin-bottom': 'var(--spacing-xs)',
-  }
-
-  const fieldValueStyle: JSX.CSSProperties = {
-    'font-size': '0.9375rem',
-    color: 'var(--text-primary)',
-    'line-height': '1.6',
-  }
-
-  const typeSelectorStyle: JSX.CSSProperties = {
-    display: 'flex',
-    gap: 'var(--spacing-md)',
-    padding: 'var(--spacing-md)',
-    background: 'var(--bg-secondary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': 'var(--radius-sm)',
-  }
-
-  const typeLabelStyle: JSX.CSSProperties = {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-    'font-size': '0.875rem',
-    color: 'var(--text-primary)',
-    cursor: 'pointer',
-  }
-
-  const globalToggleStyle: JSX.CSSProperties = {
-    padding: 'var(--spacing-md)',
-    background: 'var(--bg-secondary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': 'var(--radius-sm)',
-  }
-
   return (
     <Show when={contextItemsStore.showContextItems}>
       <ListDetailPanel
@@ -224,7 +167,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
         }
         renderListItem={(item) => (
           <Stack direction="horizontal" gap="sm" align="center" style={{ flex: '1', 'min-width': '0' }}>
-            <div style={listItemNameStyle}>
+            <div class={styles.listItemName}>
               <EJSRenderer template={item.name} mode="inline" />
             </div>
             <Badge variant={getTypeBadgeVariant(item.type)} size="sm">
@@ -260,7 +203,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
           <Show
             when={!editingId()}
             fallback={
-              <div style={formStyle}>
+              <div class={styles.form}>
                 <Input
                   value={editName()}
                   onInput={(e) => setEditName(e.currentTarget.value)}
@@ -280,8 +223,8 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 />
                 <EJSRenderer template={editDescription()} mode="preview-always" />
                 <ScriptHelpTabs />
-                <div style={typeSelectorStyle}>
-                  <label style={typeLabelStyle}>
+                <div class={styles.typeSelector}>
+                  <label class={styles.typeLabel}>
                     <input
                       type="radio"
                       name={`edit-type-${item.id}`}
@@ -290,7 +233,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                     />
                     Theme
                   </label>
-                  <label style={typeLabelStyle}>
+                  <label class={styles.typeLabel}>
                     <input
                       type="radio"
                       name={`edit-type-${item.id}`}
@@ -299,7 +242,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                     />
                     Location
                   </label>
-                  <label style={typeLabelStyle}>
+                  <label class={styles.typeLabel}>
                     <input
                       type="radio"
                       name={`edit-type-${item.id}`}
@@ -309,8 +252,8 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                     Plot
                   </label>
                 </div>
-                <div style={globalToggleStyle}>
-                  <label style={typeLabelStyle}>
+                <div class={styles.globalToggle}>
+                  <label class={styles.typeLabel}>
                     <input
                       type="checkbox"
                       checked={editIsGlobal()}
@@ -322,7 +265,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 <Stack
                   direction="horizontal"
                   gap="sm"
-                  style={{ 'padding-top': 'var(--spacing-md)', 'border-top': '1px solid var(--border-color)' }}
+                  class={styles.actionRow}
                 >
                   <Button
                     variant="primary"
@@ -340,23 +283,23 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
             }
           >
             <div>
-              <Stack direction="horizontal" gap="lg" style={{ 'margin-bottom': 'var(--spacing-lg)', 'flex-wrap': 'wrap' }}>
+              <Stack direction="horizontal" gap="lg" class={styles.fieldGroup}>
                 <div>
-                  <label style={fieldLabelStyle}>Type</label>
-                  <div style={fieldValueStyle}>
+                  <label class={styles.fieldLabel}>Type</label>
+                  <div class={styles.fieldValue}>
                     <Badge variant={getTypeBadgeVariant(item.type)} size="sm">
                       {item.type}
                     </Badge>
                   </div>
                 </div>
                 <div>
-                  <label style={fieldLabelStyle}>Global</label>
-                  <div style={fieldValueStyle}>{item.isGlobal ? 'Yes' : 'No'}</div>
+                  <label class={styles.fieldLabel}>Global</label>
+                  <div class={styles.fieldValue}>{item.isGlobal ? 'Yes' : 'No'}</div>
                 </div>
               </Stack>
               <div>
-                <label style={fieldLabelStyle}>Description</label>
-                <div style={fieldValueStyle}>
+                <label class={styles.fieldLabel}>Description</label>
+                <div class={styles.fieldValue}>
                   <EJSRenderer template={item.description} mode="inline" />
                 </div>
               </div>
@@ -365,7 +308,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
         )}
         newItemTitle="Add New Context Item"
         renderNewForm={() => (
-          <div style={formStyle}>
+          <div class={styles.form}>
             <Input
               value={newItemName()}
               onInput={(e) => setNewItemName(e.currentTarget.value)}
@@ -385,8 +328,8 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
             />
             <EJSRenderer template={newItemDescription()} mode="preview-always" />
             <ScriptHelpTabs />
-            <div style={typeSelectorStyle}>
-              <label style={typeLabelStyle}>
+            <div class={styles.typeSelector}>
+              <label class={styles.typeLabel}>
                 <input
                   type="radio"
                   name="new-item-type"
@@ -395,7 +338,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 />
                 Theme
               </label>
-              <label style={typeLabelStyle}>
+              <label class={styles.typeLabel}>
                 <input
                   type="radio"
                   name="new-item-type"
@@ -404,7 +347,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 />
                 Location
               </label>
-              <label style={typeLabelStyle}>
+              <label class={styles.typeLabel}>
                 <input
                   type="radio"
                   name="new-item-type"
@@ -414,8 +357,8 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 Plot
               </label>
             </div>
-            <div style={globalToggleStyle}>
-              <label style={typeLabelStyle}>
+            <div class={styles.globalToggle}>
+              <label class={styles.typeLabel}>
                 <input
                   type="checkbox"
                   checked={newItemIsGlobal()}
@@ -427,7 +370,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
             <Stack
               direction="horizontal"
               gap="sm"
-              style={{ 'padding-top': 'var(--spacing-md)', 'border-top': '1px solid var(--border-color)' }}
+              class={styles.actionRow}
             >
               <Button
                 variant="primary"

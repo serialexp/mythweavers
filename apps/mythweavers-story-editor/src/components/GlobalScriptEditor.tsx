@@ -2,6 +2,7 @@ import { Alert, Button, Card, CardBody, Modal, Stack } from '@mythweavers/ui'
 import { Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { CodeEditor } from './CodeEditor'
+import * as styles from './GlobalScriptEditor.css'
 
 const DEFAULT_GLOBAL_SCRIPT = `(data) => {
   // Initialize story-wide variables here
@@ -133,15 +134,8 @@ export function GlobalScriptEditor(props: GlobalScriptEditorProps) {
         <Card style={{ margin: '1rem 0' }}>
           <CardBody>
             <Show when={!isEditing()}>
-              <div
-                style={{
-                  display: 'flex',
-                  'justify-content': 'space-between',
-                  'align-items': 'center',
-                  'margin-bottom': '0.5rem',
-                }}
-              >
-                <h3 style={{ margin: 0, 'font-size': '1.1rem', color: 'var(--text-primary)' }}>Global Script</h3>
+              <div class={styles.headerRow}>
+                <h3 class={styles.sectionTitle}>Global Script</h3>
                 <Button variant="primary" size="sm" onClick={handleStartEditing}>
                   {currentStoryStore.globalScript ? 'Edit' : 'Add'} Script
                 </Button>
@@ -162,8 +156,8 @@ export function GlobalScriptEditor(props: GlobalScriptEditorProps) {
 
             <Show when={isEditing()}>
               <Stack gap="md">
-                <h3 style={{ margin: 0, 'font-size': '1.1rem', color: 'var(--text-primary)' }}>Edit Global Script</h3>
-                <p style={{ margin: 0, 'font-size': '0.9rem', color: 'var(--text-secondary)' }}>
+                <h3 class={styles.sectionTitle}>Edit Global Script</h3>
+                <p class={styles.description}>
                   This script runs before every message script. It should be a function that takes a data object and
                   returns it.
                 </p>
@@ -197,7 +191,7 @@ export function GlobalScriptEditor(props: GlobalScriptEditorProps) {
       <Modal open={!!props.compact && isEditing()} onClose={handleCancel} title="Edit Global Script" size="xl">
         <div style={{ padding: '1rem' }}>
           <Stack gap="md">
-            <p style={{ margin: 0, 'font-size': '0.9rem', color: 'var(--text-secondary)' }}>
+            <p class={styles.description}>
               This script runs before every message script. It should be a function that takes a data object and returns
               it.
             </p>

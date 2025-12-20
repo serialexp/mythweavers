@@ -1,6 +1,7 @@
 import { Alert, Button, Modal, Select, Spinner, Stack } from '@mythweavers/ui'
 import { BsFilm } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, onMount } from 'solid-js'
+import * as styles from './EpisodeViewer.css'
 
 interface Episode {
   id: string
@@ -51,173 +52,6 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-const episodeStyles = {
-  dockedContent: {
-    background: 'var(--bg-primary)',
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    'flex-direction': 'column' as const,
-    'border-left': '1px solid var(--border-color)',
-  },
-  header: {
-    display: 'flex',
-    'justify-content': 'space-between',
-    'align-items': 'center',
-    padding: '20px',
-    'border-bottom': '1px solid var(--border-color)',
-  },
-  headerTitle: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '10px',
-    margin: '0',
-    color: 'var(--text-primary)',
-    'font-size': '1.5rem',
-  },
-  episodeSelector: {
-    padding: '20px',
-    'border-bottom': '1px solid var(--border-color)',
-    display: 'flex',
-    'flex-wrap': 'wrap' as const,
-    'align-items': 'center',
-    gap: '15px',
-  },
-  scrollButtons: {
-    display: 'flex',
-    'flex-wrap': 'wrap' as const,
-    gap: '8px',
-    width: '100%',
-  },
-  selectionBar: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '15px',
-    padding: '15px 20px',
-    background: 'var(--bg-secondary)',
-    'border-bottom': '1px solid var(--border-color)',
-  },
-  selectionCount: {
-    color: 'var(--text-secondary)',
-    'font-size': '14px',
-    'font-weight': '500',
-  },
-  contentArea: {
-    flex: '1',
-    'overflow-y': 'auto' as const,
-    padding: '20px',
-  },
-  timeline: {
-    display: 'flex',
-    'flex-direction': 'column' as const,
-    gap: '30px',
-  },
-  segmentItem: {
-    display: 'flex',
-    'flex-direction': 'column' as const,
-    gap: '12px',
-    padding: '15px',
-    background: 'var(--bg-secondary)',
-    'border-radius': '8px',
-    border: '1px solid var(--border-color)',
-    'margin-bottom': '15px',
-    transition: 'all 0.2s ease',
-  },
-  segmentItemSelected: {
-    background: 'var(--bg-tertiary)',
-    'border-left': '3px solid var(--primary-color)',
-    'padding-left': '17px',
-  },
-  segmentHeader: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '10px',
-    width: '100%',
-  },
-  segmentCheckbox: {
-    width: '18px',
-    height: '18px',
-    cursor: 'pointer',
-    'accent-color': 'var(--primary-color)',
-    'flex-shrink': '0',
-  },
-  segmentTimestamp: {
-    'font-weight': 'bold',
-    color: 'var(--text-secondary)',
-    'font-size': '13px',
-    flex: '1',
-    display: 'flex',
-    'flex-direction': 'column' as const,
-    gap: '4px',
-  },
-  frameInfo: {
-    'font-size': '11px',
-    color: 'var(--text-tertiary)',
-    'margin-top': '5px',
-  },
-  frameContainer: {
-    position: 'relative' as const,
-    background: '#000',
-    'border-radius': '6px',
-    overflow: 'hidden',
-  },
-  frameImage: {
-    width: '100%',
-    height: 'auto',
-    display: 'block',
-  },
-  segmentVideo: {
-    width: '100%',
-    height: 'auto',
-    display: 'block',
-    background: '#000',
-  },
-  videoErrorIndicator: {
-    position: 'absolute' as const,
-    top: '8px',
-    right: '8px',
-    width: '24px',
-    height: '24px',
-    background: 'rgba(0, 0, 0, 0.7)',
-    color: 'var(--warning-color)',
-    'border-radius': '50%',
-    display: 'flex',
-    'align-items': 'center',
-    'justify-content': 'center',
-    'font-size': '14px',
-    cursor: 'help',
-    'z-index': '10',
-  },
-  frameIndicators: {
-    display: 'flex',
-    'justify-content': 'center',
-    gap: '4px',
-    'margin-top': '8px',
-  },
-  frameIndicator: {
-    width: '8px',
-    height: '8px',
-    'border-radius': '50%',
-    border: '1px solid var(--border-color)',
-    background: 'var(--bg-primary)',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s',
-  },
-  frameIndicatorActive: {
-    background: 'var(--accent-color)',
-  },
-  transcriptContainer: {
-    padding: '5px 0',
-  },
-  speaker: {
-    'font-weight': 'bold',
-    color: 'var(--accent-color, #3498db)',
-    'margin-right': '8px',
-  },
-  text: {
-    color: 'var(--text-primary)',
-  },
-}
 
 // Component to display a segment with video or cycling frames
 const SegmentWithFrames: Component<{
@@ -260,30 +94,25 @@ const SegmentWithFrames: Component<{
   }
 
   return (
-    <div
-      style={{
-        ...episodeStyles.segmentItem,
-        ...(props.isSelected ? episodeStyles.segmentItemSelected : {}),
-      }}
-    >
-      <div style={episodeStyles.segmentHeader}>
+    <div class={`${styles.segmentItem} ${props.isSelected ? styles.segmentItemSelected : ''}`}>
+      <div class={styles.segmentHeader}>
         <Show when={props.onToggleSelect}>
           <input
             type="checkbox"
-            style={episodeStyles.segmentCheckbox}
+            class={styles.segmentCheckbox}
             checked={props.isSelected}
             onChange={props.onToggleSelect}
           />
         </Show>
-        <div style={episodeStyles.segmentTimestamp}>
+        <div class={styles.segmentTimestamp}>
           <div>
             {formatTime(props.segment.start)} - {formatTime(props.segment.end)}
           </div>
           <Show when={!props.useVideo}>
-            <div style={episodeStyles.frameInfo}>
+            <div class={styles.frameInfo}>
               Frame {currentFrame().number}
               <Show when={props.segment.frames.length > 1}>
-                <span style={{ opacity: '0.7' }}>
+                <span class={styles.frameInfoFaded}>
                   {' '}
                   ({currentFrameIndex() + 1}/{props.segment.frames.length})
                 </span>
@@ -292,16 +121,16 @@ const SegmentWithFrames: Component<{
           </Show>
         </div>
       </div>
-      <div style={episodeStyles.frameContainer}>
+      <div class={styles.frameContainer}>
         <Show when={props.useVideo && videoError()}>
-          <div style={episodeStyles.videoErrorIndicator} title="Video unavailable - showing images instead">
+          <div class={styles.videoErrorIndicator} title="Video unavailable - showing images instead">
             ⚠️
           </div>
         </Show>
         <Show when={props.useVideo && !videoError()}>
           <video
             src={videoSrc() || undefined}
-            style={episodeStyles.segmentVideo}
+            class={styles.segmentVideo}
             preload={videoSrc() ? 'metadata' : 'none'}
             loop
             muted
@@ -369,18 +198,15 @@ const SegmentWithFrames: Component<{
           <img
             src={currentFrame().imageUrl}
             alt={`Frame ${currentFrame().number}`}
-            style={episodeStyles.frameImage}
+            class={styles.frameImage}
             loading="lazy"
           />
           <Show when={props.segment.frames.length > 1}>
-            <div style={episodeStyles.frameIndicators}>
+            <div class={styles.frameIndicators}>
               <For each={props.segment.frames}>
                 {(_, index) => (
                   <button
-                    style={{
-                      ...episodeStyles.frameIndicator,
-                      ...(index() === currentFrameIndex() ? episodeStyles.frameIndicatorActive : {}),
-                    }}
+                    class={`${styles.frameIndicator} ${index() === currentFrameIndex() ? styles.frameIndicatorActive : ''}`}
                     onClick={() => setCurrentFrameIndex(index())}
                   />
                 )}
@@ -389,12 +215,12 @@ const SegmentWithFrames: Component<{
           </Show>
         </Show>
       </div>
-      <div style={episodeStyles.transcriptContainer}>
+      <div class={styles.transcriptContainer}>
         <div>
           <Show when={props.segment.speaker}>
-            <span style={episodeStyles.speaker}>{props.segment.speaker}:</span>
+            <span class={styles.speaker}>{props.segment.speaker}:</span>
           </Show>
-          <span style={episodeStyles.text}>{props.segment.text}</span>
+          <span class={styles.text}>{props.segment.text}</span>
         </div>
       </div>
     </div>
@@ -616,8 +442,8 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
 
   const innerContent = (
     <>
-      <div style={episodeStyles.episodeSelector}>
-        <span style={{ color: 'var(--text-secondary)', 'font-weight': '500' }}>Select Episode:</span>
+      <div class={styles.episodeSelector}>
+        <span class={styles.episodeSelectorLabel}>Select Episode:</span>
         <Select
           value={selectedEpisodeId() || ''}
           onChange={(e) => handleEpisodeSelect(e.target.value)}
@@ -644,7 +470,7 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
         </Show>
 
         <Show when={episodeData() && !loading()}>
-          <div style={episodeStyles.scrollButtons}>
+          <div class={styles.scrollButtons}>
             <Button variant="secondary" size="sm" onClick={() => scrollToPosition(0)} title="Scroll to top">
               ↑ Top
             </Button>
@@ -665,8 +491,8 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
       </div>
 
       <Show when={selectedSegments().size > 0}>
-        <div style={episodeStyles.selectionBar}>
-          <span style={episodeStyles.selectionCount}>
+        <div class={styles.selectionBar}>
+          <span class={styles.selectionCount}>
             {selectedSegments().size} segment{selectedSegments().size !== 1 ? 's' : ''} selected
           </span>
           <Button
@@ -688,11 +514,11 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
         </div>
       </Show>
 
-      <div style={episodeStyles.contentArea} ref={contentAreaRef} onScroll={handleScroll}>
+      <div class={styles.contentArea} ref={contentAreaRef} onScroll={handleScroll}>
         <Show when={loading()}>
-          <Stack gap="md" style={{ 'align-items': 'center', padding: '40px' }}>
+          <Stack gap="md" class={styles.loadingContainer}>
             <Spinner size="lg" />
-            <span style={{ color: 'var(--text-secondary)' }}>Loading episode data...</span>
+            <span class={styles.loadingText}>Loading episode data...</span>
           </Stack>
         </Show>
 
@@ -701,7 +527,7 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
         </Show>
 
         <Show when={episodeData() && !loading()}>
-          <div style={episodeStyles.timeline}>
+          <div class={styles.timeline}>
             <For each={getSegmentsWithFrames()}>
               {(segment, index) => (
                 <SegmentWithFrames
@@ -723,9 +549,9 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
   if (mode === 'docked') {
     return (
       <Show when={props.isOpen}>
-        <div style={episodeStyles.dockedContent}>
-          <div style={episodeStyles.header}>
-            <h2 style={episodeStyles.headerTitle}>
+        <div class={styles.dockedContent}>
+          <div class={styles.header}>
+            <h2 class={styles.headerTitle}>
               <BsFilm /> Episode Viewer
             </h2>
           </div>

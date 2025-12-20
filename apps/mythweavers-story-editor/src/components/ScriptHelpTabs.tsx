@@ -3,6 +3,7 @@ import { BsChevronDown, BsChevronRight } from 'solid-icons/bs'
 import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { currentStoryStore } from '../stores/currentStoryStore'
+import * as styles from './ScriptHelpTabs.css'
 
 export const ScriptHelpTabs: Component = () => {
   const [activeTab, setActiveTab] = createSignal('')
@@ -54,32 +55,6 @@ export const ScriptHelpTabs: Component = () => {
     })
   })
 
-  const sectionHeaderStyle = {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-    width: '100%',
-    padding: '0.5rem',
-    background: 'var(--bg-secondary)',
-    border: 'none',
-    'border-radius': '4px',
-    cursor: 'pointer',
-    'font-weight': '600',
-    color: 'var(--text-primary)',
-    'font-size': '0.9rem',
-  }
-
-  const codeStyle = {
-    display: 'block',
-    background: 'var(--bg-tertiary)',
-    padding: '0.5rem',
-    'border-radius': '4px',
-    'font-family': 'monospace',
-    'font-size': '0.85rem',
-    'white-space': 'pre-wrap' as const,
-    color: 'var(--text-primary)',
-  }
-
   return (
     <Tabs activeTab={activeTab()} onTabChange={setActiveTab} toggleable variant="pills">
       <TabList>
@@ -95,25 +70,25 @@ export const ScriptHelpTabs: Component = () => {
       </TabList>
 
       <TabPanel id="ejs">
-        <Card style={{ 'margin-top': '0.5rem' }}>
+        <Card class={styles.cardMargin}>
           <CardBody>
             <Stack gap="sm">
               {/* Basics */}
               <div>
-                <button style={sectionHeaderStyle} onClick={() => toggleSection('basics')}>
+                <button class={styles.sectionHeader} onClick={() => toggleSection('basics')}>
                   <span>{expandedSection() === 'basics' ? <BsChevronDown /> : <BsChevronRight />}</span>
                   Basics
                 </button>
                 <Show when={expandedSection() === 'basics'}>
-                  <div style={{ padding: '0.75rem', color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
-                    <p style={{ margin: '0 0 0.5rem 0' }}>
+                  <div class={styles.sectionContent}>
+                    <p class={styles.sectionParagraph}>
                       EJS templates allow dynamic content in character descriptions and story elements.
                     </p>
-                    <code style={codeStyle}>{'<%= expression %>'} - Outputs the result</code>
-                    <code style={{ ...codeStyle, 'margin-top': '0.25rem' }}>
+                    <code class={styles.codeBlock}>{'<%= expression %>'} - Outputs the result</code>
+                    <code class={styles.codeBlockSpaced}>
                       {'<% code %>'} - Executes JavaScript code
                     </code>
-                    <code style={{ ...codeStyle, 'margin-top': '0.25rem' }}>
+                    <code class={styles.codeBlockSpaced}>
                       {'<%- html %>'} - Outputs unescaped HTML
                     </code>
                   </div>
@@ -122,17 +97,17 @@ export const ScriptHelpTabs: Component = () => {
 
               {/* Variables */}
               <div>
-                <button style={sectionHeaderStyle} onClick={() => toggleSection('variables')}>
+                <button class={styles.sectionHeader} onClick={() => toggleSection('variables')}>
                   <span>{expandedSection() === 'variables' ? <BsChevronDown /> : <BsChevronRight />}</span>
                   How Variables Work
                 </button>
                 <Show when={expandedSection() === 'variables'}>
-                  <div style={{ padding: '0.75rem', color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
-                    <p style={{ margin: '0 0 0.5rem 0' }}>Variables are defined by your scripts:</p>
-                    <div style={{ 'margin-bottom': '0.25rem' }}>
+                  <div class={styles.sectionContent}>
+                    <p class={styles.sectionParagraph}>Variables are defined by your scripts:</p>
+                    <div class={styles.sectionLabel}>
                       <strong>Global Script</strong> - Sets up initial variables and functions available everywhere
                     </div>
-                    <div style={{ 'margin-bottom': '0.25rem' }}>
+                    <div class={styles.sectionLabel}>
                       <strong>Message Scripts</strong> - Modify data as the story progresses
                     </div>
                     <div style={{ 'margin-bottom': '0.5rem' }}>
@@ -144,41 +119,41 @@ export const ScriptHelpTabs: Component = () => {
 
               {/* Functions */}
               <div>
-                <button style={sectionHeaderStyle} onClick={() => toggleSection('functions')}>
+                <button class={styles.sectionHeader} onClick={() => toggleSection('functions')}>
                   <span>{expandedSection() === 'functions' ? <BsChevronDown /> : <BsChevronRight />}</span>
                   Using Functions in Templates
                 </button>
                 <Show when={expandedSection() === 'functions'}>
-                  <div style={{ padding: '0.75rem', color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
-                    <p style={{ margin: '0 0 0.5rem 0' }}>
+                  <div class={styles.sectionContent}>
+                    <p class={styles.sectionParagraph}>
                       You can add functions to the data object in your Global Script:
                     </p>
-                    <div style={{ 'margin-bottom': '0.25rem', 'font-weight': '500' }}>Example Global Script:</div>
-                    <code style={codeStyle}>{`(data) => {
+                    <div class={styles.sectionLabel}>Example Global Script:</div>
+                    <code class={styles.codeBlock}>{`(data) => {
   data.random = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
   data.choose = (array) => array[Math.floor(Math.random() * array.length)]
   data.health = 100
 }`}</code>
                     <div style={{ 'margin-top': '0.5rem', 'font-weight': '500' }}>Using in templates:</div>
-                    <code style={{ ...codeStyle, 'margin-top': '0.25rem' }}>{'<%= random(1, 10) %>'}</code>
+                    <code class={styles.codeBlockSpaced}>{'<%= random(1, 10) %>'}</code>
                   </div>
                 </Show>
               </div>
 
               {/* Examples */}
               <div>
-                <button style={sectionHeaderStyle} onClick={() => toggleSection('examples')}>
+                <button class={styles.sectionHeader} onClick={() => toggleSection('examples')}>
                   <span>{expandedSection() === 'examples' ? <BsChevronDown /> : <BsChevronRight />}</span>
                   Examples
                 </button>
                 <Show when={expandedSection() === 'examples'}>
-                  <div style={{ padding: '0.75rem', color: 'var(--text-secondary)', 'font-size': '0.9rem' }}>
-                    <div style={{ 'margin-bottom': '0.25rem', 'font-weight': '500' }}>Using script data:</div>
-                    <code style={codeStyle}>{'A warrior with <%= strength || 10 %> strength'}</code>
+                  <div class={styles.sectionContent}>
+                    <div class={styles.sectionLabel}>Using script data:</div>
+                    <code class={styles.codeBlock}>{'A warrior with <%= strength || 10 %> strength'}</code>
                     <div style={{ 'margin-top': '0.5rem', 'margin-bottom': '0.25rem', 'font-weight': '500' }}>
                       Conditional:
                     </div>
-                    <code style={codeStyle}>{'<% if (daysPassed > 5) { %>Experienced<% } else { %>Novice<% } %>'}</code>
+                    <code class={styles.codeBlock}>{'<% if (daysPassed > 5) { %>Experienced<% } else { %>Novice<% } %>'}</code>
                   </div>
                 </Show>
               </div>
@@ -188,74 +163,35 @@ export const ScriptHelpTabs: Component = () => {
       </TabPanel>
 
       <TabPanel id="functions">
-        <Card variant="outlined" style={{ 'margin-top': '0.5rem' }}>
+        <Card variant="outlined" class={styles.cardMargin}>
           <Show
             when={availableFunctions().length > 0}
             fallback={
               <CardBody padding="md">
-                <div
-                  style={{
-                    color: 'var(--text-muted)',
-                    'font-size': '0.875rem',
-                    'text-align': 'center',
-                  }}
-                >
+                <div class={styles.emptyMessage}>
                   No functions available. Define functions in your Global Script to use them in templates.
                 </div>
               </CardBody>
             }
           >
             <CardBody padding="md" gap="sm">
-              <div
-                style={{
-                  'font-size': '0.875rem',
-                  color: 'var(--text-secondary)',
-                  'font-weight': '500',
-                  'margin-bottom': '0.5rem',
-                }}
-              >
+              <div class={styles.functionsLabel}>
                 Functions from Global Script:
               </div>
               <Stack direction="vertical" gap="xs">
                 <For each={availableFunctions()}>
                   {(func) => (
-                    <div style={{ padding: '0.25rem 0' }}>
-                      <code
-                        style={{
-                          'font-family': 'monospace',
-                          'font-size': '0.8125rem',
-                          color: 'var(--accent-color)',
-                          background: 'var(--bg-primary)',
-                          padding: '0.25rem 0.5rem',
-                          'border-radius': '3px',
-                          display: 'inline-block',
-                        }}
-                      >
+                    <div class={styles.functionItem}>
+                      <code class={styles.functionCode}>
                         functions.{func.signature}
                       </code>
                     </div>
                   )}
                 </For>
               </Stack>
-              <div
-                style={{
-                  'margin-top': '1rem',
-                  'padding-top': '0.75rem',
-                  'border-top': '1px solid var(--border-color)',
-                  'font-size': '0.75rem',
-                  color: 'var(--text-muted)',
-                }}
-              >
+              <div class={styles.functionsFooter}>
                 Use these in EJS templates like:{' '}
-                <code
-                  style={{
-                    'font-family': 'monospace',
-                    background: 'var(--bg-primary)',
-                    padding: '0.125rem 0.25rem',
-                    'border-radius': '2px',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
+                <code class={styles.inlineCode}>
                   {`<%= functions.${availableFunctions()[0]?.name || 'functionName'}(...) %>`}
                 </code>
               </div>

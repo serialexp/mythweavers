@@ -5,14 +5,11 @@ import { unwrap } from 'solid-js/store'
 import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
-import { modelsStore } from '../stores/modelsStore'
-import { settingsStore } from '../stores/settingsStore'
 import { storyManagerStore } from '../stores/storyManagerStore'
 import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
 import { createSavePayload } from '../utils/savePayload'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
 import { StoryMetadata, storyManager } from '../utils/storyManager'
-import { RefinementBatch, RefinementPreview } from './RefinementPreview'
 import { StoryList, StoryListItem } from './StoryList'
 import * as styles from './StoryManager.css'
 
@@ -84,17 +81,6 @@ export const StoryManager: Component = () => {
     // Combine and sort by date (newest first)
     return [...indexedStories, ...serverStoriesWithType].sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime())
   })
-  const [refining, setRefining] = createSignal<string | null>(null)
-  const [refinementProgress, setRefinementProgress] = createSignal<Record<string, number>>({})
-  const [showRefinementPreview, setShowRefinementPreview] = createSignal(false)
-  const [refinementBatches, setRefinementBatches] = createSignal<RefinementBatch[]>([])
-  const [refinementStatus, setRefinementStatus] = createSignal<'not_started' | 'processing' | 'completed' | 'failed'>(
-    'not_started',
-  )
-  const [currentRefinementStory, setCurrentRefinementStory] = createSignal<ApiStoryMetadata | null>(null)
-  const [refinementPollInterval, setRefinementPollInterval] = createSignal<ReturnType<typeof setInterval> | null>(null)
-  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = createSignal<number | undefined>(undefined)
-  const [averageBatchTime, setAverageBatchTime] = createSignal<number | undefined>(undefined)
   const [showSaveAs, setShowSaveAs] = createSignal(false)
   const [saveAsName, setSaveAsName] = createSignal('')
   const [saveAsMode, setSaveAsMode] = createSignal<'server' | 'local'>('local')
@@ -249,13 +235,6 @@ export const StoryManager: Component = () => {
     }
   }
 
-  const handleRefineStoryWrapper = async (storyId: string) => {
-    const story = serverStories().find((s) => s.id === storyId)
-    if (story) {
-      await handleRefineStory(story)
-    }
-  }
-
   const refreshStories = async () => {
     const stories = await storyManager.getSavedStories()
     setSavedStories(stories)
@@ -271,122 +250,6 @@ export const StoryManager: Component = () => {
     } catch (error) {
       console.error('Failed to download PDF:', error)
       alert('Failed to download PDF. Make sure Typst is installed on the server.')
-    }
-  }
-
-  const handleRefineStory = async (story: ApiStoryMetadata) => {
-    // Just open the preview modal
-    setCurrentRefinementStory(story)
-    setRefinementBatches([])
-    setRefinementStatus('not_started')
-    setRefinementProgress({})
-    setEstimatedTimeRemaining(undefined)
-    setAverageBatchTime(undefined)
-    setShowRefinementPreview(true)
-  }
-
-  const startRefinement = async (model: string) => {
-    const story = currentRefinementStory()
-    if (!story) return
-
-    try {
-      setRefining(story.id)
-      setRefinementStatus('processing')
-
-      const result = await apiClient.startRefinement(story.id, model, currentStoryStore.person, currentStoryStore.tense)
-
-      if (result.success) {
-        // Start polling for status
-        const pollInterval = setInterval(async () => {
-          try {
-            const status = await apiClient.getRefinementStatus(story.id)
-
-            if (status.status === 'processing' && status.progress !== undefined) {
-              setRefinementProgress((prev) => ({ ...prev, [story.id]: status.progress! }))
-
-              // Update batches and timing
-              if (status.batches) {
-                setRefinementBatches(status.batches)
-              }
-              if (status.estimatedTimeRemaining !== undefined) {
-                setEstimatedTimeRemaining(status.estimatedTimeRemaining)
-              }
-              if (status.averageBatchTime !== undefined) {
-                setAverageBatchTime(status.averageBatchTime)
-              }
-            } else if (status.status === 'completed') {
-              clearInterval(pollInterval)
-              setRefinementPollInterval(null)
-              setRefining(null)
-              setRefinementProgress((prev) => {
-                const newProgress = { ...prev }
-                delete newProgress[story.id]
-                return newProgress
-              })
-              setRefinementStatus('completed')
-
-              // Update final batches
-              if (status.batches) {
-                setRefinementBatches(status.batches)
-              }
-
-              // Reload server stories to show the refined version
-              await loadServerStories()
-            } else if (status.status === 'failed') {
-              clearInterval(pollInterval)
-              setRefinementPollInterval(null)
-              setRefining(null)
-              setRefinementProgress((prev) => {
-                const newProgress = { ...prev }
-                delete newProgress[story.id]
-                return newProgress
-              })
-              setRefinementStatus('failed')
-
-              // Update final batches
-              if (status.batches) {
-                setRefinementBatches(status.batches)
-              }
-            }
-          } catch (error) {
-            console.error('Failed to check refinement status:', error)
-          }
-        }, 2000) // Poll every 2 seconds
-
-        setRefinementPollInterval(pollInterval)
-      }
-    } catch (error) {
-      console.error('Failed to start refinement:', error)
-      setRefining(null)
-      setRefinementStatus('failed')
-      alert('Failed to start refinement. Make sure the server is running.')
-    }
-  }
-
-  const stopRefinement = async () => {
-    const story = currentRefinementStory()
-    if (!story) return
-
-    try {
-      // Stop polling
-      const pollInterval = refinementPollInterval()
-      if (pollInterval) {
-        clearInterval(pollInterval)
-        setRefinementPollInterval(null)
-      }
-
-      // Call stop endpoint
-      await apiClient.stopRefinement(story.id)
-
-      setRefining(null)
-      setRefinementStatus('failed')
-      setRefinementProgress((prev) => {
-        const newProgress = { ...prev }
-        delete newProgress[story.id]
-        return newProgress
-      })
-    } catch (error) {
-      console.error('Failed to stop refinement:', error)
     }
   }
 
@@ -483,9 +346,7 @@ export const StoryManager: Component = () => {
                 onLoadStory={handleLoadStoryWrapper}
                 onDeleteStory={handleDeleteStoryWrapper}
                 onExportPdf={handleExportPdf}
-                onRefineStory={handleRefineStoryWrapper}
                 onRename={refreshStories}
-                refining={refining()}
                 editingEnabled={true}
                 serverAvailable={serverAvailable()}
               />
@@ -495,22 +356,6 @@ export const StoryManager: Component = () => {
           </Show>
         </div>
       </Modal>
-
-      <RefinementPreview
-        storyName={currentRefinementStory()?.name || ''}
-        storyId={currentRefinementStory()?.id}
-        show={showRefinementPreview()}
-        onClose={() => setShowRefinementPreview(false)}
-        batches={refinementBatches()}
-        overallProgress={refinementProgress()[currentRefinementStory()?.id || ''] || 0}
-        status={refinementStatus()}
-        availableModels={modelsStore.availableModels}
-        currentModel={settingsStore.model}
-        onStartRefinement={startRefinement}
-        onStopRefinement={stopRefinement}
-        estimatedTimeRemaining={estimatedTimeRemaining()}
-        averageBatchTime={averageBatchTime()}
-      />
     </>
   )
 }

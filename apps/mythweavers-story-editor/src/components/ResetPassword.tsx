@@ -2,6 +2,7 @@ import { Alert, Button, FormField, Input, Modal, Spinner } from '@mythweavers/ui
 import { useSearchParams } from '@solidjs/router'
 import { Show, createSignal, onMount } from 'solid-js'
 import { apiClient } from '../utils/apiClient'
+import * as styles from './ResetPassword.css'
 
 interface ResetPasswordProps {
   onClose: () => void
@@ -93,9 +94,9 @@ export function ResetPassword(props: ResetPasswordProps) {
   return (
     <Modal open={true} onClose={props.onClose} title={getTitle()} size="sm">
       <Show when={validating()}>
-        <div style={{ 'text-align': 'center', padding: '2rem' }}>
+        <div class={styles.centeredContainer}>
           <Spinner size="lg" />
-          <p style={{ color: 'var(--text-secondary)', 'margin-top': '1rem' }}>Validating reset token...</p>
+          <p class={styles.validatingText}>Validating reset token...</p>
         </div>
       </Show>
 
@@ -111,8 +112,8 @@ export function ResetPassword(props: ResetPasswordProps) {
       <Show when={!validating() && tokenValid() && !success()}>
         <form onSubmit={handleSubmit}>
           <Show when={userInfo()}>
-            <p style={{ color: 'var(--text-secondary)', 'margin-bottom': '1.5rem' }}>
-              Resetting password for: <strong style={{ color: 'var(--text-primary)' }}>{userInfo()!.username}</strong>
+            <p class={styles.userInfoText}>
+              Resetting password for: <strong class={styles.usernameHighlight}>{userInfo()!.username}</strong>
             </p>
           </Show>
 
@@ -154,11 +155,11 @@ export function ResetPassword(props: ResetPasswordProps) {
       </Show>
 
       <Show when={success()}>
-        <div style={{ 'text-align': 'center', padding: '1rem 0' }}>
+        <div class={styles.successContainer}>
           <Alert variant="success" style={{ 'margin-bottom': '1rem' }}>
             Your password has been reset successfully.
           </Alert>
-          <p style={{ color: 'var(--text-secondary)' }}>Redirecting to login page...</p>
+          <p class={styles.redirectText}>Redirecting to login page...</p>
         </div>
       </Show>
     </Modal>

@@ -3,6 +3,7 @@ import { BsCodeSlash } from 'solid-icons/bs'
 import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { currentStoryStore } from '../stores/currentStoryStore'
+import * as styles from './AvailableFunctions.css'
 
 export const AvailableFunctions: Component = () => {
   const [showFunctions, setShowFunctions] = createSignal(false)
@@ -57,7 +58,7 @@ export const AvailableFunctions: Component = () => {
   })
 
   return (
-    <div style={{ margin: '0.5rem 0' }}>
+    <div class={styles.container}>
       <Button
         variant="secondary"
         size="sm"
@@ -76,56 +77,19 @@ export const AvailableFunctions: Component = () => {
       <Show when={showFunctions() && availableFunctions().length > 0}>
         <Card variant="outlined" style={{ 'margin-top': '0.75rem' }}>
           <CardBody padding="md" gap="sm">
-            <div
-              style={{
-                'font-size': '0.875rem',
-                color: 'var(--text-secondary)',
-                'font-weight': '500',
-                'margin-bottom': '0.5rem',
-              }}
-            >
-              Functions from Global Script:
-            </div>
+            <div class={styles.sectionLabel}>Functions from Global Script:</div>
             <Stack direction="vertical" gap="xs">
               <For each={availableFunctions()}>
                 {(func) => (
                   <div style={{ padding: '0.25rem 0' }}>
-                    <code
-                      style={{
-                        'font-family': 'monospace',
-                        'font-size': '0.8125rem',
-                        color: 'var(--accent-color)',
-                        background: 'var(--bg-primary)',
-                        padding: '0.25rem 0.5rem',
-                        'border-radius': '3px',
-                        display: 'inline-block',
-                      }}
-                    >
-                      functions.{func.signature}
-                    </code>
+                    <code class={styles.functionCode}>functions.{func.signature}</code>
                   </div>
                 )}
               </For>
             </Stack>
-            <div
-              style={{
-                'margin-top': '1rem',
-                'padding-top': '0.75rem',
-                'border-top': '1px solid var(--border-color)',
-                'font-size': '0.75rem',
-                color: 'var(--text-muted)',
-              }}
-            >
+            <div class={styles.usageNote}>
               Use these in EJS templates like:{' '}
-              <code
-                style={{
-                  'font-family': 'monospace',
-                  background: 'var(--bg-primary)',
-                  padding: '0.125rem 0.25rem',
-                  'border-radius': '2px',
-                  color: 'var(--text-secondary)',
-                }}
-              >
+              <code class={styles.usageCode}>
                 {`<%= functions.${availableFunctions()[0]?.name || 'functionName'}(...) %>`}
               </code>
             </div>
@@ -136,13 +100,7 @@ export const AvailableFunctions: Component = () => {
       <Show when={showFunctions() && availableFunctions().length === 0}>
         <Card variant="outlined" style={{ 'margin-top': '0.75rem' }}>
           <CardBody padding="md">
-            <div
-              style={{
-                color: 'var(--text-muted)',
-                'font-size': '0.875rem',
-                'text-align': 'center',
-              }}
-            >
+            <div class={styles.emptyMessage}>
               No functions available. Define functions in your Global Script to use them in templates.
             </div>
           </CardBody>

@@ -3,6 +3,7 @@ import { Button, Card, CardBody, FormField, IconButton, Input, Select, Stack } f
 import { BsPlus, BsTrash } from 'solid-icons/bs'
 import { Component, Index, Show, createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
+import * as styles from './CalendarEditor.css'
 
 // Helper component to render subdivisions recursively
 interface SubdivisionEditorProps {
@@ -13,70 +14,12 @@ interface SubdivisionEditorProps {
   onAddNested: (path: number[]) => void
 }
 
-const subdivisionStyles = {
-  item: {
-    display: 'flex',
-    gap: '0.75rem',
-    'align-items': 'flex-start',
-    padding: '1rem',
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '6px',
-  },
-  fields: {
-    flex: '1',
-    display: 'grid',
-    'grid-template-columns': 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: '0.75rem',
-  },
-  fieldFull: {
-    'grid-column': '1 / -1',
-    display: 'flex',
-    'flex-direction': 'column' as const,
-    gap: '0.5rem',
-  },
-  toggle: {
-    display: 'flex',
-    'align-items': 'center',
-    gap: '0.5rem',
-  },
-  customGrid: {
-    display: 'grid',
-    'grid-template-columns': 'repeat(auto-fill, minmax(80px, 1fr))',
-    gap: '0.5rem',
-  },
-  customField: {
-    display: 'flex',
-    'flex-direction': 'column' as const,
-    gap: '0.25rem',
-  },
-  customLabel: {
-    'font-size': '0.75rem',
-    'font-weight': '500',
-    color: 'var(--text-secondary)',
-    'text-align': 'center' as const,
-  },
-  hint: {
-    'font-size': '0.75rem',
-    color: 'var(--text-muted)',
-    'margin-top': '-0.25rem',
-  },
-  nestedList: {
-    'margin-left': '1.5rem',
-    'padding-left': '1rem',
-    'border-left': '2px solid var(--border-color)',
-    display: 'flex',
-    'flex-direction': 'column' as const,
-    gap: '1rem',
-  },
-}
-
 const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
   const sub = () => props.subdivision
 
   return (
-    <div style={subdivisionStyles.item}>
-      <div style={subdivisionStyles.fields}>
+    <div class={styles.subdivisionItem}>
+      <div class={styles.subdivisionFields}>
         {/* ID, Name, Plural, Count fields */}
         <FormField label="ID">
           <Input
@@ -113,9 +56,9 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
         </FormField>
 
         {/* Days per Unit section */}
-        <div style={subdivisionStyles.fieldFull}>
-          <div style={subdivisionStyles.toggle}>
-            <span style={{ 'font-size': '0.75rem', 'font-weight': '500', color: 'var(--text-secondary)' }}>
+        <div class={styles.fieldFull}>
+          <div class={styles.toggle}>
+            <span class={styles.toggleLabel}>
               Days per Unit
             </span>
             <Select
@@ -141,11 +84,11 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
           </div>
 
           {sub().daysPerUnit ? (
-            <div style={subdivisionStyles.customGrid}>
+            <div class={styles.customGrid}>
               <Index each={sub().daysPerUnit}>
                 {(days, daysIndex) => (
-                  <div style={subdivisionStyles.customField}>
-                    <label style={subdivisionStyles.customLabel}>{daysIndex + 1}</label>
+                  <div class={styles.customField}>
+                    <label class={styles.customLabel}>{daysIndex + 1}</label>
                     <Input
                       type="number"
                       value={days()}
@@ -176,9 +119,9 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
         </div>
 
         {/* Unit Labels section */}
-        <div style={subdivisionStyles.fieldFull}>
-          <div style={subdivisionStyles.toggle}>
-            <span style={{ 'font-size': '0.75rem', 'font-weight': '500', color: 'var(--text-secondary)' }}>
+        <div class={styles.fieldFull}>
+          <div class={styles.toggle}>
+            <span class={styles.toggleLabel}>
               Unit Labels
             </span>
             <Select
@@ -220,12 +163,7 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
           {sub().useCustomLabels !== false && (
             <>
               {sub().labels && (
-                <div
-                  style={{
-                    ...subdivisionStyles.customGrid,
-                    'grid-template-columns': 'repeat(auto-fill, minmax(120px, 1fr))',
-                  }}
-                >
+                <div class={styles.customGridWide}>
                   <Index each={sub().labels}>
                     {(label, labelIndex) => {
                       const autoLabel = () => {
@@ -234,8 +172,8 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
                       }
 
                       return (
-                        <div style={subdivisionStyles.customField}>
-                          <label style={subdivisionStyles.customLabel}>{labelIndex + 1}</label>
+                        <div class={styles.customField}>
+                          <label class={styles.customLabel}>{labelIndex + 1}</label>
                           <Input
                             type="text"
                             value={label()}
@@ -252,32 +190,32 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
                   </Index>
                 </div>
               )}
-              <div style={subdivisionStyles.hint}>
+              <div class={styles.hint}>
                 Custom names for each unit. Leave empty to use the label format above.
               </div>
             </>
           )}
           {sub().useCustomLabels === false && (
-            <div style={subdivisionStyles.hint}>All units will use the label format.</div>
+            <div class={styles.hint}>All units will use the label format.</div>
           )}
         </div>
 
         {/* Nested subdivisions */}
         <Show when={sub().subdivisions && sub().subdivisions!.length > 0}>
-          <div style={subdivisionStyles.fieldFull}>
+          <div class={styles.fieldFull}>
             <Stack
               direction="horizontal"
               gap="sm"
               style={{ 'justify-content': 'space-between', 'align-items': 'center', 'margin-bottom': '0.5rem' }}
             >
-              <span style={{ 'font-size': '0.75rem', 'font-weight': '500', color: 'var(--text-secondary)' }}>
+              <span class={styles.toggleLabel}>
                 Nested Subdivisions
               </span>
               <Button variant="primary" size="sm" onClick={() => props.onAddNested(props.path)}>
                 <BsPlus /> Add Nested
               </Button>
             </Stack>
-            <div style={subdivisionStyles.nestedList}>
+            <div class={styles.nestedList}>
               <Index each={sub().subdivisions!}>
                 {(nestedSub, nestedIndex) => (
                   <SubdivisionEditor
@@ -294,7 +232,7 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
         </Show>
 
         <Show when={!sub().subdivisions || sub().subdivisions!.length === 0}>
-          <div style={subdivisionStyles.fieldFull}>
+          <div class={styles.fieldFull}>
             <Button variant="primary" size="sm" onClick={() => props.onAddNested(props.path)}>
               <BsPlus /> Add Nested Subdivision
             </Button>
@@ -518,21 +456,21 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
 
   return (
     <Stack gap="lg">
-      <h3 style={{ margin: '0', 'font-size': '1.125rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+      <h3 class={styles.sectionTitle}>
         Calendar Configuration
       </h3>
 
       <Card>
         <CardBody>
           <Stack gap="md">
-            <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+            <h4 class={styles.cardTitle}>
               Basic Information
             </h4>
 
             <FormField
               label={
                 <>
-                  Calendar ID <span style={{ color: 'var(--danger-color)' }}>*</span>
+                  Calendar ID <span class={styles.requiredMark}>*</span>
                 </>
               }
               hint="Unique identifier (lowercase, hyphens, no spaces)"
@@ -543,7 +481,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
             <FormField
               label={
                 <>
-                  Name <span style={{ color: 'var(--danger-color)' }}>*</span>
+                  Name <span class={styles.requiredMark}>*</span>
                 </>
               }
             >
@@ -570,7 +508,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       <Card>
         <CardBody>
           <Stack gap="md">
-            <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+            <h4 class={styles.cardTitle}>
               Time Units
             </h4>
 
@@ -609,7 +547,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       <Card>
         <CardBody>
           <Stack gap="md">
-            <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+            <h4 class={styles.cardTitle}>
               Era Labels
             </h4>
 
@@ -632,7 +570,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
                 />
               </FormField>
             </Stack>
-            <div style={{ 'font-size': '0.75rem', color: 'var(--text-muted)' }}>
+            <div class={styles.hint}>
               Used for years before/after year 0 (e.g., "22 BBY")
             </div>
           </Stack>
@@ -647,14 +585,14 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
               gap="sm"
               style={{ 'justify-content': 'space-between', 'align-items': 'center' }}
             >
-              <h4 style={{ margin: '0', 'font-size': '1rem', 'font-weight': '600', color: 'var(--text-primary)' }}>
+              <h4 class={styles.cardTitle}>
                 Subdivisions (Optional)
               </h4>
               <Button variant="primary" size="sm" onClick={addSubdivision}>
                 <BsPlus /> Add Subdivision
               </Button>
             </Stack>
-            <div style={{ 'font-size': '0.75rem', color: 'var(--text-muted)' }}>
+            <div class={styles.hint}>
               Define how the year is divided (e.g., 4 quarters of 92 days each, 12 months, etc.)
             </div>
 
@@ -678,7 +616,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
       <Stack
         direction="horizontal"
         gap="md"
-        style={{ 'justify-content': 'flex-end', 'padding-top': '1rem', 'border-top': '1px solid var(--border-color)' }}
+        class={styles.actionRow}
       >
         <Button variant="secondary" onClick={props.onCancel}>
           Cancel

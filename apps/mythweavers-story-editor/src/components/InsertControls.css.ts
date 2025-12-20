@@ -12,4 +12,11 @@ export const container = style({
   ':hover': {
     opacity: 1,
   },
+
+  // Always visible on mobile - touch devices need visible targets
+  '@media': {
+    '(max-width: 768px)': {
+      opacity: 1,
+    },
+  },
 })

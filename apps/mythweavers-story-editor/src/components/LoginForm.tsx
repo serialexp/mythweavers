@@ -2,6 +2,7 @@ import { Alert, Button, Card, CardBody, FormField, Input } from '@mythweavers/ui
 import { Component, Show, createSignal } from 'solid-js'
 import { postAuthLogin, postAuthRegister } from '../client/config'
 import { ForgotPassword } from './ForgotPassword'
+import * as styles from './LoginForm.css'
 
 interface LoginFormProps {
   onSuccess: (user: any | { offline: boolean }) => void
@@ -97,29 +98,11 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        'flex-direction': 'column',
-        'align-items': 'center',
-        'justify-content': 'center',
-        'min-height': '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      }}
-    >
+    <div class={styles.container}>
       <Card variant="elevated" style={{ width: '100%', 'max-width': '400px' }}>
         <CardBody padding="lg">
           <form onSubmit={handleSubmit}>
-            <h2
-              style={{
-                'text-align': 'center',
-                'margin-bottom': '2rem',
-                color: 'var(--text-primary)',
-                'font-size': '1.5rem',
-              }}
-            >
-              {isRegistering() ? 'Create Account' : 'Welcome Back'}
-            </h2>
+            <h2 class={styles.title}>{isRegistering() ? 'Create Account' : 'Welcome Back'}</h2>
 
             <Show when={error()}>
               <Alert variant="error" style={{ 'margin-bottom': '1rem' }}>
@@ -193,51 +176,16 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
               </div>
             </Show>
 
-            <div
-              style={{
-                'text-align': 'center',
-                'margin-top': '1rem',
-                color: 'var(--text-secondary)',
-                display: 'flex',
-                'align-items': 'center',
-                'justify-content': 'center',
-                gap: '0.25rem',
-              }}
-            >
+            <div class={styles.switchModeText}>
               {isRegistering() ? 'Already have an account?' : "Don't have an account?"}
               <Button type="button" variant="ghost" size="sm" onClick={switchMode} disabled={isLoading()}>
                 {isRegistering() ? 'Login' : 'Register'}
               </Button>
             </div>
 
-            <div
-              style={{
-                position: 'relative',
-                'text-align': 'center',
-                margin: '1.5rem 0',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '0',
-                  right: '0',
-                  height: '1px',
-                  background: 'var(--border-color)',
-                }}
-              />
-              <span
-                style={{
-                  background: 'var(--bg-primary)',
-                  padding: '0 1rem',
-                  position: 'relative',
-                  color: 'var(--text-muted)',
-                  'font-size': '0.875rem',
-                }}
-              >
-                OR
-              </span>
+            <div class={styles.dividerContainer}>
+              <div class={styles.dividerLine} />
+              <span class={styles.dividerText}>OR</span>
             </div>
 
             <Button

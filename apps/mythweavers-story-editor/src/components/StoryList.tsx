@@ -1,17 +1,9 @@
 import { Badge, Card, CardBody, IconButton, Input, Spinner } from '@mythweavers/ui'
-import {
-  BsCloudFill,
-  BsExclamationTriangle,
-  BsFilePdf,
-  BsHddFill,
-  BsPencil,
-  BsServer,
-  BsStars,
-  BsTrash,
-} from 'solid-icons/bs'
+import { BsCloudFill, BsExclamationTriangle, BsFilePdf, BsHddFill, BsPencil, BsServer, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { storyManager } from '../utils/storyManager'
+import * as styles from './StoryList.css'
 
 export interface StoryListItem {
   id: string
@@ -32,11 +24,9 @@ interface StoryListProps {
   onLoadStory: (storyId: string, type: 'local' | 'server') => void | Promise<void>
   onDeleteStory?: (storyId: string, type: 'local' | 'server') => void
   onExportPdf?: (storyId: string) => void
-  onRefineStory?: (storyId: string) => void
   onSyncToServer?: (storyId: string) => void
   onRename?: () => void
   syncing?: string | null
-  refining?: string | null
   editingEnabled?: boolean
   serverAvailable?: boolean
 }
@@ -113,7 +103,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
   }
 
   return (
-    <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>
+    <div class={styles.container}>
       <For each={props.stories}>
         {(story) => (
           <Card
@@ -130,33 +120,16 @@ export const StoryList: Component<StoryListProps> = (props) => {
                 }
               }
             }}
+            class={story.isCurrentStory ? styles.currentStoryBorder : undefined}
             style={{
               position: 'relative',
               cursor: loadingId() === story.id ? 'wait' : 'pointer',
               opacity: loadingId() === story.id ? '0.7' : '1',
-              'border-color': story.isCurrentStory ? 'var(--primary-color)' : undefined,
             }}
           >
             {/* Loading Overlay */}
             <Show when={loadingId() === story.id}>
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '0',
-                  left: '0',
-                  right: '0',
-                  bottom: '0',
-                  background: 'rgba(0, 0, 0, 0.5)',
-                  'backdrop-filter': 'blur(2px)',
-                  display: 'flex',
-                  'align-items': 'center',
-                  'justify-content': 'center',
-                  gap: '1rem',
-                  'border-radius': '8px',
-                  'z-index': '10',
-                  color: 'var(--text-primary)',
-                }}
-              >
+              <div class={styles.loadingOverlay}>
                 <Spinner size="sm" />
                 <span>Loading story...</span>
               </div>
@@ -164,45 +137,22 @@ export const StoryList: Component<StoryListProps> = (props) => {
 
             <CardBody padding="md">
               {/* Header Row */}
-              <div
-                style={{
-                  display: 'flex',
-                  'justify-content': 'space-between',
-                  'align-items': 'center',
-                  'margin-bottom': '0.5rem',
-                }}
-              >
+              <div class={styles.headerRow}>
                 <Show
                   when={editingId() === story.id}
                   fallback={
                     <div
-                      style={{
-                        display: 'flex',
-                        'align-items': 'center',
-                        gap: '0.5rem',
-                        'font-weight': '500',
-                        'font-size': '1.1rem',
-                        color: 'var(--text-primary)',
-                      }}
+                      class={styles.storyName}
                       onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}
                     >
                       {story.type === 'server' ? (
-                        <BsCloudFill
-                          style={{ width: '16px', height: '16px', color: 'var(--text-secondary)' }}
-                          title="Server story"
-                        />
+                        <BsCloudFill class={styles.storyTypeIcon} title="Server story" />
                       ) : (
-                        <BsHddFill
-                          style={{ width: '16px', height: '16px', color: 'var(--text-secondary)' }}
-                          title="Local story"
-                        />
+                        <BsHddFill class={styles.storyTypeIcon} title="Local story" />
                       )}
                       <span>{story.name}</span>
                       {story.hasLocalDifferences && (
-                        <BsExclamationTriangle
-                          style={{ width: '16px', height: '16px', color: 'var(--warning-color)' }}
-                          title="Local version differs from server"
-                        />
+                        <BsExclamationTriangle class={styles.warningIcon} title="Local version differs from server" />
                       )}
                       {story.isCurrentStory && (
                         <Badge variant="success" size="sm">
@@ -228,7 +178,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                 </Show>
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '0.25rem' }} onClick={(e) => e.stopPropagation()}>
+                <div class={styles.actionButtons} onClick={(e) => e.stopPropagation()}>
                   <Show when={props.editingEnabled && editingId() !== story.id}>
                     <IconButton
                       aria-label="Rename story"
@@ -278,18 +228,6 @@ export const StoryList: Component<StoryListProps> = (props) => {
                     </IconButton>
                   </Show>
 
-                  <Show when={story.type === 'server' && props.onRefineStory}>
-                    <IconButton
-                      aria-label="Refine story with AI"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => props.onRefineStory!(story.id)}
-                      disabled={props.refining === story.id}
-                    >
-                      {props.refining === story.id ? <Spinner size="sm" /> : <BsStars />}
-                    </IconButton>
-                  </Show>
-
                   <Show when={props.onDeleteStory}>
                     <IconButton
                       aria-label={story.isCurrentStory ? 'Cannot delete currently loaded story' : 'Delete story'}
@@ -309,38 +247,18 @@ export const StoryList: Component<StoryListProps> = (props) => {
               </div>
 
               {/* Meta Row */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '1rem',
-                  'font-size': '0.9rem',
-                  color: 'var(--text-secondary)',
-                  'margin-bottom': story.storySetting ? '0.5rem' : '0',
-                  'flex-wrap': 'wrap',
-                }}
-              >
+              <div class={styles.metaRow} style={{ 'margin-bottom': story.storySetting ? '0.5rem' : '0' }}>
                 <span>{story.messageCount} messages</span>
                 <span>{story.characterCount} characters</span>
                 <Show when={story.chapterCount > 0}>
                   <span>{story.chapterCount} chapters</span>
                 </Show>
-                <span style={{ 'margin-left': 'auto' }}>{formatDate(story.savedAt)}</span>
+                <span class={styles.metaDate}>{formatDate(story.savedAt)}</span>
               </div>
 
               {/* Story Setting */}
               <Show when={story.storySetting}>
-                <div
-                  style={{
-                    'font-size': '0.9rem',
-                    color: 'var(--text-secondary)',
-                    'font-style': 'italic',
-                    overflow: 'hidden',
-                    'text-overflow': 'ellipsis',
-                    'white-space': 'nowrap',
-                  }}
-                >
-                  {story.storySetting}
-                </div>
+                <div class={styles.storySetting}>{story.storySetting}</div>
               </Show>
             </CardBody>
           </Card>

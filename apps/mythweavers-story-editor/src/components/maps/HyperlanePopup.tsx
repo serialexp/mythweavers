@@ -1,6 +1,7 @@
 import { Alert, Button, Input, Stack } from '@mythweavers/ui'
 import { Accessor, Component, For, Show, createMemo } from 'solid-js'
 import { Hyperlane, Landmark } from '../../types/core'
+import * as styles from './HyperlanePopup.css'
 
 export interface HyperlanePopupProps {
   popupRef?: (el: HTMLDivElement) => void
@@ -39,37 +40,20 @@ export const HyperlanePopup: Component<HyperlanePopupProps> = (props) => {
       .filter((lm): lm is Landmark => lm !== undefined)
   })
 
-  const popupStyle = {
-    position: 'absolute' as const,
-    background: 'var(--bg-primary)',
-    border: '1px solid var(--border-color)',
-    'border-radius': '8px',
-    padding: '1rem',
-    'min-width': '250px',
-    'box-shadow': 'var(--shadow-lg)',
-    'z-index': '1000',
-  }
-
   return (
     <Show when={props.selectedHyperlane()}>
       <div
         ref={props.popupRef}
-        style={{ ...popupStyle, left: `${props.popupPosition().x}px`, top: `${props.popupPosition().y}px` }}
+        class={styles.popup}
+        style={{ left: `${props.popupPosition().x}px`, top: `${props.popupPosition().y}px` }}
       >
         <Show
           when={!props.isEditing()}
           fallback={
             <Stack gap="md">
-              <h3 style={{ margin: 0, 'font-size': '1.1rem', color: 'var(--text-primary)' }}>Edit Hyperlane</h3>
+              <h3 class={styles.title}>Edit Hyperlane</h3>
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    'margin-bottom': '0.25rem',
-                    color: 'var(--text-secondary)',
-                    'font-size': '0.9rem',
-                  }}
-                >
+                <label class={styles.label}>
                   Speed Multiplier:
                 </label>
                 <Input
@@ -82,15 +66,15 @@ export const HyperlanePopup: Component<HyperlanePopupProps> = (props) => {
                   placeholder="10.0"
                 />
                 <Show when={props.speedMultiplierError()}>
-                  <Alert variant="error" style={{ 'margin-top': '0.5rem' }}>
+                  <Alert variant="error" class={styles.alertMargin}>
                     {props.speedMultiplierError()}
                   </Alert>
                 </Show>
-                <small style={{ color: 'var(--text-muted)', 'font-size': '0.8rem' }}>
+                <small class={styles.hint}>
                   How much faster than normal space (1x - 20x)
                 </small>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div class={styles.buttonRow}>
                 <Button variant="primary" onClick={props.onSaveHyperlane} disabled={props.isSaving()}>
                   {props.isSaving() ? 'Saving...' : 'Save'}
                 </Button>
@@ -102,11 +86,11 @@ export const HyperlanePopup: Component<HyperlanePopupProps> = (props) => {
           }
         >
           <Stack gap="sm">
-            <h3 style={{ margin: 0, 'font-size': '1.1rem', color: 'var(--text-primary)' }}>Hyperlane</h3>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+            <h3 class={styles.title}>Hyperlane</h3>
+            <p class={styles.paragraph}>
               <strong>Speed Multiplier:</strong> {props.selectedHyperlane()!.speedMultiplier}x
             </p>
-            <div style={{ display: 'flex', gap: '0.25rem' }}>
+            <div class={styles.quickButtonRow}>
               <Button size="sm" variant="secondary" onClick={() => props.onQuickSaveSpeedMultiplier?.('2.5')}>
                 2.5x
               </Button>
@@ -117,22 +101,20 @@ export const HyperlanePopup: Component<HyperlanePopupProps> = (props) => {
                 10x
               </Button>
             </div>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+            <p class={styles.paragraph}>
               <strong>Segments:</strong> {props.selectedHyperlane()!.segments.length}
             </p>
 
             <Show when={connectedLandmarks().length > 0}>
-              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              <p class={styles.paragraph}>
                 <strong>Connected to:</strong>
               </p>
-              <ul
-                style={{ margin: 0, padding: '0 0 0 1.25rem', color: 'var(--text-secondary)', 'font-size': '0.9rem' }}
-              >
+              <ul class={styles.connectedList}>
                 <For each={connectedLandmarks()}>{(landmark) => <li>{landmark.name}</li>}</For>
               </ul>
             </Show>
 
-            <div style={{ display: 'flex', gap: '0.5rem', 'margin-top': '0.5rem' }}>
+            <div class={styles.actionRow}>
               <Button variant="primary" onClick={props.onStartEditing}>
                 Edit
               </Button>
