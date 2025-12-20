@@ -1,19 +1,25 @@
-import { Button, Card, CardBody, IconButton, Input, Stack } from '@mythweavers/ui'
+import { Button, Card, CardBody, IconButton, Input, Modal, Stack } from '@mythweavers/ui'
 import { BsArrowLeft, BsCalendar, BsCheck, BsPlus, BsShuffle, BsX } from 'solid-icons/bs'
 import { Component, Show, createMemo, createSignal } from 'solid-js'
 import { calendarStore } from '../stores/calendarStore'
+import { currentStoryStore } from '../stores/currentStoryStore'
+import { nodeStore } from '../stores/nodeStore'
+import { getTimelineRange } from '../utils/timelineUtils'
+import * as styles from './StoryTimePicker.css'
 
 interface StoryTimePickerProps {
   currentTime?: number | null // Story time in minutes (null = not set)
   previousChapterTime?: number | null // Previous chapter's time for quick copy
   onSave: (time: number | null) => void
   onCancel: () => void
+  modal?: boolean // If true, render as a modal dialog
+  open?: boolean // Control modal open state (only used when modal=true)
 }
 
 export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
   const calendar = createMemo(() => calendarStore.engine)
 
-  // Initialize from current time or default to year 0, day 1, 00:00
+  // Initialize from current time or default to timeline start time
   const initialDate = createMemo(() => {
     const engine = calendar()
     if (!engine) return null
@@ -21,7 +27,19 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
     if (props.currentTime) {
       return engine.storyTimeToDate(props.currentTime)
     }
-    // Default to year 0, day 1, 00:00
+
+    // Use the timeline start time as the default
+    if (currentStoryStore.isInitialized) {
+      const storyForTimeline = {
+        timelineStartTime: currentStoryStore.timelineStartTime,
+        timelineEndTime: currentStoryStore.timelineEndTime,
+        timelineGranularity: currentStoryStore.timelineGranularity,
+      }
+      const timelineRange = getTimelineRange(storyForTimeline as Parameters<typeof getTimelineRange>[0], nodeStore.nodesArray)
+      return engine.storyTimeToDate(timelineRange.start)
+    }
+
+    // Fallback to year 0, day 1, 00:00
     return {
       year: 0,
       era: 'positive' as const,
@@ -149,200 +167,160 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
     return engine.formatDate(prevDate, false)
   }
 
+  const content = (
+    <Stack gap="md">
+      <Show when={props.previousChapterTime !== null && props.previousChapterTime !== undefined}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleCopyFromPrevious}
+          style={{ 'justify-content': 'flex-start' }}
+        >
+          <BsArrowLeft />
+          Copy from Previous: {previousTimePreview()}
+        </Button>
+      </Show>
+
+      <Card variant="flat">
+        <CardBody padding="sm">
+          <Stack gap="xs">
+            <label class={styles.incrementLabel}>
+              Increment by:
+            </label>
+            <div class={styles.incrementRow}>
+              <Input
+                type="number"
+                value={daysToAdd()}
+                onInput={(e) => setDaysToAdd(Number.parseInt(e.currentTarget.value) || 1)}
+                placeholder="1"
+                style={{ width: '80px' }}
+              />
+              <span class={styles.daysText}>days</span>
+              <Button variant="primary" size="sm" onClick={handleIncrementDays} style={{ 'margin-left': 'auto' }}>
+                <BsPlus /> Add
+              </Button>
+            </div>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      <Card variant="flat">
+        <CardBody padding="sm" class={styles.previewBox}>
+          {preview()}
+        </CardBody>
+      </Card>
+
+      <Stack gap="sm">
+        <div class={styles.inputRow}>
+          <label class={styles.inputLabel}>Year:</label>
+          <Input
+            type="number"
+            value={year()}
+            onInput={(e) => setYear(Number.parseInt(e.currentTarget.value) || 0)}
+            placeholder="0"
+          />
+          <Show when={calendar()?.config.eras.positive || calendar()?.config.eras.negative}>
+            <span class={styles.eraLabel}>
+              {era() === 'negative'
+                ? calendar()?.config.eras.negative
+                : era() === 'positive'
+                  ? calendar()?.config.eras.positive
+                  : ''}
+            </span>
+          </Show>
+        </div>
+
+        <div class={styles.inputRow}>
+          <label class={styles.inputLabel}>Day of Year:</label>
+          <Input
+            type="number"
+            min={1}
+            max={calendar()?.config.daysPerYear ?? 365}
+            value={dayOfYear()}
+            onInput={(e) => {
+              const val = Number.parseInt(e.currentTarget.value) || 1
+              const maxDays = calendar()?.config.daysPerYear ?? 365
+              setDayOfYear(Math.max(1, Math.min(maxDays, val)))
+            }}
+            placeholder="1"
+          />
+          <span class={styles.eraLabel}>
+            1-{calendar()?.config.daysPerYear ?? 365}
+          </span>
+        </div>
+
+        <div class={styles.inputRow}>
+          <label class={styles.inputLabel}>Hour:</label>
+          <Input
+            type="number"
+            min={0}
+            max={(calendar()?.config.hoursPerDay ?? 24) - 1}
+            value={hour()}
+            onInput={(e) => {
+              const val = Number.parseInt(e.currentTarget.value) || 0
+              const maxHours = (calendar()?.config.hoursPerDay ?? 24) - 1
+              setHour(Math.max(0, Math.min(maxHours, val)))
+            }}
+            placeholder="0"
+          />
+          <IconButton variant="ghost" size="sm" onClick={randomizeHour} aria-label="Random hour">
+            <BsShuffle />
+          </IconButton>
+        </div>
+
+        <div class={styles.inputRow}>
+          <label class={styles.inputLabel}>Minute:</label>
+          <Input
+            type="number"
+            min={0}
+            max={(calendar()?.config.minutesPerHour ?? 60) - 1}
+            value={minute()}
+            onInput={(e) => {
+              const val = Number.parseInt(e.currentTarget.value) || 0
+              const maxMinutes = (calendar()?.config.minutesPerHour ?? 60) - 1
+              setMinute(Math.max(0, Math.min(maxMinutes, val)))
+            }}
+            placeholder="0"
+          />
+          <IconButton variant="ghost" size="sm" onClick={randomizeMinute} aria-label="Random minute">
+            <BsShuffle />
+          </IconButton>
+        </div>
+      </Stack>
+
+      <div class={styles.actionRow}>
+        <Button variant="primary" onClick={handleSave}>
+          <BsCheck /> Save
+        </Button>
+        <Show when={props.currentTime !== null && props.currentTime !== undefined}>
+          <Button variant="danger" onClick={handleClear}>
+            Clear
+          </Button>
+        </Show>
+        <Button variant="secondary" onClick={props.onCancel}>
+          <BsX /> Cancel
+        </Button>
+      </div>
+    </Stack>
+  )
+
+  if (props.modal) {
+    return (
+      <Modal open={props.open ?? true} onClose={props.onCancel} title="Set Story Time" size="sm">
+        {content}
+      </Modal>
+    )
+  }
+
   return (
     <Card style={{ 'min-width': '280px' }}>
       <CardBody>
         <Stack gap="md">
-          <div
-            style={{
-              display: 'flex',
-              'align-items': 'center',
-              gap: 'var(--spacing-sm)',
-              'font-weight': '600',
-              color: 'var(--text-primary)',
-            }}
-          >
+          <div class={styles.cardTitle}>
             <BsCalendar />
             <span>Set Story Time</span>
           </div>
-
-          <Show when={props.previousChapterTime !== null && props.previousChapterTime !== undefined}>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleCopyFromPrevious}
-              style={{ 'justify-content': 'flex-start' }}
-            >
-              <BsArrowLeft />
-              Copy from Previous: {previousTimePreview()}
-            </Button>
-          </Show>
-
-          <Card variant="flat">
-            <CardBody padding="sm">
-              <Stack gap="xs">
-                <label style={{ 'font-size': '0.85em', color: 'var(--text-secondary)', 'font-weight': '500' }}>
-                  Increment by:
-                </label>
-                <div style={{ display: 'flex', 'align-items': 'center', gap: 'var(--spacing-sm)' }}>
-                  <Input
-                    type="number"
-                    value={daysToAdd()}
-                    onInput={(e) => setDaysToAdd(Number.parseInt(e.currentTarget.value) || 1)}
-                    placeholder="1"
-                    style={{ width: '80px' }}
-                  />
-                  <span style={{ 'font-size': '0.85em', color: 'var(--text-secondary)' }}>days</span>
-                  <Button variant="primary" size="sm" onClick={handleIncrementDays} style={{ 'margin-left': 'auto' }}>
-                    <BsPlus /> Add
-                  </Button>
-                </div>
-              </Stack>
-            </CardBody>
-          </Card>
-
-          <Card variant="flat">
-            <CardBody
-              padding="sm"
-              style={{
-                'text-align': 'center',
-                'font-family': 'monospace',
-                'font-size': '0.9em',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              {preview()}
-            </CardBody>
-          </Card>
-
-          <Stack gap="sm">
-            <div
-              style={{
-                display: 'grid',
-                'grid-template-columns': '80px 1fr auto',
-                'align-items': 'center',
-                gap: 'var(--spacing-sm)',
-              }}
-            >
-              <label style={{ 'font-size': '0.9em', color: 'var(--text-secondary)' }}>Year:</label>
-              <Input
-                type="number"
-                value={year()}
-                onInput={(e) => setYear(Number.parseInt(e.currentTarget.value) || 0)}
-                placeholder="0"
-              />
-              <Show when={calendar()?.config.eras.positive || calendar()?.config.eras.negative}>
-                <span
-                  style={{
-                    'font-size': '0.8em',
-                    color: 'var(--text-muted)',
-                    'min-width': '60px',
-                    'text-align': 'right',
-                  }}
-                >
-                  {era() === 'negative'
-                    ? calendar()?.config.eras.negative
-                    : era() === 'positive'
-                      ? calendar()?.config.eras.positive
-                      : ''}
-                </span>
-              </Show>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                'grid-template-columns': '80px 1fr auto',
-                'align-items': 'center',
-                gap: 'var(--spacing-sm)',
-              }}
-            >
-              <label style={{ 'font-size': '0.9em', color: 'var(--text-secondary)' }}>Day of Year:</label>
-              <Input
-                type="number"
-                min={1}
-                max={calendar()?.config.daysPerYear ?? 365}
-                value={dayOfYear()}
-                onInput={(e) => {
-                  const val = Number.parseInt(e.currentTarget.value) || 1
-                  const maxDays = calendar()?.config.daysPerYear ?? 365
-                  setDayOfYear(Math.max(1, Math.min(maxDays, val)))
-                }}
-                placeholder="1"
-              />
-              <span
-                style={{ 'font-size': '0.8em', color: 'var(--text-muted)', 'min-width': '60px', 'text-align': 'right' }}
-              >
-                1-{calendar()?.config.daysPerYear ?? 365}
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                'grid-template-columns': '80px 1fr auto',
-                'align-items': 'center',
-                gap: 'var(--spacing-sm)',
-              }}
-            >
-              <label style={{ 'font-size': '0.9em', color: 'var(--text-secondary)' }}>Hour:</label>
-              <Input
-                type="number"
-                min={0}
-                max={(calendar()?.config.hoursPerDay ?? 24) - 1}
-                value={hour()}
-                onInput={(e) => {
-                  const val = Number.parseInt(e.currentTarget.value) || 0
-                  const maxHours = (calendar()?.config.hoursPerDay ?? 24) - 1
-                  setHour(Math.max(0, Math.min(maxHours, val)))
-                }}
-                placeholder="0"
-              />
-              <IconButton variant="ghost" size="sm" onClick={randomizeHour} aria-label="Random hour">
-                <BsShuffle />
-              </IconButton>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                'grid-template-columns': '80px 1fr auto',
-                'align-items': 'center',
-                gap: 'var(--spacing-sm)',
-              }}
-            >
-              <label style={{ 'font-size': '0.9em', color: 'var(--text-secondary)' }}>Minute:</label>
-              <Input
-                type="number"
-                min={0}
-                max={(calendar()?.config.minutesPerHour ?? 60) - 1}
-                value={minute()}
-                onInput={(e) => {
-                  const val = Number.parseInt(e.currentTarget.value) || 0
-                  const maxMinutes = (calendar()?.config.minutesPerHour ?? 60) - 1
-                  setMinute(Math.max(0, Math.min(maxMinutes, val)))
-                }}
-                placeholder="0"
-              />
-              <IconButton variant="ghost" size="sm" onClick={randomizeMinute} aria-label="Random minute">
-                <BsShuffle />
-              </IconButton>
-            </div>
-          </Stack>
-
-          <div style={{ display: 'flex', gap: 'var(--spacing-sm)', 'justify-content': 'flex-end' }}>
-            <Button variant="primary" onClick={handleSave}>
-              <BsCheck /> Save
-            </Button>
-            <Show when={props.currentTime !== null && props.currentTime !== undefined}>
-              <Button variant="danger" onClick={handleClear}>
-                Clear
-              </Button>
-            </Show>
-            <Button variant="secondary" onClick={props.onCancel}>
-              <BsX /> Cancel
-            </Button>
-          </div>
+          {content}
         </Stack>
       </CardBody>
     </Card>

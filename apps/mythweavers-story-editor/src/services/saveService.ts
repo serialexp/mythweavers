@@ -904,13 +904,29 @@ export class SaveService {
 
       case 'story-settings': {
         console.log('[SaveService] Saving story settings:', data)
+        // Map frontend values to backend enum values
+        const perspectiveMap: Record<string, 'FIRST' | 'SECOND' | 'THIRD'> = {
+          first: 'FIRST',
+          second: 'SECOND',
+          third: 'THIRD',
+        }
+        const tenseMap: Record<string, 'PAST' | 'PRESENT'> = {
+          past: 'PAST',
+          present: 'PRESENT',
+        }
         const settingsResponse = await patchMyStoriesById({
           path: { id: storyId },
           body: {
             name: data.name,
-            summary: data.storySetting,
-            // Note: other fields like person, tense, globalScript, etc.
-            // will need to be added to unified backend schema
+            genre: data.storySetting, // storySetting is the genre (fantasy, sci-fi, etc.)
+            defaultPerspective: data.person ? perspectiveMap[data.person] : undefined,
+            defaultTense: data.tense ? tenseMap[data.tense] : undefined,
+            paragraphsPerTurn: data.paragraphsPerTurn,
+            timelineStartTime: data.timelineStartTime,
+            timelineEndTime: data.timelineEndTime,
+            timelineGranularity: data.timelineGranularity,
+            provider: data.provider,
+            model: data.model,
           },
         })
         console.log('[SaveService] Settings response:', settingsResponse)
@@ -1264,6 +1280,7 @@ export class SaveService {
       person: 'first' | 'second' | 'third'
       tense: 'present' | 'past'
       storySetting: string
+      paragraphsPerTurn: number
       globalScript: string
       selectedChapterId: string | null
       selectedNodeId: string | null

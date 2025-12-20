@@ -76,8 +76,8 @@ export function getTimelineRange(
     }
   }
 
-  // Fallback: default range around 22 BBY (start of Clone Wars)
-  const defaultTime = -22 * 368 * 1440 // -22 years in minutes
+  // Fallback: default range around year 0
+  const defaultTime = 0
   const defaultRange = 365 * 1440 // 1 year range in minutes
 
   return {
