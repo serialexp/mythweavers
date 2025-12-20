@@ -37,9 +37,10 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
       const triggerElement = triggerRef.firstElementChild as HTMLElement | null
       const rect = triggerElement?.getBoundingClientRect() ?? triggerRef.getBoundingClientRect()
       const menuWidth = menuRef?.offsetWidth ?? 180
+      const menuHeight = menuRef?.offsetHeight ?? 200
 
       let left = props.alignRight ? rect.right - menuWidth : rect.left
-      // Keep menu within viewport
+      // Keep menu within viewport horizontally
       if (left + menuWidth > window.innerWidth) {
         left = window.innerWidth - menuWidth - 8
       }
@@ -47,10 +48,22 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
         left = 8
       }
 
-      setMenuPosition({
-        top: rect.bottom + 4,
-        left,
-      })
+      // Check if menu fits below, otherwise flip above
+      const spaceBelow = window.innerHeight - rect.bottom - 8
+      const spaceAbove = rect.top - 8
+      const fitsBelow = spaceBelow >= menuHeight
+      const fitsAbove = spaceAbove >= menuHeight
+
+      let top: number
+      if (fitsBelow || (!fitsAbove && spaceBelow >= spaceAbove)) {
+        // Position below
+        top = rect.bottom + 4
+      } else {
+        // Position above
+        top = rect.top - menuHeight - 4
+      }
+
+      setMenuPosition({ top, left })
     }
   }
 
@@ -104,6 +117,14 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
             }
           : undefined
       }
+      onClick={(e) => {
+        // Close dropdown when any menu item is clicked
+        // (unless the click target is an expanding submenu)
+        const target = e.target as HTMLElement
+        if (target.closest('button, a, [role="menuitem"]')) {
+          close()
+        }
+      }}
     >
       {props.children}
     </div>
@@ -118,7 +139,7 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
 
   return (
     <div ref={containerRef} class={containerClass()}>
-      <div ref={triggerRef} onClick={toggle} style={props.portal ? { display: 'contents' } : undefined}>
+      <div ref={triggerRef} onClick={(e) => { e.stopPropagation(); toggle() }} style={props.portal ? { display: 'contents' } : undefined}>
         {props.trigger}
       </div>
       <Show when={isOpen()}>
