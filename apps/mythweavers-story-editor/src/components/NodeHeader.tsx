@@ -330,6 +330,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
   const handleEditTime = (e: MouseEvent) => {
     e.stopPropagation()
     setIsEditingTime(true)
+    setShowDropdown(false)
   }
 
   const handleSaveTime = (time: number | null) => {
@@ -645,14 +646,6 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 </button>
               </Show>
 
-              <Show when={isEditingTime()}>
-                <StoryTimePicker
-                  currentTime={props.node.storyTime ?? null}
-                  previousChapterTime={previousChapter()?.storyTime ?? null}
-                  onSave={handleSaveTime}
-                  onCancel={handleCancelTimeEdit}
-                />
-              </Show>
 
               <Show when={props.node.type === 'scene'}>
                 <button class={styles.dropdownButton} onClick={handleManageContext}>
@@ -806,6 +799,15 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
           </Show>
         </Portal>
       </div>
+
+      <StoryTimePicker
+        modal
+        open={isEditingTime()}
+        currentTime={props.node.storyTime ?? null}
+        previousChapterTime={previousChapter()?.storyTime ?? null}
+        onSave={handleSaveTime}
+        onCancel={handleCancelTimeEdit}
+      />
 
       <Show when={props.node.summary || props.node.isSummarizing}>
         <div class={styles.summarySection}>
