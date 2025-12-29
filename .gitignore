@@ -56,3 +56,6 @@ audio
 # Bundle analysis
 bundle-stats.json
 bundle-analysis.html
+
+# Migration mapping artifacts
+apps/mythweavers-backend/migration-mappings-*.json
