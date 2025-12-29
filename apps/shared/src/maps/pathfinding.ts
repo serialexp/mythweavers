@@ -390,18 +390,21 @@ export function calculateOptimalPath(
 }
 
 export function formatTravelTime(minutes: number): string {
+  // Round to avoid floating point precision issues
+  minutes = Math.round(minutes)
+
   if (minutes < MINUTES_PER_HOUR) {
-    return `${minutes} minutes`
+    return `${minutes} minute${minutes === 1 ? '' : 's'}`
   }
 
   const hours = Math.floor(minutes / MINUTES_PER_HOUR)
-  const remainingMinutes = minutes % MINUTES_PER_HOUR
+  const remainingMinutes = Math.round(minutes % MINUTES_PER_HOUR)
 
   if (hours < HOURS_PER_DAY) {
     if (remainingMinutes === 0) {
-      return `${hours} hours`
+      return `${hours} hour${hours === 1 ? '' : 's'}`
     }
-    return `${hours} hours ${remainingMinutes} minutes`
+    return `${hours} hour${hours === 1 ? '' : 's'} ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`
   }
 
   const days = Math.floor(hours / HOURS_PER_DAY)
