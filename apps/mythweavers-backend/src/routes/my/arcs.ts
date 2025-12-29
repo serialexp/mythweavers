@@ -33,6 +33,14 @@ const arcSchema = z.strictObject({
     example: 0,
   }),
   nodeType: nodeTypeSchema,
+  deleted: z.boolean().meta({
+    description: 'Whether the arc is soft-deleted',
+    example: false,
+  }),
+  deletedAt: z.string().nullable().meta({
+    description: 'When the arc was deleted',
+    example: null,
+  }),
   createdAt: z.string().meta({
     description: 'Creation timestamp',
     example: '2025-12-05T12:00:00.000Z',
@@ -242,9 +250,9 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Book not found' })
         }
 
-        // Get arcs
+        // Get arcs (filter out deleted)
         const arcs = await prisma.arc.findMany({
-          where: { bookId },
+          where: { bookId, deleted: false },
           orderBy: { sortOrder: 'asc' },
         })
 
@@ -283,6 +291,7 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const arc = await prisma.arc.findFirst({
           where: {
             id,
+            deleted: false,
             book: {
               story: {
                 ownerId: userId,
@@ -370,10 +379,20 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/arcs/:id',
     {
       schema: {
-        description: 'Delete an arc (must own the parent story)',
+        description:
+          'Delete an arc. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-arcs'],
         security: [{ sessionAuth: [] }],
         params: arcIdParamSchema,
+        querystring: z.strictObject({
+          permanent: z
+            .enum(['true', 'false'])
+            .optional()
+            .meta({
+              description: 'If true, permanently delete (no recovery possible)',
+              example: 'false',
+            }),
+        }),
         response: {
           200: deleteArcResponseSchema,
           401: errorSchema,
@@ -386,6 +405,7 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       try {
         const userId = request.user!.id
         const { id } = request.params
+        const permanent = request.query.permanent === 'true'
 
         // Check if arc exists and user owns the parent story
         const existingArc = await prisma.arc.findFirst({
@@ -397,18 +417,51 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
               },
             },
           },
+          include: {
+            chapters: {
+              select: {
+                id: true,
+                scenes: { select: { id: true } },
+              },
+            },
+          },
         })
 
         if (!existingArc) {
           return reply.status(404).send({ error: 'Arc not found' })
         }
 
-        // Delete arc (cascade will handle chapters/scenes)
-        await prisma.arc.delete({
-          where: { id },
-        })
-
-        fastify.log.info({ arcId: id, userId }, 'Arc deleted')
+        if (permanent) {
+          // Hard delete - cascade will handle chapters/scenes/messages
+          await prisma.arc.delete({
+            where: { id },
+          })
+          fastify.log.info({ arcId: id, userId }, 'Arc permanently deleted')
+        } else {
+          // Soft delete - mark arc, its chapters, scenes, and messages as deleted
+          const now = new Date()
+          const chapterIds = existingArc.chapters.map((c) => c.id)
+          const sceneIds = existingArc.chapters.flatMap((c) => c.scenes.map((s) => s.id))
+          await prisma.$transaction([
+            prisma.arc.update({
+              where: { id },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.chapter.updateMany({
+              where: { arcId: id },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.scene.updateMany({
+              where: { chapterId: { in: chapterIds } },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.message.updateMany({
+              where: { sceneId: { in: sceneIds } },
+              data: { deleted: true },
+            }),
+          ])
+          fastify.log.info({ arcId: id, userId }, 'Arc soft deleted')
+        }
 
         return {
           success: true as const,

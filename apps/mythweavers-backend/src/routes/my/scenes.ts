@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
@@ -32,6 +33,14 @@ const sceneSchema = z.strictObject({
     description: 'Sort order within chapter',
     example: 0,
   }),
+  status: z.string().nullable().meta({
+    description: 'Scene status: draft, needs_work, review, done',
+    example: 'draft',
+  }),
+  includeInFull: z.number().meta({
+    description: 'Include mode: 0=not included, 1=summary only, 2=full content',
+    example: 1,
+  }),
   perspective: perspectiveSchema.nullable().meta({
     description: 'Narrative perspective for this scene',
     example: 'THIRD',
@@ -62,6 +71,14 @@ const sceneSchema = z.strictObject({
     description: 'When this scene occurs in story timeline (minutes)',
     example: 1440,
   }),
+  deleted: z.boolean().meta({
+    description: 'Whether the scene is soft-deleted',
+    example: false,
+  }),
+  deletedAt: z.string().nullable().meta({
+    description: 'When the scene was deleted',
+    example: null,
+  }),
   createdAt: z.string().meta({
     description: 'Creation timestamp',
     example: '2025-12-05T12:00:00.000Z',
@@ -89,6 +106,14 @@ const createSceneBodySchema = z.strictObject({
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within chapter (defaults to end)',
     example: 0,
+  }),
+  status: z.string().optional().meta({
+    description: 'Scene status: draft, needs_work, review, done',
+    example: 'draft',
+  }),
+  includeInFull: z.number().int().optional().meta({
+    description: 'Include mode: 0=not included, 1=summary only, 2=full content',
+    example: 1,
   }),
   perspective: perspectiveSchema.optional().meta({
     description: 'Narrative perspective for this scene',
@@ -135,6 +160,14 @@ const updateSceneBodySchema = z.strictObject({
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within chapter',
     example: 0,
+  }),
+  status: z.string().nullable().optional().meta({
+    description: 'Scene status: draft, needs_work, review, done',
+    example: 'draft',
+  }),
+  includeInFull: z.number().int().optional().meta({
+    description: 'Include mode: 0=not included, 1=summary only, 2=full content',
+    example: 1,
   }),
   perspective: perspectiveSchema.nullable().optional().meta({
     description: 'Narrative perspective for this scene',
@@ -295,8 +328,8 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             sortOrder: finalSortOrder,
             perspective: perspective || null,
             viewpointCharacterId: viewpointCharacterId || null,
-            activeCharacterIds: activeCharacterIds || null,
-            activeContextItemIds: activeContextItemIds || null,
+            activeCharacterIds: (activeCharacterIds || null) as Prisma.InputJsonValue,
+            activeContextItemIds: (activeContextItemIds || null) as Prisma.InputJsonValue,
             goal: goal || null,
             storyTime: storyTime || null,
           },
@@ -355,9 +388,9 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Chapter not found' })
         }
 
-        // Get scenes
+        // Get scenes (filter out deleted)
         const scenes = await prisma.scene.findMany({
-          where: { chapterId },
+          where: { chapterId, deleted: false },
           orderBy: { sortOrder: 'asc' },
         })
 
@@ -396,6 +429,7 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const scene = await prisma.scene.findFirst({
           where: {
             id,
+            deleted: false,
             chapter: {
               arc: {
                 book: {
@@ -470,7 +504,7 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // Update scene
         const scene = await prisma.scene.update({
           where: { id },
-          data: updates,
+          data: updates as Prisma.SceneUpdateInput,
         })
 
         fastify.log.info({ sceneId: scene.id, userId }, 'Scene updated')
@@ -491,10 +525,20 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/scenes/:id',
     {
       schema: {
-        description: 'Delete a scene (must own the parent story)',
+        description:
+          'Delete a scene. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-scenes'],
         security: [{ sessionAuth: [] }],
         params: sceneIdParamSchema,
+        querystring: z.strictObject({
+          permanent: z
+            .enum(['true', 'false'])
+            .optional()
+            .meta({
+              description: 'If true, permanently delete (no recovery possible)',
+              example: 'false',
+            }),
+        }),
         response: {
           200: deleteSceneResponseSchema,
           401: errorSchema,
@@ -507,6 +551,7 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       try {
         const userId = request.user!.id
         const { id } = request.params
+        const permanent = request.query.permanent === 'true'
 
         // Check if scene exists and user owns the parent story
         const existingScene = await prisma.scene.findFirst({
@@ -528,12 +573,27 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Scene not found' })
         }
 
-        // Delete scene (cascade will handle paragraphs)
-        await prisma.scene.delete({
-          where: { id },
-        })
-
-        fastify.log.info({ sceneId: id, userId }, 'Scene deleted')
+        if (permanent) {
+          // Hard delete - cascade will handle messages/paragraphs
+          await prisma.scene.delete({
+            where: { id },
+          })
+          fastify.log.info({ sceneId: id, userId }, 'Scene permanently deleted')
+        } else {
+          // Soft delete - mark scene and its messages as deleted
+          const now = new Date()
+          await prisma.$transaction([
+            prisma.scene.update({
+              where: { id },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.message.updateMany({
+              where: { sceneId: id },
+              data: { deleted: true },
+            }),
+          ])
+          fastify.log.info({ sceneId: id, userId }, 'Scene soft deleted')
+        }
 
         return {
           success: true as const,

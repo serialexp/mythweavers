@@ -45,6 +45,14 @@ const bookSchema = z.strictObject({
     description: 'Spine art file ID',
     example: 'clx1234567890',
   }),
+  deleted: z.boolean().meta({
+    description: 'Whether the book is soft-deleted',
+    example: false,
+  }),
+  deletedAt: z.string().nullable().meta({
+    description: 'When the book was deleted',
+    example: null,
+  }),
   createdAt: z.string().meta({
     description: 'Creation timestamp',
     example: '2025-12-05T12:00:00.000Z',
@@ -254,9 +262,9 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Story not found' })
         }
 
-        // Get books
+        // Get books (filter out deleted)
         const books = await prisma.book.findMany({
-          where: { storyId },
+          where: { storyId, deleted: false },
           orderBy: { sortOrder: 'asc' },
         })
 
@@ -295,6 +303,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const book = await prisma.book.findFirst({
           where: {
             id,
+            deleted: false,
             story: {
               ownerId: userId,
             },
@@ -378,10 +387,20 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/books/:id',
     {
       schema: {
-        description: 'Delete a book (must own the parent story)',
+        description:
+          'Delete a book. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-books'],
         security: [{ sessionAuth: [] }],
         params: bookIdParamSchema,
+        querystring: z.strictObject({
+          permanent: z
+            .enum(['true', 'false'])
+            .optional()
+            .meta({
+              description: 'If true, permanently delete (no recovery possible)',
+              example: 'false',
+            }),
+        }),
         response: {
           200: deleteBookResponseSchema,
           401: errorSchema,
@@ -394,6 +413,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
       try {
         const userId = request.user!.id
         const { id } = request.params
+        const permanent = request.query.permanent === 'true'
 
         // Check if book exists and user owns the parent story
         const existingBook = await prisma.book.findFirst({
@@ -403,18 +423,63 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
               ownerId: userId,
             },
           },
+          include: {
+            arcs: {
+              select: {
+                id: true,
+                chapters: {
+                  select: {
+                    id: true,
+                    scenes: { select: { id: true } },
+                  },
+                },
+              },
+            },
+          },
         })
 
         if (!existingBook) {
           return reply.status(404).send({ error: 'Book not found' })
         }
 
-        // Delete book (cascade will handle arcs/chapters/scenes)
-        await prisma.book.delete({
-          where: { id },
-        })
-
-        fastify.log.info({ bookId: id, userId }, 'Book deleted')
+        if (permanent) {
+          // Hard delete - cascade will handle arcs/chapters/scenes/messages
+          await prisma.book.delete({
+            where: { id },
+          })
+          fastify.log.info({ bookId: id, userId }, 'Book permanently deleted')
+        } else {
+          // Soft delete - mark book, its arcs, chapters, scenes, and messages as deleted
+          const now = new Date()
+          const arcIds = existingBook.arcs.map((a) => a.id)
+          const chapterIds = existingBook.arcs.flatMap((a) => a.chapters.map((c) => c.id))
+          const sceneIds = existingBook.arcs.flatMap((a) =>
+            a.chapters.flatMap((c) => c.scenes.map((s) => s.id)),
+          )
+          await prisma.$transaction([
+            prisma.book.update({
+              where: { id },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.arc.updateMany({
+              where: { bookId: id },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.chapter.updateMany({
+              where: { arcId: { in: arcIds } },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.scene.updateMany({
+              where: { chapterId: { in: chapterIds } },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.message.updateMany({
+              where: { sceneId: { in: sceneIds } },
+              data: { deleted: true },
+            }),
+          ])
+          fastify.log.info({ bookId: id, userId }, 'Book soft deleted')
+        }
 
         return {
           success: true as const,

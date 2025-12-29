@@ -71,6 +71,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
           200: authSuccessSchema,
           400: errorSchema,
           409: errorSchema,
+          500: errorSchema,
         },
       },
     },
@@ -155,6 +156,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
           200: authSuccessSchema,
           400: errorSchema,
           401: errorSchema,
+          500: errorSchema,
         },
       },
     },
@@ -237,6 +239,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         tags: ['auth'],
         response: {
           200: logoutResponseSchema,
+          500: errorSchema,
         },
       },
     },
@@ -271,6 +274,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         tags: ['auth'],
         response: {
           200: sessionResponseSchema,
+          500: errorSchema,
         },
       },
     },

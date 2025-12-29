@@ -5,7 +5,7 @@ import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import swagger from '@fastify/swagger'
 import scalar from '@scalar/fastify-api-reference'
-import Fastify from 'fastify'
+import Fastify, { type FastifyError } from 'fastify'
 import {
   fastifyZodOpenApiPlugin,
   fastifyZodOpenApiTransformers,
@@ -23,15 +23,18 @@ import myCharactersRoutes from './routes/my/characters.js'
 import myContextItemsRoutes from './routes/my/context-items.js'
 import myFilesRoutes from './routes/my/files.js'
 import myInventoryRoutes from './routes/my/inventory.js'
+import myLandmarkStatesRoutes from './routes/my/landmark-states.js'
 import myLandmarksRoutes from './routes/my/landmarks.js'
 import myMapsRoutes from './routes/my/maps.js'
 import myMessageRevisionsRoutes from './routes/my/message-revisions.js'
+import myMessagesBatchRoutes from './routes/my/messages-batch.js'
 import myMessagesRoutes from './routes/my/messages.js'
 import myParagraphRevisionsRoutes from './routes/my/paragraph-revisions.js'
 import myParagraphsRoutes from './routes/my/paragraphs.js'
 import myPathSegmentsRoutes from './routes/my/path-segments.js'
 import myPathsRoutes from './routes/my/paths.js'
 import myPawnsRoutes from './routes/my/pawns.js'
+import myPlotPointStatesRoutes from './routes/my/plot-point-states.js'
 import myScenesRoutes from './routes/my/scenes.js'
 import myStoriesRoutes from './routes/my/stories.js'
 import myStoryCalendarRoutes from './routes/my/story-calendar.js'
@@ -152,7 +155,7 @@ await server.register(scalar, {
 })
 
 // Custom error handler to format errors consistently
-server.setErrorHandler((error, request, reply) => {
+server.setErrorHandler((error: FastifyError, request, reply) => {
   const statusCode = error.statusCode || 500
 
   // Log error details with extra info for validation errors
@@ -174,7 +177,7 @@ server.setErrorHandler((error, request, reply) => {
   }
 
   // Build error response with validation details
-  const errorResponse: any = {
+  const errorResponse: Record<string, unknown> = {
     error: error.message || 'Internal Server Error',
   }
 
@@ -184,8 +187,8 @@ server.setErrorHandler((error, request, reply) => {
   }
 
   // Include Zod validation issues if present
-  if ((error as any).issues) {
-    errorResponse.zodIssues = (error as any).issues
+  if ('issues' in error) {
+    errorResponse.zodIssues = error.issues
   }
 
   // In development, include full error details
@@ -251,6 +254,7 @@ await server.register(myScenesRoutes, { prefix: '/my' })
 await server.register(myCharactersRoutes, { prefix: '/my' })
 await server.register(myContextItemsRoutes, { prefix: '/my' })
 await server.register(myMessagesRoutes, { prefix: '/my' })
+await server.register(myMessagesBatchRoutes, { prefix: '/my' })
 await server.register(myMessageRevisionsRoutes, { prefix: '/my' })
 await server.register(myParagraphsRoutes, { prefix: '/my' })
 await server.register(myParagraphRevisionsRoutes, { prefix: '/my' })
@@ -261,9 +265,11 @@ await server.register(myCalendarsRoutes, { prefix: '/my' })
 await server.register(myStoryCalendarRoutes, { prefix: '/my' })
 await server.register(myMapsRoutes, { prefix: '/my' })
 await server.register(myLandmarksRoutes, { prefix: '/my' })
+await server.register(myLandmarkStatesRoutes, { prefix: '/my' })
 await server.register(myPawnsRoutes, { prefix: '/my' })
 await server.register(myPathsRoutes, { prefix: '/my' })
 await server.register(myPathSegmentsRoutes, { prefix: '/my' })
+await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
 await server.register(publicStoriesRoutes, { prefix: '/stories' })
 await server.register(publicTagRoutes, { prefix: '' })
 await server.register(calendarPresetsRoutes, { prefix: '/calendars' })

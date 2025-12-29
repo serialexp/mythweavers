@@ -3,19 +3,34 @@ import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
 import { transformDates } from '../../lib/transform-dates.js'
-import { errorSchema } from '../../schemas/common.js'
+import { errorSchema, propertySchemaSchema } from '../../schemas/common.js'
+
+// Infer the type from the schema
+type PropertySchema = z.infer<typeof propertySchemaSchema>
+
+// Helper to transform map with properly typed propertySchema
+function transformMap<T extends { propertySchema: unknown }>(
+  map: T,
+): Omit<T, 'propertySchema'> & { propertySchema: PropertySchema | null } {
+  return {
+    ...map,
+    propertySchema: map.propertySchema as PropertySchema | null,
+  }
+}
 
 // Schemas
 const createMapBodySchema = z.strictObject({
   name: z.string().min(1).meta({ description: 'Map name', example: 'Galaxy Map' }),
   fileId: z.string().optional().meta({ description: 'File ID for map image', example: 'clx123' }),
   borderColor: z.string().optional().meta({ description: 'Border color (hex)', example: '#FF0000' }),
+  propertySchema: propertySchemaSchema.optional().meta({ description: 'Schema for landmark properties and state fields' }),
 })
 
 const updateMapBodySchema = z.strictObject({
   name: z.string().min(1).optional().meta({ description: 'Map name' }),
   fileId: z.string().nullable().optional().meta({ description: 'File ID for map image (null to remove)' }),
   borderColor: z.string().nullable().optional().meta({ description: 'Border color (null to remove)' }),
+  propertySchema: propertySchemaSchema.nullable().optional().meta({ description: 'Schema for landmark properties and state fields (null to remove)' }),
 })
 
 const mapSchema = z.strictObject({
@@ -24,6 +39,7 @@ const mapSchema = z.strictObject({
   name: z.string().meta({ description: 'Map name', example: 'Galaxy Map' }),
   fileId: z.string().nullable().meta({ description: 'File ID for map image', example: 'clx123' }),
   borderColor: z.string().nullable().meta({ description: 'Border color', example: '#FF0000' }),
+  propertySchema: propertySchemaSchema.nullable().meta({ description: 'Schema for landmark properties and state fields' }),
   createdAt: z.string().datetime().meta({ description: 'Creation timestamp', example: '2025-12-05T12:00:00.000Z' }),
   updatedAt: z.string().datetime().meta({ description: 'Last update timestamp', example: '2025-12-05T12:00:00.000Z' }),
 })
@@ -33,8 +49,12 @@ const createMapResponseSchema = z.strictObject({
   map: mapSchema,
 })
 
+const mapListItemSchema = mapSchema.extend({
+  landmarkCount: z.number().meta({ description: 'Number of landmarks on the map', example: 42 }),
+})
+
 const listMapsResponseSchema = z.strictObject({
-  maps: z.array(mapSchema).meta({ description: 'Story maps (sorted by creation date)' }),
+  maps: z.array(mapListItemSchema).meta({ description: 'Story maps (sorted by creation date)' }),
 })
 
 const getMapResponseSchema = z.strictObject({
@@ -83,7 +103,7 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { storyId } = request.params
-      const { name, fileId, borderColor } = request.body
+      const { name, fileId, borderColor, propertySchema } = request.body
       const userId = request.user!.id
 
       // Verify story exists and user owns it
@@ -119,12 +139,13 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
           name,
           fileId,
           borderColor,
+          propertySchema: propertySchema ?? undefined,
         },
       })
 
       return reply.code(201).send({
         success: true as const,
-        map: transformDates(map),
+        map: transformMap(transformDates(map)),
       })
     },
   )
@@ -158,6 +179,11 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
           ownerId: true,
           maps: {
             orderBy: { createdAt: 'asc' },
+            include: {
+              _count: {
+                select: { landmarks: true },
+              },
+            },
           },
         },
       })
@@ -171,7 +197,13 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
 
       return reply.code(200).send({
-        maps: story.maps.map(transformDates),
+        maps: story.maps.map((m) => {
+          const { _count, ...mapData } = m
+          return {
+            ...transformMap(transformDates(mapData)),
+            landmarkCount: _count.landmarks,
+          }
+        }),
       })
     },
   )
@@ -218,7 +250,7 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { story, ...mapData } = map
 
       return reply.code(200).send({
-        map: transformDates(mapData),
+        map: transformMap(transformDates(mapData)),
       })
     },
   )
@@ -244,7 +276,7 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { id } = request.params
-      const { name, fileId, borderColor } = request.body
+      const { name, fileId, borderColor, propertySchema } = request.body
       const userId = request.user!.id
 
       // Get map with story ownership check
@@ -282,6 +314,7 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (name !== undefined) updateData.name = name
       if (fileId !== undefined) updateData.fileId = fileId
       if (borderColor !== undefined) updateData.borderColor = borderColor
+      if (propertySchema !== undefined) updateData.propertySchema = propertySchema
 
       // Update map
       const map = await prisma.map.update({
@@ -291,7 +324,7 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       return reply.code(200).send({
         success: true as const,
-        map: transformDates(map),
+        map: transformMap(transformDates(map)),
       })
     },
   )

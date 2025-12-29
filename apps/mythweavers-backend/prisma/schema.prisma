@@ -146,6 +146,7 @@ model Story {
   defaultTense           Tense?            @default(PAST)
   genre                  String?           // Story genre (fantasy, sci-fi, etc.)
   paragraphsPerTurn      Int               @default(3) // Target paragraphs per AI generation
+  format                 String            @default("narrative") // 'narrative' | 'cyoa'
   defaultProtagonistId   String?
   defaultProtagonist     Character?        @relation("DefaultProtagonist", fields: [defaultProtagonistId], references: [id], onDelete: SetNull)
   sortOrder              Int               @default(0)
@@ -163,9 +164,16 @@ model Story {
   // Branching support (from Story Project)
   branchChoices          Json?             // Record<branchMessageId, selectedOptionId>
 
+  // UI state (from Story Project)
+  selectedNodeId         String?           // Last selected node (scene) ID for restoring UI state
+
   // LLM settings (from Story Project)
   provider               String            @default("ollama") // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
   model                  String?
+
+  // Script support
+  globalScript           String?           @db.Text // JavaScript function for initializing story data and defining reusable functions
+  plotPointDefaults      Json?             // Array of { key: string, type: 'string' | 'number', default: string | number }
 
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
@@ -181,6 +189,7 @@ model Story {
   maps                   Map[]
   mediaAttachments       MediaAttachment[]
   bookShelfStories       BookShelfStory[]
+  plotPointStates        PlotPointState[]
 
   @@index([ownerId])
 }
@@ -223,24 +232,27 @@ model StoryReadStatus {
 // ============================================================================
 
 model Book {
-  id             String   @id @default(cuid())
-  name           String   @default("")
-  summary        String?  @db.Text
+  id             String    @id @default(cuid())
+  name           String    @default("")
+  summary        String?   @db.Text
   storyId        String
-  story          Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story          Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
   coverArtFileId String?
-  coverArtFile   File?    @relation("BookCoverArt", fields: [coverArtFileId], references: [id], onDelete: SetNull)
+  coverArtFile   File?     @relation("BookCoverArt", fields: [coverArtFileId], references: [id], onDelete: SetNull)
   spineArtFileId String?
-  spineArtFile   File?    @relation("BookSpineArt", fields: [spineArtFileId], references: [id], onDelete: SetNull)
+  spineArtFile   File?     @relation("BookSpineArt", fields: [spineArtFileId], references: [id], onDelete: SetNull)
   pages          Int?
   sortOrder      Int
-  nodeType       String   @default("story") // "story" | "non-story" | "context"
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  nodeType       String    @default("story") // "story" | "non-story" | "context"
+  deleted        Boolean   @default(false)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   arcs           Arc[]
 
   @@index([storyId])
+  @@index([deleted])
 }
 
 model Arc {
@@ -251,12 +263,15 @@ model Arc {
   book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
   sortOrder Int
   nodeType  String    @default("story") // "story" | "non-story" | "context"
+  deleted   Boolean   @default(false)
+  deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   chapters  Chapter[]
 
   @@index([bookId])
+  @@index([deleted])
 }
 
 model Chapter {
@@ -270,6 +285,11 @@ model Chapter {
   royalRoadId      Int?
   nodeType         String              @default("story") // "story" | "non-story" | "context"
 
+  // Chapter state (from Story Project Node model)
+  status           String?             // Chapter status: draft, needs_work, review, done
+  deleted          Boolean             @default(false)
+  deletedAt        DateTime?
+
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
@@ -278,31 +298,39 @@ model Chapter {
   storyReadStatus  StoryReadStatus[]
 
   @@index([arcId])
+  @@index([deleted])
 }
 
 model Scene {
-  id                    String      @id @default(cuid())
-  name                  String      @default("")
-  summary               String?     @db.Text
+  id                    String       @id @default(cuid())
+  name                  String       @default("")
+  summary               String?      @db.Text
   chapterId             String
-  chapter               Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  chapter               Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   sortOrder             Int
 
-  // POV & Context (Scene is the POV/context boundary)
-  perspective           Perspective?     // FIRST/THIRD person
-  viewpointCharacterId  String?          // POV character
-  activeCharacterIds    Json?            // JSON array of active character IDs
-  activeContextItemIds  Json?            // JSON array of active context item IDs
-  goal                  String?     @db.Text  // Scene goal for generation
-  storyTime             Int?             // When this scene occurs in timeline
+  // Scene state (from Story Project Node model)
+  status                String?      // Scene status: draft, needs_work, review, done
+  includeInFull         Int          @default(1) // 0=not included, 1=summary only, 2=full content
+  deleted               Boolean      @default(false)
+  deletedAt             DateTime?
 
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  // POV & Context (Scene is the POV/context boundary)
+  perspective           Perspective? // FIRST/THIRD person
+  viewpointCharacterId  String?      // POV character
+  activeCharacterIds    Json?        // JSON array of active character IDs
+  activeContextItemIds  Json?        // JSON array of active context item IDs
+  goal                  String?      @db.Text  // Scene goal for generation
+  storyTime             Int?         // When this scene occurs in timeline
+
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   messages              Message[]
   mediaLinks            MediaSceneLink[]
 
   @@index([chapterId])
+  @@index([deleted])
 }
 
 // ============================================================================
@@ -316,6 +344,11 @@ model Message {
   sortOrder               Int
   instruction             String?          @db.Text  // Generation instruction for this message
   script                  String?          @db.Text  // JavaScript to execute
+  deleted                 Boolean          @default(false) // Soft delete flag
+
+  // Branch support (from Story Project)
+  type                    String?          // Message type: null for normal, 'chapter' for chapter markers, 'event' for events, 'branch' for branch points
+  options                 Json?            // BranchOption[] - only for branch messages
 
   // Current active revision (denormalized for easy querying)
   currentMessageRevisionId String?
@@ -325,8 +358,10 @@ model Message {
   updatedAt               DateTime         @updatedAt
 
   messageRevisions        MessageRevision[] @relation("AllRevisions")
+  plotPointStates         PlotPointState[]
 
   @@index([sceneId])
+  @@index([sceneId, deleted])
 }
 
 model MessageRevision {
@@ -392,6 +427,26 @@ model ParagraphRevision {
 
   @@index([paragraphId])
   @@unique([paragraphId, version])
+}
+
+// ============================================================================
+// PLOT POINT STATE (message-level overrides for script data)
+// ============================================================================
+
+model PlotPointState {
+  id        String   @id @default(cuid())
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  key       String
+  value     String   // Store numbers as strings, parse on use
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([messageId, key]) // One value per key per message
+  @@index([storyId])
+  @@index([messageId])
 }
 
 model ParagraphComment {
@@ -527,25 +582,29 @@ model Item {
 // ============================================================================
 
 model File {
-  id        String   @id @default(cuid())
-  ownerId   Int
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  storyId   String?
-  story     Story?   @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  localPath String?
-  path      String   @unique
-  sha256    String   @default("")
-  width     Int?
-  height    Int?
-  bytes     Int?
-  mimeType  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  ownerId    Int
+  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  storyId    String?
+  story      Story?   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  localPath  String? // Absolute path on filesystem (for local storage)
+  r2Key      String? // Object key in R2 bucket (for R2 storage)
+  visibility String   @default("private") // 'public' or 'private'
+  path       String   @unique // URL path to access the file
+  sha256     String   @default("")
+  width      Int?
+  height     Int?
+  bytes      Int?
+  mimeType   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   storyCoverArt    Story[]     @relation("StoryCoverArt")
   bookCoverArt     Book[]      @relation("BookCoverArt")
   bookSpineArt     Book[]      @relation("BookSpineArt")
   characterPicture Character[] @relation("CharacterPicture")
+
+  @@index([r2Key])
 }
 
 // ============================================================================
@@ -571,38 +630,35 @@ model Calendar {
 // ============================================================================
 
 model Map {
-  id          String      @id @default(cuid())
-  storyId     String
-  story       Story       @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  name        String
-  fileId      String?
-  borderColor String?
-  landmarks   Landmark[]
-  pawns       Pawn[]
-  paths       Path[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id             String      @id @default(cuid())
+  storyId        String
+  story          Story       @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  name           String
+  fileId         String?
+  borderColor    String?
+  propertySchema Json?       // Schema defining available properties and state fields for landmarks
+  landmarks      Landmark[]
+  pawns          Pawn[]
+  paths          Path[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@index([storyId])
 }
 
 model Landmark {
-  id              String          @id @default(cuid())
-  mapId           String
-  map             Map             @relation(fields: [mapId], references: [id], onDelete: Cascade)
-  x               Float
-  y               Float
-  name            String
-  description     String          @db.Text
-  type            String          @default("system") // "system" | "station" | "nebula" | "junction"
-  population      String?
-  industry        String?         // "farming" | "political" | "industry" | "trade" | "mining"
-  color           String?
-  size            String?         // "small" | "medium" | "large"
-  region          String?
-  sector          String?
-  planetaryBodies String?
-  states          LandmarkState[]
+  id          String          @id @default(cuid())
+  mapId       String
+  map         Map             @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  x           Float
+  y           Float
+  name        String
+  description String          @db.Text
+  type        String          @default("point") // Generic: "point", "area", "region", etc.
+  color       String?         // Pin/marker color
+  size        String?         // "small", "medium", "large"
+  properties  Json            @default("{}") // Custom properties as key-value pairs
+  states      LandmarkState[]
 
   @@unique([mapId, id])
   @@index([mapId])

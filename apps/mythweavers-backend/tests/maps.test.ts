@@ -300,8 +300,8 @@ describe('Landmark Endpoints', () => {
           y: 200.3,
           name: 'Coruscant',
           description: 'Capital world',
-          type: 'system',
-          population: '1 trillion',
+          type: 'point',
+          properties: { population: '1 trillion' },
         },
         cookies,
       })
@@ -312,7 +312,7 @@ describe('Landmark Endpoints', () => {
       expect(body.landmark.name).toBe('Coruscant')
       expect(body.landmark.x).toBe(100.5)
       expect(body.landmark.y).toBe(200.3)
-      expect(body.landmark.population).toBe('1 trillion')
+      expect(body.landmark.properties.population).toBe('1 trillion')
     })
 
     test('should return 404 for non-existent map', async () => {

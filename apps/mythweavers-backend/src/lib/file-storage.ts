@@ -4,15 +4,28 @@ import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import type { MultipartFile } from '@fastify/multipart'
 import sharp from 'sharp'
+import {
+  type StorageVisibility,
+  deleteFromR2,
+  generateStorageKey,
+  getFromR2,
+  isR2Configured,
+  putToR2,
+} from './r2-storage.js'
 
 // Configuration
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
+// Use R2 if configured, otherwise fall back to local storage
+const USE_R2 = isR2Configured()
+
 export interface FileMetadata {
-  path: string // Relative path from upload root
-  localPath: string // Absolute path on filesystem
+  path: string // URL path to access the file
+  localPath: string | null // Absolute path on filesystem (null for R2)
+  r2Key: string | null // R2 object key (null for local storage)
+  visibility: StorageVisibility // 'public' or 'private'
   sha256: string
   mimeType: string
   bytes: number
@@ -21,9 +34,16 @@ export interface FileMetadata {
 }
 
 /**
- * Calculate SHA256 hash of a file
+ * Calculate SHA256 hash of a buffer
  */
-async function calculateSHA256(filePath: string): Promise<string> {
+function calculateSHA256FromBuffer(buffer: Buffer): string {
+  return createHash('sha256').update(buffer).digest('hex')
+}
+
+/**
+ * Calculate SHA256 hash of a file on disk
+ */
+async function calculateSHA256FromFile(filePath: string): Promise<string> {
   const hash = createHash('sha256')
   const stream = createReadStream(filePath)
 
@@ -36,7 +56,7 @@ async function calculateSHA256(filePath: string): Promise<string> {
  * Get image dimensions using sharp
  */
 async function getImageDimensions(
-  filePath: string,
+  input: string | Buffer,
   mimeType: string,
 ): Promise<{ width: number | null; height: number | null }> {
   // Only get dimensions for images
@@ -45,7 +65,7 @@ async function getImageDimensions(
   }
 
   try {
-    const metadata = await sharp(filePath).metadata()
+    const metadata = await sharp(input).metadata()
     return {
       width: metadata.width || null,
       height: metadata.height || null,
@@ -70,16 +90,17 @@ function createUploadPath(ownerId: number): string {
 }
 
 /**
- * Generate unique filename to avoid collisions
+ * Generate filename using content hash for natural deduplication
+ * Same content + same month = same path = no duplicate upload
  */
-function generateUniqueFilename(originalFilename: string): string {
-  const timestamp = Date.now()
-  const random = Math.random().toString(36).substring(2, 8)
+function generateFilename(originalFilename: string, contentHash: string): string {
   const ext = path.extname(originalFilename)
   const base = path.basename(originalFilename, ext)
   const sanitized = base.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 50)
+  // Use first 12 chars of hash - provides 48 bits of uniqueness
+  const hashPrefix = contentHash.substring(0, 12)
 
-  return `${sanitized}-${timestamp}-${random}${ext}`
+  return `${sanitized}-${hashPrefix}${ext}`
 }
 
 /**
@@ -95,101 +116,232 @@ export function validateFile(file: MultipartFile): void {
 }
 
 /**
- * Save uploaded file to organized directory structure
+ * Save uploaded file to R2 or local filesystem
  * Returns file metadata including SHA256 hash and dimensions
  */
-export async function saveFile(file: MultipartFile, ownerId: number): Promise<FileMetadata> {
+export async function saveFile(
+  file: MultipartFile,
+  ownerId: number,
+  visibility: StorageVisibility = 'private',
+): Promise<FileMetadata> {
   // Validate file
   validateFile(file)
 
-  // Create upload directory
+  // Read file into buffer (we need it for hashing and dimensions anyway)
+  const chunks: Buffer[] = []
+  let totalBytes = 0
+
+  for await (const chunk of file.file) {
+    totalBytes += chunk.length
+
+    if (totalBytes > MAX_FILE_SIZE) {
+      throw new Error(`File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024}MB`)
+    }
+
+    chunks.push(chunk)
+  }
+
+  const buffer = Buffer.concat(chunks)
+
+  // Calculate SHA256 hash
+  const sha256 = calculateSHA256FromBuffer(buffer)
+
+  // Get image dimensions
+  const { width, height } = await getImageDimensions(buffer, file.mimetype)
+
+  // Generate filename using content hash for deduplication
+  const filename = generateFilename(file.filename, sha256)
+
+  if (USE_R2) {
+    // Upload to R2
+    const key = generateStorageKey(ownerId, filename)
+    const result = await putToR2(key, buffer, file.mimetype, visibility)
+
+    return {
+      path: result.url,
+      localPath: null,
+      r2Key: key,
+      visibility,
+      sha256,
+      mimeType: file.mimetype,
+      bytes: result.bytes,
+      width,
+      height,
+    }
+  }
+
+  // Fall back to local storage
   const uploadPath = createUploadPath(ownerId)
   await fs.mkdir(uploadPath, { recursive: true })
 
-  // Generate unique filename
-  const filename = generateUniqueFilename(file.filename)
   const localPath = path.join(uploadPath, filename)
+  await fs.writeFile(localPath, buffer)
 
-  // Calculate relative path from upload root
   const relativePath = path.relative(UPLOAD_DIR, localPath)
 
-  // Stream file to disk with size limit
-  let bytesWritten = 0
-  const fileStream = createWriteStream(localPath)
-
-  try {
-    for await (const chunk of file.file) {
-      bytesWritten += chunk.length
-
-      if (bytesWritten > MAX_FILE_SIZE) {
-        // Stop writing and clean up
-        fileStream.destroy()
-        await fs.unlink(localPath).catch(() => {})
-        throw new Error(`File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024}MB`)
-      }
-
-      fileStream.write(chunk)
-    }
-
-    fileStream.end()
-
-    // Wait for stream to finish
-    await new Promise((resolve, reject) => {
-      fileStream.on('finish', resolve)
-      fileStream.on('error', reject)
-    })
-  } catch (error) {
-    // Clean up on error
-    await fs.unlink(localPath).catch(() => {})
-    throw error
-  }
-
-  // Calculate SHA256 hash
-  const sha256 = await calculateSHA256(localPath)
-
-  // Get image dimensions
-  const { width, height } = await getImageDimensions(localPath, file.mimetype)
-
   return {
-    path: `/files/${relativePath}`,
+    path: `/my/files/${relativePath}`,
     localPath,
+    r2Key: null,
+    visibility,
     sha256,
     mimeType: file.mimetype,
-    bytes: bytesWritten,
+    bytes: buffer.length,
     width,
     height,
   }
 }
 
 /**
- * Delete file from filesystem
+ * Save a raw buffer to storage (for migration, etc.)
  */
-export async function deleteFile(localPath: string): Promise<void> {
-  try {
-    await fs.unlink(localPath)
-  } catch (error) {
-    // Ignore if file doesn't exist
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error
+export async function saveBuffer(
+  buffer: Buffer,
+  filename: string,
+  mimeType: string,
+  ownerId: number,
+  visibility: StorageVisibility = 'private',
+): Promise<FileMetadata> {
+  // Calculate SHA256 hash
+  const sha256 = calculateSHA256FromBuffer(buffer)
+
+  // Get image dimensions
+  const { width, height } = await getImageDimensions(buffer, mimeType)
+
+  // Generate filename using content hash for deduplication
+  const uniqueFilename = generateFilename(filename, sha256)
+
+  if (USE_R2) {
+    // Upload to R2
+    const key = generateStorageKey(ownerId, uniqueFilename)
+    const result = await putToR2(key, buffer, mimeType, visibility)
+
+    return {
+      path: result.url,
+      localPath: null,
+      r2Key: key,
+      visibility,
+      sha256,
+      mimeType,
+      bytes: result.bytes,
+      width,
+      height,
+    }
+  }
+
+  // Fall back to local storage
+  const uploadPath = createUploadPath(ownerId)
+  await fs.mkdir(uploadPath, { recursive: true })
+
+  const localPath = path.join(uploadPath, uniqueFilename)
+  await fs.writeFile(localPath, buffer)
+
+  const relativePath = path.relative(UPLOAD_DIR, localPath)
+
+  return {
+    path: `/my/files/${relativePath}`,
+    localPath,
+    r2Key: null,
+    visibility,
+    sha256,
+    mimeType,
+    bytes: buffer.length,
+    width,
+    height,
+  }
+}
+
+/**
+ * Delete file from storage (R2 or local filesystem)
+ */
+export async function deleteFile(
+  localPath: string | null,
+  r2Key: string | null,
+  visibility: StorageVisibility = 'private',
+): Promise<void> {
+  if (r2Key) {
+    // Delete from R2
+    await deleteFromR2(r2Key, visibility)
+  } else if (localPath) {
+    // Delete from local filesystem
+    try {
+      await fs.unlink(localPath)
+    } catch (error) {
+      // Ignore if file doesn't exist
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error
+      }
     }
   }
 }
 
 /**
- * Check if file exists on filesystem
+ * Get file stream from storage (R2 or local filesystem)
  */
-export async function fileExists(localPath: string): Promise<boolean> {
-  try {
-    await fs.access(localPath)
-    return true
-  } catch {
-    return false
+export async function getFileStream(
+  localPath: string | null,
+  r2Key: string | null,
+  visibility: StorageVisibility = 'private',
+): Promise<{
+  stream: NodeJS.ReadableStream
+  contentType?: string
+  contentLength?: number
+}> {
+  if (r2Key) {
+    // Get from R2
+    const result = await getFromR2(r2Key, visibility)
+    return {
+      stream: result.body,
+      contentType: result.contentType,
+      contentLength: result.contentLength,
+    }
   }
+
+  if (localPath) {
+    // Get from local filesystem
+    const stats = await fs.stat(localPath)
+    return {
+      stream: createReadStream(localPath),
+      contentLength: stats.size,
+    }
+  }
+
+  throw new Error('No file path or R2 key provided')
 }
 
 /**
- * Get upload directory path
+ * Check if file exists in storage
+ */
+export async function fileExists(localPath: string | null, r2Key: string | null): Promise<boolean> {
+  if (r2Key) {
+    // Check in R2
+    const { existsInR2 } = await import('./r2-storage.js')
+    return existsInR2(r2Key)
+  }
+
+  if (localPath) {
+    // Check local filesystem
+    try {
+      await fs.access(localPath)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  return false
+}
+
+/**
+ * Get upload directory path (for local storage)
  */
 export function getUploadDir(): string {
   return UPLOAD_DIR
+}
+
+/**
+ * Check if R2 storage is being used
+ */
+export function isUsingR2(): boolean {
+  return USE_R2
 }

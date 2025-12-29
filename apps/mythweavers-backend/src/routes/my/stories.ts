@@ -3,7 +3,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
-import { errorSchema, paginationSchema } from '../../schemas/common.js'
+import { errorSchema, paginationSchema, propertySchemaSchema, successSchema } from '../../schemas/common.js'
 
 // Enums from Prisma schema
 const storyStatusSchema = z.enum(['COMPLETED', 'ONGOING', 'HIATUS']).meta({
@@ -124,6 +124,10 @@ const storySchema = z.strictObject({
     description: 'Target paragraphs per AI generation turn',
     example: 3,
   }),
+  format: z.string().meta({
+    description: 'Story format (narrative or cyoa)',
+    example: 'narrative',
+  }),
   defaultProtagonistId: z.string().nullable().meta({
     description: 'Default protagonist character ID',
     example: 'clx1234567890',
@@ -175,6 +179,26 @@ const storySchema = z.strictObject({
   branchChoices: z.any().nullable().meta({
     description: 'Branch choices JSON object',
   }),
+  selectedNodeId: z.string().nullable().optional().meta({
+    description: 'Last selected node (scene) ID for restoring UI state',
+    example: 'clx1234567890',
+  }),
+  globalScript: z.string().nullable().meta({
+    description: 'JavaScript function for initializing story data and defining reusable functions',
+  }),
+  plotPointDefaults: z
+    .array(
+      z.object({
+        key: z.string(),
+        type: z.enum(['string', 'number', 'enum', 'boolean']),
+        default: z.union([z.string(), z.number(), z.boolean()]),
+        options: z.array(z.string()).optional(),
+      }),
+    )
+    .nullable()
+    .meta({
+      description: 'Array of plot point definitions with default values',
+    }),
   createdAt: z.string().meta({
     description: 'Creation timestamp',
     example: '2025-12-05T12:00:00.000Z',
@@ -205,6 +229,10 @@ const createStoryBodySchema = z.strictObject({
   paragraphsPerTurn: z.number().optional().meta({
     description: 'Target paragraphs per AI generation turn',
     example: 3,
+  }),
+  format: z.string().optional().meta({
+    description: 'Story format (narrative or cyoa)',
+    example: 'narrative',
   }),
   provider: z.string().optional().meta({
     description: 'LLM provider',
@@ -242,6 +270,10 @@ const updateStoryBodySchema = z.strictObject({
     description: 'Target paragraphs per AI generation turn',
     example: 3,
   }),
+  format: z.string().optional().meta({
+    description: 'Story format (narrative or cyoa)',
+    example: 'narrative',
+  }),
   timelineStartTime: z.number().nullable().optional().meta({
     description: 'Timeline start time in minutes from epoch',
     example: -525600,
@@ -266,6 +298,30 @@ const updateStoryBodySchema = z.strictObject({
   coverTextColor: z.string().optional(),
   coverFontFamily: z.string().optional(),
   sortOrder: z.number().optional(),
+  globalScript: z.string().nullable().optional().meta({
+    description: 'JavaScript function for initializing story data and defining reusable functions',
+  }),
+  plotPointDefaults: z
+    .array(
+      z.object({
+        key: z.string(),
+        type: z.enum(['string', 'number', 'enum', 'boolean']),
+        default: z.union([z.string(), z.number(), z.boolean()]),
+        options: z.array(z.string()).optional(),
+      }),
+    )
+    .nullable()
+    .optional()
+    .meta({
+      description: 'Array of plot point definitions with default values',
+    }),
+  selectedNodeId: z.string().nullable().optional().meta({
+    description: 'Last selected node (scene) ID for restoring UI state',
+    example: 'clx1234567890',
+  }),
+  branchChoices: z.any().nullable().optional().meta({
+    description: 'Branch choices JSON object',
+  }),
 })
 
 // List query parameters
@@ -330,6 +386,8 @@ const exportStoryResponseSchema = z.strictObject({
       spineArtFileId: z.string().nullable(),
       pages: z.number().nullable(),
       nodeType: z.enum(['story', 'non-story', 'context']),
+      deleted: z.boolean(),
+      deletedAt: z.string().nullable(),
       createdAt: z.string(),
       updatedAt: z.string(),
       arcs: z.array(
@@ -340,6 +398,8 @@ const exportStoryResponseSchema = z.strictObject({
           summary: z.string().nullable(),
           sortOrder: z.number(),
           nodeType: z.enum(['story', 'non-story', 'context']),
+          deleted: z.boolean(),
+          deletedAt: z.string().nullable(),
           createdAt: z.string(),
           updatedAt: z.string(),
           chapters: z.array(
@@ -350,6 +410,9 @@ const exportStoryResponseSchema = z.strictObject({
               summary: z.string().nullable(),
               sortOrder: z.number(),
               nodeType: z.enum(['story', 'non-story', 'context']),
+              status: z.string().nullable(),
+              deleted: z.boolean(),
+              deletedAt: z.string().nullable(),
               publishedOn: z.string().nullable(),
               royalRoadId: z.number().nullable(),
               createdAt: z.string(),
@@ -361,6 +424,10 @@ const exportStoryResponseSchema = z.strictObject({
                   name: z.string(),
                   summary: z.string().nullable(),
                   sortOrder: z.number(),
+                  status: z.string().nullable(),
+                  includeInFull: z.number(),
+                  deleted: z.boolean(),
+                  deletedAt: z.string().nullable(),
                   perspective: perspectiveSchema.nullable(),
                   viewpointCharacterId: z.string().nullable(),
                   activeCharacterIds: z.array(z.string()),
@@ -376,6 +443,9 @@ const exportStoryResponseSchema = z.strictObject({
                       sortOrder: z.number(),
                       instruction: z.string().nullable(),
                       script: z.string().nullable(),
+                      deleted: z.boolean(),
+                      type: z.string().nullable(),
+                      options: z.any().nullable(),
                       currentMessageRevisionId: z.string().nullable(),
                       createdAt: z.string(),
                       updatedAt: z.string(),
@@ -451,6 +521,7 @@ const exportStoryResponseSchema = z.strictObject({
       distinguishingFeatures: z.string().nullable(),
       writingStyle: z.string().nullable(),
       pictureFileId: z.string().nullable(),
+      pictureFileUrl: z.string().nullable().meta({ description: 'URL path to fetch the character picture' }),
       birthdate: z.number().nullable(),
       significantActions: z.any().nullable(),
       isMainCharacter: z.boolean(),
@@ -488,7 +559,9 @@ const exportStoryResponseSchema = z.strictObject({
       storyId: z.string(),
       name: z.string(),
       fileId: z.string().nullable(),
-      borderColor: z.string(),
+      borderColor: z.string().nullable(),
+      propertySchema: propertySchemaSchema.nullable(),
+      landmarkCount: z.number(),
       createdAt: z.string(),
       updatedAt: z.string(),
     }),
@@ -740,7 +813,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // Update story
         const story = await prisma.story.update({
           where: { id },
-          data: updates,
+          data: updates as Prisma.StoryUpdateInput,
         })
 
         fastify.log.info({ storyId: story.id, userId }, 'Story updated')
@@ -880,10 +953,13 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           },
         })
 
-        // Load characters
+        // Load characters with their picture files
         const characters = await prisma.character.findMany({
           where: { storyId: id },
           orderBy: { createdAt: 'asc' },
+          include: {
+            pictureFile: true,
+          },
         })
 
         // Load context items
@@ -905,6 +981,11 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const maps = await prisma.map.findMany({
           where: { storyId: id },
           orderBy: { createdAt: 'asc' },
+          include: {
+            _count: {
+              select: { landmarks: true },
+            },
+          },
         })
 
         // Format dates in nested structure
@@ -935,8 +1016,11 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             ...formatDates(arc),
             chapters: arc.chapters.map((chapter) => ({
               ...formatDates(chapter),
+              status: chapter.status,
               scenes: chapter.scenes.map((scene) => ({
                 ...formatDates(scene),
+                status: scene.status,
+                includeInFull: scene.includeInFull,
                 activeCharacterIds: scene.activeCharacterIds || [],
                 activeContextItemIds: scene.activeContextItemIds || [],
                 messages: scene.messages.map((message) => ({
@@ -945,6 +1029,9 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                   sortOrder: message.sortOrder,
                   instruction: message.instruction,
                   script: message.script,
+                  deleted: message.deleted,
+                  type: message.type,
+                  options: message.options,
                   currentMessageRevisionId: message.currentMessageRevisionId,
                   createdAt: message.createdAt.toISOString(),
                   updatedAt: message.updatedAt.toISOString(),
@@ -999,17 +1086,846 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return {
           story: formatStory(story),
           books: formattedBooks,
-          characters: characters.map(formatDates),
+          characters: characters.map((char) => {
+            const { pictureFile, ...charData } = char
+            return {
+              ...formatDates(charData),
+              pictureFileUrl: pictureFile?.path ?? null,
+            }
+          }),
           contextItems: contextItems.map(formatDates),
           calendars: calendars.map((cal) => ({
             ...formatDates(cal),
             isDefault: isDefault(cal.id),
           })),
-          maps: maps.map(formatDates),
+          maps: maps.map((m) => {
+            const { _count, ...mapData } = m
+            return {
+              ...formatDates(mapData),
+              landmarkCount: _count.landmarks,
+            }
+          }),
         }
       } catch (error) {
         fastify.log.error({ error }, 'Failed to export story')
         return reply.status(500).send({ error: 'Failed to export story' })
+      }
+    },
+  )
+
+  // GET /my/stories/:id/deleted-messages - List deleted messages for a story
+  fastify.get(
+    '/:id/deleted-messages',
+    {
+      schema: {
+        description: 'List all deleted messages for a story (for potential restoration)',
+        tags: ['my-stories'],
+        security: [{ sessionAuth: [] }],
+        params: storyIdParamSchema,
+        querystring: z.strictObject({
+          limit: z.coerce.number().int().min(1).max(100).default(50).meta({
+            description: 'Maximum number of messages to return',
+            example: 50,
+          }),
+          offset: z.coerce.number().int().min(0).default(0).meta({
+            description: 'Number of messages to skip',
+            example: 0,
+          }),
+        }),
+        response: {
+          200: z.strictObject({
+            messages: z.array(
+              z.strictObject({
+                id: z.string().meta({ example: 'clx1234567890' }),
+                sceneId: z.string().meta({ example: 'clx1234567890' }),
+                sceneName: z.string().meta({ example: 'Scene 1' }),
+                chapterName: z.string().meta({ example: 'Chapter 1' }),
+                sortOrder: z.number().int().meta({ example: 0 }),
+                content: z.string().meta({ example: 'The story content...' }),
+                instruction: z.string().nullable().meta({ example: 'Write a dramatic scene' }),
+                createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
+                updatedAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
+              }),
+            ),
+            pagination: z.strictObject({
+              total: z.number().int().meta({ example: 10 }),
+              limit: z.number().int().meta({ example: 50 }),
+              offset: z.number().int().meta({ example: 0 }),
+            }),
+          }),
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.id
+        const { id } = request.params
+        const { limit, offset } = request.query
+
+        // Verify story exists and user owns it
+        const story = await prisma.story.findFirst({
+          where: {
+            id,
+            ownerId: userId,
+          },
+        })
+
+        if (!story) {
+          return reply.status(404).send({ error: 'Story not found' })
+        }
+
+        // Count total deleted messages
+        const total = await prisma.message.count({
+          where: {
+            deleted: true,
+            scene: {
+              chapter: {
+                arc: {
+                  book: {
+                    storyId: id,
+                  },
+                },
+              },
+            },
+          },
+        })
+
+        // Fetch deleted messages with their content
+        const deletedMessages = await prisma.message.findMany({
+          where: {
+            deleted: true,
+            scene: {
+              chapter: {
+                arc: {
+                  book: {
+                    storyId: id,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+          skip: offset,
+          take: limit,
+          include: {
+            scene: {
+              include: {
+                chapter: true,
+              },
+            },
+            currentMessageRevision: {
+              include: {
+                paragraphs: {
+                  orderBy: { sortOrder: 'asc' },
+                  include: {
+                    currentParagraphRevision: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+
+        // Transform to response format
+        const messages = deletedMessages.map((msg) => {
+          // Combine paragraph bodies into content
+          const content = msg.currentMessageRevision?.paragraphs
+            .map((p) => p.currentParagraphRevision?.body ?? '')
+            .filter((body) => body.length > 0)
+            .join('\n\n') ?? ''
+
+          return {
+            id: msg.id,
+            sceneId: msg.sceneId,
+            sceneName: msg.scene.name,
+            chapterName: msg.scene.chapter.name,
+            sortOrder: msg.sortOrder,
+            content,
+            instruction: msg.instruction,
+            createdAt: msg.createdAt.toISOString(),
+            updatedAt: msg.updatedAt.toISOString(),
+          }
+        })
+
+        return {
+          messages,
+          pagination: {
+            total,
+            limit,
+            offset,
+          },
+        }
+      } catch (error) {
+        fastify.log.error({ error }, 'Failed to list deleted messages')
+        return reply.status(500).send({ error: 'Failed to list deleted messages' })
+      }
+    },
+  )
+
+  // POST /my/stories/:id/deleted-messages/:messageId/restore - Restore a deleted message
+  fastify.post(
+    '/:id/deleted-messages/:messageId/restore',
+    {
+      schema: {
+        description: 'Restore a previously deleted message',
+        tags: ['my-stories'],
+        security: [{ sessionAuth: [] }],
+        params: z.strictObject({
+          id: z.string().meta({
+            description: 'Story ID',
+            example: 'clx1234567890',
+          }),
+          messageId: z.string().meta({
+            description: 'Message ID to restore',
+            example: 'clx1234567890',
+          }),
+        }),
+        response: {
+          200: z.strictObject({
+            success: z.literal(true),
+            message: z.strictObject({
+              id: z.string().meta({ example: 'clx1234567890' }),
+              sceneId: z.string().meta({ example: 'clx1234567890' }),
+              deleted: z.boolean().meta({ example: false }),
+            }),
+          }),
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.id
+        const { id, messageId } = request.params
+
+        // Verify story exists and user owns it
+        const story = await prisma.story.findFirst({
+          where: {
+            id,
+            ownerId: userId,
+          },
+        })
+
+        if (!story) {
+          return reply.status(404).send({ error: 'Story not found' })
+        }
+
+        // Find the deleted message and verify it belongs to this story
+        const message = await prisma.message.findFirst({
+          where: {
+            id: messageId,
+            deleted: true,
+            scene: {
+              chapter: {
+                arc: {
+                  book: {
+                    storyId: id,
+                  },
+                },
+              },
+            },
+          },
+        })
+
+        if (!message) {
+          return reply.status(404).send({ error: 'Deleted message not found' })
+        }
+
+        // Restore the message
+        const restoredMessage = await prisma.message.update({
+          where: { id: messageId },
+          data: { deleted: false },
+        })
+
+        fastify.log.info({ storyId: id, messageId, userId }, 'Message restored')
+
+        return {
+          success: true as const,
+          message: {
+            id: restoredMessage.id,
+            sceneId: restoredMessage.sceneId,
+            deleted: restoredMessage.deleted,
+          },
+        }
+      } catch (error) {
+        fastify.log.error({ error }, 'Failed to restore message')
+        return reply.status(500).send({ error: 'Failed to restore message' })
+      }
+    },
+  )
+
+  // ============================================================================
+  // DELETED NODES (Books, Arcs, Chapters, Scenes)
+  // ============================================================================
+
+  const deletedNodeSchema = z.strictObject({
+    id: z.string().meta({ example: 'clx1234567890' }),
+    name: z.string().meta({ example: 'Chapter 1' }),
+    type: z.enum(['book', 'arc', 'chapter', 'scene']).meta({ example: 'chapter' }),
+    parentName: z.string().nullable().meta({ example: 'Arc 1' }),
+    deletedAt: z.string().datetime().nullable().meta({ example: '2025-12-27T12:00:00.000Z' }),
+  })
+
+  // GET /my/stories/:id/deleted-nodes - List all deleted nodes for a story
+  fastify.get(
+    '/:id/deleted-nodes',
+    {
+      schema: {
+        description: 'List all deleted nodes (books, arcs, chapters, scenes) for a story',
+        tags: ['my-stories'],
+        security: [{ sessionAuth: [] }],
+        params: storyIdParamSchema,
+        response: {
+          200: z.strictObject({
+            nodes: z.array(deletedNodeSchema),
+          }),
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.id
+        const { id } = request.params
+
+        // Verify story exists and user owns it
+        const story = await prisma.story.findFirst({
+          where: { id, ownerId: userId },
+        })
+
+        if (!story) {
+          return reply.status(404).send({ error: 'Story not found' })
+        }
+
+        // Fetch all deleted nodes
+        const [deletedBooks, deletedArcs, deletedChapters, deletedScenes] = await Promise.all([
+          prisma.book.findMany({
+            where: { storyId: id, deleted: true },
+            select: { id: true, name: true, deletedAt: true },
+            orderBy: { deletedAt: 'desc' },
+          }),
+          prisma.arc.findMany({
+            where: { book: { storyId: id }, deleted: true },
+            select: { id: true, name: true, deletedAt: true, book: { select: { name: true } } },
+            orderBy: { deletedAt: 'desc' },
+          }),
+          prisma.chapter.findMany({
+            where: { arc: { book: { storyId: id } }, deleted: true },
+            select: { id: true, name: true, deletedAt: true, arc: { select: { name: true } } },
+            orderBy: { deletedAt: 'desc' },
+          }),
+          prisma.scene.findMany({
+            where: { chapter: { arc: { book: { storyId: id } } }, deleted: true },
+            select: {
+              id: true,
+              name: true,
+              deletedAt: true,
+              chapter: { select: { name: true } },
+            },
+            orderBy: { deletedAt: 'desc' },
+          }),
+        ])
+
+        const nodes = [
+          ...deletedBooks.map((b) => ({
+            id: b.id,
+            name: b.name,
+            type: 'book' as const,
+            parentName: null,
+            deletedAt: b.deletedAt?.toISOString() ?? null,
+          })),
+          ...deletedArcs.map((a) => ({
+            id: a.id,
+            name: a.name,
+            type: 'arc' as const,
+            parentName: a.book.name,
+            deletedAt: a.deletedAt?.toISOString() ?? null,
+          })),
+          ...deletedChapters.map((c) => ({
+            id: c.id,
+            name: c.name,
+            type: 'chapter' as const,
+            parentName: c.arc.name,
+            deletedAt: c.deletedAt?.toISOString() ?? null,
+          })),
+          ...deletedScenes.map((s) => ({
+            id: s.id,
+            name: s.name,
+            type: 'scene' as const,
+            parentName: s.chapter.name,
+            deletedAt: s.deletedAt?.toISOString() ?? null,
+          })),
+        ]
+
+        // Sort by deletedAt descending
+        nodes.sort((a, b) => {
+          if (!a.deletedAt) return 1
+          if (!b.deletedAt) return -1
+          return new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime()
+        })
+
+        return { nodes }
+      } catch (error) {
+        fastify.log.error({ error }, 'Failed to list deleted nodes')
+        return reply.status(500).send({ error: 'Failed to list deleted nodes' })
+      }
+    },
+  )
+
+  // POST /my/stories/:id/deleted-scenes/:sceneId/restore - Restore a deleted scene
+  fastify.post(
+    '/:id/deleted-scenes/:sceneId/restore',
+    {
+      schema: {
+        description: 'Restore a deleted scene and all its messages',
+        tags: ['my-stories'],
+        security: [{ sessionAuth: [] }],
+        params: z.strictObject({
+          id: z.string().meta({ description: 'Story ID', example: 'clx1234567890' }),
+          sceneId: z.string().meta({ description: 'Scene ID', example: 'clx1234567890' }),
+        }),
+        response: {
+          200: successSchema,
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.id
+        const { id, sceneId } = request.params
+
+        // Verify story exists and user owns it
+        const story = await prisma.story.findFirst({
+          where: { id, ownerId: userId },
+        })
+
+        if (!story) {
+          return reply.status(404).send({ error: 'Story not found' })
+        }
+
+        // Find the deleted scene
+        const scene = await prisma.scene.findFirst({
+          where: {
+            id: sceneId,
+            deleted: true,
+            chapter: { arc: { book: { storyId: id } } },
+          },
+        })
+
+        if (!scene) {
+          return reply.status(404).send({ error: 'Deleted scene not found' })
+        }
+
+        // Restore scene and its messages
+        await prisma.$transaction([
+          prisma.scene.update({
+            where: { id: sceneId },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.message.updateMany({
+            where: { sceneId },
+            data: { deleted: false },
+          }),
+        ])
+
+        fastify.log.info({ storyId: id, sceneId, userId }, 'Scene restored')
+
+        return { success: true as const }
+      } catch (error) {
+        fastify.log.error({ error }, 'Failed to restore scene')
+        return reply.status(500).send({ error: 'Failed to restore scene' })
+      }
+    },
+  )
+
+  // POST /my/stories/:id/deleted-chapters/:chapterId/restore - Restore a deleted chapter
+  fastify.post(
+    '/:id/deleted-chapters/:chapterId/restore',
+    {
+      schema: {
+        description: 'Restore a deleted chapter and all its scenes and messages',
+        tags: ['my-stories'],
+        security: [{ sessionAuth: [] }],
+        params: z.strictObject({
+          id: z.string().meta({ description: 'Story ID', example: 'clx1234567890' }),
+          chapterId: z.string().meta({ description: 'Chapter ID', example: 'clx1234567890' }),
+        }),
+        response: {
+          200: successSchema,
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.id
+        const { id, chapterId } = request.params
+
+        // Verify story exists and user owns it
+        const story = await prisma.story.findFirst({
+          where: { id, ownerId: userId },
+        })
+
+        if (!story) {
+          return reply.status(404).send({ error: 'Story not found' })
+        }
+
+        // Find the deleted chapter with its scenes
+        const chapter = await prisma.chapter.findFirst({
+          where: {
+            id: chapterId,
+            deleted: true,
+            arc: { book: { storyId: id } },
+          },
+          include: { scenes: { select: { id: true } } },
+        })
+
+        if (!chapter) {
+          return reply.status(404).send({ error: 'Deleted chapter not found' })
+        }
+
+        // Restore chapter, its scenes, and their messages
+        const sceneIds = chapter.scenes.map((s) => s.id)
+        await prisma.$transaction([
+          prisma.chapter.update({
+            where: { id: chapterId },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.scene.updateMany({
+            where: { chapterId },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.message.updateMany({
+            where: { sceneId: { in: sceneIds } },
+            data: { deleted: false },
+          }),
+        ])
+
+        fastify.log.info({ storyId: id, chapterId, userId }, 'Chapter restored')
+
+        return { success: true as const }
+      } catch (error) {
+        fastify.log.error({ error }, 'Failed to restore chapter')
+        return reply.status(500).send({ error: 'Failed to restore chapter' })
+      }
+    },
+  )
+
+  // POST /my/stories/:id/deleted-arcs/:arcId/restore - Restore a deleted arc
+  fastify.post(
+    '/:id/deleted-arcs/:arcId/restore',
+    {
+      schema: {
+        description: 'Restore a deleted arc and all its chapters, scenes, and messages',
+        tags: ['my-stories'],
+        security: [{ sessionAuth: [] }],
+        params: z.strictObject({
+          id: z.string().meta({ description: 'Story ID', example: 'clx1234567890' }),
+          arcId: z.string().meta({ description: 'Arc ID', example: 'clx1234567890' }),
+        }),
+        response: {
+          200: successSchema,
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.id
+        const { id, arcId } = request.params
+
+        // Verify story exists and user owns it
+        const story = await prisma.story.findFirst({
+          where: { id, ownerId: userId },
+        })
+
+        if (!story) {
+          return reply.status(404).send({ error: 'Story not found' })
+        }
+
+        // Find the deleted arc with its chapters and scenes
+        const arc = await prisma.arc.findFirst({
+          where: {
+            id: arcId,
+            deleted: true,
+            book: { storyId: id },
+          },
+          include: {
+            chapters: {
+              select: { id: true, scenes: { select: { id: true } } },
+            },
+          },
+        })
+
+        if (!arc) {
+          return reply.status(404).send({ error: 'Deleted arc not found' })
+        }
+
+        // Restore arc, its chapters, scenes, and messages
+        const chapterIds = arc.chapters.map((c) => c.id)
+        const sceneIds = arc.chapters.flatMap((c) => c.scenes.map((s) => s.id))
+        await prisma.$transaction([
+          prisma.arc.update({
+            where: { id: arcId },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.chapter.updateMany({
+            where: { arcId },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.scene.updateMany({
+            where: { chapterId: { in: chapterIds } },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.message.updateMany({
+            where: { sceneId: { in: sceneIds } },
+            data: { deleted: false },
+          }),
+        ])
+
+        fastify.log.info({ storyId: id, arcId, userId }, 'Arc restored')
+
+        return { success: true as const }
+      } catch (error) {
+        fastify.log.error({ error }, 'Failed to restore arc')
+        return reply.status(500).send({ error: 'Failed to restore arc' })
+      }
+    },
+  )
+
+  // POST /my/stories/:id/deleted-books/:bookId/restore - Restore a deleted book
+  fastify.post(
+    '/:id/deleted-books/:bookId/restore',
+    {
+      schema: {
+        description: 'Restore a deleted book and all its arcs, chapters, scenes, and messages',
+        tags: ['my-stories'],
+        security: [{ sessionAuth: [] }],
+        params: z.strictObject({
+          id: z.string().meta({ description: 'Story ID', example: 'clx1234567890' }),
+          bookId: z.string().meta({ description: 'Book ID', example: 'clx1234567890' }),
+        }),
+        response: {
+          200: successSchema,
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.id
+        const { id, bookId } = request.params
+
+        // Verify story exists and user owns it
+        const story = await prisma.story.findFirst({
+          where: { id, ownerId: userId },
+        })
+
+        if (!story) {
+          return reply.status(404).send({ error: 'Story not found' })
+        }
+
+        // Find the deleted book with its arcs, chapters, and scenes
+        const book = await prisma.book.findFirst({
+          where: {
+            id: bookId,
+            deleted: true,
+            storyId: id,
+          },
+          include: {
+            arcs: {
+              select: {
+                id: true,
+                chapters: {
+                  select: { id: true, scenes: { select: { id: true } } },
+                },
+              },
+            },
+          },
+        })
+
+        if (!book) {
+          return reply.status(404).send({ error: 'Deleted book not found' })
+        }
+
+        // Restore book, its arcs, chapters, scenes, and messages
+        const arcIds = book.arcs.map((a) => a.id)
+        const chapterIds = book.arcs.flatMap((a) => a.chapters.map((c) => c.id))
+        const sceneIds = book.arcs.flatMap((a) =>
+          a.chapters.flatMap((c) => c.scenes.map((s) => s.id)),
+        )
+        await prisma.$transaction([
+          prisma.book.update({
+            where: { id: bookId },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.arc.updateMany({
+            where: { bookId },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.chapter.updateMany({
+            where: { arcId: { in: arcIds } },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.scene.updateMany({
+            where: { chapterId: { in: chapterIds } },
+            data: { deleted: false, deletedAt: null },
+          }),
+          prisma.message.updateMany({
+            where: { sceneId: { in: sceneIds } },
+            data: { deleted: false },
+          }),
+        ])
+
+        fastify.log.info({ storyId: id, bookId, userId }, 'Book restored')
+
+        return { success: true as const }
+      } catch (error) {
+        fastify.log.error({ error }, 'Failed to restore book')
+        return reply.status(500).send({ error: 'Failed to restore book' })
+      }
+    },
+  )
+
+  // Bulk reorder nodes (books, arcs, chapters, scenes)
+  fastify.post(
+    '/:storyId/nodes/reorder',
+    {
+      preHandler: requireAuth,
+      schema: {
+        description: 'Bulk reorder nodes (books, arcs, chapters, scenes) within a story',
+        tags: ['stories'],
+        params: z.strictObject({
+          storyId: z.string().meta({
+            description: 'Story ID',
+            example: 'clx1234567890',
+          }),
+        }),
+        body: z.strictObject({
+          items: z
+            .array(
+              z.strictObject({
+                nodeId: z.string().meta({ description: 'Node ID to update' }),
+                nodeType: z.enum(['book', 'arc', 'chapter', 'scene']).meta({ description: 'Type of node' }),
+                parentId: z.string().nullable().meta({ description: 'Parent node ID (null for books)' }),
+                order: z.number().int().min(0).meta({ description: 'New sort order' }),
+              }),
+            )
+            .meta({
+              description: 'Array of node updates',
+            }),
+        }),
+        response: {
+          200: z.strictObject({
+            success: z.literal(true),
+            updatedAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
+          }),
+          400: errorSchema,
+          401: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { storyId } = request.params
+      const { items } = request.body
+      const userId = request.user!.id
+
+      // Verify story exists and user owns it
+      const story = await prisma.story.findUnique({
+        where: { id: storyId },
+        select: { ownerId: true },
+      })
+
+      if (!story) {
+        return reply.code(404).send({ error: 'Story not found' })
+      }
+
+      if (story.ownerId !== userId) {
+        return reply.code(404).send({ error: 'Story not found' })
+      }
+
+      if (items.length === 0) {
+        return {
+          success: true as const,
+          updatedAt: new Date().toISOString(),
+        }
+      }
+
+      // Group items by type for batch updates
+      const books = items.filter((i) => i.nodeType === 'book')
+      const arcs = items.filter((i) => i.nodeType === 'arc')
+      const chapters = items.filter((i) => i.nodeType === 'chapter')
+      const scenes = items.filter((i) => i.nodeType === 'scene')
+
+      const updatedAt = new Date()
+
+      // Update all nodes in a transaction
+      await prisma.$transaction([
+        // Update books
+        ...books.map((item) =>
+          prisma.book.update({
+            where: { id: item.nodeId },
+            data: {
+              sortOrder: item.order,
+              updatedAt,
+            },
+          }),
+        ),
+        // Update arcs
+        ...arcs.map((item) =>
+          prisma.arc.update({
+            where: { id: item.nodeId },
+            data: {
+              bookId: item.parentId!,
+              sortOrder: item.order,
+              updatedAt,
+            },
+          }),
+        ),
+        // Update chapters
+        ...chapters.map((item) =>
+          prisma.chapter.update({
+            where: { id: item.nodeId },
+            data: {
+              arcId: item.parentId!,
+              sortOrder: item.order,
+              updatedAt,
+            },
+          }),
+        ),
+        // Update scenes
+        ...scenes.map((item) =>
+          prisma.scene.update({
+            where: { id: item.nodeId },
+            data: {
+              chapterId: item.parentId!,
+              sortOrder: item.order,
+              updatedAt,
+            },
+          }),
+        ),
+      ])
+
+      return {
+        success: true as const,
+        updatedAt: updatedAt.toISOString(),
       }
     },
   )

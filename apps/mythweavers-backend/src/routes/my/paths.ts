@@ -17,12 +17,27 @@ const updatePathBodySchema = z.strictObject({
   speedMultiplier: z.number().optional().meta({ description: 'Speed multiplier for travel along this path' }),
 })
 
+const pathSegmentSchema = z.strictObject({
+  id: z.string().meta({ description: 'Segment ID', example: 'clx1234567890' }),
+  pathId: z.string().meta({ description: 'Path ID', example: 'clx0987654321' }),
+  mapId: z.string().meta({ description: 'Map ID', example: 'clx0987654321' }),
+  order: z.number().meta({ description: 'Segment order', example: 0 }),
+  startX: z.number().meta({ description: 'Start X coordinate (0-1)', example: 0.5 }),
+  startY: z.number().meta({ description: 'Start Y coordinate (0-1)', example: 0.3 }),
+  endX: z.number().meta({ description: 'End X coordinate (0-1)', example: 0.7 }),
+  endY: z.number().meta({ description: 'End Y coordinate (0-1)', example: 0.8 }),
+  startLandmarkId: z.string().nullable().meta({ description: 'Start landmark ID', example: 'clx1234567890' }),
+  endLandmarkId: z.string().nullable().meta({ description: 'End landmark ID', example: 'clx0987654321' }),
+})
+
 const pathSchema = z.strictObject({
   id: z.string().meta({ description: 'Path ID', example: 'clx1234567890' }),
   mapId: z.string().meta({ description: 'Map ID', example: 'clx0987654321' }),
   speedMultiplier: z.number().meta({ description: 'Speed multiplier', example: 10.0 }),
-  createdAt: z.string().meta({ description: 'Creation timestamp', example: '2025-12-05T12:00:00.000Z' }),
-  updatedAt: z.string().meta({ description: 'Last update timestamp', example: '2025-12-05T12:00:00.000Z' }),
+})
+
+const pathWithSegmentsSchema = pathSchema.extend({
+  segments: z.array(pathSegmentSchema).meta({ description: 'Path segments' }),
 })
 
 const createPathResponseSchema = z.strictObject({
@@ -30,8 +45,20 @@ const createPathResponseSchema = z.strictObject({
   path: pathSchema,
 })
 
+const listPathsQuerySchema = z.strictObject({
+  includeSegments: z
+    .string()
+    .optional()
+    .transform((val) => val === 'true')
+    .meta({ description: 'Include path segments in response', example: 'true' }),
+})
+
 const listPathsResponseSchema = z.strictObject({
   paths: z.array(pathSchema).meta({ description: 'Map paths' }),
+})
+
+const listPathsWithSegmentsResponseSchema = z.strictObject({
+  paths: z.array(pathWithSegmentsSchema).meta({ description: 'Map paths with segments' }),
 })
 
 const getPathResponseSchema = z.strictObject({
@@ -123,8 +150,9 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
         description: 'List all paths on a map',
         tags: ['maps', 'paths'],
         params: mapIdParamsSchema,
+        querystring: listPathsQuerySchema,
         response: {
-          200: listPathsResponseSchema,
+          200: listPathsWithSegmentsResponseSchema, // Use the more complete schema that works for both cases
           401: errorSchema,
           403: errorSchema,
           404: errorSchema,
@@ -134,6 +162,7 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { mapId } = request.params
+      const { includeSegments } = request.query
       const userId = request.user!.id
 
       // Verify map exists and user owns it
@@ -143,7 +172,15 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
           story: {
             select: { ownerId: true },
           },
-          paths: true,
+          paths: {
+            include: includeSegments
+              ? {
+                  segments: {
+                    orderBy: { order: 'asc' },
+                  },
+                }
+              : undefined,
+          },
         },
       })
 
@@ -156,7 +193,29 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
 
       return reply.code(200).send({
-        paths: map.paths.map(transformDates),
+        paths: map.paths.map((path) => {
+          const { id, mapId, speedMultiplier } = path
+          if (includeSegments && 'segments' in path) {
+            return {
+              id,
+              mapId,
+              speedMultiplier,
+              segments: (path as any).segments.map((s: any) => ({
+                id: s.id,
+                pathId: s.pathId,
+                mapId: s.mapId,
+                order: s.order,
+                startX: s.startX,
+                startY: s.startY,
+                endX: s.endX,
+                endY: s.endY,
+                startLandmarkId: s.startLandmarkId,
+                endLandmarkId: s.endLandmarkId,
+              })),
+            }
+          }
+          return { id, mapId, speedMultiplier, segments: [] }
+        }),
       })
     },
   )

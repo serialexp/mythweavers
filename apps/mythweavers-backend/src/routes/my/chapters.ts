@@ -41,6 +41,18 @@ const chapterSchema = z.strictObject({
     example: 123456,
   }),
   nodeType: nodeTypeSchema,
+  status: z.string().nullable().meta({
+    description: 'Chapter status: draft, needs_work, review, done',
+    example: 'draft',
+  }),
+  deleted: z.boolean().meta({
+    description: 'Whether the chapter is soft-deleted',
+    example: false,
+  }),
+  deletedAt: z.string().nullable().meta({
+    description: 'When the chapter was deleted',
+    example: null,
+  }),
   createdAt: z.string().meta({
     description: 'Creation timestamp',
     example: '2025-12-05T12:00:00.000Z',
@@ -70,6 +82,10 @@ const createChapterBodySchema = z.strictObject({
     description: 'Sort order within arc (defaults to end)',
     example: 0,
   }),
+  status: z.string().optional().meta({
+    description: 'Chapter status: draft, needs_work, review, done',
+    example: 'draft',
+  }),
 })
 
 // Update chapter request body (all fields optional)
@@ -94,6 +110,10 @@ const updateChapterBodySchema = z.strictObject({
   royalRoadId: z.number().nullable().optional().meta({
     description: 'Royal Road chapter ID',
     example: 123456,
+  }),
+  status: z.string().nullable().optional().meta({
+    description: 'Chapter status: draft, needs_work, review, done',
+    example: 'draft',
   }),
 })
 
@@ -263,9 +283,9 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Arc not found' })
         }
 
-        // Get chapters
+        // Get chapters (filter out deleted)
         const chapters = await prisma.chapter.findMany({
-          where: { arcId },
+          where: { arcId, deleted: false },
           orderBy: { sortOrder: 'asc' },
         })
 
@@ -304,6 +324,7 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const chapter = await prisma.chapter.findFirst({
           where: {
             id,
+            deleted: false,
             arc: {
               book: {
                 story: {
@@ -401,10 +422,20 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/chapters/:id',
     {
       schema: {
-        description: 'Delete a chapter (must own the parent story)',
+        description:
+          'Delete a chapter. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-chapters'],
         security: [{ sessionAuth: [] }],
         params: chapterIdParamSchema,
+        querystring: z.strictObject({
+          permanent: z
+            .enum(['true', 'false'])
+            .optional()
+            .meta({
+              description: 'If true, permanently delete (no recovery possible)',
+              example: 'false',
+            }),
+        }),
         response: {
           200: deleteChapterResponseSchema,
           401: errorSchema,
@@ -417,6 +448,7 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
       try {
         const userId = request.user!.id
         const { id } = request.params
+        const permanent = request.query.permanent === 'true'
 
         // Check if chapter exists and user owns the parent story
         const existingChapter = await prisma.chapter.findFirst({
@@ -430,18 +462,41 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
               },
             },
           },
+          include: {
+            scenes: { select: { id: true } },
+          },
         })
 
         if (!existingChapter) {
           return reply.status(404).send({ error: 'Chapter not found' })
         }
 
-        // Delete chapter (cascade will handle scenes)
-        await prisma.chapter.delete({
-          where: { id },
-        })
-
-        fastify.log.info({ chapterId: id, userId }, 'Chapter deleted')
+        if (permanent) {
+          // Hard delete - cascade will handle scenes/messages
+          await prisma.chapter.delete({
+            where: { id },
+          })
+          fastify.log.info({ chapterId: id, userId }, 'Chapter permanently deleted')
+        } else {
+          // Soft delete - mark chapter, its scenes, and their messages as deleted
+          const now = new Date()
+          const sceneIds = existingChapter.scenes.map((s) => s.id)
+          await prisma.$transaction([
+            prisma.chapter.update({
+              where: { id },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.scene.updateMany({
+              where: { chapterId: id },
+              data: { deleted: true, deletedAt: now },
+            }),
+            prisma.message.updateMany({
+              where: { sceneId: { in: sceneIds } },
+              data: { deleted: true },
+            }),
+          ])
+          fastify.log.info({ chapterId: id, userId }, 'Chapter soft deleted')
+        }
 
         return {
           success: true as const,

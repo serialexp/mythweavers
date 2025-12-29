@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
@@ -187,15 +188,15 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
               contentSchema: request.body.contentSchema || null,
               version: 1,
               state: request.body.state || null,
-              plotPointActions: request.body.plotPointActions || null,
-              inventoryActions: request.body.inventoryActions || null,
+              plotPointActions: (request.body.plotPointActions || null) as Prisma.InputJsonValue,
+              inventoryActions: (request.body.inventoryActions || null) as Prisma.InputJsonValue,
             },
           },
         },
         include: {
           paragraphRevisions: true,
         },
-      })
+      }) as Prisma.ParagraphGetPayload<{ include: { paragraphRevisions: true } }>
 
       // Set currentParagraphRevisionId to the first revision
       const updatedParagraph = await prisma.paragraph.update({
@@ -442,8 +443,12 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 ? request.body.contentSchema
                 : (currentRevision?.contentSchema ?? null),
             state: request.body.state ?? currentRevision?.state ?? null,
-            plotPointActions: request.body.plotPointActions ?? currentRevision?.plotPointActions ?? null,
-            inventoryActions: request.body.inventoryActions ?? currentRevision?.inventoryActions ?? null,
+            plotPointActions: (request.body.plotPointActions ??
+              currentRevision?.plotPointActions ??
+              null) as Prisma.InputJsonValue,
+            inventoryActions: (request.body.inventoryActions ??
+              currentRevision?.inventoryActions ??
+              null) as Prisma.InputJsonValue,
           },
         })
 

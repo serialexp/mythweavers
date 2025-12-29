@@ -21,15 +21,18 @@ import myCharactersRoutes from '../src/routes/my/characters.js'
 import myContextItemsRoutes from '../src/routes/my/context-items.js'
 import myFilesRoutes from '../src/routes/my/files.js'
 import myInventoryRoutes from '../src/routes/my/inventory.js'
+import myLandmarkStatesRoutes from '../src/routes/my/landmark-states.js'
 import myLandmarksRoutes from '../src/routes/my/landmarks.js'
 import myMapsRoutes from '../src/routes/my/maps.js'
 import myMessageRevisionsRoutes from '../src/routes/my/message-revisions.js'
+import myMessagesBatchRoutes from '../src/routes/my/messages-batch.js'
 import myMessagesRoutes from '../src/routes/my/messages.js'
 import myParagraphRevisionsRoutes from '../src/routes/my/paragraph-revisions.js'
 import myParagraphsRoutes from '../src/routes/my/paragraphs.js'
 import myPathSegmentsRoutes from '../src/routes/my/path-segments.js'
 import myPathsRoutes from '../src/routes/my/paths.js'
 import myPawnsRoutes from '../src/routes/my/pawns.js'
+import myPlotPointStatesRoutes from '../src/routes/my/plot-point-states.js'
 import myScenesRoutes from '../src/routes/my/scenes.js'
 import myStoriesRoutes from '../src/routes/my/stories.js'
 import myStoryCalendarRoutes from '../src/routes/my/story-calendar.js'
@@ -128,6 +131,7 @@ async function buildAppInternal() {
   await app.register(myCharactersRoutes, { prefix: '/my' })
   await app.register(myContextItemsRoutes, { prefix: '/my' })
   await app.register(myMessagesRoutes, { prefix: '/my' })
+  await app.register(myMessagesBatchRoutes, { prefix: '/my' })
   await app.register(myMessageRevisionsRoutes, { prefix: '/my' })
   await app.register(myParagraphsRoutes, { prefix: '/my' })
   await app.register(myParagraphRevisionsRoutes, { prefix: '/my' })
@@ -138,9 +142,11 @@ async function buildAppInternal() {
   await app.register(myStoryCalendarRoutes, { prefix: '/my' })
   await app.register(myMapsRoutes, { prefix: '/my' })
   await app.register(myLandmarksRoutes, { prefix: '/my' })
+  await app.register(myLandmarkStatesRoutes, { prefix: '/my' })
   await app.register(myPawnsRoutes, { prefix: '/my' })
   await app.register(myPathsRoutes, { prefix: '/my' })
   await app.register(myPathSegmentsRoutes, { prefix: '/my' })
+  await app.register(myPlotPointStatesRoutes, { prefix: '/my' })
   await app.register(publicStoriesRoutes, { prefix: '/stories' })
   await app.register(publicTagRoutes, { prefix: '' })
   await app.register(calendarPresetsRoutes, { prefix: '/calendars' })

@@ -1,8 +1,9 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
-import { deleteFile as deleteFileFromDisk, saveFile } from '../../lib/file-storage.js'
+import { deleteFile, getFileStream, saveFile } from '../../lib/file-storage.js'
 import { prisma } from '../../lib/prisma.js'
+import type { StorageVisibility } from '../../lib/r2-storage.js'
 import { transformDates } from '../../lib/transform-dates.js'
 import { errorSchema, successSchema } from '../../schemas/common.js'
 
@@ -15,6 +16,8 @@ const fileSchema = z.strictObject({
   ownerId: z.number().int().meta({ example: 1 }),
   storyId: z.string().nullable().meta({ example: 'clx1234567890' }),
   localPath: z.string().nullable().meta({ example: '/uploads/1/2025/12/image-123.jpg' }),
+  r2Key: z.string().nullable().meta({ example: '1/2025/12/image-123.jpg' }),
+  visibility: z.string().meta({ example: 'private' }),
   path: z.string().meta({ example: '/files/1/2025/12/image-123.jpg' }),
   sha256: z.string().meta({ example: 'abc123...' }),
   width: z.number().int().nullable().meta({ example: 1920 }),
@@ -55,7 +58,7 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       preHandler: requireAuth,
       schema: {
-        description: 'Upload a file (image for cover art, character pictures, etc.)',
+        description: 'Upload a file (image for cover art, character pictures, maps, etc.)',
         tags: ['files'],
         // Note: multipart requests don't use body schema
         // File validation happens in the handler
@@ -63,6 +66,7 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
           201: uploadFileResponseSchema,
           400: errorSchema,
           401: errorSchema,
+          404: errorSchema, // Story not found
           413: errorSchema, // Payload too large
         },
       },
@@ -78,8 +82,10 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.code(400).send({ error: 'No file provided' })
         }
 
-        // Optional storyId from fields
-        const storyId = data.fields.storyId?.value as string | undefined
+        // Optional storyId and visibility from fields
+        const storyId = (data.fields.storyId as { value?: string } | undefined)?.value
+        const visibilityField = (data.fields.visibility as { value?: string } | undefined)?.value
+        const visibility: StorageVisibility = visibilityField === 'public' ? 'public' : 'private'
 
         // If storyId provided, verify user owns the story
         if (storyId) {
@@ -93,8 +99,8 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
           }
         }
 
-        // Save file to disk and get metadata
-        const fileMetadata = await saveFile(data, userId)
+        // Save file to storage (R2 or local)
+        const fileMetadata = await saveFile(data, userId, visibility)
 
         // Check if file with same SHA256 already exists for this user
         const existingFile = await prisma.file.findFirst({
@@ -107,7 +113,7 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
         if (existingFile) {
           // File already exists (deduplication)
           // Delete the newly uploaded file and return existing
-          await deleteFileFromDisk(fileMetadata.localPath)
+          await deleteFile(fileMetadata.localPath, fileMetadata.r2Key, visibility)
           return reply.code(201).send({
             success: true as const,
             file: transformDates(existingFile),
@@ -120,6 +126,8 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
             ownerId: userId,
             storyId: storyId || null,
             localPath: fileMetadata.localPath,
+            r2Key: fileMetadata.r2Key,
+            visibility: fileMetadata.visibility,
             path: fileMetadata.path,
             sha256: fileMetadata.sha256,
             width: fileMetadata.width,
@@ -146,7 +154,67 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
   )
 
-  // List user's files
+  // Serve private files (proxies from R2 or local storage)
+  // This endpoint is used for files that require authentication
+  fastify.get(
+    '/files/*',
+    {
+      preHandler: requireAuth,
+      schema: {
+        description: 'Get file content (for private files that require authentication)',
+        tags: ['files'],
+        produces: ['image/*', 'application/octet-stream'],
+        response: {
+          // 200 returns binary file data (no JSON schema)
+          200: z.any().meta({ description: 'Binary file content' }),
+          401: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.id
+      // Get the path from the wildcard
+      const filePath = `/my/files/${(request.params as { '*': string })['*']}`
+
+      // Find the file
+      const file = await prisma.file.findFirst({
+        where: { path: filePath },
+      })
+
+      if (!file) {
+        return reply.code(404).send({ error: 'File not found' })
+      }
+
+      // Check access - user must own the file or it must be public
+      if (file.visibility === 'private' && file.ownerId !== userId) {
+        return reply.code(404).send({ error: 'File not found' })
+      }
+
+      try {
+        // Get file stream from storage
+        const { stream, contentType, contentLength } = await getFileStream(
+          file.localPath,
+          file.r2Key,
+          file.visibility as StorageVisibility,
+        )
+
+        // Set response headers
+        reply.header('Content-Type', contentType || file.mimeType)
+        if (contentLength) {
+          reply.header('Content-Length', contentLength)
+        }
+        reply.header('Cache-Control', 'public, max-age=31536000') // 1 year cache
+
+        return reply.send(stream)
+      } catch (error) {
+        console.error('Error serving file:', error)
+        return reply.code(404).send({ error: 'File not found' })
+      }
+    },
+  )
+
+  // List user's files (metadata only)
   fastify.get(
     '/files',
     {
@@ -211,7 +279,7 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
   )
 
-  // Get single file
+  // Get single file metadata
   fastify.get(
     '/files/:id',
     {
@@ -259,7 +327,7 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       preHandler: requireAuth,
       schema: {
-        description: 'Delete a file (removes from database and filesystem)',
+        description: 'Delete a file (removes from database and storage)',
         tags: ['files'],
         params: z.strictObject({
           id: z.string().meta({
@@ -315,10 +383,8 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // Delete file from database
       await prisma.file.delete({ where: { id } })
 
-      // Delete file from filesystem
-      if (file.localPath) {
-        await deleteFileFromDisk(file.localPath)
-      }
+      // Delete file from storage
+      await deleteFile(file.localPath, file.r2Key, file.visibility as StorageVisibility)
 
       return { success: true as const }
     },

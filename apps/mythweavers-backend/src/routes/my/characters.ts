@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
@@ -445,7 +446,7 @@ const myCharactersRoutes: FastifyPluginAsyncZod = async (fastify) => {
             distinguishingFeatures: characterData.distinguishingFeatures ?? null,
             writingStyle: characterData.writingStyle ?? null,
             laterVersionOfId: characterData.laterVersionOfId ?? null,
-            significantActions: characterData.significantActions ?? null,
+            significantActions: (characterData.significantActions ?? null) as Prisma.InputJsonValue,
             birthdate: characterData.birthdate ?? null,
           },
         })
@@ -614,7 +615,7 @@ const myCharactersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // Update character
         const character = await prisma.character.update({
           where: { id },
-          data: updates,
+          data: updates as Prisma.CharacterUpdateInput,
         })
 
         fastify.log.info({ characterId: character.id, userId }, 'Character updated')

@@ -25,11 +25,26 @@ const messageRevisionSchema = z.strictObject({
   think: z.string().nullable().meta({ example: 'The scene should establish...' }),
   showThink: z.boolean().meta({ example: false }),
   createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
+  // Combined paragraph content for display
+  content: z.string().meta({ example: 'The story content...', description: 'Combined text from all paragraphs' }),
 })
 
 const listMessageRevisionsResponseSchema = z.strictObject({
   revisions: z.array(messageRevisionSchema),
 })
+
+// Type for the expected versionType enum values
+type VersionType = 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit'
+
+// Helper to transform message revision with properly typed versionType
+function transformMessageRevision<T extends { versionType: string }>(
+  revision: T,
+): Omit<T, 'versionType'> & { versionType: VersionType } {
+  return {
+    ...revision,
+    versionType: revision.versionType as VersionType,
+  }
+}
 
 // ============================================================================
 // ROUTES
@@ -96,9 +111,32 @@ const messageRevisionRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const revisions = await prisma.messageRevision.findMany({
         where: { messageId },
         orderBy: { version: 'desc' },
+        include: {
+          paragraphs: {
+            orderBy: { sortOrder: 'asc' },
+            include: {
+              currentParagraphRevision: true,
+            },
+          },
+        },
       })
 
-      return { revisions: revisions.map(transformCreatedAt) }
+      // Transform revisions and combine paragraph content
+      const transformedRevisions = revisions.map((r) => {
+        // Combine paragraph bodies into content
+        const content = r.paragraphs
+          .map((p) => p.currentParagraphRevision?.body ?? '')
+          .filter((body) => body.length > 0)
+          .join('\n\n')
+
+        const { paragraphs, ...revisionData } = r
+        return {
+          ...transformMessageRevision(transformCreatedAt(revisionData)),
+          content,
+        }
+      })
+
+      return { revisions: transformedRevisions }
     },
   )
 
@@ -230,7 +268,10 @@ const messageRevisionRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       return reply.code(201).send({
         success: true as const,
-        revision: transformCreatedAt(revision),
+        revision: {
+          ...transformMessageRevision(transformCreatedAt(revision)),
+          content: '', // New revision starts with no paragraphs
+        },
       })
     },
   )

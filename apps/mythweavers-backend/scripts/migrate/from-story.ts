@@ -25,9 +25,19 @@
  *   6. Calendar.config (string JSON) → Calendar.config (JSONB) + name extraction
  */
 
-import { PrismaClient as TargetPrisma } from '@prisma/client'
-import { PrismaClient as SourcePrisma } from '../../src/generated/story-prisma'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import * as crypto from 'node:crypto'
+import { fileURLToPath } from 'node:url'
+
+// ESM equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 import { IdMapper, type MigrationLogger, createConsoleLogger, generateCuid } from './utils'
+
+// Dynamic imports to avoid errors when just showing help
+type TargetPrisma = import('@prisma/client').PrismaClient
+type SourcePrisma = import('../../src/generated/story-prisma').PrismaClient
 
 interface MigrationOptions {
   sourceUserId: string // cuid from story-backend
@@ -53,6 +63,7 @@ interface MigrationResult {
     paragraphs: number
     characters: number
     contextItems: number
+    files: number
     maps: number
     landmarks: number
     pawns: number
@@ -103,6 +114,7 @@ export async function migrateFromStoryBackend(
   targetPrisma: TargetPrisma,
   options: MigrationOptions,
 ): Promise<MigrationResult> {
+  // Note: Prisma clients are passed in from main() after dynamic import
   const {
     sourceUserId,
     targetUserId,
@@ -126,6 +138,7 @@ export async function migrateFromStoryBackend(
     paragraphs: 0,
     characters: 0,
     contextItems: 0,
+    files: 0,
     maps: 0,
     landmarks: 0,
     pawns: 0,
@@ -157,7 +170,7 @@ export async function migrateFromStoryBackend(
         },
         chapters: true, // Legacy chapters
         messages: {
-          where: { deleted: false },
+          // Include deleted messages so they can be restored in the new system
           orderBy: { order: 'asc' },
           include: {
             versions: {
@@ -230,6 +243,7 @@ export async function migrateFromStoryBackend(
             branchChoices: story.branchChoices,
             provider: story.provider,
             model: story.model,
+            globalScript: story.globalScript || null,
             sortOrder: 0,
             createdAt: story.savedAt,
             updatedAt: story.updatedAt,
@@ -341,7 +355,11 @@ export async function migrateFromStoryBackend(
       // =========================================================================
       // 6. Migrate Node hierarchy → Book/Arc/Chapter
       // =========================================================================
-      logger.info(`  Migrating ${story.nodes.length} nodes to hierarchy...`)
+      // Count chapters for progress display
+      const totalChapters = story.nodes.filter((n) => n.type === 'chapter').length
+      let processedChapters = 0
+
+      logger.info(`  Migrating ${story.nodes.length} nodes (${totalChapters} chapters) to hierarchy...`)
 
       // Build tree from flat nodes
       const _nodeMap = new Map(story.nodes.map((n) => [n.id, n]))
@@ -429,6 +447,7 @@ export async function migrateFromStoryBackend(
                 arcId: parentInfo.id,
                 sortOrder,
                 nodeType: 'story',
+                status: node.status || null,
                 createdAt: node.createdAt,
                 updatedAt: node.updatedAt,
               },
@@ -477,10 +496,12 @@ export async function migrateFromStoryBackend(
             await targetPrisma.scene.create({
               data: {
                 id: newSceneId,
-                name: node.title,
+                name: 'Scene 1',
                 summary: node.summary,
                 chapterId: newChapterId,
                 sortOrder: 0,
+                status: node.status || null,
+                includeInFull: node.includeInFull ?? 1,
                 perspective: null, // Story-backend doesn't track perspective per scene
                 viewpointCharacterId,
                 activeCharacterIds: activeCharacterIds && activeCharacterIds.length > 0 ? activeCharacterIds : null,
@@ -495,181 +516,320 @@ export async function migrateFromStoryBackend(
           }
           stats.scenes++
 
-          // Migrate messages for this chapter/scene
+          // Migrate messages for this chapter/scene (batched for performance)
           const chapterMessages = story.messages.filter((m) => m.nodeId === node.id)
+          await migrateMessagesForScene(chapterMessages, newSceneId)
 
-          for (let msgIdx = 0; msgIdx < chapterMessages.length; msgIdx++) {
-            const msg = chapterMessages[msgIdx]
-            await migrateMessage(msg, newSceneId, msgIdx)
-          }
+          processedChapters++
+          const pct = Math.round((processedChapters / totalChapters) * 100)
+          process.stdout.write(`\r    Chapter ${processedChapters}/${totalChapters} (${pct}%) - ${chapterMessages.length} messages`)
         }
       }
 
-      const migrateMessage = async (msg: (typeof story.messages)[0], sceneId: string, sortOrder: number) => {
-        const newMessageId = generateCuid()
-        idMapper.setMapping('message', msg.id, newMessageId)
+      // Clear the progress line after completion
+      if (totalChapters > 0) {
+        process.stdout.write('\r' + ' '.repeat(80) + '\r')
+      }
 
-        if (!dryRun) {
-          await targetPrisma.message.create({
-            data: {
-              id: newMessageId,
-              sceneId,
-              sortOrder,
-              instruction: msg.instruction,
-              script: msg.script,
-              createdAt: msg.timestamp,
-              updatedAt: msg.timestamp,
-            },
-          })
-        }
-        stats.messages++
+      // Track branch messages that need their options updated after all messages are migrated
+      const branchMessagesToUpdate: Array<{
+        newMessageId: string
+        sourceOptions: Array<{
+          id: string
+          label: string
+          targetNodeId: string
+          targetMessageId: string
+          description?: string
+        }>
+      }> = []
 
-        // Create MessageRevision from current message state
-        const newMsgRevisionId = generateCuid()
+      // Batched message migration - collects all data first, then bulk inserts
+      const migrateMessagesForScene = async (messages: typeof story.messages, sceneId: string) => {
+        if (messages.length === 0) return
 
-        if (!dryRun) {
-          await targetPrisma.messageRevision.create({
-            data: {
-              id: newMsgRevisionId,
-              messageId: newMessageId,
-              version: 1,
-              versionType: 'initial',
-              model: msg.model,
-              tokensPerSecond: msg.tokensPerSecond,
-              totalTokens: msg.totalTokens,
-              promptTokens: msg.promptTokens,
-              cacheCreationTokens: msg.cacheCreationTokens,
-              cacheReadTokens: msg.cacheReadTokens,
-              think: msg.think,
-              showThink: msg.showThink,
-              createdAt: msg.timestamp,
-            },
-          })
-        }
+        // Collect all data for batch insert
+        const messagesToCreate: Array<{
+          id: string
+          sceneId: string
+          sortOrder: number
+          instruction: string | null
+          script: string | null
+          deleted: boolean
+          type: string | null
+          options: unknown | null
+          createdAt: Date
+          updatedAt: Date
+        }> = []
 
-        // Parse paragraphs from message content
-        // In story-backend, msg.paragraphs is JSON with paragraph data
-        // msg.content is the raw text
-        let paragraphsData: Array<{ text: string; summary?: string }> = []
+        // Track message -> revision mapping for batch update
+        const messageToRevisionMap: Array<{ messageId: string; revisionId: string }> = []
 
-        if (msg.paragraphs) {
-          try {
-            paragraphsData = msg.paragraphs as Array<{ text: string; summary?: string }>
-          } catch {
-            // If parsing fails, treat entire content as one paragraph
-            paragraphsData = [{ text: msg.content }]
+        const messageRevisionsToCreate: Array<{
+          id: string
+          messageId: string
+          version: number
+          versionType: string
+          model: string | null
+          tokensPerSecond: number | null
+          totalTokens: number | null
+          promptTokens: number | null
+          cacheCreationTokens: number | null
+          cacheReadTokens: number | null
+          think: string | null
+          showThink: boolean
+          createdAt: Date
+        }> = []
+
+        const paragraphsToCreate: Array<{
+          id: string
+          messageRevisionId: string
+          sortOrder: number
+          createdAt: Date
+          updatedAt: Date
+        }> = []
+
+        // Track paragraph -> revision mapping for batch update
+        const paragraphToRevisionMap: Array<{ paragraphId: string; revisionId: string }> = []
+
+        const paragraphRevisionsToCreate: Array<{
+          id: string
+          paragraphId: string
+          body: string
+          version: number
+          state: null
+          createdAt: Date
+        }> = []
+
+        // Process each message and collect data
+        for (let msgIdx = 0; msgIdx < messages.length; msgIdx++) {
+          const msg = messages[msgIdx]
+          const newMessageId = generateCuid()
+          idMapper.setMapping('message', msg.id, newMessageId)
+
+          // Build all versions including current, then sort by date to assign version numbers
+          // The current message content is the latest version
+          interface VersionEntry {
+            content: string
+            versionType: string
+            model: string | null
+            tokensPerSecond: number | null
+            totalTokens: number | null
+            promptTokens: number | null
+            cacheCreationTokens: number | null
+            cacheReadTokens: number | null
+            think: string | null
+            showThink: boolean
+            createdAt: Date
+            isCurrent: boolean
+            paragraphs?: string[]
           }
-        } else {
-          // Split content by double newlines as paragraphs
-          paragraphsData = msg.content
-            .split(/\n\n+/)
-            .filter((p) => p.trim())
-            .map((text) => ({ text: text.trim() }))
-        }
 
-        // Create Paragraph and ParagraphRevision for each
-        for (let pIdx = 0; pIdx < paragraphsData.length; pIdx++) {
-          const para = paragraphsData[pIdx]
-          const newParagraphId = generateCuid()
-          const newParagraphRevisionId = generateCuid()
+          const allVersions: VersionEntry[] = []
 
-          if (!dryRun) {
-            await targetPrisma.paragraph.create({
-              data: {
-                id: newParagraphId,
-                messageRevisionId: newMsgRevisionId,
-                sortOrder: pIdx,
-                createdAt: msg.timestamp,
-                updatedAt: msg.timestamp,
-              },
+          // Add historical versions from msg.versions
+          for (const version of msg.versions) {
+            allVersions.push({
+              content: version.content,
+              versionType: version.versionType || 'edit',
+              model: version.model,
+              tokensPerSecond: null,
+              totalTokens: null,
+              promptTokens: null,
+              cacheCreationTokens: null,
+              cacheReadTokens: null,
+              think: null,
+              showThink: false,
+              createdAt: new Date(version.createdAt),
+              isCurrent: false,
+            })
+          }
+
+          // Add current message content as the latest version
+          // Parse paragraphs for current content
+          let currentParagraphTexts: string[] = []
+          if (msg.paragraphs) {
+            currentParagraphTexts = (msg.paragraphs as string[]).filter((p) => p != null)
+          } else {
+            currentParagraphTexts = msg.content
+              .split(/\n\n+/)
+              .filter((p) => p.trim())
+              .map((text) => text.trim())
+          }
+
+          allVersions.push({
+            content: msg.content,
+            versionType: allVersions.length === 0 ? 'initial' : 'edit',
+            model: msg.model,
+            tokensPerSecond: msg.tokensPerSecond,
+            totalTokens: msg.totalTokens,
+            promptTokens: msg.promptTokens,
+            cacheCreationTokens: msg.cacheCreationTokens,
+            cacheReadTokens: msg.cacheReadTokens,
+            think: msg.think,
+            showThink: msg.showThink ?? false,
+            createdAt: new Date(msg.timestamp),
+            isCurrent: true,
+            paragraphs: currentParagraphTexts,
+          })
+
+          // Sort by creation date ascending (oldest first = version 1)
+          allVersions.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+
+          // Find which revision ID will be the current one
+          let currentRevisionId: string | null = null
+
+          // Create revisions with correct version numbers
+          for (let versionIdx = 0; versionIdx < allVersions.length; versionIdx++) {
+            const versionEntry = allVersions[versionIdx]
+            const versionNumber = versionIdx + 1 // Version 1, 2, 3, etc.
+            const newRevisionId = generateCuid()
+
+            if (versionEntry.isCurrent) {
+              currentRevisionId = newRevisionId
+            }
+
+            messageRevisionsToCreate.push({
+              id: newRevisionId,
+              messageId: newMessageId,
+              version: versionNumber,
+              versionType: versionNumber === 1 ? 'initial' : versionEntry.versionType,
+              model: versionEntry.model,
+              tokensPerSecond: versionEntry.tokensPerSecond,
+              totalTokens: versionEntry.totalTokens,
+              promptTokens: versionEntry.promptTokens,
+              cacheCreationTokens: versionEntry.cacheCreationTokens,
+              cacheReadTokens: versionEntry.cacheReadTokens,
+              think: versionEntry.think,
+              showThink: versionEntry.showThink,
+              createdAt: versionEntry.createdAt,
             })
 
-            await targetPrisma.paragraphRevision.create({
-              data: {
+            // Create paragraphs for this revision
+            if (versionEntry.isCurrent && versionEntry.paragraphs) {
+              // Current version has structured paragraphs
+              for (let pIdx = 0; pIdx < versionEntry.paragraphs.length; pIdx++) {
+                const newParagraphId = generateCuid()
+                const newParagraphRevisionId = generateCuid()
+
+                paragraphsToCreate.push({
+                  id: newParagraphId,
+                  messageRevisionId: newRevisionId,
+                  sortOrder: pIdx,
+                  createdAt: versionEntry.createdAt,
+                  updatedAt: versionEntry.createdAt,
+                })
+                paragraphToRevisionMap.push({ paragraphId: newParagraphId, revisionId: newParagraphRevisionId })
+
+                paragraphRevisionsToCreate.push({
+                  id: newParagraphRevisionId,
+                  paragraphId: newParagraphId,
+                  body: versionEntry.paragraphs[pIdx] ?? '',
+                  version: 1,
+                  state: null,
+                  createdAt: versionEntry.createdAt,
+                })
+              }
+              stats.paragraphs += versionEntry.paragraphs.length
+            } else {
+              // Historical version - single paragraph with full content
+              const newParagraphId = generateCuid()
+              const newParagraphRevisionId = generateCuid()
+
+              paragraphsToCreate.push({
+                id: newParagraphId,
+                messageRevisionId: newRevisionId,
+                sortOrder: 0,
+                createdAt: versionEntry.createdAt,
+                updatedAt: versionEntry.createdAt,
+              })
+              paragraphToRevisionMap.push({ paragraphId: newParagraphId, revisionId: newParagraphRevisionId })
+
+              paragraphRevisionsToCreate.push({
                 id: newParagraphRevisionId,
                 paragraphId: newParagraphId,
-                body: para.text,
+                body: versionEntry.content,
                 version: 1,
-                state: null, // Story-backend doesn't track paragraph state
-                createdAt: msg.timestamp,
-              },
-            })
+                state: null,
+                createdAt: versionEntry.createdAt,
+              })
+            }
+          }
 
-            // Set current revision
-            await targetPrisma.paragraph.update({
-              where: { id: newParagraphId },
-              data: { currentParagraphRevisionId: newParagraphRevisionId },
+          // Message (currentMessageRevisionId set via batch update after revisions exist)
+          // For branch messages, track for post-processing (targets may not be migrated yet)
+          if (msg.type === 'branch' && msg.options) {
+            const sourceOptions = msg.options as Array<{
+              id: string
+              label: string
+              targetNodeId: string
+              targetMessageId: string
+              description?: string
+            }>
+            branchMessagesToUpdate.push({
+              newMessageId,
+              sourceOptions,
             })
           }
-          stats.paragraphs++
-        }
 
-        // Set current message revision
-        if (!dryRun) {
-          await targetPrisma.message.update({
-            where: { id: newMessageId },
-            data: { currentMessageRevisionId: newMsgRevisionId },
+          messagesToCreate.push({
+            id: newMessageId,
+            sceneId,
+            sortOrder: msgIdx,
+            instruction: msg.instruction,
+            script: msg.script,
+            deleted: msg.deleted ?? false, // Preserve deleted status for restoration
+            type: msg.type || null, // Preserve message type (branch, event, chapter)
+            options: null, // Will be updated after all messages are migrated
+            createdAt: msg.timestamp,
+            updatedAt: msg.timestamp,
           })
-        }
 
-        // Migrate message versions
-        for (const version of msg.versions) {
-          if (version.version === 1) continue // Already created above
-
-          const newVersionId = generateCuid()
-
-          if (!dryRun) {
-            await targetPrisma.messageRevision.create({
-              data: {
-                id: newVersionId,
-                messageId: newMessageId,
-                version: version.version,
-                versionType: version.versionType,
-                model: version.model,
-                createdAt: version.createdAt,
-              },
-            })
-
-            // Create paragraph for this version
-            const versionParagraphId = generateCuid()
-            const versionParagraphRevisionId = generateCuid()
-
-            await targetPrisma.paragraph.create({
-              data: {
-                id: versionParagraphId,
-                messageRevisionId: newVersionId,
-                sortOrder: 0,
-                createdAt: version.createdAt,
-                updatedAt: version.createdAt,
-              },
-            })
-
-            await targetPrisma.paragraphRevision.create({
-              data: {
-                id: versionParagraphRevisionId,
-                paragraphId: versionParagraphId,
-                body: version.content,
-                version: 1,
-                createdAt: version.createdAt,
-              },
-            })
-
-            await targetPrisma.paragraph.update({
-              where: { id: versionParagraphId },
-              data: { currentParagraphRevisionId: versionParagraphRevisionId },
-            })
+          if (currentRevisionId) {
+            messageToRevisionMap.push({ messageId: newMessageId, revisionId: currentRevisionId })
           }
+
+          stats.messages++
         }
 
-        // Migrate paragraph embeddings
-        for (const _embedding of msg.paragraphEmbeddings) {
-          // Find the corresponding paragraph revision
-          // This is approximate since embeddings are per-message paragraph index
-          const _paragraphRevisionId = generateCuid() // Would need proper mapping
+        // Bulk insert all data (order matters for FK constraints)
+        if (!dryRun) {
+          // 1. Create messages first (revisions reference them)
+          await targetPrisma.message.createMany({ data: messagesToCreate })
 
-          if (!dryRun) {
-            // Note: This would need the actual paragraph revision ID
-            // For now, skipping embeddings migration as it requires more complex mapping
+          // 2. Create message revisions (they reference messages)
+          await targetPrisma.messageRevision.createMany({ data: messageRevisionsToCreate })
+
+          // 3. Batch update messages to set currentMessageRevisionId
+          // Using raw SQL for efficient batch update
+          if (messageToRevisionMap.length > 0) {
+            const messageUpdateCases = messageToRevisionMap
+              .map((m) => `WHEN '${m.messageId}' THEN '${m.revisionId}'`)
+              .join(' ')
+            const messageIds = messageToRevisionMap.map((m) => `'${m.messageId}'`).join(',')
+            await targetPrisma.$executeRawUnsafe(`
+              UPDATE "Message"
+              SET "currentMessageRevisionId" = CASE "id" ${messageUpdateCases} END
+              WHERE "id" IN (${messageIds})
+            `)
+          }
+
+          // 4. Create paragraphs first (revisions reference them)
+          await targetPrisma.paragraph.createMany({ data: paragraphsToCreate })
+
+          // 5. Create paragraph revisions (they reference paragraphs)
+          await targetPrisma.paragraphRevision.createMany({ data: paragraphRevisionsToCreate })
+
+          // 6. Batch update paragraphs to set currentParagraphRevisionId
+          if (paragraphToRevisionMap.length > 0) {
+            const paragraphUpdateCases = paragraphToRevisionMap
+              .map((p) => `WHEN '${p.paragraphId}' THEN '${p.revisionId}'`)
+              .join(' ')
+            const paragraphIds = paragraphToRevisionMap.map((p) => `'${p.paragraphId}'`).join(',')
+            await targetPrisma.$executeRawUnsafe(`
+              UPDATE "Paragraph"
+              SET "currentParagraphRevisionId" = CASE "id" ${paragraphUpdateCases} END
+              WHERE "id" IN (${paragraphIds})
+            `)
           }
         }
       }
@@ -680,13 +840,199 @@ export async function migrateFromStoryBackend(
       }
 
       // =========================================================================
-      // 7. Migrate Maps
+      // 6b. Update branch message options with remapped IDs
+      // =========================================================================
+      if (branchMessagesToUpdate.length > 0) {
+        logger.info(`  Updating ${branchMessagesToUpdate.length} branch message options...`)
+        for (const branch of branchMessagesToUpdate) {
+          const mappedOptions = branch.sourceOptions.map((opt) => ({
+            id: opt.id,
+            label: opt.label,
+            // Map old node ID to new scene ID (scenes were created from chapters/nodes)
+            targetNodeId: idMapper.getMapping('scene', opt.targetNodeId) || opt.targetNodeId,
+            // Map old message ID to new message ID
+            targetMessageId: idMapper.getMapping('message', opt.targetMessageId) || opt.targetMessageId,
+            description: opt.description,
+          }))
+
+          if (!dryRun) {
+            await targetPrisma.message.update({
+              where: { id: branch.newMessageId },
+              data: { options: mappedOptions },
+            })
+          }
+        }
+      }
+
+      // =========================================================================
+      // 6c. Update branchChoices with remapped message IDs
+      // =========================================================================
+      if (story.branchChoices && Object.keys(story.branchChoices).length > 0) {
+        logger.info(`  Remapping ${Object.keys(story.branchChoices).length} branch choices...`)
+        const remappedBranchChoices: Record<string, string> = {}
+
+        for (const [oldMessageId, optionId] of Object.entries(story.branchChoices)) {
+          const newMessageId = idMapper.getMapping('message', oldMessageId)
+          if (newMessageId) {
+            remappedBranchChoices[newMessageId] = optionId as string
+          } else {
+            logger.warn(`    Branch choice for message ${oldMessageId} could not be remapped (message not found)`)
+          }
+        }
+
+        if (!dryRun && Object.keys(remappedBranchChoices).length > 0) {
+          await targetPrisma.story.update({
+            where: { id: newStoryId },
+            data: { branchChoices: remappedBranchChoices },
+          })
+          logger.info(`    Updated story with ${Object.keys(remappedBranchChoices).length} remapped branch choices`)
+        }
+      }
+
+      // =========================================================================
+      // 6d. Update selectedNodeId with remapped scene ID
+      // =========================================================================
+      if (story.selectedNodeId) {
+        const newSelectedNodeId = idMapper.getMapping('scene', story.selectedNodeId)
+        if (newSelectedNodeId) {
+          logger.info(`  Remapping selectedNodeId: ${story.selectedNodeId} -> ${newSelectedNodeId}`)
+          if (!dryRun) {
+            await targetPrisma.story.update({
+              where: { id: newStoryId },
+              data: { selectedNodeId: newSelectedNodeId },
+            })
+          }
+        } else {
+          logger.warn(`  Could not remap selectedNodeId ${story.selectedNodeId} (scene not found)`)
+        }
+      }
+
+      // =========================================================================
+      // 7. Migrate Files (map images, etc.)
+      // =========================================================================
+      // Get all files for this story from the source database
+      const sourceFiles = await sourcePrisma.file.findMany({
+        where: { storyId: story.id },
+      })
+      logger.info(`  Migrating ${sourceFiles.length} files...`)
+
+      // Check if R2 is configured
+      const useR2 = !!(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY)
+
+      // Ensure uploads directory exists (for local storage fallback)
+      const uploadsDir = path.resolve(__dirname, '../../uploads')
+      if (!useR2 && !fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true })
+      }
+
+      for (const file of sourceFiles) {
+        const newFileId = generateCuid()
+        idMapper.setMapping('file', file.id, newFileId)
+
+        if (!dryRun) {
+          // Generate a unique filename
+          const ext = path.extname(file.filename) || '.bin'
+          const uniqueFilename = `${newFileId}${ext}`
+          const sha256 = crypto.createHash('sha256').update(file.data).digest('hex')
+
+          let filePath: string | null = null
+          let r2Key: string | null = null
+          let urlPath: string
+
+          if (useR2) {
+            // Upload to R2
+            const { putToR2, generateStorageKey } = await import('../../src/lib/r2-storage.js')
+            r2Key = generateStorageKey(targetUserId, uniqueFilename)
+            const result = await putToR2(r2Key, file.data, file.mimeType, 'private')
+            urlPath = result.url
+          } else {
+            // Fall back to local storage
+            filePath = path.join(uploadsDir, uniqueFilename)
+            urlPath = `/files/${uniqueFilename}`
+            fs.writeFileSync(filePath, file.data)
+          }
+
+          // Create the file record in the target database
+          await targetPrisma.file.create({
+            data: {
+              id: newFileId,
+              ownerId: targetUserId,
+              storyId: newStoryId,
+              localPath: filePath,
+              r2Key: r2Key,
+              visibility: 'private',
+              path: urlPath,
+              sha256,
+              bytes: file.data.length,
+              mimeType: file.mimeType,
+              createdAt: file.createdAt,
+              updatedAt: file.createdAt, // Source doesn't have updatedAt
+            },
+          })
+        }
+        stats.files++
+      }
+
+      // =========================================================================
+      // 7b. Update Characters with Profile Images
+      // =========================================================================
+      // Now that files are migrated, update characters with their profile images
+      logger.info(`  Linking character profile images...`)
+      let linkedImages = 0
+      for (const char of story.characters) {
+        if (char.profileImageId) {
+          const newFileId = idMapper.getMapping('file', char.profileImageId)
+          const newCharId = idMapper.getMapping('character', char.id)
+          if (newFileId && newCharId && !dryRun) {
+            await targetPrisma.character.update({
+              where: { id: newCharId },
+              data: { pictureFileId: newFileId },
+            })
+            linkedImages++
+          }
+        }
+      }
+      if (linkedImages > 0) {
+        logger.info(`    Linked ${linkedImages} character profile images`)
+      }
+
+      // =========================================================================
+      // 8. Migrate Maps
       // =========================================================================
       logger.info(`  Migrating ${story.maps.length} maps...`)
+
+      // Default property schema for Star Wars stories (migrated from fixed columns)
+      const starWarsPropertySchema = {
+        properties: [
+          { key: 'population', label: 'Population', type: 'text' },
+          { key: 'industry', label: 'Industry', type: 'enum', options: [
+            { value: 'farming', label: 'Agricultural' },
+            { value: 'mining', label: 'Mining' },
+            { value: 'trade', label: 'Trade Hub' },
+            { value: 'political', label: 'Political' },
+            { value: 'industry', label: 'Industrial' },
+          ]},
+          { key: 'region', label: 'Region', type: 'text' },
+          { key: 'sector', label: 'Sector', type: 'text' },
+          { key: 'planetaryBodies', label: 'Planetary Bodies', type: 'text' },
+        ],
+        stateFields: [
+          { key: 'allegiance', label: 'Allegiance', options: [
+            { value: 'republic', label: 'Republic', color: '#3498db' },
+            { value: 'separatist', label: 'Separatist', color: '#e74c3c' },
+            { value: 'contested', label: 'Contested', color: '#f39c12' },
+            { value: 'neutral', label: 'Neutral', color: '#95a5a6' },
+            { value: 'independent', label: 'Independent', color: '#7f8c8d' },
+          ]},
+        ],
+      }
 
       for (const map of story.maps) {
         const newMapId = generateCuid()
         idMapper.setMapping('map', map.id, newMapId)
+
+        // Get the new file ID (mapped from old fileId)
+        const newFileId = map.fileId ? idMapper.getMapping('file', map.fileId) : null
 
         if (!dryRun) {
           await targetPrisma.map.create({
@@ -694,8 +1040,9 @@ export async function migrateFromStoryBackend(
               id: newMapId,
               storyId: newStoryId,
               name: map.name,
-              fileId: map.fileId,
+              fileId: newFileId,
               borderColor: map.borderColor,
+              propertySchema: starWarsPropertySchema,
               createdAt: map.createdAt,
               updatedAt: map.updatedAt,
             },
@@ -708,6 +1055,14 @@ export async function migrateFromStoryBackend(
           const newLandmarkId = generateCuid()
           idMapper.setMapping('landmark', landmark.id, newLandmarkId)
 
+          // Convert fixed columns to properties JSON
+          const properties: Record<string, string> = {}
+          if (landmark.population) properties.population = landmark.population
+          if (landmark.industry) properties.industry = landmark.industry
+          if (landmark.region) properties.region = landmark.region
+          if (landmark.sector) properties.sector = landmark.sector
+          if (landmark.planetaryBodies) properties.planetaryBodies = landmark.planetaryBodies
+
           if (!dryRun) {
             await targetPrisma.landmark.create({
               data: {
@@ -718,13 +1073,9 @@ export async function migrateFromStoryBackend(
                 name: landmark.name,
                 description: landmark.description,
                 type: landmark.type,
-                population: landmark.population,
-                industry: landmark.industry,
                 color: landmark.color,
                 size: landmark.size,
-                region: landmark.region,
-                sector: landmark.sector,
-                planetaryBodies: landmark.planetaryBodies,
+                properties,
               },
             })
 
@@ -856,6 +1207,7 @@ export async function migrateFromStoryBackend(
     logger.info(`  - Characters: ${stats.characters}`)
     logger.info(`  - Context Items: ${stats.contextItems}`)
     logger.info(`  - Calendars: ${stats.calendars}`)
+    logger.info(`  - Files: ${stats.files}`)
     logger.info(`  - Maps: ${stats.maps}`)
     logger.info(`  - Landmarks: ${stats.landmarks}`)
     logger.info(`  - Pawns (Fleets): ${stats.pawns}`)
@@ -893,25 +1245,142 @@ export async function migrateFromStoryBackend(
   }
 }
 
+async function showHelp(sourceUserId?: string, targetUserId?: number) {
+  console.log(`
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    Story Migration Tool                                      ║
+║                                                                              ║
+║  Migrates stories from Story Backend (SQLite) to Unified Backend (PostgreSQL)║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Usage:
+  pnpm migrate:story <source-user-id> <target-user-id> [story-id] [options]
+
+Arguments:
+  source-user-id   User ID (cuid) from story-backend SQLite database
+  target-user-id   User ID (integer) in unified-backend PostgreSQL database
+  story-id         (Optional) Specific story ID to migrate
+                   If omitted, shows available stories to choose from
+
+Options:
+  --all            Migrate all stories (required if no story-id specified)
+  --dry-run        Preview changes without modifying the database
+  --replace        Delete and re-import stories that already exist
+  --help, -h       Show this help message
+
+Environment Variables:
+  SOURCE_DATABASE_URL   SQLite connection string for story-backend
+                        Default: file:../../story-backend/prisma/dev.db
+  DATABASE_URL          PostgreSQL connection string for unified-backend
+`)
+
+  // Try to show available users from databases
+  try {
+    const { PrismaClient: TargetPrismaClient } = await import('@prisma/client')
+    const { PrismaClient: SourcePrismaClient } = await import('../../src/generated/story-prisma')
+
+    const sourcePrisma = new SourcePrismaClient({
+      datasources: {
+        db: { url: process.env.SOURCE_DATABASE_URL || 'file:../../story-backend/prisma/dev.db' },
+      },
+    })
+    const targetPrisma = new TargetPrismaClient()
+
+    // Get users from both databases
+    const [sourceUsers, targetUsers] = await Promise.all([
+      sourcePrisma.user.findMany({ take: 5, select: { id: true, email: true } }),
+      targetPrisma.user.findMany({ take: 5, select: { id: true, email: true } }),
+    ])
+
+    if (sourceUsers.length > 0) {
+      console.log('Available source users (story-backend):')
+      for (const user of sourceUsers) {
+        console.log(`  ${user.id}  ${user.email}`)
+      }
+      console.log('')
+    }
+
+    if (targetUsers.length > 0) {
+      console.log('Available target users (unified-backend):')
+      for (const user of targetUsers) {
+        console.log(`  ${user.id}  ${user.email}`)
+      }
+      console.log('')
+    }
+
+    // If source user ID provided, show their stories
+    if (sourceUserId) {
+      const stories = await sourcePrisma.story.findMany({
+        where: { userId: sourceUserId, deleted: false },
+        select: { id: true, name: true },
+        take: 20,
+      })
+
+      if (stories.length > 0) {
+        console.log(`Stories for source user ${sourceUserId}:`)
+        for (const story of stories) {
+          console.log(`  ${story.id}  "${story.name}"`)
+        }
+        console.log('')
+      } else {
+        console.log(`No stories found for source user ${sourceUserId}\n`)
+      }
+    }
+
+    await sourcePrisma.$disconnect()
+    await targetPrisma.$disconnect()
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+
+    if (errorMsg.includes('Cannot find module') && errorMsg.includes('story-prisma')) {
+      console.log('Source Prisma client not generated. Run this first:')
+      console.log('  cd apps/mythweavers-backend && pnpm prisma:generate:source\n')
+    } else {
+      console.log('Could not connect to databases to show available users.')
+      console.log(`Error: ${errorMsg}`)
+      console.log('')
+      console.log('Make sure SOURCE_DATABASE_URL and DATABASE_URL are set correctly.')
+      console.log(`Current SOURCE_DATABASE_URL: ${process.env.SOURCE_DATABASE_URL || '(not set, using default)'}\n`)
+    }
+  }
+
+  console.log(`Examples:
+  # List available stories for a user
+  pnpm migrate:story clx1234567890 1
+
+  # Migrate a specific story
+  pnpm migrate:story clx1234567890 1 story_cuid_here
+
+  # Migrate ALL stories for a user
+  pnpm migrate:story clx1234567890 1 --all
+
+  # Preview migration without changes
+  pnpm migrate:story clx1234567890 1 --all --dry-run
+
+  # Re-import an already migrated story
+  pnpm migrate:story clx1234567890 1 story_cuid_here --replace
+`)
+}
+
 /**
  * CLI entry point
  */
 async function main() {
   const args = process.argv.slice(2)
+  const nonFlagArgs = args.filter((a) => !a.startsWith('--'))
+
+  // Show help if requested or no arguments provided
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    // Pass any provided user IDs to show relevant info
+    const sourceUserId = nonFlagArgs[0]
+    const targetUserId = nonFlagArgs[1] ? Number.parseInt(nonFlagArgs[1], 10) : undefined
+    await showHelp(sourceUserId, targetUserId)
+    process.exit(args.length === 0 ? 1 : 0)
+  }
 
   if (args.length < 2) {
-    console.log('Usage: npx tsx from-story.ts <source-user-id> <target-user-id> [story-id] [--dry-run] [--replace]')
-    console.log('')
-    console.log('Arguments:')
-    console.log('  source-user-id   User ID (cuid) from story-backend SQLite')
-    console.log('  target-user-id   User ID (int) in unified-backend PostgreSQL')
-    console.log('  story-id         Optional: Specific story ID to migrate')
-    console.log('  --dry-run        Run without making database changes')
-    console.log('  --replace        Delete existing stories and re-import (otherwise skips if exists)')
-    console.log('')
-    console.log('Environment variables:')
-    console.log('  SOURCE_DATABASE_URL  SQLite connection string for story-backend')
-    console.log('  DATABASE_URL         PostgreSQL connection string for unified-backend')
+    console.error('Error: Missing required arguments.\n')
+    await showHelp(nonFlagArgs[0])
     process.exit(1)
   }
 
@@ -920,6 +1389,7 @@ async function main() {
   const storyIdArg = args.find((a) => !a.startsWith('--') && a !== sourceUserId && a !== args[1])
   const dryRun = args.includes('--dry-run')
   const replace = args.includes('--replace')
+  const migrateAll = args.includes('--all')
 
   if (Number.isNaN(targetUserId)) {
     console.error('Error: target-user-id must be a number')
@@ -928,9 +1398,13 @@ async function main() {
 
   const logger = createConsoleLogger()
 
+  // Dynamic imports - only load Prisma clients after validating arguments
+  // This allows showing help without needing the generated clients
+  const { PrismaClient: TargetPrismaClient } = await import('@prisma/client')
+  const { PrismaClient: SourcePrismaClient } = await import('../../src/generated/story-prisma')
+
   // Initialize Prisma clients
-  // Note: You'll need to configure these with appropriate connection strings
-  const sourcePrisma = new SourcePrisma({
+  const sourcePrisma = new SourcePrismaClient({
     datasources: {
       db: {
         url: process.env.SOURCE_DATABASE_URL || 'file:../../story-backend/prisma/dev.db',
@@ -938,7 +1412,35 @@ async function main() {
     },
   })
 
-  const targetPrisma = new TargetPrisma()
+  const targetPrisma = new TargetPrismaClient()
+
+  // If no story ID and no --all flag, show available stories
+  if (!storyIdArg && !migrateAll) {
+    const stories = await sourcePrisma.story.findMany({
+      where: { userId: sourceUserId, deleted: false },
+      select: { id: true, name: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    if (stories.length === 0) {
+      console.log(`No stories found for user ${sourceUserId}`)
+      process.exit(1)
+    }
+
+    console.log(`\nAvailable stories for user ${sourceUserId}:\n`)
+    for (const story of stories) {
+      const date = story.updatedAt.toISOString().split('T')[0]
+      console.log(`  ${story.id}  "${story.name}" (${date})`)
+    }
+    console.log(`\nTo migrate a specific story:`)
+    console.log(`  pnpm migrate:story ${sourceUserId} ${targetUserId} <story-id>\n`)
+    console.log(`To migrate ALL ${stories.length} stories:`)
+    console.log(`  pnpm migrate:story ${sourceUserId} ${targetUserId} --all\n`)
+
+    await sourcePrisma.$disconnect()
+    await targetPrisma.$disconnect()
+    process.exit(0)
+  }
 
   try {
     const result = await migrateFromStoryBackend(sourcePrisma, targetPrisma, {

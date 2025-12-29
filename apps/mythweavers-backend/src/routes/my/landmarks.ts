@@ -6,68 +6,69 @@ import { errorSchema } from '../../schemas/common.js'
 
 // Schemas
 const createLandmarkBodySchema = z.strictObject({
-  x: z.number().meta({ description: 'X coordinate', example: 100.5 }),
-  y: z.number().meta({ description: 'Y coordinate', example: 200.3 }),
-  name: z.string().min(1).meta({ description: 'Landmark name', example: 'Coruscant' }),
-  description: z.string().meta({ description: 'Landmark description', example: 'Capital of the Republic' }),
-  type: z.string().optional().meta({ description: 'Landmark type', example: 'system' }),
-  population: z.string().optional().meta({ description: 'Population', example: '1 trillion' }),
-  industry: z.string().optional().meta({ description: 'Industry type', example: 'political' }),
+  x: z.number().meta({ description: 'X coordinate (0-1 normalized)', example: 0.5 }),
+  y: z.number().meta({ description: 'Y coordinate (0-1 normalized)', example: 0.3 }),
+  name: z.string().min(1).meta({ description: 'Landmark name', example: 'Capital City' }),
+  description: z.string().meta({ description: 'Landmark description', example: 'The main capital' }),
+  type: z.string().optional().meta({ description: 'Landmark type', example: 'point' }),
   color: z.string().optional().meta({ description: 'Display color (hex)', example: '#00FF00' }),
   size: z.string().optional().meta({ description: 'Size category', example: 'large' }),
-  region: z.string().optional().meta({ description: 'Region name', example: 'Core Worlds' }),
-  sector: z.string().optional().meta({ description: 'Sector name', example: 'Coruscant Sector' }),
-  planetaryBodies: z.string().optional().meta({ description: 'Planetary bodies info', example: '4 moons' }),
+  properties: z.record(z.string(), z.any()).optional().meta({ description: 'Custom properties', example: { population: '1 million', faction: 'alliance' } }),
 })
 
 const updateLandmarkBodySchema = z.strictObject({
-  x: z.number().optional().meta({ description: 'X coordinate' }),
-  y: z.number().optional().meta({ description: 'Y coordinate' }),
+  x: z.number().optional().meta({ description: 'X coordinate (0-1 normalized)' }),
+  y: z.number().optional().meta({ description: 'Y coordinate (0-1 normalized)' }),
   name: z.string().min(1).optional().meta({ description: 'Landmark name' }),
   description: z.string().optional().meta({ description: 'Landmark description' }),
   type: z.string().optional().meta({ description: 'Landmark type' }),
-  population: z.string().nullable().optional().meta({ description: 'Population (null to remove)' }),
-  industry: z.string().nullable().optional().meta({ description: 'Industry type (null to remove)' }),
   color: z.string().nullable().optional().meta({ description: 'Display color (null to remove)' }),
   size: z.string().nullable().optional().meta({ description: 'Size category (null to remove)' }),
-  region: z.string().nullable().optional().meta({ description: 'Region name (null to remove)' }),
-  sector: z.string().nullable().optional().meta({ description: 'Sector name (null to remove)' }),
-  planetaryBodies: z.string().nullable().optional().meta({ description: 'Planetary bodies info (null to remove)' }),
+  properties: z.record(z.string(), z.any()).optional().meta({ description: 'Custom properties (merged with existing)' }),
 })
 
-const landmarkSchema = z.strictObject({
+// List view schema - minimal data for rendering pins
+const landmarkListItemSchema = z.strictObject({
   id: z.string().meta({ description: 'Landmark ID', example: 'clx1234567890' }),
   mapId: z.string().meta({ description: 'Map ID', example: 'clx0987654321' }),
-  x: z.number().meta({ description: 'X coordinate', example: 100.5 }),
-  y: z.number().meta({ description: 'Y coordinate', example: 200.3 }),
-  name: z.string().meta({ description: 'Landmark name', example: 'Coruscant' }),
-  description: z.string().meta({ description: 'Landmark description' }),
-  type: z.string().meta({ description: 'Landmark type', example: 'system' }),
-  population: z.string().nullable().meta({ description: 'Population' }),
-  industry: z.string().nullable().meta({ description: 'Industry type' }),
+  x: z.number().meta({ description: 'X coordinate', example: 0.5 }),
+  y: z.number().meta({ description: 'Y coordinate', example: 0.3 }),
+  name: z.string().meta({ description: 'Landmark name', example: 'Capital City' }),
+  type: z.string().meta({ description: 'Landmark type', example: 'point' }),
   color: z.string().nullable().meta({ description: 'Display color' }),
   size: z.string().nullable().meta({ description: 'Size category' }),
-  region: z.string().nullable().meta({ description: 'Region name' }),
-  sector: z.string().nullable().meta({ description: 'Sector name' }),
-  planetaryBodies: z.string().nullable().meta({ description: 'Planetary bodies info' }),
+})
+
+// Detail view schema - full data including properties
+const landmarkDetailSchema = z.strictObject({
+  id: z.string().meta({ description: 'Landmark ID', example: 'clx1234567890' }),
+  mapId: z.string().meta({ description: 'Map ID', example: 'clx0987654321' }),
+  x: z.number().meta({ description: 'X coordinate', example: 0.5 }),
+  y: z.number().meta({ description: 'Y coordinate', example: 0.3 }),
+  name: z.string().meta({ description: 'Landmark name', example: 'Capital City' }),
+  description: z.string().meta({ description: 'Landmark description' }),
+  type: z.string().meta({ description: 'Landmark type', example: 'point' }),
+  color: z.string().nullable().meta({ description: 'Display color' }),
+  size: z.string().nullable().meta({ description: 'Size category' }),
+  properties: z.record(z.string(), z.any()).meta({ description: 'Custom properties' }),
 })
 
 const createLandmarkResponseSchema = z.strictObject({
   success: z.literal(true),
-  landmark: landmarkSchema,
+  landmark: landmarkDetailSchema,
 })
 
 const listLandmarksResponseSchema = z.strictObject({
-  landmarks: z.array(landmarkSchema).meta({ description: 'Map landmarks' }),
+  landmarks: z.array(landmarkListItemSchema).meta({ description: 'Map landmarks (minimal data)' }),
 })
 
 const getLandmarkResponseSchema = z.strictObject({
-  landmark: landmarkSchema,
+  landmark: landmarkDetailSchema,
 })
 
 const updateLandmarkResponseSchema = z.strictObject({
   success: z.literal(true),
-  landmark: landmarkSchema,
+  landmark: landmarkDetailSchema,
 })
 
 const deleteLandmarkResponseSchema = z.strictObject({
@@ -106,7 +107,7 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { mapId } = request.params
-      const landmarkData = request.body
+      const { properties, ...coreData } = request.body
       const userId = request.user!.id
 
       // Verify map exists and user owns it
@@ -131,24 +132,25 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const landmark = await prisma.landmark.create({
         data: {
           mapId,
-          ...landmarkData,
-          type: landmarkData.type || 'system',
+          ...coreData,
+          type: coreData.type || 'point',
+          properties: properties || {},
         },
       })
 
       return reply.code(201).send({
         success: true as const,
-        landmark,
+        landmark: landmark as z.infer<typeof landmarkDetailSchema>,
       })
     },
   )
 
-  // GET /my/maps/:mapId/landmarks - List landmarks for map
+  // GET /my/maps/:mapId/landmarks - List landmarks for map (minimal data)
   fastify.get(
     '/maps/:mapId/landmarks',
     {
       schema: {
-        description: 'List all landmarks on a map',
+        description: 'List all landmarks on a map (minimal data for rendering)',
         tags: ['maps', 'landmarks'],
         params: mapIdParamsSchema,
         response: {
@@ -171,7 +173,6 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
           story: {
             select: { ownerId: true },
           },
-          landmarks: true,
         },
       })
 
@@ -183,18 +184,33 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(403).send({ error: 'Access denied' })
       }
 
+      // Get landmarks with minimal fields (no properties/description)
+      const landmarks = await prisma.landmark.findMany({
+        where: { mapId },
+        select: {
+          id: true,
+          mapId: true,
+          x: true,
+          y: true,
+          name: true,
+          type: true,
+          color: true,
+          size: true,
+        },
+      })
+
       return reply.code(200).send({
-        landmarks: map.landmarks,
+        landmarks,
       })
     },
   )
 
-  // GET /my/landmarks/:id - Get single landmark
+  // GET /my/landmarks/:id - Get single landmark (full data)
   fastify.get(
     '/landmarks/:id',
     {
       schema: {
-        description: 'Get a single landmark by ID',
+        description: 'Get a single landmark by ID (full data including properties)',
         tags: ['landmarks'],
         params: landmarkIdParamsSchema,
         response: {
@@ -235,7 +251,7 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { map, ...landmarkData } = landmark
 
       return reply.code(200).send({
-        landmark: landmarkData,
+        landmark: landmarkData as z.infer<typeof landmarkDetailSchema>,
       })
     },
   )
@@ -260,7 +276,7 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { id } = request.params
-      const updateData = request.body
+      const { properties, ...coreData } = request.body
       const userId = request.user!.id
 
       // Get landmark with map/story ownership check
@@ -285,15 +301,22 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(403).send({ error: 'Access denied' })
       }
 
+      // Merge properties if provided
+      const existingProperties = (existingLandmark.properties as Record<string, unknown>) || {}
+      const updatedProperties = properties ? { ...existingProperties, ...properties } : undefined
+
       // Update landmark
       const landmark = await prisma.landmark.update({
         where: { id },
-        data: updateData,
+        data: {
+          ...coreData,
+          ...(updatedProperties !== undefined && { properties: updatedProperties }),
+        },
       })
 
       return reply.code(200).send({
         success: true as const,
-        landmark,
+        landmark: landmark as z.infer<typeof landmarkDetailSchema>,
       })
     },
   )

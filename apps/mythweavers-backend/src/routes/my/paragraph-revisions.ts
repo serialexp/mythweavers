@@ -38,6 +38,31 @@ const listParagraphRevisionsResponseSchema = z.strictObject({
   revisions: z.array(paragraphRevisionSchema),
 })
 
+// Type for the expected state enum values
+type ParagraphState = 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT' | null
+
+// Types for expected array schemas
+type PlotPointAction = { plot_point_id: string; action: 'introduce' | 'mentioned' | 'partially resolved' | 'resolved' }
+type InventoryAction = { type: 'add' | 'remove'; item_name: string; item_amount: number }
+
+// Helper to transform paragraph revision with properly typed fields
+function transformParagraphRevision<
+  T extends { state: string | null; plotPointActions: unknown; inventoryActions: unknown },
+>(
+  revision: T,
+): Omit<T, 'state' | 'plotPointActions' | 'inventoryActions'> & {
+  state: ParagraphState
+  plotPointActions: PlotPointAction[] | null
+  inventoryActions: InventoryAction[] | null
+} {
+  return {
+    ...revision,
+    state: revision.state as ParagraphState,
+    plotPointActions: revision.plotPointActions as PlotPointAction[] | null,
+    inventoryActions: revision.inventoryActions as InventoryAction[] | null,
+  }
+}
+
 // ============================================================================
 // ROUTES
 // ============================================================================
@@ -113,7 +138,7 @@ const paragraphRevisionRoutes: FastifyPluginAsyncZod = async (fastify) => {
         orderBy: { version: 'desc' },
       })
 
-      return { revisions: revisions.map(transformCreatedAt) }
+      return { revisions: revisions.map((r) => transformParagraphRevision(transformCreatedAt(r))) }
     },
   )
 }

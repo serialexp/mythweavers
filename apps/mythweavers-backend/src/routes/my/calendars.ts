@@ -80,6 +80,7 @@ const calendarRoutes: FastifyPluginAsyncZod = async (fastify) => {
           201: createCalendarResponseSchema,
           400: errorSchema,
           401: errorSchema,
+          403: errorSchema,
           404: errorSchema,
           500: errorSchema,
         },

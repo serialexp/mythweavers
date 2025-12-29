@@ -1,0 +1,420 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/story-prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("SOURCE_DATABASE_URL")
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  username            String               @unique
+  passwordHash        String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  stories             Story[]
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([email])
+  @@index([username])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Story {
+  id                String   @id @default(cuid())
+  name              String
+  savedAt           DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  input             String   @default("")
+  storySetting      String   @default("")
+  person            String   @default("third")
+  tense             String   @default("past")
+  globalScript      String?
+  selectedChapterId String?
+  selectedNodeId    String?
+  branchChoices     Json? // Record<branchMessageId, selectedOptionId> - tracks chosen path through story branches
+  deleted           Boolean  @default(false)
+  userId            String? // Nullable initially for migration
+
+  // LLM settings
+  provider String  @default("ollama") // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
+  model    String? // Model name for the selected provider
+
+  // Timeline settings (minutes from 0 BBY)
+  timelineStartTime   Int? // Story timeline start (negative = BBY, positive = ABY)
+  timelineEndTime     Int? // Story timeline end
+  timelineGranularity String @default("hour") // 'hour' | 'day' - slider increment size
+
+  // Calendar settings
+  defaultCalendarId String?
+  defaultCalendar   Calendar? @relation("DefaultCalendar", fields: [defaultCalendarId], references: [id], onDelete: SetNull)
+
+  // Cover image
+  coverImageId String?
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     Message[]
+  characters   Character[]
+  contextItems ContextItem[]
+  chapters     Chapter[]
+  nodes        Node[] // New hierarchical structure
+  maps         Map[]
+  calendars    Calendar[]    @relation("StoryCalendars")
+
+  @@index([savedAt])
+  @@index([deleted])
+  @@index([userId])
+  @@index([defaultCalendarId])
+}
+
+model Calendar {
+  id        String   @id @default(cuid())
+  storyId   String
+  story     Story    @relation("StoryCalendars", fields: [storyId], references: [id], onDelete: Cascade)
+  config    String // JSON-serialized CalendarConfig
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation for stories that use this as their default
+  defaultForStories Story[] @relation("DefaultCalendar")
+
+  @@index([storyId])
+}
+
+model Message {
+  id                    String               @default(cuid())
+  storyId               String
+  story                 Story                @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  role                  String // 'assistant' in your case
+  content               String
+  instruction           String?
+  timestamp             DateTime
+  tokensPerSecond       Float?
+  totalTokens           Int?
+  promptTokens          Int?
+  cacheCreationTokens   Int? // Tokens written to cache
+  cacheReadTokens       Int? // Tokens read from cache
+  isQuery               Boolean              @default(false)
+  paragraphs            Json?
+  sentenceSummary       String?
+  summary               String?
+  paragraphSummary      String?
+  isExpanded            Boolean              @default(false)
+  isInstructionExpanded Boolean              @default(false) // Whether instruction is expanded (for truncated instructions)
+  isSummarizing         Boolean              @default(false)
+  think                 String?
+  showThink             Boolean              @default(false)
+  sceneAnalysis         Json? // Store SceneAnalysis as JSON
+  isAnalyzing           Boolean              @default(false)
+  model                 String? // Model used to generate this message
+  isCompacted           Boolean              @default(false) // True if this is a compacted summary
+  compactedMessageIds   Json? // Array of message IDs this compaction represents
+  script                String? // JavaScript to execute for this turn
+  order                 Int // To maintain message order
+  deleted               Boolean              @default(false) // Soft delete flag
+  type                  String? // Message type: null for normal, 'chapter' for chapter markers, 'event' for events, 'branch' for branch points
+  options               Json? // BranchOption[] - only for branch messages
+  chapterId             String? // References the chapter this message belongs to
+  chapter               Chapter?             @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  nodeId                String? // References the node (chapter) this message belongs to
+  node                  Node?                @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  versions              MessageVersion[]
+  paragraphEmbeddings   ParagraphEmbedding[]
+
+  @@id([storyId, id])
+  @@index([storyId, order])
+  @@index([storyId, deleted])
+  @@index([storyId, chapterId])
+  @@index([storyId, nodeId])
+}
+
+model ParagraphEmbedding {
+  id             String   @id @default(cuid())
+  storyId        String
+  messageId      String
+  message        Message  @relation(fields: [storyId, messageId], references: [storyId, id], onDelete: Cascade)
+  paragraphIndex Int
+  content        String
+  embedding      Bytes
+  model          String
+  dimension      Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([storyId, messageId, paragraphIndex])
+  @@index([storyId, messageId])
+}
+
+model Character {
+  id             String
+  storyId        String
+  story          Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  name           String
+  description    String
+  birthdate      Int? // Birth date in story time (minutes from 0 BBY)
+  isProtagonist  Boolean @default(false)
+  profileImageId String?
+
+  @@id([storyId, id])
+  @@index([storyId])
+}
+
+model ContextItem {
+  id          String
+  storyId     String
+  story       Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  type        String // 'theme' | 'location' | 'plot' | 'custom'
+  name        String
+  description String
+  isGlobal    Boolean @default(false) // Whether this context item is active in all chapters
+
+  @@id([storyId, id])
+  @@index([storyId])
+}
+
+model Node {
+  id       String  @id @default(cuid())
+  storyId  String
+  story    Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  parentId String? // Parent node ID (null for root nodes)
+  parent   Node?   @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Node[]  @relation("NodeHierarchy")
+  type     String // 'book' | 'arc' | 'chapter'
+  title    String
+  summary  String?
+  order    Int // Order within parent
+  expanded Boolean @default(true) // Whether the node is expanded in the UI
+
+  // Chapter-specific fields (only used when type='chapter')
+  includeInFull        Int       @default(1) // 0=not included, 1=summary only, 2=full content
+  status               String? // Chapter status: draft, needs_work, review, done
+  goal                 String? // Chapter goal: what we're trying to accomplish in this chapter (used in generation context)
+  messages             Message[] // Only chapters have messages
+  activeCharacterIds   String? // JSON array of character IDs active in this chapter
+  activeContextItemIds String? // JSON array of context item IDs active in this chapter
+  viewpointCharacterId String? // Character ID for the viewpoint character in this chapter (defaults to protagonist if not set)
+
+  // Story timeline (minutes from 0 BBY - negative values = BBY, positive = ABY)
+  storyTime Int? // When this node occurs in story time
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storyId])
+  @@index([parentId])
+  @@index([storyId, parentId, order])
+}
+
+// Keep Chapter as an alias for compatibility during migration
+model Chapter {
+  id            String    @id @default(cuid())
+  storyId       String
+  story         Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String?
+  expanded      Boolean   @default(true) // Whether the chapter is expanded in the UI
+  includeInFull Int       @default(1) // 0=not included, 1=summary only, 2=full content
+  status        String? // Chapter status: draft, needs_work, review, done
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+
+  @@index([storyId])
+}
+
+model Map {
+  id          String      @id @default(cuid())
+  storyId     String
+  story       Story       @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  name        String
+  fileId      String? // Reference to file storage
+  borderColor String? // EJS template for landmark border colors
+  landmarks   Landmark[]
+  fleets      Fleet[]
+  hyperlanes  Hyperlane[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([storyId])
+}
+
+model Landmark {
+  id              String
+  mapId           String
+  map             Map             @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  x               Float // X coordinate (0-1 normalized)
+  y               Float // Y coordinate (0-1 normalized)
+  name            String
+  description     String
+  type            String          @default("system") // Type of landmark: "system", "station", "nebula", or "junction"
+  population      String? // Population as a string to handle large numbers
+  industry        String? // Primary industry: farming, political, industry, trade, mining
+  color           String? // Hex color for the pin
+  size            String? // Size of the pin (small, medium, large)
+  region          String? // Region the landmark belongs to
+  sector          String? // Sector the landmark belongs to
+  planetaryBodies String? // Comma-separated list of planetary bodies (for systems)
+  states          LandmarkState[]
+
+  @@id([mapId, id])
+  @@index([mapId])
+}
+
+model LandmarkState {
+  id         String   @id @default(cuid())
+  storyId    String
+  mapId      String
+  landmarkId String
+  messageId  String? // Optional - for backwards compatibility, can be null if only storyTime is set
+  storyTime  Int? // When this state change occurs (minutes from 0 BBY)
+  field      String // The field being changed (e.g., "allegiance", "control", etc.)
+  value      String // The value for this field at this point in time
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  landmark Landmark @relation(fields: [mapId, landmarkId], references: [mapId, id], onDelete: Cascade)
+
+  @@unique([mapId, landmarkId, storyTime, field])
+  @@index([storyId, messageId])
+  @@index([storyId, storyTime])
+  @@index([mapId, landmarkId])
+}
+
+model Fleet {
+  id               String
+  mapId            String
+  map              Map             @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  designation      String? // Short text to display on the fleet marker (e.g., "1st", "A", "Alpha")
+  hyperdriveRating Float           @default(1.0) // 0.5 = fast, 2.0 = slow
+  defaultX         Float // Default X coordinate (0-1 normalized)
+  defaultY         Float // Default Y coordinate (0-1 normalized)
+  color            String? // Hex color for the fleet marker
+  size             String? // Size of the marker (small, medium, large)
+  movements        FleetMovement[]
+
+  @@id([mapId, id])
+  @@index([mapId])
+}
+
+model FleetMovement {
+  id             String   @id @default(cuid())
+  storyId        String
+  mapId          String
+  fleetId        String
+  startStoryTime Int // When the fleet departs (minutes from 0 BBY)
+  endStoryTime   Int // When the fleet arrives (minutes from 0 BBY)
+  startX         Float // Starting X coordinate (0-1 normalized)
+  startY         Float // Starting Y coordinate (0-1 normalized)
+  endX           Float // Ending X coordinate (0-1 normalized)
+  endY           Float // Ending Y coordinate (0-1 normalized)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  fleet Fleet @relation(fields: [mapId, fleetId], references: [mapId, id], onDelete: Cascade)
+
+  @@index([storyId])
+  @@index([mapId, fleetId])
+  @@index([startStoryTime])
+  @@index([endStoryTime])
+}
+
+model Hyperlane {
+  id              String             @id @default(cuid())
+  mapId           String
+  map             Map                @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  speedMultiplier Float              @default(10.0) // How much faster than normal space (10x by default)
+  segments        HyperlaneSegment[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([mapId])
+}
+
+model HyperlaneSegment {
+  id              String    @id @default(cuid())
+  hyperlaneId     String
+  hyperlane       Hyperlane @relation(fields: [hyperlaneId], references: [id], onDelete: Cascade)
+  mapId           String
+  order           Int // Order within the hyperlane path (0, 1, 2, ...)
+  startX          Float // Starting X coordinate (0-1 normalized)
+  startY          Float // Starting Y coordinate (0-1 normalized)
+  endX            Float // Ending X coordinate (0-1 normalized)
+  endY            Float // Ending Y coordinate (0-1 normalized)
+  startLandmarkId String? // If start point snaps to a landmark/junction
+  endLandmarkId   String? // If end point snaps to a landmark/junction
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([hyperlaneId])
+  @@index([mapId])
+  @@index([startLandmarkId])
+  @@index([endLandmarkId])
+}
+
+model File {
+  id        String   @id @default(cuid())
+  storyId   String
+  filename  String
+  mimeType  String
+  data      Bytes // Binary data for the file
+  createdAt DateTime @default(now())
+
+  @@index([storyId])
+}
+
+model MessageVersion {
+  id          String   @id @default(cuid())
+  storyId     String
+  messageId   String // The message this version belongs to
+  versionType String // 'regeneration' or 'edit'
+  content     String // The content at this version
+  instruction String? // The instruction at this version
+  model       String? // Model used for this version
+  version     Int // Version number (1, 2, 3, etc.)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  message Message @relation(fields: [storyId, messageId], references: [storyId, id], onDelete: Cascade)
+
+  @@index([storyId, messageId])
+  @@index([createdAt])
+}

@@ -7,6 +7,47 @@ import { z } from 'zod'
  * Define them once here and import where needed.
  */
 
+// ============================================================================
+// Property Schema (for map landmark properties and state fields)
+// ============================================================================
+
+export const propertyDefinitionSchema = z.strictObject({
+  key: z.string().meta({ description: 'Property key', example: 'population' }),
+  label: z.string().meta({ description: 'Display label', example: 'Population' }),
+  type: z.enum(['text', 'number', 'enum', 'color', 'boolean']).meta({ description: 'Property type' }),
+  options: z
+    .array(
+      z.strictObject({
+        value: z.string(),
+        label: z.string(),
+        color: z.string().optional(),
+      }),
+    )
+    .optional()
+    .meta({ description: 'Options for enum type' }),
+  placeholder: z.string().optional().meta({ description: 'Placeholder text' }),
+  description: z.string().optional().meta({ description: 'Help text' }),
+})
+
+export const stateFieldDefinitionSchema = z.strictObject({
+  key: z.string().meta({ description: 'State field key', example: 'allegiance' }),
+  label: z.string().meta({ description: 'Display label', example: 'Allegiance' }),
+  options: z
+    .array(
+      z.strictObject({
+        value: z.string(),
+        label: z.string(),
+        color: z.string(),
+      }),
+    )
+    .meta({ description: 'Available state values with colors' }),
+})
+
+export const propertySchemaSchema = z.strictObject({
+  properties: z.array(propertyDefinitionSchema).meta({ description: 'Landmark property definitions' }),
+  stateFields: z.array(stateFieldDefinitionSchema).meta({ description: 'Timeline state field definitions' }),
+})
+
 // User schema - appears in auth responses and other user-related endpoints
 export const userSchema = z.strictObject({
   id: z.number().meta({

@@ -1,8 +1,23 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
+import type { JsonValue } from '@prisma/client/runtime/library'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema, successSchema } from '../../schemas/common.js'
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+// Branch option type for type casting
+type BranchOption = {
+  id: string
+  label: string
+  targetNodeId: string
+  targetMessageId: string
+  description?: string
+}
 
 // ============================================================================
 // HELPERS
@@ -19,9 +34,41 @@ function transformDates<T extends { createdAt: Date; updatedAt: Date }>(
   }
 }
 
+// Helper to transform message from Prisma (dates + options type cast)
+function transformMessage<T extends { createdAt: Date; updatedAt: Date; options: JsonValue | null }>(
+  obj: T,
+): Omit<T, 'createdAt' | 'updatedAt' | 'options'> & { createdAt: string; updatedAt: string; options: BranchOption[] | null } {
+  return {
+    ...obj,
+    createdAt: obj.createdAt.toISOString(),
+    updatedAt: obj.updatedAt.toISOString(),
+    options: obj.options as BranchOption[] | null,
+  }
+}
+
+// Helper to convert options for Prisma input (handles null -> Prisma.JsonNull)
+function toJsonInput(value: BranchOption[] | null | undefined): Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined {
+  if (value === null) {
+    return Prisma.JsonNull
+  }
+  if (value === undefined) {
+    return undefined
+  }
+  return value as unknown as Prisma.InputJsonValue
+}
+
 // ============================================================================
 // SCHEMAS
 // ============================================================================
+
+// Branch option schema (for branch messages)
+const branchOptionSchema = z.strictObject({
+  id: z.string().meta({ example: 'opt123' }),
+  label: z.string().meta({ example: 'Trust the stranger' }),
+  targetNodeId: z.string().meta({ example: 'clx9876543210' }),
+  targetMessageId: z.string().meta({ example: 'clx1234567890' }),
+  description: z.string().optional().meta({ example: 'You decide to take a chance' }),
+})
 
 // Message schemas
 const messageSchema = z.strictObject({
@@ -30,6 +77,15 @@ const messageSchema = z.strictObject({
   sortOrder: z.number().int().meta({ example: 0 }),
   instruction: z.string().nullable().meta({ example: 'Write a dramatic opening' }),
   script: z.string().nullable().meta({ example: 'console.log("hello")' }),
+  deleted: z.boolean().meta({ example: false, description: 'Soft delete flag' }),
+  type: z
+    .string()
+    .nullable()
+    .meta({ example: 'branch', description: 'Message type: null for normal, branch for choices, event for events' }),
+  options: z
+    .array(branchOptionSchema)
+    .nullable()
+    .meta({ description: 'Branch options - only present for branch type messages' }),
   currentMessageRevisionId: z.string().nullable().meta({ example: 'clx1234567890' }),
   createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
   updatedAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
@@ -53,6 +109,13 @@ const createMessageBodySchema = z.strictObject({
     description: 'Display order (auto-increments if not provided)',
     example: 0,
   }),
+  type: z.string().optional().meta({
+    description: 'Message type: null for normal, branch for choices, event for events',
+    example: 'branch',
+  }),
+  options: z.array(branchOptionSchema).optional().meta({
+    description: 'Branch options - only for branch type messages',
+  }),
 })
 
 // Update message body
@@ -65,6 +128,15 @@ const updateMessageBodySchema = z.strictObject({
   }),
   sortOrder: z.number().int().min(0).optional().meta({
     description: 'Display order',
+  }),
+  type: z.string().nullable().optional().meta({
+    description: 'Message type: null for normal, branch for choices, event for events',
+  }),
+  options: z.array(branchOptionSchema).nullable().optional().meta({
+    description: 'Branch options - only for branch type messages',
+  }),
+  deleted: z.boolean().optional().meta({
+    description: 'Soft delete flag',
   }),
 })
 
@@ -173,6 +245,8 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           sortOrder,
           instruction: request.body.instruction || null,
           script: request.body.script || null,
+          type: request.body.type || null,
+          options: toJsonInput(request.body.options), // undefined if not provided, array if provided
           messageRevisions: {
             create: {
               version: 1,
@@ -185,17 +259,18 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
       })
 
       // Set currentMessageRevisionId to the first revision
+      const firstRevision = message.messageRevisions[0]
       const updatedMessage = await prisma.message.update({
         where: { id: message.id },
         data: {
-          currentMessageRevisionId: message.messageRevisions[0].id,
+          currentMessageRevisionId: firstRevision.id,
         },
       })
 
       // Transform dates to ISO strings for schema validation
       return reply.code(201).send({
         success: true as const,
-        message: transformDates(updatedMessage),
+        message: transformMessage(updatedMessage),
       })
     },
   )
@@ -258,7 +333,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
         orderBy: { sortOrder: 'asc' },
       })
 
-      return { messages: messages.map(transformDates) }
+      return { messages: messages.map(transformMessage) }
     },
   )
 
@@ -321,7 +396,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // Return without nested scene data
       const { scene, ...messageData } = message
 
-      return { message: transformDates(messageData) }
+      return { message: transformMessage(messageData) }
     },
   )
 
@@ -394,12 +469,15 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           instruction: request.body.instruction,
           script: request.body.script,
           sortOrder: request.body.sortOrder,
+          type: request.body.type,
+          options: toJsonInput(request.body.options),
+          deleted: request.body.deleted,
         },
       })
 
       return {
         success: true as const,
-        message: transformDates(updated),
+        message: transformMessage(updated),
       }
     },
   )
@@ -466,6 +544,93 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
       })
 
       return { success: true as const }
+    },
+  )
+
+  // Bulk reorder messages (supports moving between scenes)
+  fastify.post(
+    '/stories/:storyId/messages/reorder',
+    {
+      preHandler: requireAuth,
+      schema: {
+        description: 'Bulk reorder messages and optionally move them between scenes',
+        tags: ['messages'],
+        params: z.strictObject({
+          storyId: z.string().meta({
+            description: 'Story ID',
+            example: 'clx1234567890',
+          }),
+        }),
+        body: z.strictObject({
+          storyId: z.string().optional().meta({
+            description: 'Story ID (also in path, included for compatibility)',
+          }),
+          items: z.array(
+            z.strictObject({
+              messageId: z.string().meta({ description: 'Message ID to update' }),
+              nodeId: z.string().meta({ description: 'Target scene/node ID' }),
+              order: z.number().int().min(0).meta({ description: 'New sort order' }),
+            }),
+          ).meta({
+            description: 'Array of message updates',
+          }),
+        }),
+        response: {
+          200: z.strictObject({
+            success: z.literal(true),
+            updatedAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
+          }),
+          400: errorSchema,
+          401: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { storyId } = request.params
+      const { items } = request.body
+      const userId = request.user!.id
+
+      // Verify story exists and user owns it
+      const story = await prisma.story.findUnique({
+        where: { id: storyId },
+        select: { ownerId: true },
+      })
+
+      if (!story) {
+        return reply.code(404).send({ error: 'Story not found' })
+      }
+
+      if (story.ownerId !== userId) {
+        return reply.code(404).send({ error: 'Story not found' })
+      }
+
+      if (items.length === 0) {
+        return {
+          success: true as const,
+          updatedAt: new Date().toISOString(),
+        }
+      }
+
+      // Update all messages in a transaction
+      const updatedAt = new Date()
+      await prisma.$transaction(
+        items.map((item) =>
+          prisma.message.update({
+            where: { id: item.messageId },
+            data: {
+              sceneId: item.nodeId,
+              sortOrder: item.order,
+              updatedAt,
+            },
+          }),
+        ),
+      )
+
+      return {
+        success: true as const,
+        updatedAt: updatedAt.toISOString(),
+      }
     },
   )
 }
