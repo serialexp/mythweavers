@@ -5,7 +5,7 @@ import { messagesStore } from '../stores/messagesStore'
 import { TreeNode, nodeStore } from '../stores/nodeStore'
 import { Message, Node } from '../types/core'
 import { getCharacterDisplayName } from './character'
-import { calculateActivePath, getChaptersInStoryOrder } from './nodeTraversal'
+import { calculateActivePath } from './nodeTraversal'
 
 function isDescendantOf(node: Node, ancestorId: string, nodesById: Record<string, Node>): boolean {
   let currentParentId: string | null | undefined = node.parentId
@@ -19,34 +19,55 @@ function isDescendantOf(node: Node, ancestorId: string, nodesById: Record<string
   return false
 }
 
-export function getChapterIdsForNode(nodeId: string): string[] {
+/**
+ * Get all scene IDs for a node. Scenes are the leaf nodes that contain messages.
+ * - For a scene: returns just that scene's ID
+ * - For a chapter: returns all child scene IDs
+ * - For an arc/book: returns all descendant scene IDs
+ */
+export function getSceneIdsForNode(nodeId: string): string[] {
   const targetNode = nodeStore.nodes[nodeId]
   if (!targetNode) {
     return []
   }
 
-  if (targetNode.type === 'chapter') {
+  // If this IS a scene, return just this scene
+  if (targetNode.type === 'scene') {
     return [targetNode.id]
   }
 
+  // Otherwise, find all descendant scenes
   const nodesArray = nodeStore.nodesArray
   const nodesById = nodeStore.nodes
-  const chaptersInOrder = getChaptersInStoryOrder(nodesArray)
 
-  return chaptersInOrder.filter((chapter) => isDescendantOf(chapter, nodeId, nodesById)).map((chapter) => chapter.id)
+  // Get all scenes in story order, then filter to descendants of this node
+  const scenesInOrder = nodesArray
+    .filter((n) => n.type === 'scene')
+    .sort((a, b) => a.order - b.order)
+
+  return scenesInOrder
+    .filter((scene) => isDescendantOf(scene, nodeId, nodesById))
+    .map((scene) => scene.id)
+}
+
+/**
+ * @deprecated Use getSceneIdsForNode instead - scenes now contain the content, not chapters
+ */
+export function getChapterIdsForNode(nodeId: string): string[] {
+  return getSceneIdsForNode(nodeId)
 }
 
 export function getNodeMessageContents(nodeId: string): string[] {
-  const chapterIds = getChapterIdsForNode(nodeId)
-  if (chapterIds.length === 0) {
+  const sceneIds = getSceneIdsForNode(nodeId)
+  if (sceneIds.length === 0) {
     return []
   }
 
-  const chapterIdSet = new Set(chapterIds)
-  const chapterMessageMap = new Map<string, string[]>()
+  const sceneIdSet = new Set(sceneIds)
+  const sceneMessageMap = new Map<string, string[]>()
 
-  chapterIds.forEach((id) => {
-    chapterMessageMap.set(id, [])
+  sceneIds.forEach((id) => {
+    sceneMessageMap.set(id, [])
   })
 
   const messages = messagesStore.messages
@@ -57,23 +78,21 @@ export function getNodeMessageContents(nodeId: string): string[] {
     if (message.isQuery) continue
     if (message.type === 'chapter') continue
 
-    const nodeIdMatch = message.nodeId && chapterIdSet.has(message.nodeId)
-    const chapterIdMatch = message.chapterId && chapterIdSet.has(message.chapterId)
-    const owningChapterId = nodeIdMatch ? message.nodeId! : chapterIdMatch ? message.chapterId! : undefined
-    if (!owningChapterId || !chapterIdSet.has(owningChapterId)) continue
+    const owningSceneId = message.sceneId && sceneIdSet.has(message.sceneId) ? message.sceneId : undefined
+    if (!owningSceneId) continue
 
     const trimmedContent = message.content?.trim()
     if (!trimmedContent) continue
 
-    const bucket = chapterMessageMap.get(owningChapterId)
+    const bucket = sceneMessageMap.get(owningSceneId)
     if (bucket) {
       bucket.push(trimmedContent)
     }
   }
 
   const orderedContents: string[] = []
-  chapterIds.forEach((id) => {
-    const bucket = chapterMessageMap.get(id)
+  sceneIds.forEach((id) => {
+    const bucket = sceneMessageMap.get(id)
     if (bucket && bucket.length > 0) {
       orderedContents.push(...bucket)
     }
@@ -177,7 +196,7 @@ export interface PrecedingContextOptions {
 }
 
 /**
- * Build a markdown snippet that captures the chapters that appear before the
+ * Build a markdown snippet that captures the scenes that appear before the
  * provided node. This is useful for giving readers or models a quick recap
  * without copying the entire story.
  */
@@ -196,10 +215,10 @@ export function buildPrecedingContextMarkdown(nodeId: string, options: Preceding
     includeStoryContextItems = true,
   } = options
 
-  const precedingChapters = nodeStore.getPrecedingChapters(nodeId)
-  let nodesToExport = [...precedingChapters]
+  const precedingScenes = nodeStore.getPrecedingScenes(nodeId)
+  let nodesToExport = [...precedingScenes]
 
-  if (includeCurrentNode && targetNode.type === 'chapter') {
+  if (includeCurrentNode && targetNode.type === 'scene') {
     nodesToExport.push(targetNode)
   }
 
@@ -253,17 +272,17 @@ export function buildPrecedingContextMarkdown(nodeId: string, options: Preceding
   }
 
   for (let i = 0; i < nodesToExport.length; i++) {
-    const chapter = nodesToExport[i]
-    if (chapter.type !== 'chapter') continue
+    const scene = nodesToExport[i]
+    if (scene.type !== 'scene') continue
 
     let sectionBody = ''
-    const summary = chapter.summary?.trim()
+    const summary = scene.summary?.trim()
 
     if (mode === 'summary') {
       if (summary) {
         sectionBody = summary
       } else {
-        const messageContents = getNodeMessageContents(chapter.id)
+        const messageContents = getNodeMessageContents(scene.id)
         if (messageContents.length > 0) {
           const joined = messageContents.join('\n\n').trim()
           if (joined) {
@@ -277,7 +296,7 @@ export function buildPrecedingContextMarkdown(nodeId: string, options: Preceding
         }
       }
     } else {
-      const messageContents = getNodeMessageContents(chapter.id)
+      const messageContents = getNodeMessageContents(scene.id)
       if (messageContents.length > 0) {
         sectionBody = messageContents.join('\n\n').trim()
       } else if (summary) {
@@ -289,7 +308,7 @@ export function buildPrecedingContextMarkdown(nodeId: string, options: Preceding
       continue
     }
 
-    sections.push(`${headingPrefix} ${chapter.title}\n\n${sectionBody}`)
+    sections.push(`${headingPrefix} ${scene.title}\n\n${sectionBody}`)
   }
 
   return sections.join('\n\n')

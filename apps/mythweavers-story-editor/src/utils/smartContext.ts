@@ -344,12 +344,12 @@ export const buildSmartContext = async (
     if (targetMessageId) {
       // If we have a target message ID, use its chapter
       const targetMessage = messages.find((msg) => msg.id === targetMessageId)
-      currentChapterId = targetMessage?.chapterId
+      currentChapterId = targetMessage?.sceneId
     } else {
       // Otherwise use the most recent message
       const recentMessages = storyMessages.slice(-1)
       if (recentMessages.length === 0) return []
-      currentChapterId = recentMessages[0].chapterId
+      currentChapterId = recentMessages[0].sceneId
     }
 
     // If no current chapter, return empty (hard break)
@@ -358,7 +358,7 @@ export const buildSmartContext = async (
     }
 
     // Get all messages from the current chapter
-    const currentChapterMessages = storyMessages.filter((msg) => msg.chapterId === currentChapterId)
+    const currentChapterMessages = storyMessages.filter((msg) => msg.sceneId === currentChapterId)
 
     // Create synthetic messages for chapter summaries
     const chapterSummaryMessages: Message[] = []
@@ -370,9 +370,9 @@ export const buildSmartContext = async (
     // (Chapter markers no longer exist - chapters are managed through nodes)
     const seenChapters = new Set<string>()
     for (const msg of messages) {
-      if (msg.chapterId && !seenChapters.has(msg.chapterId)) {
-        chapterOrder.push(msg.chapterId)
-        seenChapters.add(msg.chapterId)
+      if (msg.sceneId && !seenChapters.has(msg.sceneId)) {
+        chapterOrder.push(msg.sceneId)
+        seenChapters.add(msg.sceneId)
       }
     }
 
@@ -393,7 +393,7 @@ export const buildSmartContext = async (
     const chaptersWithContent = previousChapters.filter((chapter) => {
       // Count messages in this chapter (excluding chapter markers and queries)
       const chapterMessages = messages.filter(
-        (msg) => msg.chapterId === chapter.id && msg.type !== 'chapter' && !msg.isQuery,
+        (msg) => msg.sceneId === chapter.id && msg.type !== 'chapter' && !msg.isQuery,
       )
       return chapterMessages.length > 0
     })
@@ -403,20 +403,20 @@ export const buildSmartContext = async (
     if (chaptersWithoutSummaries.length > 0 && !forceMissingSummaries) {
       const missingChapterTitles = chaptersWithoutSummaries.map((ch) => ch.title).join(', ')
       throw new Error(
-        `Cannot generate story continuation. The following previous chapters need summaries first: ${missingChapterTitles}`,
+        `Cannot generate story continuation. The following previous scenes need summaries first: ${missingChapterTitles}`,
       )
     }
 
-    // Add summaries from previous chapters IN STORY ORDER
+    // Add summaries from previous scenes IN STORY ORDER
     // We need to iterate through previousChapterIds to maintain the correct order
     for (const chapterId of chapterOrder.slice(0, currentChapterIndex)) {
       const chapter = previousChapters.find((ch) => ch.id === chapterId)
       if (chapter?.summary) {
-        // Create a synthetic message for the chapter summary
+        // Create a synthetic message for the scene summary
         const summaryMessage: Message = {
-          id: `chapter-summary-${chapter.id}`,
+          id: `scene-summary-${chapter.id}`,
           role: 'assistant',
-          content: `[Chapter: ${chapter.title}]\n${chapter.summary}`,
+          content: `[Scene: ${chapter.title}]\n${chapter.summary}`,
           timestamp: new Date(chapter.createdAt),
           order: 0, // Order doesn't matter for synthetic messages
           isCompacted: true, // Treat as compacted so it won't be further summarized
@@ -425,7 +425,7 @@ export const buildSmartContext = async (
       }
     }
 
-    // Return chapter summaries followed by current chapter messages
+    // Return scene summaries followed by current scene messages
     return [...chapterSummaryMessages, ...currentChapterMessages]
   }
 

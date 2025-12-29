@@ -36,7 +36,7 @@ export const InsertControls: Component<InsertControlsProps> = (props) => {
       messagesStore.insertMessage(props.afterMessageId, newMessage)
     } else {
       // This is at the end - find the last message
-      const messages = messagesStore.messages.filter((m) => m.nodeId === props.nodeId || m.chapterId === props.nodeId)
+      const messages = messagesStore.messages.filter((m) => m.sceneId === props.nodeId)
       const lastMessage = messages[messages.length - 1]
       if (lastMessage) {
         messagesStore.insertMessage(lastMessage.id, newMessage)
@@ -61,7 +61,7 @@ export const InsertControls: Component<InsertControlsProps> = (props) => {
     })
 
     const nodeMessages = messages
-      .filter((m) => m.nodeId === props.nodeId || m.chapterId === props.nodeId)
+      .filter((m) => m.sceneId === props.nodeId)
       .sort((a, b) => a.order - b.order)
 
     let insertAfter: string | null

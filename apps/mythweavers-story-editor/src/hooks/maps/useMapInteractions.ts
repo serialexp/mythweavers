@@ -1,6 +1,8 @@
 import { Viewport } from 'pixi-viewport'
 import * as PIXI from 'pixi.js'
 import { Accessor } from 'solid-js'
+import { mapEditorStore } from '../../stores/mapEditorStore'
+import { mapsStore } from '../../stores/mapsStore'
 import { PixiContainers } from './usePixiMap'
 
 export interface MapClickPosition {
@@ -15,17 +17,12 @@ export interface UseMapInteractionsOptions {
   containers: Accessor<PixiContainers>
   mapSprite: Accessor<PIXI.Sprite | null>
   canvasContainer: Accessor<HTMLDivElement | undefined>
-  isEditing: Accessor<boolean>
-  isAddingNew: Accessor<boolean>
-  mapSelected: Accessor<boolean>
-  lastUsedType: Accessor<'system' | 'station' | 'nebula' | 'junction'>
-  creationMode: Accessor<'landmark' | 'fleet' | 'hyperlane'>
+  // Callbacks that need Maps.tsx context
   onMapClick?: (position: MapClickPosition) => void
   onMapRightClick?: (position: MapClickPosition) => void
-  paintModeEnabled?: Accessor<boolean>
-  isShiftHeld?: Accessor<boolean>
-  selectedPaintFaction?: Accessor<string | null>
   onPaintClick?: (screenX: number, screenY: number, faction: string | null) => Promise<void>
+  // Local UI state not in stores
+  isShiftHeld?: Accessor<boolean>
 }
 
 export interface UseMapInteractionsReturn {
@@ -35,13 +32,14 @@ export interface UseMapInteractionsReturn {
     color: string,
     size: 'small' | 'medium' | 'large',
     type: 'system' | 'station' | 'nebula' | 'junction',
-    mode?: 'landmark' | 'fleet' | 'hyperlane',
+    mode?: 'select' | 'landmark' | 'pawn' | 'path',
   ) => void
   hidePreview: () => void
 }
 
 /**
  * Hook to manage map interactions (mouse, touch, preview)
+ * Reads UI state directly from mapEditorStore and mapsStore.
  */
 export function useMapInteractions(options: UseMapInteractionsOptions): UseMapInteractionsReturn {
   const {
@@ -49,18 +47,20 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
     containers,
     mapSprite,
     canvasContainer,
-    isEditing,
-    isAddingNew,
-    mapSelected,
-    lastUsedType,
-    creationMode,
     onMapClick,
     onMapRightClick,
-    paintModeEnabled,
-    isShiftHeld,
-    selectedPaintFaction,
     onPaintClick,
+    isShiftHeld,
   } = options
+
+  // Read from stores instead of options
+  const isEditing = () => mapEditorStore.isEditing
+  const isAddingNew = () => mapEditorStore.isAddingLandmark
+  const mapSelected = () => mapsStore.selectedMap !== null
+  const lastUsedType = () => mapEditorStore.lastUsedType
+  const creationMode = () => mapEditorStore.creationMode
+  const paintModeEnabled = () => mapEditorStore.paintModeEnabled
+  const selectedPaintFaction = () => mapEditorStore.selectedPaintFaction
 
   let isDragging = false
   let dragStartPos: { x: number; y: number } | null = null
@@ -121,7 +121,9 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
 
       // Don't show hover preview when adding new landmark (handled by the effect)
       // Only show preview when just hovering over the map
-      if (!isEditing() && !isAddingNew() && mapSelected()) {
+      // Hide preview in select mode (no creation happening)
+      const mode = creationMode()
+      if (!isEditing() && !isAddingNew() && mapSelected() && mode !== 'select') {
         // Get world position
         const worldPos = vp.toWorld(e.global)
 
@@ -138,9 +140,8 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
           previewSprite.clear()
 
           // Draw different previews based on creation mode
-          const mode = creationMode()
-          if (mode === 'fleet') {
-            // Draw fleet triangle preview
+          if (mode === 'pawn') {
+            // Draw pawn triangle preview
             const size = 14 // Medium size
             const height = size * 1.5
             const baseWidth = size
@@ -161,7 +162,7 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
             previewSprite.closePath()
             previewSprite.fill()
             previewSprite.endFill()
-          } else if (mode === 'hyperlane') {
+          } else if (mode === 'path') {
             // Draw junction preview (small white circle)
             const radius = 8 // Small size for junction
 
@@ -374,7 +375,7 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
     color: string,
     size: 'small' | 'medium' | 'large',
     type: 'system' | 'station' | 'nebula' | 'junction',
-    mode: 'landmark' | 'fleet' | 'hyperlane' = 'landmark',
+    mode: 'select' | 'landmark' | 'pawn' | 'path' = 'landmark',
   ) => {
     const previewSprite = containers().preview
     const sprite = mapSprite()
@@ -388,8 +389,8 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
 
     previewSprite.clear()
 
-    if (mode === 'fleet') {
-      // Draw fleet triangle preview
+    if (mode === 'pawn') {
+      // Draw pawn triangle preview
       const sizeMap = { small: 10, medium: 14, large: 18 }
       const fleetSize = sizeMap[size]
       const height = fleetSize * 1.5
@@ -412,7 +413,7 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
       previewSprite.closePath()
       previewSprite.fill()
       previewSprite.endFill()
-    } else if (mode === 'hyperlane') {
+    } else if (mode === 'path') {
       // Draw junction preview (small white circle)
       const sizeMap = { small: 6, medium: 8, large: 10 }
       const radius = sizeMap[size]

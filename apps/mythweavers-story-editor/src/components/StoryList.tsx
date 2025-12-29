@@ -247,7 +247,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
               </div>
 
               {/* Meta Row */}
-              <div class={styles.metaRow} style={{ 'margin-bottom': story.storySetting ? '0.5rem' : '0' }}>
+              <div class={styles.metaRow}>
                 <span>{story.messageCount} messages</span>
                 <span>{story.characterCount} characters</span>
                 <Show when={story.chapterCount > 0}>
@@ -255,11 +255,6 @@ export const StoryList: Component<StoryListProps> = (props) => {
                 </Show>
                 <span class={styles.metaDate}>{formatDate(story.savedAt)}</span>
               </div>
-
-              {/* Story Setting */}
-              <Show when={story.storySetting}>
-                <div class={styles.storySetting}>{story.storySetting}</div>
-              </Show>
             </CardBody>
           </Card>
         )}

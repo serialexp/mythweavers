@@ -243,6 +243,31 @@ export const footerButtons = style({
   flexWrap: 'wrap',
 })
 
+export const tokenEstimate = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  marginBottom: tokens.space['2'],
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+  backgroundColor: tokens.color.bg.base,
+  borderRadius: tokens.radius.default,
+  flexWrap: 'wrap',
+})
+
+export const tokenEstimateDetail = style({
+  color: tokens.color.text.secondary,
+})
+
+export const tokenEstimateWarning = style({
+  color: '#f59e0b',
+})
+
+export const tokenEstimateError = style({
+  color: '#ef4444',
+})
+
 export const addButton = style({
   display: 'flex',
   alignItems: 'center',
@@ -299,5 +324,5 @@ export const dragPreview = style({
 })
 
 export const childrenContainer = style({
-  marginLeft: tokens.space['2'],
+  marginLeft: tokens.space['1'],
 })

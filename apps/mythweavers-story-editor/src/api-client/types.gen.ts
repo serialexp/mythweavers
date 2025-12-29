@@ -56,6 +56,12 @@ export type PostAuthRegisterErrors = {
     409: {
         error: string;
     };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
 };
 
 export type PostAuthRegisterError = PostAuthRegisterErrors[keyof PostAuthRegisterErrors];
@@ -105,6 +111,12 @@ export type PostAuthLoginErrors = {
     401: {
         error: string;
     };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
 };
 
 export type PostAuthLoginError = PostAuthLoginErrors[keyof PostAuthLoginErrors];
@@ -132,6 +144,17 @@ export type PostAuthLogoutData = {
     url: '/auth/logout';
 };
 
+export type PostAuthLogoutErrors = {
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostAuthLogoutError = PostAuthLogoutErrors[keyof PostAuthLogoutErrors];
+
 export type PostAuthLogoutResponses = {
     /**
      * Default Response
@@ -149,6 +172,17 @@ export type GetAuthSessionData = {
     query?: never;
     url: '/auth/session';
 };
+
+export type GetAuthSessionErrors = {
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type GetAuthSessionError = GetAuthSessionErrors[keyof GetAuthSessionErrors];
 
 export type GetAuthSessionResponses = {
     /**
@@ -306,6 +340,10 @@ export type PostMyStoriesData = {
          */
         paragraphsPerTurn?: number;
         /**
+         * Story format (narrative or cyoa)
+         */
+        format?: string;
+        /**
          * LLM provider
          */
         provider?: string;
@@ -441,6 +479,10 @@ export type PostMyStoriesResponses = {
              */
             paragraphsPerTurn: number;
             /**
+             * Story format (narrative or cyoa)
+             */
+            format: string;
+            /**
              * Default protagonist character ID
              */
             defaultProtagonistId: string | null;
@@ -492,6 +534,23 @@ export type PostMyStoriesResponses = {
              * Branch choices JSON object
              */
             branchChoices: unknown | null;
+            /**
+             * Last selected node (scene) ID for restoring UI state
+             */
+            selectedNodeId?: string | null;
+            /**
+             * JavaScript function for initializing story data and defining reusable functions
+             */
+            globalScript: string | null;
+            /**
+             * Array of plot point definitions with default values
+             */
+            plotPointDefaults: Array<{
+                key: string;
+                type: 'string' | 'number' | 'enum' | 'boolean';
+                default: string | number | boolean;
+                options?: Array<string>;
+            }> | null;
             /**
              * Creation timestamp
              */
@@ -706,6 +765,10 @@ export type GetMyStoriesByIdResponses = {
              */
             paragraphsPerTurn: number;
             /**
+             * Story format (narrative or cyoa)
+             */
+            format: string;
+            /**
              * Default protagonist character ID
              */
             defaultProtagonistId: string | null;
@@ -758,6 +821,23 @@ export type GetMyStoriesByIdResponses = {
              */
             branchChoices: unknown | null;
             /**
+             * Last selected node (scene) ID for restoring UI state
+             */
+            selectedNodeId?: string | null;
+            /**
+             * JavaScript function for initializing story data and defining reusable functions
+             */
+            globalScript: string | null;
+            /**
+             * Array of plot point definitions with default values
+             */
+            plotPointDefaults: Array<{
+                key: string;
+                type: 'string' | 'number' | 'enum' | 'boolean';
+                default: string | number | boolean;
+                options?: Array<string>;
+            }> | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -804,6 +884,10 @@ export type PatchMyStoriesByIdData = {
          */
         paragraphsPerTurn?: number;
         /**
+         * Story format (narrative or cyoa)
+         */
+        format?: string;
+        /**
          * Timeline start time in minutes from epoch
          */
         timelineStartTime?: number | null;
@@ -827,6 +911,27 @@ export type PatchMyStoriesByIdData = {
         coverTextColor?: string;
         coverFontFamily?: string;
         sortOrder?: number;
+        /**
+         * JavaScript function for initializing story data and defining reusable functions
+         */
+        globalScript?: string | null;
+        /**
+         * Array of plot point definitions with default values
+         */
+        plotPointDefaults?: Array<{
+            key: string;
+            type: 'string' | 'number' | 'enum' | 'boolean';
+            default: string | number | boolean;
+            options?: Array<string>;
+        }> | null;
+        /**
+         * Last selected node (scene) ID for restoring UI state
+         */
+        selectedNodeId?: string | null;
+        /**
+         * Branch choices JSON object
+         */
+        branchChoices?: unknown | null;
     };
     path: {
         /**
@@ -973,6 +1078,10 @@ export type PatchMyStoriesByIdResponses = {
              */
             paragraphsPerTurn: number;
             /**
+             * Story format (narrative or cyoa)
+             */
+            format: string;
+            /**
              * Default protagonist character ID
              */
             defaultProtagonistId: string | null;
@@ -1024,6 +1133,23 @@ export type PatchMyStoriesByIdResponses = {
              * Branch choices JSON object
              */
             branchChoices: unknown | null;
+            /**
+             * Last selected node (scene) ID for restoring UI state
+             */
+            selectedNodeId?: string | null;
+            /**
+             * JavaScript function for initializing story data and defining reusable functions
+             */
+            globalScript: string | null;
+            /**
+             * Array of plot point definitions with default values
+             */
+            plotPointDefaults: Array<{
+                key: string;
+                type: 'string' | 'number' | 'enum' | 'boolean';
+                default: string | number | boolean;
+                options?: Array<string>;
+            }> | null;
             /**
              * Creation timestamp
              */
@@ -1171,6 +1297,10 @@ export type GetMyStoriesByIdExportResponses = {
              */
             paragraphsPerTurn: number;
             /**
+             * Story format (narrative or cyoa)
+             */
+            format: string;
+            /**
              * Default protagonist character ID
              */
             defaultProtagonistId: string | null;
@@ -1223,6 +1353,23 @@ export type GetMyStoriesByIdExportResponses = {
              */
             branchChoices: unknown | null;
             /**
+             * Last selected node (scene) ID for restoring UI state
+             */
+            selectedNodeId?: string | null;
+            /**
+             * JavaScript function for initializing story data and defining reusable functions
+             */
+            globalScript: string | null;
+            /**
+             * Array of plot point definitions with default values
+             */
+            plotPointDefaults: Array<{
+                key: string;
+                type: 'string' | 'number' | 'enum' | 'boolean';
+                default: string | number | boolean;
+                options?: Array<string>;
+            }> | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -1241,6 +1388,8 @@ export type GetMyStoriesByIdExportResponses = {
             spineArtFileId: string | null;
             pages: number | null;
             nodeType: 'story' | 'non-story' | 'context';
+            deleted: boolean;
+            deletedAt: string | null;
             createdAt: string;
             updatedAt: string;
             arcs: Array<{
@@ -1250,6 +1399,8 @@ export type GetMyStoriesByIdExportResponses = {
                 summary: string | null;
                 sortOrder: number;
                 nodeType: 'story' | 'non-story' | 'context';
+                deleted: boolean;
+                deletedAt: string | null;
                 createdAt: string;
                 updatedAt: string;
                 chapters: Array<{
@@ -1259,6 +1410,9 @@ export type GetMyStoriesByIdExportResponses = {
                     summary: string | null;
                     sortOrder: number;
                     nodeType: 'story' | 'non-story' | 'context';
+                    status: string | null;
+                    deleted: boolean;
+                    deletedAt: string | null;
                     publishedOn: string | null;
                     royalRoadId: number | null;
                     createdAt: string;
@@ -1269,6 +1423,10 @@ export type GetMyStoriesByIdExportResponses = {
                         name: string;
                         summary: string | null;
                         sortOrder: number;
+                        status: string | null;
+                        includeInFull: number;
+                        deleted: boolean;
+                        deletedAt: string | null;
                         perspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
                         viewpointCharacterId: string | null;
                         activeCharacterIds: Array<string>;
@@ -1283,6 +1441,9 @@ export type GetMyStoriesByIdExportResponses = {
                             sortOrder: number;
                             instruction: string | null;
                             script: string | null;
+                            deleted: boolean;
+                            type: string | null;
+                            options: unknown | null;
                             currentMessageRevisionId: string | null;
                             createdAt: string;
                             updatedAt: string;
@@ -1346,6 +1507,10 @@ export type GetMyStoriesByIdExportResponses = {
             distinguishingFeatures: string | null;
             writingStyle: string | null;
             pictureFileId: string | null;
+            /**
+             * URL path to fetch the character picture
+             */
+            pictureFileUrl: string | null;
             birthdate: number | null;
             significantActions: unknown | null;
             isMainCharacter: boolean;
@@ -1377,7 +1542,64 @@ export type GetMyStoriesByIdExportResponses = {
             storyId: string;
             name: string;
             fileId: string | null;
-            borderColor: string;
+            borderColor: string | null;
+            propertySchema: {
+                /**
+                 * Landmark property definitions
+                 */
+                properties: Array<{
+                    /**
+                     * Property key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Property type
+                     */
+                    type: 'text' | 'number' | 'enum' | 'color' | 'boolean';
+                    /**
+                     * Options for enum type
+                     */
+                    options?: Array<{
+                        value: string;
+                        label: string;
+                        color?: string;
+                    }>;
+                    /**
+                     * Placeholder text
+                     */
+                    placeholder?: string;
+                    /**
+                     * Help text
+                     */
+                    description?: string;
+                }>;
+                /**
+                 * Timeline state field definitions
+                 */
+                stateFields: Array<{
+                    /**
+                     * State field key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Available state values with colors
+                     */
+                    options: Array<{
+                        value: string;
+                        label: string;
+                        color: string;
+                    }>;
+                }>;
+            } | null;
+            landmarkCount: number;
             createdAt: string;
             updatedAt: string;
         }>;
@@ -1385,6 +1607,632 @@ export type GetMyStoriesByIdExportResponses = {
 };
 
 export type GetMyStoriesByIdExportResponse = GetMyStoriesByIdExportResponses[keyof GetMyStoriesByIdExportResponses];
+
+export type GetMyStoriesByIdDeletedMessagesData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        id: string;
+    };
+    query?: {
+        /**
+         * Maximum number of messages to return
+         */
+        limit?: number;
+        /**
+         * Number of messages to skip
+         */
+        offset?: number;
+    };
+    url: '/my/stories/{id}/deleted-messages';
+};
+
+export type GetMyStoriesByIdDeletedMessagesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByIdDeletedMessagesError = GetMyStoriesByIdDeletedMessagesErrors[keyof GetMyStoriesByIdDeletedMessagesErrors];
+
+export type GetMyStoriesByIdDeletedMessagesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        messages: Array<{
+            id: string;
+            sceneId: string;
+            sceneName: string;
+            chapterName: string;
+            sortOrder: number;
+            content: string;
+            instruction: string | null;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+        pagination: {
+            total: number;
+            limit: number;
+            offset: number;
+        };
+    };
+};
+
+export type GetMyStoriesByIdDeletedMessagesResponse = GetMyStoriesByIdDeletedMessagesResponses[keyof GetMyStoriesByIdDeletedMessagesResponses];
+
+export type PostMyStoriesByIdDeletedMessagesByMessageIdRestoreData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        id: string;
+        /**
+         * Message ID to restore
+         */
+        messageId: string;
+    };
+    query?: never;
+    url: '/my/stories/{id}/deleted-messages/{messageId}/restore';
+};
+
+export type PostMyStoriesByIdDeletedMessagesByMessageIdRestoreErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByIdDeletedMessagesByMessageIdRestoreError = PostMyStoriesByIdDeletedMessagesByMessageIdRestoreErrors[keyof PostMyStoriesByIdDeletedMessagesByMessageIdRestoreErrors];
+
+export type PostMyStoriesByIdDeletedMessagesByMessageIdRestoreResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        message: {
+            id: string;
+            sceneId: string;
+            deleted: boolean;
+        };
+    };
+};
+
+export type PostMyStoriesByIdDeletedMessagesByMessageIdRestoreResponse = PostMyStoriesByIdDeletedMessagesByMessageIdRestoreResponses[keyof PostMyStoriesByIdDeletedMessagesByMessageIdRestoreResponses];
+
+export type GetMyStoriesByIdDeletedNodesData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/stories/{id}/deleted-nodes';
+};
+
+export type GetMyStoriesByIdDeletedNodesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByIdDeletedNodesError = GetMyStoriesByIdDeletedNodesErrors[keyof GetMyStoriesByIdDeletedNodesErrors];
+
+export type GetMyStoriesByIdDeletedNodesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        nodes: Array<{
+            id: string;
+            name: string;
+            type: 'book' | 'arc' | 'chapter' | 'scene';
+            parentName: string | null;
+            deletedAt: string | null;
+        }>;
+    };
+};
+
+export type GetMyStoriesByIdDeletedNodesResponse = GetMyStoriesByIdDeletedNodesResponses[keyof GetMyStoriesByIdDeletedNodesResponses];
+
+export type PostMyStoriesByIdDeletedScenesBySceneIdRestoreData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        id: string;
+        /**
+         * Scene ID
+         */
+        sceneId: string;
+    };
+    query?: never;
+    url: '/my/stories/{id}/deleted-scenes/{sceneId}/restore';
+};
+
+export type PostMyStoriesByIdDeletedScenesBySceneIdRestoreErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByIdDeletedScenesBySceneIdRestoreError = PostMyStoriesByIdDeletedScenesBySceneIdRestoreErrors[keyof PostMyStoriesByIdDeletedScenesBySceneIdRestoreErrors];
+
+export type PostMyStoriesByIdDeletedScenesBySceneIdRestoreResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+};
+
+export type PostMyStoriesByIdDeletedScenesBySceneIdRestoreResponse = PostMyStoriesByIdDeletedScenesBySceneIdRestoreResponses[keyof PostMyStoriesByIdDeletedScenesBySceneIdRestoreResponses];
+
+export type PostMyStoriesByIdDeletedChaptersByChapterIdRestoreData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        id: string;
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/stories/{id}/deleted-chapters/{chapterId}/restore';
+};
+
+export type PostMyStoriesByIdDeletedChaptersByChapterIdRestoreErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByIdDeletedChaptersByChapterIdRestoreError = PostMyStoriesByIdDeletedChaptersByChapterIdRestoreErrors[keyof PostMyStoriesByIdDeletedChaptersByChapterIdRestoreErrors];
+
+export type PostMyStoriesByIdDeletedChaptersByChapterIdRestoreResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+};
+
+export type PostMyStoriesByIdDeletedChaptersByChapterIdRestoreResponse = PostMyStoriesByIdDeletedChaptersByChapterIdRestoreResponses[keyof PostMyStoriesByIdDeletedChaptersByChapterIdRestoreResponses];
+
+export type PostMyStoriesByIdDeletedArcsByArcIdRestoreData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        id: string;
+        /**
+         * Arc ID
+         */
+        arcId: string;
+    };
+    query?: never;
+    url: '/my/stories/{id}/deleted-arcs/{arcId}/restore';
+};
+
+export type PostMyStoriesByIdDeletedArcsByArcIdRestoreErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByIdDeletedArcsByArcIdRestoreError = PostMyStoriesByIdDeletedArcsByArcIdRestoreErrors[keyof PostMyStoriesByIdDeletedArcsByArcIdRestoreErrors];
+
+export type PostMyStoriesByIdDeletedArcsByArcIdRestoreResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+};
+
+export type PostMyStoriesByIdDeletedArcsByArcIdRestoreResponse = PostMyStoriesByIdDeletedArcsByArcIdRestoreResponses[keyof PostMyStoriesByIdDeletedArcsByArcIdRestoreResponses];
+
+export type PostMyStoriesByIdDeletedBooksByBookIdRestoreData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        id: string;
+        /**
+         * Book ID
+         */
+        bookId: string;
+    };
+    query?: never;
+    url: '/my/stories/{id}/deleted-books/{bookId}/restore';
+};
+
+export type PostMyStoriesByIdDeletedBooksByBookIdRestoreErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByIdDeletedBooksByBookIdRestoreError = PostMyStoriesByIdDeletedBooksByBookIdRestoreErrors[keyof PostMyStoriesByIdDeletedBooksByBookIdRestoreErrors];
+
+export type PostMyStoriesByIdDeletedBooksByBookIdRestoreResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+};
+
+export type PostMyStoriesByIdDeletedBooksByBookIdRestoreResponse = PostMyStoriesByIdDeletedBooksByBookIdRestoreResponses[keyof PostMyStoriesByIdDeletedBooksByBookIdRestoreResponses];
+
+export type PostMyStoriesByStoryIdNodesReorderData = {
+    body: {
+        /**
+         * Array of node updates
+         */
+        items: Array<{
+            /**
+             * Node ID to update
+             */
+            nodeId: string;
+            /**
+             * Type of node
+             */
+            nodeType: 'book' | 'arc' | 'chapter' | 'scene';
+            /**
+             * Parent node ID (null for books)
+             */
+            parentId: string | null;
+            /**
+             * New sort order
+             */
+            order: number;
+        }>;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/nodes/reorder';
+};
+
+export type PostMyStoriesByStoryIdNodesReorderErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdNodesReorderError = PostMyStoriesByStoryIdNodesReorderErrors[keyof PostMyStoriesByStoryIdNodesReorderErrors];
+
+export type PostMyStoriesByStoryIdNodesReorderResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        updatedAt: string;
+    };
+};
+
+export type PostMyStoriesByStoryIdNodesReorderResponse = PostMyStoriesByStoryIdNodesReorderResponses[keyof PostMyStoriesByStoryIdNodesReorderResponses];
 
 export type GetMyStoriesByStoryIdBooksData = {
     body?: never;
@@ -1484,6 +2332,14 @@ export type GetMyStoriesByStoryIdBooksResponses = {
              * Spine art file ID
              */
             spineArtFileId: string | null;
+            /**
+             * Whether the book is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the book was deleted
+             */
+            deletedAt: string | null;
             /**
              * Creation timestamp
              */
@@ -1632,6 +2488,14 @@ export type PostMyStoriesByStoryIdBooksResponses = {
              */
             spineArtFileId: string | null;
             /**
+             * Whether the book is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the book was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -1653,7 +2517,12 @@ export type DeleteMyBooksByIdData = {
          */
         id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * If true, permanently delete (no recovery possible)
+         */
+        permanent?: 'true' | 'false';
+    };
     url: '/my/books/{id}';
 };
 
@@ -1811,6 +2680,14 @@ export type GetMyBooksByIdResponses = {
              */
             spineArtFileId: string | null;
             /**
+             * Whether the book is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the book was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -1958,6 +2835,14 @@ export type PatchMyBooksByIdResponses = {
              */
             spineArtFileId: string | null;
             /**
+             * Whether the book is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the book was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -2057,6 +2942,14 @@ export type GetMyBooksByBookIdArcsResponses = {
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
+            /**
+             * Whether the arc is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the arc was deleted
+             */
+            deletedAt: string | null;
             /**
              * Creation timestamp
              */
@@ -2193,6 +3086,14 @@ export type PostMyBooksByBookIdArcsResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Whether the arc is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the arc was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -2214,7 +3115,12 @@ export type DeleteMyArcsByIdData = {
          */
         id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * If true, permanently delete (no recovery possible)
+         */
+        permanent?: 'true' | 'false';
+    };
     url: '/my/arcs/{id}';
 };
 
@@ -2360,6 +3266,14 @@ export type GetMyArcsByIdResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Whether the arc is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the arc was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -2491,6 +3405,14 @@ export type PatchMyArcsByIdResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Whether the arc is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the arc was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -2599,6 +3521,18 @@ export type GetMyArcsByArcIdChaptersResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Chapter status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Whether the chapter is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the chapter was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -2634,6 +3568,10 @@ export type PostMyArcsByArcIdChaptersData = {
          * Sort order within arc (defaults to end)
          */
         sortOrder?: number;
+        /**
+         * Chapter status: draft, needs_work, review, done
+         */
+        status?: string;
     };
     path: {
         /**
@@ -2742,6 +3680,18 @@ export type PostMyArcsByArcIdChaptersResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Chapter status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Whether the chapter is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the chapter was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -2763,7 +3713,12 @@ export type DeleteMyChaptersByIdData = {
          */
         id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * If true, permanently delete (no recovery possible)
+         */
+        permanent?: 'true' | 'false';
+    };
     url: '/my/chapters/{id}';
 };
 
@@ -2917,6 +3872,18 @@ export type GetMyChaptersByIdResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Chapter status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Whether the chapter is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the chapter was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -2956,6 +3923,10 @@ export type PatchMyChaptersByIdData = {
          * Royal Road chapter ID
          */
         royalRoadId?: number | null;
+        /**
+         * Chapter status: draft, needs_work, review, done
+         */
+        status?: string | null;
     };
     path: {
         /**
@@ -3064,6 +4035,18 @@ export type PatchMyChaptersByIdResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Chapter status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Whether the chapter is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the chapter was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -3160,6 +4143,14 @@ export type GetMyChaptersByChapterIdScenesResponses = {
              */
             sortOrder: number;
             /**
+             * Scene status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Include mode: 0=not included, 1=summary only, 2=full content
+             */
+            includeInFull: number;
+            /**
              * Narrative perspective for this scene
              */
             perspective: 'FIRST' | 'THIRD' | null;
@@ -3183,6 +4174,14 @@ export type GetMyChaptersByChapterIdScenesResponses = {
              * When this scene occurs in story timeline (minutes)
              */
             storyTime: number | null;
+            /**
+             * Whether the scene is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the scene was deleted
+             */
+            deletedAt: string | null;
             /**
              * Creation timestamp
              */
@@ -3215,6 +4214,14 @@ export type PostMyChaptersByChapterIdScenesData = {
          * Sort order within chapter (defaults to end)
          */
         sortOrder?: number;
+        /**
+         * Scene status: draft, needs_work, review, done
+         */
+        status?: string;
+        /**
+         * Include mode: 0=not included, 1=summary only, 2=full content
+         */
+        includeInFull?: number;
         /**
          * Narrative perspective for this scene
          */
@@ -3335,6 +4342,14 @@ export type PostMyChaptersByChapterIdScenesResponses = {
              */
             sortOrder: number;
             /**
+             * Scene status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Include mode: 0=not included, 1=summary only, 2=full content
+             */
+            includeInFull: number;
+            /**
              * Narrative perspective for this scene
              */
             perspective: 'FIRST' | 'THIRD' | null;
@@ -3359,6 +4374,14 @@ export type PostMyChaptersByChapterIdScenesResponses = {
              */
             storyTime: number | null;
             /**
+             * Whether the scene is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the scene was deleted
+             */
+            deletedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -3380,7 +4403,12 @@ export type DeleteMyScenesByIdData = {
          */
         id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * If true, permanently delete (no recovery possible)
+         */
+        permanent?: 'true' | 'false';
+    };
     url: '/my/scenes/{id}';
 };
 
@@ -3522,6 +4550,14 @@ export type GetMyScenesByIdResponses = {
              */
             sortOrder: number;
             /**
+             * Scene status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Include mode: 0=not included, 1=summary only, 2=full content
+             */
+            includeInFull: number;
+            /**
              * Narrative perspective for this scene
              */
             perspective: 'FIRST' | 'THIRD' | null;
@@ -3545,6 +4581,14 @@ export type GetMyScenesByIdResponses = {
              * When this scene occurs in story timeline (minutes)
              */
             storyTime: number | null;
+            /**
+             * Whether the scene is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the scene was deleted
+             */
+            deletedAt: string | null;
             /**
              * Creation timestamp
              */
@@ -3573,6 +4617,14 @@ export type PatchMyScenesByIdData = {
          * Sort order within chapter
          */
         sortOrder?: number;
+        /**
+         * Scene status: draft, needs_work, review, done
+         */
+        status?: string | null;
+        /**
+         * Include mode: 0=not included, 1=summary only, 2=full content
+         */
+        includeInFull?: number;
         /**
          * Narrative perspective for this scene
          */
@@ -3693,6 +4745,14 @@ export type PatchMyScenesByIdResponses = {
              */
             sortOrder: number;
             /**
+             * Scene status: draft, needs_work, review, done
+             */
+            status: string | null;
+            /**
+             * Include mode: 0=not included, 1=summary only, 2=full content
+             */
+            includeInFull: number;
+            /**
              * Narrative perspective for this scene
              */
             perspective: 'FIRST' | 'THIRD' | null;
@@ -3716,6 +4776,14 @@ export type PatchMyScenesByIdResponses = {
              * When this scene occurs in story timeline (minutes)
              */
             storyTime: number | null;
+            /**
+             * Whether the scene is soft-deleted
+             */
+            deleted: boolean;
+            /**
+             * When the scene was deleted
+             */
+            deletedAt: string | null;
             /**
              * Creation timestamp
              */
@@ -5381,6 +6449,24 @@ export type GetMyScenesBySceneIdMessagesResponses = {
             sortOrder: number;
             instruction: string | null;
             script: string | null;
+            /**
+             * Soft delete flag
+             */
+            deleted: boolean;
+            /**
+             * Message type: null for normal, branch for choices, event for events
+             */
+            type: string | null;
+            /**
+             * Branch options - only present for branch type messages
+             */
+            options: Array<{
+                id: string;
+                label: string;
+                targetNodeId: string;
+                targetMessageId: string;
+                description?: string;
+            }> | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -5408,6 +6494,20 @@ export type PostMyScenesBySceneIdMessagesData = {
          * Display order (auto-increments if not provided)
          */
         sortOrder?: number;
+        /**
+         * Message type: null for normal, branch for choices, event for events
+         */
+        type?: string;
+        /**
+         * Branch options - only for branch type messages
+         */
+        options?: Array<{
+            id: string;
+            label: string;
+            targetNodeId: string;
+            targetMessageId: string;
+            description?: string;
+        }>;
     };
     path: {
         /**
@@ -5475,6 +6575,24 @@ export type PostMyScenesBySceneIdMessagesResponses = {
             sortOrder: number;
             instruction: string | null;
             script: string | null;
+            /**
+             * Soft delete flag
+             */
+            deleted: boolean;
+            /**
+             * Message type: null for normal, branch for choices, event for events
+             */
+            type: string | null;
+            /**
+             * Branch options - only present for branch type messages
+             */
+            options: Array<{
+                id: string;
+                label: string;
+                targetNodeId: string;
+                targetMessageId: string;
+                description?: string;
+            }> | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -5595,6 +6713,24 @@ export type GetMyMessagesByIdResponses = {
             sortOrder: number;
             instruction: string | null;
             script: string | null;
+            /**
+             * Soft delete flag
+             */
+            deleted: boolean;
+            /**
+             * Message type: null for normal, branch for choices, event for events
+             */
+            type: string | null;
+            /**
+             * Branch options - only present for branch type messages
+             */
+            options: Array<{
+                id: string;
+                label: string;
+                targetNodeId: string;
+                targetMessageId: string;
+                description?: string;
+            }> | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -5618,6 +6754,24 @@ export type PatchMyMessagesByIdData = {
          * Display order
          */
         sortOrder?: number;
+        /**
+         * Message type: null for normal, branch for choices, event for events
+         */
+        type?: string | null;
+        /**
+         * Branch options - only for branch type messages
+         */
+        options?: Array<{
+            id: string;
+            label: string;
+            targetNodeId: string;
+            targetMessageId: string;
+            description?: string;
+        }> | null;
+        /**
+         * Soft delete flag
+         */
+        deleted?: boolean;
     };
     path: {
         /**
@@ -5685,6 +6839,24 @@ export type PatchMyMessagesByIdResponses = {
             sortOrder: number;
             instruction: string | null;
             script: string | null;
+            /**
+             * Soft delete flag
+             */
+            deleted: boolean;
+            /**
+             * Message type: null for normal, branch for choices, event for events
+             */
+            type: string | null;
+            /**
+             * Branch options - only present for branch type messages
+             */
+            options: Array<{
+                id: string;
+                label: string;
+                targetNodeId: string;
+                targetMessageId: string;
+                description?: string;
+            }> | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -5693,6 +6865,236 @@ export type PatchMyMessagesByIdResponses = {
 };
 
 export type PatchMyMessagesByIdResponse = PatchMyMessagesByIdResponses[keyof PatchMyMessagesByIdResponses];
+
+export type PostMyStoriesByStoryIdMessagesReorderData = {
+    body: {
+        /**
+         * Story ID (also in path, included for compatibility)
+         */
+        storyId?: string;
+        /**
+         * Array of message updates
+         */
+        items: Array<{
+            /**
+             * Message ID to update
+             */
+            messageId: string;
+            /**
+             * Target scene/node ID
+             */
+            nodeId: string;
+            /**
+             * New sort order
+             */
+            order: number;
+        }>;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/messages/reorder';
+};
+
+export type PostMyStoriesByStoryIdMessagesReorderErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdMessagesReorderError = PostMyStoriesByStoryIdMessagesReorderErrors[keyof PostMyStoriesByStoryIdMessagesReorderErrors];
+
+export type PostMyStoriesByStoryIdMessagesReorderResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        updatedAt: string;
+    };
+};
+
+export type PostMyStoriesByStoryIdMessagesReorderResponse = PostMyStoriesByStoryIdMessagesReorderResponses[keyof PostMyStoriesByStoryIdMessagesReorderResponses];
+
+export type PostMyStoriesByStoryIdMessagesBatchData = {
+    body: {
+        /**
+         * Array of messages to create (max 1000)
+         */
+        messages: Array<{
+            /**
+             * Optional client-provided ID (auto-generated if not provided)
+             */
+            id?: string;
+            /**
+             * Scene ID where the message belongs
+             */
+            sceneId: string;
+            /**
+             * Display order within the scene
+             */
+            sortOrder: number;
+            /**
+             * Generation instruction for this message
+             */
+            instruction?: string;
+            /**
+             * JavaScript to execute
+             */
+            script?: string;
+            /**
+             * Message type: null for normal, branch for choices, event for events
+             */
+            type?: string;
+            /**
+             * Branch options - only for branch type messages
+             */
+            options?: Array<{
+                id: string;
+                label: string;
+                targetNodeId: string;
+                targetMessageId: string;
+                description?: string;
+            }>;
+            /**
+             * Paragraphs to create for this message
+             */
+            paragraphs?: Array<{
+                /**
+                 * Optional client-provided ID (auto-generated if not provided)
+                 */
+                id?: string;
+                /**
+                 * Paragraph content text
+                 */
+                body: string;
+                /**
+                 * ProseMirror JSON structure for rich text (optional)
+                 */
+                contentSchema?: string | null;
+                /**
+                 * Paragraph state
+                 */
+                state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT';
+                /**
+                 * Display order within the message
+                 */
+                sortOrder?: number;
+            }>;
+        }>;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/messages/batch';
+};
+
+export type PostMyStoriesByStoryIdMessagesBatchErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdMessagesBatchError = PostMyStoriesByStoryIdMessagesBatchErrors[keyof PostMyStoriesByStoryIdMessagesBatchErrors];
+
+export type PostMyStoriesByStoryIdMessagesBatchResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        success: true;
+        /**
+         * Number of messages created
+         */
+        created: number;
+        /**
+         * IDs of created messages in order
+         */
+        messageIds: Array<string>;
+    };
+};
+
+export type PostMyStoriesByStoryIdMessagesBatchResponse = PostMyStoriesByStoryIdMessagesBatchResponses[keyof PostMyStoriesByStoryIdMessagesBatchResponses];
 
 export type GetMyMessagesByMessageIdRevisionsData = {
     body?: never;
@@ -5759,6 +7161,10 @@ export type GetMyMessagesByMessageIdRevisionsResponses = {
             think: string | null;
             showThink: boolean;
             createdAt: string;
+            /**
+             * Combined text from all paragraphs
+             */
+            content: string;
         }>;
     };
 };
@@ -5864,6 +7270,10 @@ export type PostMyMessagesByIdRegenerateResponses = {
             think: string | null;
             showThink: boolean;
             createdAt: string;
+            /**
+             * Combined text from all paragraphs
+             */
+            content: string;
         };
     };
 };
@@ -6437,6 +7847,8 @@ export type GetMyFilesResponses = {
             ownerId: number;
             storyId: string | null;
             localPath: string | null;
+            r2Key: string | null;
+            visibility: string;
             path: string;
             sha256: string;
             width: number | null;
@@ -6494,6 +7906,19 @@ export type PostMyFilesErrors = {
     /**
      * Default Response
      */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
     413: {
         /**
          * Error message
@@ -6519,6 +7944,8 @@ export type PostMyFilesResponses = {
             ownerId: number;
             storyId: string | null;
             localPath: string | null;
+            r2Key: string | null;
+            visibility: string;
             path: string;
             sha256: string;
             width: number | null;
@@ -6532,6 +7959,53 @@ export type PostMyFilesResponses = {
 };
 
 export type PostMyFilesResponse = PostMyFilesResponses[keyof PostMyFilesResponses];
+
+export type GetMyFilesBy__Data = {
+    body?: never;
+    path: {
+        '*': string;
+    };
+    query?: never;
+    url: '/my/files/{*}';
+};
+
+export type GetMyFilesBy__Errors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyFilesBy__Error = GetMyFilesBy__Errors[keyof GetMyFilesBy__Errors];
+
+export type GetMyFilesBy__Responses = {
+    /**
+     * Binary file content
+     */
+    200: unknown;
+};
 
 export type DeleteMyFilesByIdData = {
     body?: never;
@@ -6656,6 +8130,8 @@ export type GetMyFilesByIdResponses = {
             ownerId: number;
             storyId: string | null;
             localPath: string | null;
+            r2Key: string | null;
+            visibility: string;
             path: string;
             sha256: string;
             width: number | null;
@@ -7448,6 +8924,19 @@ export type PostMyStoriesByStoryIdCalendarsErrors = {
     /**
      * Default Response
      */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
     404: {
         /**
          * Error message
@@ -8022,6 +9511,65 @@ export type GetMyStoriesByStoryIdMapsResponses = {
              */
             borderColor: string | null;
             /**
+             * Schema for landmark properties and state fields
+             */
+            propertySchema: {
+                /**
+                 * Landmark property definitions
+                 */
+                properties: Array<{
+                    /**
+                     * Property key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Property type
+                     */
+                    type: 'text' | 'number' | 'enum' | 'color' | 'boolean';
+                    /**
+                     * Options for enum type
+                     */
+                    options?: Array<{
+                        value: string;
+                        label: string;
+                        color?: string;
+                    }>;
+                    /**
+                     * Placeholder text
+                     */
+                    placeholder?: string;
+                    /**
+                     * Help text
+                     */
+                    description?: string;
+                }>;
+                /**
+                 * Timeline state field definitions
+                 */
+                stateFields: Array<{
+                    /**
+                     * State field key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Available state values with colors
+                     */
+                    options: Array<{
+                        value: string;
+                        label: string;
+                        color: string;
+                    }>;
+                }>;
+            } | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -8029,6 +9577,10 @@ export type GetMyStoriesByStoryIdMapsResponses = {
              * Last update timestamp
              */
             updatedAt: string;
+            /**
+             * Number of landmarks on the map
+             */
+            landmarkCount: number;
         }>;
     };
 };
@@ -8049,6 +9601,65 @@ export type PostMyStoriesByStoryIdMapsData = {
          * Border color (hex)
          */
         borderColor?: string;
+        /**
+         * Schema for landmark properties and state fields
+         */
+        propertySchema?: {
+            /**
+             * Landmark property definitions
+             */
+            properties: Array<{
+                /**
+                 * Property key
+                 */
+                key: string;
+                /**
+                 * Display label
+                 */
+                label: string;
+                /**
+                 * Property type
+                 */
+                type: 'text' | 'number' | 'enum' | 'color' | 'boolean';
+                /**
+                 * Options for enum type
+                 */
+                options?: Array<{
+                    value: string;
+                    label: string;
+                    color?: string;
+                }>;
+                /**
+                 * Placeholder text
+                 */
+                placeholder?: string;
+                /**
+                 * Help text
+                 */
+                description?: string;
+            }>;
+            /**
+             * Timeline state field definitions
+             */
+            stateFields: Array<{
+                /**
+                 * State field key
+                 */
+                key: string;
+                /**
+                 * Display label
+                 */
+                label: string;
+                /**
+                 * Available state values with colors
+                 */
+                options: Array<{
+                    value: string;
+                    label: string;
+                    color: string;
+                }>;
+            }>;
+        };
     };
     path: {
         /**
@@ -8157,6 +9768,65 @@ export type PostMyStoriesByStoryIdMapsResponses = {
              * Border color
              */
             borderColor: string | null;
+            /**
+             * Schema for landmark properties and state fields
+             */
+            propertySchema: {
+                /**
+                 * Landmark property definitions
+                 */
+                properties: Array<{
+                    /**
+                     * Property key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Property type
+                     */
+                    type: 'text' | 'number' | 'enum' | 'color' | 'boolean';
+                    /**
+                     * Options for enum type
+                     */
+                    options?: Array<{
+                        value: string;
+                        label: string;
+                        color?: string;
+                    }>;
+                    /**
+                     * Placeholder text
+                     */
+                    placeholder?: string;
+                    /**
+                     * Help text
+                     */
+                    description?: string;
+                }>;
+                /**
+                 * Timeline state field definitions
+                 */
+                stateFields: Array<{
+                    /**
+                     * State field key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Available state values with colors
+                     */
+                    options: Array<{
+                        value: string;
+                        label: string;
+                        color: string;
+                    }>;
+                }>;
+            } | null;
             /**
              * Creation timestamp
              */
@@ -8347,6 +10017,65 @@ export type GetMyMapsByIdResponses = {
              */
             borderColor: string | null;
             /**
+             * Schema for landmark properties and state fields
+             */
+            propertySchema: {
+                /**
+                 * Landmark property definitions
+                 */
+                properties: Array<{
+                    /**
+                     * Property key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Property type
+                     */
+                    type: 'text' | 'number' | 'enum' | 'color' | 'boolean';
+                    /**
+                     * Options for enum type
+                     */
+                    options?: Array<{
+                        value: string;
+                        label: string;
+                        color?: string;
+                    }>;
+                    /**
+                     * Placeholder text
+                     */
+                    placeholder?: string;
+                    /**
+                     * Help text
+                     */
+                    description?: string;
+                }>;
+                /**
+                 * Timeline state field definitions
+                 */
+                stateFields: Array<{
+                    /**
+                     * State field key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Available state values with colors
+                     */
+                    options: Array<{
+                        value: string;
+                        label: string;
+                        color: string;
+                    }>;
+                }>;
+            } | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -8374,6 +10103,65 @@ export type PutMyMapsByIdData = {
          * Border color (null to remove)
          */
         borderColor?: string | null;
+        /**
+         * Schema for landmark properties and state fields (null to remove)
+         */
+        propertySchema?: {
+            /**
+             * Landmark property definitions
+             */
+            properties: Array<{
+                /**
+                 * Property key
+                 */
+                key: string;
+                /**
+                 * Display label
+                 */
+                label: string;
+                /**
+                 * Property type
+                 */
+                type: 'text' | 'number' | 'enum' | 'color' | 'boolean';
+                /**
+                 * Options for enum type
+                 */
+                options?: Array<{
+                    value: string;
+                    label: string;
+                    color?: string;
+                }>;
+                /**
+                 * Placeholder text
+                 */
+                placeholder?: string;
+                /**
+                 * Help text
+                 */
+                description?: string;
+            }>;
+            /**
+             * Timeline state field definitions
+             */
+            stateFields: Array<{
+                /**
+                 * State field key
+                 */
+                key: string;
+                /**
+                 * Display label
+                 */
+                label: string;
+                /**
+                 * Available state values with colors
+                 */
+                options: Array<{
+                    value: string;
+                    label: string;
+                    color: string;
+                }>;
+            }>;
+        } | null;
     };
     path: {
         /**
@@ -8483,6 +10271,65 @@ export type PutMyMapsByIdResponses = {
              */
             borderColor: string | null;
             /**
+             * Schema for landmark properties and state fields
+             */
+            propertySchema: {
+                /**
+                 * Landmark property definitions
+                 */
+                properties: Array<{
+                    /**
+                     * Property key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Property type
+                     */
+                    type: 'text' | 'number' | 'enum' | 'color' | 'boolean';
+                    /**
+                     * Options for enum type
+                     */
+                    options?: Array<{
+                        value: string;
+                        label: string;
+                        color?: string;
+                    }>;
+                    /**
+                     * Placeholder text
+                     */
+                    placeholder?: string;
+                    /**
+                     * Help text
+                     */
+                    description?: string;
+                }>;
+                /**
+                 * Timeline state field definitions
+                 */
+                stateFields: Array<{
+                    /**
+                     * State field key
+                     */
+                    key: string;
+                    /**
+                     * Display label
+                     */
+                    label: string;
+                    /**
+                     * Available state values with colors
+                     */
+                    options: Array<{
+                        value: string;
+                        label: string;
+                        color: string;
+                    }>;
+                }>;
+            } | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -8571,7 +10418,7 @@ export type GetMyMapsByMapIdLandmarksResponses = {
      */
     200: {
         /**
-         * Map landmarks
+         * Map landmarks (minimal data)
          */
         landmarks: Array<{
             /**
@@ -8595,21 +10442,9 @@ export type GetMyMapsByMapIdLandmarksResponses = {
              */
             name: string;
             /**
-             * Landmark description
-             */
-            description: string;
-            /**
              * Landmark type
              */
             type: string;
-            /**
-             * Population
-             */
-            population: string | null;
-            /**
-             * Industry type
-             */
-            industry: string | null;
             /**
              * Display color
              */
@@ -8618,18 +10453,6 @@ export type GetMyMapsByMapIdLandmarksResponses = {
              * Size category
              */
             size: string | null;
-            /**
-             * Region name
-             */
-            region: string | null;
-            /**
-             * Sector name
-             */
-            sector: string | null;
-            /**
-             * Planetary bodies info
-             */
-            planetaryBodies: string | null;
         }>;
     };
 };
@@ -8639,11 +10462,11 @@ export type GetMyMapsByMapIdLandmarksResponse = GetMyMapsByMapIdLandmarksRespons
 export type PostMyMapsByMapIdLandmarksData = {
     body: {
         /**
-         * X coordinate
+         * X coordinate (0-1 normalized)
          */
         x: number;
         /**
-         * Y coordinate
+         * Y coordinate (0-1 normalized)
          */
         y: number;
         /**
@@ -8659,14 +10482,6 @@ export type PostMyMapsByMapIdLandmarksData = {
          */
         type?: string;
         /**
-         * Population
-         */
-        population?: string;
-        /**
-         * Industry type
-         */
-        industry?: string;
-        /**
          * Display color (hex)
          */
         color?: string;
@@ -8675,17 +10490,11 @@ export type PostMyMapsByMapIdLandmarksData = {
          */
         size?: string;
         /**
-         * Region name
+         * Custom properties
          */
-        region?: string;
-        /**
-         * Sector name
-         */
-        sector?: string;
-        /**
-         * Planetary bodies info
-         */
-        planetaryBodies?: string;
+        properties?: {
+            [key: string]: unknown;
+        };
     };
     path: {
         /**
@@ -8790,14 +10599,6 @@ export type PostMyMapsByMapIdLandmarksResponses = {
              */
             type: string;
             /**
-             * Population
-             */
-            population: string | null;
-            /**
-             * Industry type
-             */
-            industry: string | null;
-            /**
              * Display color
              */
             color: string | null;
@@ -8806,17 +10607,11 @@ export type PostMyMapsByMapIdLandmarksResponses = {
              */
             size: string | null;
             /**
-             * Region name
+             * Custom properties
              */
-            region: string | null;
-            /**
-             * Sector name
-             */
-            sector: string | null;
-            /**
-             * Planetary bodies info
-             */
-            planetaryBodies: string | null;
+            properties: {
+                [key: string]: unknown;
+            };
         };
     };
 };
@@ -9007,14 +10802,6 @@ export type GetMyLandmarksByIdResponses = {
              */
             type: string;
             /**
-             * Population
-             */
-            population: string | null;
-            /**
-             * Industry type
-             */
-            industry: string | null;
-            /**
              * Display color
              */
             color: string | null;
@@ -9023,17 +10810,11 @@ export type GetMyLandmarksByIdResponses = {
              */
             size: string | null;
             /**
-             * Region name
+             * Custom properties
              */
-            region: string | null;
-            /**
-             * Sector name
-             */
-            sector: string | null;
-            /**
-             * Planetary bodies info
-             */
-            planetaryBodies: string | null;
+            properties: {
+                [key: string]: unknown;
+            };
         };
     };
 };
@@ -9043,11 +10824,11 @@ export type GetMyLandmarksByIdResponse = GetMyLandmarksByIdResponses[keyof GetMy
 export type PutMyLandmarksByIdData = {
     body: {
         /**
-         * X coordinate
+         * X coordinate (0-1 normalized)
          */
         x?: number;
         /**
-         * Y coordinate
+         * Y coordinate (0-1 normalized)
          */
         y?: number;
         /**
@@ -9063,14 +10844,6 @@ export type PutMyLandmarksByIdData = {
          */
         type?: string;
         /**
-         * Population (null to remove)
-         */
-        population?: string | null;
-        /**
-         * Industry type (null to remove)
-         */
-        industry?: string | null;
-        /**
          * Display color (null to remove)
          */
         color?: string | null;
@@ -9079,17 +10852,11 @@ export type PutMyLandmarksByIdData = {
          */
         size?: string | null;
         /**
-         * Region name (null to remove)
+         * Custom properties (merged with existing)
          */
-        region?: string | null;
-        /**
-         * Sector name (null to remove)
-         */
-        sector?: string | null;
-        /**
-         * Planetary bodies info (null to remove)
-         */
-        planetaryBodies?: string | null;
+        properties?: {
+            [key: string]: unknown;
+        };
     };
     path: {
         /**
@@ -9194,14 +10961,6 @@ export type PutMyLandmarksByIdResponses = {
              */
             type: string;
             /**
-             * Population
-             */
-            population: string | null;
-            /**
-             * Industry type
-             */
-            industry: string | null;
-            /**
              * Display color
              */
             color: string | null;
@@ -9210,22 +10969,535 @@ export type PutMyLandmarksByIdResponses = {
              */
             size: string | null;
             /**
-             * Region name
+             * Custom properties
              */
-            region: string | null;
-            /**
-             * Sector name
-             */
-            sector: string | null;
-            /**
-             * Planetary bodies info
-             */
-            planetaryBodies: string | null;
+            properties: {
+                [key: string]: unknown;
+            };
         };
     };
 };
 
 export type PutMyLandmarksByIdResponse = PutMyLandmarksByIdResponses[keyof PutMyLandmarksByIdResponses];
+
+export type GetMyStoriesByStoryIdLandmarkStatesData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: {
+        /**
+         * Filter by map ID
+         */
+        mapId?: string;
+    };
+    url: '/my/stories/{storyId}/landmark-states';
+};
+
+export type GetMyStoriesByStoryIdLandmarkStatesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdLandmarkStatesError = GetMyStoriesByStoryIdLandmarkStatesErrors[keyof GetMyStoriesByStoryIdLandmarkStatesErrors];
+
+export type GetMyStoriesByStoryIdLandmarkStatesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Landmark states
+         */
+        states: Array<{
+            /**
+             * State ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Landmark ID
+             */
+            landmarkId: string;
+            /**
+             * Timeline position (minutes from epoch)
+             */
+            storyTime: number | null;
+            /**
+             * State field name
+             */
+            field: string;
+            /**
+             * State value
+             */
+            value: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetMyStoriesByStoryIdLandmarkStatesResponse = GetMyStoriesByStoryIdLandmarkStatesResponses[keyof GetMyStoriesByStoryIdLandmarkStatesResponses];
+
+export type GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+        /**
+         * Timeline position (minutes from epoch)
+         */
+        storyTime: number;
+    };
+    query?: {
+        /**
+         * Filter by map ID
+         */
+        mapId?: string;
+    };
+    url: '/my/stories/{storyId}/landmark-states/at/{storyTime}';
+};
+
+export type GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeError = GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeErrors[keyof GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeErrors];
+
+export type GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Accumulated states at the specified storyTime
+         */
+        states: Array<{
+            /**
+             * State ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Landmark ID
+             */
+            landmarkId: string;
+            /**
+             * Timeline position (minutes from epoch)
+             */
+            storyTime: number | null;
+            /**
+             * State field name
+             */
+            field: string;
+            /**
+             * State value
+             */
+            value: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeResponse = GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeResponses[keyof GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeResponses];
+
+export type PostMyLandmarksByLandmarkIdStatesData = {
+    body: {
+        /**
+         * Timeline position (minutes from epoch)
+         */
+        storyTime: number;
+        /**
+         * State field name
+         */
+        field: string;
+        /**
+         * State value (null to delete)
+         */
+        value: string | null;
+    };
+    path: {
+        /**
+         * Landmark ID
+         */
+        landmarkId: string;
+    };
+    query?: never;
+    url: '/my/landmarks/{landmarkId}/states';
+};
+
+export type PostMyLandmarksByLandmarkIdStatesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyLandmarksByLandmarkIdStatesError = PostMyLandmarksByLandmarkIdStatesErrors[keyof PostMyLandmarksByLandmarkIdStatesErrors];
+
+export type PostMyLandmarksByLandmarkIdStatesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        state?: {
+            /**
+             * State ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Landmark ID
+             */
+            landmarkId: string;
+            /**
+             * Timeline position (minutes from epoch)
+             */
+            storyTime: number | null;
+            /**
+             * State field name
+             */
+            field: string;
+            /**
+             * State value
+             */
+            value: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+        deleted?: boolean;
+    };
+    /**
+     * Default Response
+     */
+    201: {
+        success: true;
+        state?: {
+            /**
+             * State ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Landmark ID
+             */
+            landmarkId: string;
+            /**
+             * Timeline position (minutes from epoch)
+             */
+            storyTime: number | null;
+            /**
+             * State field name
+             */
+            field: string;
+            /**
+             * State value
+             */
+            value: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+        deleted?: boolean;
+    };
+};
+
+export type PostMyLandmarksByLandmarkIdStatesResponse = PostMyLandmarksByLandmarkIdStatesResponses[keyof PostMyLandmarksByLandmarkIdStatesResponses];
+
+export type DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeData = {
+    body?: never;
+    path: {
+        /**
+         * Landmark ID
+         */
+        landmarkId: string;
+        /**
+         * State field name
+         */
+        field: string;
+        /**
+         * Timeline position
+         */
+        storyTime: number;
+    };
+    query?: never;
+    url: '/my/landmarks/{landmarkId}/states/{field}/{storyTime}';
+};
+
+export type DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeError = DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeErrors[keyof DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeErrors];
+
+export type DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeResponse = DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeResponses[keyof DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeResponses];
 
 export type GetMyMapsByMapIdPawnsData = {
     body?: never;
@@ -9870,7 +12142,12 @@ export type GetMyMapsByMapIdPathsData = {
          */
         mapId: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Include path segments in response
+         */
+        includeSegments?: string;
+    };
     url: '/my/maps/{mapId}/paths';
 };
 
@@ -9937,7 +12214,7 @@ export type GetMyMapsByMapIdPathsResponses = {
      */
     200: {
         /**
-         * Map paths
+         * Map paths with segments
          */
         paths: Array<{
             /**
@@ -9953,13 +12230,50 @@ export type GetMyMapsByMapIdPathsResponses = {
              */
             speedMultiplier: number;
             /**
-             * Creation timestamp
+             * Path segments
              */
-            createdAt: string;
-            /**
-             * Last update timestamp
-             */
-            updatedAt: string;
+            segments: Array<{
+                /**
+                 * Segment ID
+                 */
+                id: string;
+                /**
+                 * Path ID
+                 */
+                pathId: string;
+                /**
+                 * Map ID
+                 */
+                mapId: string;
+                /**
+                 * Segment order
+                 */
+                order: number;
+                /**
+                 * Start X coordinate (0-1)
+                 */
+                startX: number;
+                /**
+                 * Start Y coordinate (0-1)
+                 */
+                startY: number;
+                /**
+                 * End X coordinate (0-1)
+                 */
+                endX: number;
+                /**
+                 * End Y coordinate (0-1)
+                 */
+                endY: number;
+                /**
+                 * Start landmark ID
+                 */
+                startLandmarkId: string | null;
+                /**
+                 * End landmark ID
+                 */
+                endLandmarkId: string | null;
+            }>;
         }>;
     };
 };
@@ -10059,14 +12373,6 @@ export type PostMyMapsByMapIdPathsResponses = {
              * Speed multiplier
              */
             speedMultiplier: number;
-            /**
-             * Creation timestamp
-             */
-            createdAt: string;
-            /**
-             * Last update timestamp
-             */
-            updatedAt: string;
         };
     };
 };
@@ -10240,14 +12546,6 @@ export type GetMyPathsByIdResponses = {
              * Speed multiplier
              */
             speedMultiplier: number;
-            /**
-             * Creation timestamp
-             */
-            createdAt: string;
-            /**
-             * Last update timestamp
-             */
-            updatedAt: string;
         };
     };
 };
@@ -10347,14 +12645,6 @@ export type PutMyPathsByIdResponses = {
              * Speed multiplier
              */
             speedMultiplier: number;
-            /**
-             * Creation timestamp
-             */
-            createdAt: string;
-            /**
-             * Last update timestamp
-             */
-            updatedAt: string;
         };
     };
 };
@@ -11045,6 +13335,279 @@ export type PutMyPathSegmentsByIdResponses = {
 };
 
 export type PutMyPathSegmentsByIdResponse = PutMyPathSegmentsByIdResponses[keyof PutMyPathSegmentsByIdResponses];
+
+export type GetMyStoriesByStoryIdPlotPointStatesData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/plot-point-states';
+};
+
+export type GetMyStoriesByStoryIdPlotPointStatesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdPlotPointStatesError = GetMyStoriesByStoryIdPlotPointStatesErrors[keyof GetMyStoriesByStoryIdPlotPointStatesErrors];
+
+export type GetMyStoriesByStoryIdPlotPointStatesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        plotPointStates: Array<{
+            /**
+             * Plot point state ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Message ID where this state is set
+             */
+            messageId: string;
+            /**
+             * Plot point key
+             */
+            key: string;
+            /**
+             * Plot point value (stored as string, parse as needed)
+             */
+            value: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetMyStoriesByStoryIdPlotPointStatesResponse = GetMyStoriesByStoryIdPlotPointStatesResponses[keyof GetMyStoriesByStoryIdPlotPointStatesResponses];
+
+export type PostMyMessagesByMessageIdPlotPointStatesData = {
+    body: {
+        /**
+         * Plot point key
+         */
+        key: string;
+        /**
+         * Plot point value (numbers should be stringified)
+         */
+        value: string;
+    };
+    path: {
+        /**
+         * Message ID
+         */
+        messageId: string;
+    };
+    query?: never;
+    url: '/my/messages/{messageId}/plot-point-states';
+};
+
+export type PostMyMessagesByMessageIdPlotPointStatesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyMessagesByMessageIdPlotPointStatesError = PostMyMessagesByMessageIdPlotPointStatesErrors[keyof PostMyMessagesByMessageIdPlotPointStatesErrors];
+
+export type PostMyMessagesByMessageIdPlotPointStatesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        plotPointState: {
+            /**
+             * Plot point state ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Message ID where this state is set
+             */
+            messageId: string;
+            /**
+             * Plot point key
+             */
+            key: string;
+            /**
+             * Plot point value (stored as string, parse as needed)
+             */
+            value: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+    };
+};
+
+export type PostMyMessagesByMessageIdPlotPointStatesResponse = PostMyMessagesByMessageIdPlotPointStatesResponses[keyof PostMyMessagesByMessageIdPlotPointStatesResponses];
+
+export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyData = {
+    body?: never;
+    path: {
+        /**
+         * Message ID
+         */
+        messageId: string;
+        /**
+         * Plot point key
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/my/messages/{messageId}/plot-point-states/{key}';
+};
+
+export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyError = DeleteMyMessagesByMessageIdPlotPointStatesByKeyErrors[keyof DeleteMyMessagesByMessageIdPlotPointStatesByKeyErrors];
+
+export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponse = DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses[keyof DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses];
 
 export type GetStoriesData = {
     body?: never;

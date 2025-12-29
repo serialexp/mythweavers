@@ -82,8 +82,6 @@ export const goToTargetButton = style({
 
 export const addOptionButton = style({
   width: '100%',
-  border: `1px dashed ${tokens.color.border.default}`,
-  background: tokens.color.bg.base,
 })
 
 export const optionsContainer = style({

@@ -165,16 +165,20 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
             </TabList>
           </Tabs>
         }
-        renderListItem={(item) => (
-          <Stack direction="horizontal" gap="sm" align="center" style={{ flex: '1', 'min-width': '0' }}>
-            <div class={styles.listItemName}>
-              <EJSRenderer template={item.name} mode="inline" />
-            </div>
-            <Badge variant={getTypeBadgeVariant(item.type)} size="sm">
-              {item.type}
-            </Badge>
-          </Stack>
-        )}
+        renderListItem={(item) => {
+          // Access item from store to get reactive updates when properties change
+          const storeItem = () => contextItemsStore.contextItems.find((i) => i.id === item.id) ?? item
+          return (
+            <Stack direction="horizontal" gap="sm" align="center" style={{ flex: '1', 'min-width': '0' }}>
+              <div class={styles.listItemName}>
+                <EJSRenderer template={storeItem().name} mode="inline" />
+              </div>
+              <Badge variant={getTypeBadgeVariant(storeItem().type)} size="sm">
+                {storeItem().type}
+              </Badge>
+            </Stack>
+          )
+        }}
         detailTitle={(item) => (
           <Show when={!editingId()} fallback="Edit Context Item">
             <Stack direction="horizontal" gap="sm" align="center" style={{ flex: '1' }}>

@@ -118,9 +118,20 @@ export const checkboxContainer = style({
 })
 
 export const checkboxLabel = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
   fontSize: '0.875rem',
   fontWeight: 500,
   color: tokens.color.text.primary,
+  cursor: 'pointer',
+})
+
+export const checkbox = style({
+  width: '1rem',
+  height: '1rem',
+  accentColor: tokens.color.accent.primary,
+  cursor: 'pointer',
 })
 
 export const checkboxDescription = style({

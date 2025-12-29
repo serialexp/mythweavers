@@ -1,9 +1,10 @@
-import { Alert, Button, Card, CardBody, Grid, Modal, Stack } from '@mythweavers/ui'
-import { Component, Show, createSignal } from 'solid-js'
+import { Alert, Button, Card, CardBody, Grid, Modal, Stack, Tab, TabList, TabPanel, Tabs } from '@mythweavers/ui'
+import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { calendarStore } from '../stores/calendarStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { plotPointsStore } from '../stores/plotPointsStore'
 import { Message } from '../types/core'
 import { getAllNodesUpToNode, getMessagesInStoryOrder } from '../utils/nodeTraversal'
 import { executeScript, executeScriptsUpToMessage } from '../utils/scriptEngine'
@@ -15,34 +16,201 @@ interface MessageScriptModalProps {
   onClose: () => void
 }
 
+// Plot Points Override Editor for a specific message
+function PlotPointsOverrideEditor(props: { messageId: string }) {
+  const [editingKey, setEditingKey] = createSignal<string | null>(null)
+  const [editValue, setEditValue] = createSignal('')
+
+  // Get messages in story order up to this message
+  const messagesInOrder = createMemo(() => {
+    return getMessagesInStoryOrder(messagesStore.messages, nodeStore.nodesArray, props.messageId)
+  })
+
+  // Get message IDs in order (up to and including this message)
+  const messageIdsInOrder = createMemo(() => {
+    const msgs = messagesInOrder()
+    const idx = msgs.findIndex((m) => m.id === props.messageId)
+    return msgs.slice(0, idx + 1).map((m) => m.id)
+  })
+
+  // Get accumulated values at this message
+  const accumulatedValues = createMemo(() => {
+    return plotPointsStore.getAccumulatedValues(messageIdsInOrder(), props.messageId)
+  })
+
+  const startEdit = (key: string) => {
+    const currentValue = accumulatedValues()[key]
+    setEditingKey(key)
+    setEditValue(String(currentValue ?? ''))
+  }
+
+  const saveEdit = (key: string) => {
+    plotPointsStore.setStateAtMessage(props.messageId, key, editValue())
+    setEditingKey(null)
+  }
+
+  const cancelEdit = () => {
+    setEditingKey(null)
+  }
+
+  const clearOverride = (key: string) => {
+    plotPointsStore.removeStateAtMessage(props.messageId, key)
+  }
+
+  // For enum types, directly set the value without entering edit mode
+  const handleEnumChange = (key: string, value: string) => {
+    plotPointsStore.setStateAtMessage(props.messageId, key, value)
+  }
+
+  // For boolean types, toggle the value
+  const handleBooleanChange = (key: string, value: boolean) => {
+    plotPointsStore.setStateAtMessage(props.messageId, key, String(value))
+  }
+
+  return (
+    <Stack gap="md">
+      <p class={styles.plotPointsDescription}>
+        Override plot point values at this message. Changes will affect all subsequent messages. Values in{' '}
+        <span class={styles.plotPointsHint}>blue</span> are set at this message.
+      </p>
+
+      <Show
+        when={plotPointsStore.definitions.length > 0}
+        fallback={<p class={styles.emptyState}>No plot points defined. Add them in the Global Script editor.</p>}
+      >
+        <div class={styles.plotPointsList}>
+          <For each={plotPointsStore.definitions}>
+            {(def) => {
+              const isSetHere = () => plotPointsStore.isStateSetAtMessage(props.messageId, def.key)
+              const currentValue = () => accumulatedValues()[def.key]
+
+              return (
+                <div
+                  class={isSetHere() ? styles.plotPointRowActive : styles.plotPointRow}
+                  style={{ 'flex-wrap': def.type === 'enum' ? 'wrap' : undefined }}
+                >
+                  <code class={styles.plotPointKey}>{def.key}</code>
+                  <span class={styles.plotPointType}>{def.type}</span>
+
+                  {/* Enum type: show radio buttons directly */}
+                  <Show when={def.type === 'enum' && def.options}>
+                    <div class={styles.radioGroup}>
+                      <For each={def.options}>
+                        {(option) => (
+                          <label
+                            class={currentValue() === option ? styles.radioLabelSelected : styles.radioLabel}
+                            onClick={() => handleEnumChange(def.key, option)}
+                          >
+                            <input type="radio" name={`enum-${def.key}`} class={styles.radioInput} checked={currentValue() === option} />
+                            {option}
+                          </label>
+                        )}
+                      </For>
+                    </div>
+                    <Show when={isSetHere()}>
+                      <Button variant="ghost" size="sm" onClick={() => clearOverride(def.key)}>
+                        Clear
+                      </Button>
+                    </Show>
+                  </Show>
+
+                  {/* Boolean type: show toggle buttons */}
+                  <Show when={def.type === 'boolean'}>
+                    <div class={styles.toggleContainer}>
+                      <button
+                        type="button"
+                        class={currentValue() === true || currentValue() === 'true' ? styles.toggleButtonSelected : styles.toggleButton}
+                        onClick={() => handleBooleanChange(def.key, true)}
+                      >
+                        true
+                      </button>
+                      <button
+                        type="button"
+                        class={currentValue() === false || currentValue() === 'false' ? styles.toggleButtonSelected : styles.toggleButton}
+                        onClick={() => handleBooleanChange(def.key, false)}
+                      >
+                        false
+                      </button>
+                    </div>
+                    <Show when={isSetHere()}>
+                      <Button variant="ghost" size="sm" onClick={() => clearOverride(def.key)}>
+                        Clear
+                      </Button>
+                    </Show>
+                  </Show>
+
+                  {/* String/Number types: show edit mode */}
+                  <Show when={def.type !== 'enum' && def.type !== 'boolean'}>
+                    <Show
+                      when={editingKey() === def.key}
+                      fallback={
+                        <>
+                          <span class={isSetHere() ? styles.plotPointValueActive : styles.plotPointValue}>
+                            = {JSON.stringify(currentValue())}
+                          </span>
+                          <Button variant="ghost" size="sm" onClick={() => startEdit(def.key)}>
+                            {isSetHere() ? 'Edit' : 'Override'}
+                          </Button>
+                          <Show when={isSetHere()}>
+                            <Button variant="ghost" size="sm" onClick={() => clearOverride(def.key)}>
+                              Clear
+                            </Button>
+                          </Show>
+                        </>
+                      }
+                    >
+                      <input
+                        type={def.type === 'number' ? 'number' : 'text'}
+                        value={editValue()}
+                        onInput={(e) => setEditValue(e.currentTarget.value)}
+                        class={styles.input}
+                      />
+                      <Button variant="primary" size="sm" onClick={() => saveEdit(def.key)}>
+                        Save
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                        Cancel
+                      </Button>
+                    </Show>
+                  </Show>
+                </div>
+              )
+            }}
+          </For>
+        </div>
+      </Show>
+    </Stack>
+  )
+}
+
 const DEFAULT_MESSAGE_SCRIPT = `(data, functions) => {
   // Modify data based on this story turn
   // Data is immutable - write normal mutation code but original data is preserved!
   // Functions from global script are available in the 'functions' object
-  
+
   // Example: Use functions from global script
   // With Immer, you can just call functions without reassigning!
   // functions.advanceTime(data, 7); // Advance time by a week
-  // functions.updateAges(data); // Update all character ages  
+  // functions.updateAges(data); // Update all character ages
   // functions.addEvent(data, 'Battle of Yavin', { importance: 'high' });
-  
+
   // Example: Check values without modifying
   // const daysPassed = functions.getDaysSinceStart(data);
   // if (functions.hasCharacter(data, 'Luke')) {
   //   console.log('Luke is in the story!');
   // }
-  
+
   // Example: Direct data mutation (Immer makes it safe!)
   // data.locationName = 'Death Star';
   // data.tension = (data.tension || 0) + 10;
-  
+
   // Example: Complex mutations are easy
   // if (!data.inventory) data.inventory = {};
   // data.inventory.lightsaber = { color: 'blue', owner: 'Luke' };
-  
+
   // Increment turn counter
   // data.turnNumber = (data.turnNumber || 0) + 1;
-  
+
   // No need to return data unless you're replacing the whole object
   // Immer will handle all the mutations you made above
 }`
@@ -52,6 +220,7 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
   const [error, setError] = createSignal<string | null>(null)
   const [previewData, setPreviewData] = createSignal<any>(null)
   const [showPreview, setShowPreview] = createSignal(false)
+  const [activeTab, setActiveTab] = createSignal('script')
 
   const validateScript = (script: string): boolean => {
     if (!script.trim()) {
@@ -108,9 +277,9 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
 
         console.log('[MessageScriptModal] Executing scripts up to previous message', {
           currentMessageId: props.message.id.substring(0, 8),
-          currentNodeId: props.message.nodeId?.substring(0, 8),
+          currentNodeId: props.message.sceneId?.substring(0, 8),
           previousMessageId: previousMessageId.substring(0, 8),
-          previousNodeId: previousMessage.nodeId?.substring(0, 8),
+          previousNodeId: previousMessage.sceneId?.substring(0, 8),
         })
 
         dataBefore = executeScriptsUpToMessage(
@@ -127,10 +296,10 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
 
         // If this message is in a different chapter than the previous one,
         // we need to update currentTime to reflect the new chapter's storyTime
-        if (props.message.nodeId && previousMessage.nodeId !== props.message.nodeId) {
-          const currentNode = nodeStore.nodesArray.find((n) => n.id === props.message.nodeId)
+        if (props.message.sceneId && previousMessage.sceneId !== props.message.sceneId) {
+          const currentNode = nodeStore.nodesArray.find((n) => n.id === props.message.sceneId)
           console.log('[MessageScriptModal] Detected node change', {
-            currentNodeId: props.message.nodeId.substring(0, 8),
+            currentNodeId: props.message.sceneId.substring(0, 8),
             currentNodeStoryTime: currentNode?.storyTime,
             currentNodeTitle: currentNode?.title,
           })
@@ -145,7 +314,7 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
           } else {
             // Node doesn't have storyTime - reset to last chapter's base time
             // Find the last node before the current one that has a storyTime set
-            const allNodesUpToCurrent = getAllNodesUpToNode(nodeStore.nodesArray, props.message.nodeId)
+            const allNodesUpToCurrent = getAllNodesUpToNode(nodeStore.nodesArray, props.message.sceneId)
             console.log(
               '[MessageScriptModal] Nodes up to current:',
               allNodesUpToCurrent.map((n) => ({
@@ -175,8 +344,8 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
         dataBefore = globalResult.data
 
         // Set currentTime from this message's chapter
-        if (props.message.nodeId) {
-          const currentNode = nodeStore.nodesArray.find((n) => n.id === props.message.nodeId)
+        if (props.message.sceneId) {
+          const currentNode = nodeStore.nodesArray.find((n) => n.id === props.message.sceneId)
           if (currentNode?.storyTime != null) {
             dataBefore = {
               ...dataBefore,
@@ -227,52 +396,69 @@ export const MessageScriptModal: Component<MessageScriptModalProps> = (props) =>
   }
 
   return (
-    <Modal open={true} onClose={props.onClose} title="Edit Turn Script" size="xl">
-      <div style={{ padding: '1.5rem', 'overflow-y': 'auto', flex: 1 }}>
-        <p class={styles.description}>
-          This script runs when generating context for this turn. It receives the data object after all previous scripts
-          have run, and should return the modified data object.
-        </p>
+    <Modal open={true} onClose={props.onClose} title="Turn Script & Plot Points" size="xl">
+      <div class={styles.modalContent}>
+        <Tabs activeTab={activeTab()} onTabChange={setActiveTab}>
+          <TabList>
+            <Tab id="script">Script</Tab>
+            <Tab id="plot-points">Plot Points</Tab>
+          </TabList>
 
-        <CodeEditor
-          value={scriptContent()}
-          onChange={(value) => {
-            setScriptContent(value)
-            validateScript(value)
-            setShowPreview(false)
-          }}
-          error={error()}
-          height="350px"
-        />
+          <TabPanel id="script">
+            <div class={styles.tabPanelContent}>
+              <p class={styles.description}>
+                This script runs when generating context for this turn. It receives the data object after all previous
+                scripts have run, and should return the modified data object.
+              </p>
 
-        <Show when={error()}>
-          <Alert variant="error" style={{ 'margin-top': '0.5rem' }}>
-            {error()}
-          </Alert>
-        </Show>
+              <CodeEditor
+                value={scriptContent()}
+                onChange={(value) => {
+                  setScriptContent(value)
+                  validateScript(value)
+                  setShowPreview(false)
+                }}
+                error={error()}
+                height="350px"
+              />
 
-        <Stack gap="md" style={{ 'margin-top': '1rem' }}>
-          <Button variant="secondary" onClick={handlePreview} disabled={!!error()}>
-            {showPreview() ? 'Hide Preview' : 'Preview Data State'}
-          </Button>
+              <Show when={error()}>
+                <Alert variant="error" style={{ 'margin-top': '0.5rem' }}>
+                  {error()}
+                </Alert>
+              </Show>
 
-          <Show when={showPreview() && previewData()}>
-            <Grid cols={2} gap="md" style={{ 'margin-top': '1rem' }}>
-              <Card variant="flat">
-                <CardBody>
-                  <h4 class={styles.previewHeader}>Data Before This Turn</h4>
-                  <pre class={styles.previewContent}>{JSON.stringify(previewData().before, null, 2)}</pre>
-                </CardBody>
-              </Card>
-              <Card variant="flat">
-                <CardBody>
-                  <h4 class={styles.previewHeader}>Data After This Turn</h4>
-                  <pre class={styles.previewContent}>{JSON.stringify(previewData().after, null, 2)}</pre>
-                </CardBody>
-              </Card>
-            </Grid>
-          </Show>
-        </Stack>
+              <Stack gap="md" style={{ 'margin-top': '1rem' }}>
+                <Button variant="secondary" onClick={handlePreview} disabled={!!error()}>
+                  {showPreview() ? 'Hide Preview' : 'Preview Data State'}
+                </Button>
+
+                <Show when={showPreview() && previewData()}>
+                  <Grid cols={2} gap="md" style={{ 'margin-top': '1rem' }}>
+                    <Card variant="flat">
+                      <CardBody>
+                        <h4 class={styles.previewHeader}>Data Before This Turn</h4>
+                        <pre class={styles.previewContent}>{JSON.stringify(previewData().before, null, 2)}</pre>
+                      </CardBody>
+                    </Card>
+                    <Card variant="flat">
+                      <CardBody>
+                        <h4 class={styles.previewHeader}>Data After This Turn</h4>
+                        <pre class={styles.previewContent}>{JSON.stringify(previewData().after, null, 2)}</pre>
+                      </CardBody>
+                    </Card>
+                  </Grid>
+                </Show>
+              </Stack>
+            </div>
+          </TabPanel>
+
+          <TabPanel id="plot-points">
+            <div class={styles.tabPanelContent}>
+              <PlotPointsOverrideEditor messageId={props.message.id} />
+            </div>
+          </TabPanel>
+        </Tabs>
       </div>
 
       <div class={styles.footer}>

@@ -69,8 +69,17 @@ export const hint = style({
   marginTop: '-0.25rem',
 })
 
+export const formatPreview = style({
+  marginTop: tokens.space['2'],
+  padding: tokens.space['2'],
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.secondary,
+  background: tokens.color.bg.base,
+  borderRadius: tokens.radius.sm,
+  border: `1px solid ${tokens.color.border.subtle}`,
+})
+
 export const nestedList = style({
-  marginLeft: '1.5rem',
   paddingLeft: '1rem',
   borderLeft: `2px solid ${tokens.color.border.default}`,
   display: 'flex',
@@ -102,4 +111,62 @@ export const actionRow = style({
   justifyContent: 'flex-end',
   paddingTop: '1rem',
   borderTop: `1px solid ${tokens.color.border.default}`,
+})
+
+// Holiday styles
+export const holidayItem = style({
+  display: 'flex',
+  gap: '0.75rem',
+  alignItems: 'center',
+  padding: '0.75rem',
+  background: tokens.color.bg.elevated,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+})
+
+export const holidayName = style({
+  flex: 1,
+  fontWeight: tokens.font.weight.medium,
+})
+
+export const holidayRule = style({
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.secondary,
+})
+
+export const holidayForm = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gap: '0.75rem',
+  padding: '1rem',
+  background: tokens.color.bg.elevated,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+})
+
+export const weekdayGrid = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(7, 1fr)',
+  gap: tokens.space['1'],
+})
+
+export const weekdayInput = style({
+  textAlign: 'center',
+})
+
+// Step builder styles for computed holidays
+export const stepItem = style({
+  display: 'flex',
+  gap: tokens.space['2'],
+  alignItems: 'center',
+  padding: tokens.space['2'],
+  background: tokens.color.bg.base,
+  border: `1px solid ${tokens.color.border.subtle}`,
+  borderRadius: tokens.radius.sm,
+})
+
+export const stepNumber = style({
+  fontWeight: tokens.font.weight.semibold,
+  color: tokens.color.text.muted,
+  minWidth: '1.5rem',
 })

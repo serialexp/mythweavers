@@ -119,19 +119,19 @@ describe('buildPrecedingContextMarkdown', () => {
         id: 'm-1',
         content: 'Opening scene content',
         order: 0,
-        nodeId: 'ch-1',
+        sceneId: 'ch-1',
       }),
       createMessage({
         id: 'm-2',
         content: 'Second act moment one.\n\nSecond act moment two.',
         order: 1,
-        nodeId: 'ch-2',
+        sceneId: 'ch-2',
       }),
       createMessage({
         id: 'm-3',
         content: 'Climax scene content',
         order: 2,
-        nodeId: 'ch-3',
+        sceneId: 'ch-3',
       }),
     ])
   })

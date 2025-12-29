@@ -173,6 +173,7 @@ export const getStoryPrompt = (
   isNewStory?: boolean,
   viewpointCharacterName?: string,
   chapterGoal?: string,
+  storyFormat?: 'narrative' | 'cyoa',
 ) => {
   const selectedSetting = STORY_SETTINGS.find((s) => s.value === storySetting)
   const settingText = selectedSetting?.value
@@ -180,7 +181,7 @@ export const getStoryPrompt = (
     : ''
 
   // Build narrative style instruction
-  const personText = person === 'first' ? 'first person' : 'third person'
+  const personText = person === 'first' ? 'first person' : person === 'second' ? 'second person' : 'third person'
   const tenseText = tense === 'present' ? 'present tense' : 'past tense'
 
   // Determine the viewpoint character name to use (explicit viewpoint or protagonist fallback)
@@ -191,6 +192,8 @@ export const getStoryPrompt = (
   if (viewpointName) {
     if (person === 'first') {
       perspectiveText = ` from the perspective of ${viewpointName}`
+    } else if (person === 'second') {
+      perspectiveText = ` where "you" refers to ${viewpointName}`
     } else {
       // Third person - use "following X's viewpoint"
       perspectiveText = ` following ${viewpointName}'s viewpoint`
@@ -208,9 +211,40 @@ export const getStoryPrompt = (
     ? `Create a story based on the user's direction. `
     : `Continue the story based on the user's direction, maintaining consistency with previous events and character development. `
 
+  // CYOA-specific instructions
+  if (storyFormat === 'cyoa') {
+    return `You are a creative story writer creating an interactive "Choose Your Own Adventure" narrative. ${settingText}${styleText}${taskText}${goalText}Write in a natural, flowing style that draws the reader in. Focus on "show, don't tell" and include vivid descriptions, dialogue, and character thoughts where appropriate.
+
+IMPORTANT:
+- Write a single story section that responds to the reader's choice
+- Use natural paragraph breaks to structure your writing
+- Do not include chapter headers, separators, or section labels
+- Do not add author notes or commentary
+- If you need to reason about the story, use <think>your reasoning here</think> tags
+- Do NOT use any other tags (no </s>, <|im_end|>, etc.) - only <think> tags when needed
+
+PACING AND TONE GUIDELINES:
+- Not every turn needs to end with a cliffhanger or dramatic revelation
+- ABSOLUTELY NEVER use repetitive reflective endings. FORBIDDEN phrases include: "their life would never be the same", "everything had changed", "nothing would ever be the same", "the world had shifted", "everything was different now", "life as they knew it was over", "a new chapter had begun", "the old world was gone", "everything was forever altered", or ANY similar clichéd reflective conclusion. These are BANNED.
+- Allow for natural story rhythms with quieter moments, conversations, and character development
+- Focus on authentic character actions and dialogue rather than overly dramatic internal monologues
+
+CYOA FORMAT REQUIREMENT:
+After completing this turn's story content, you MUST present 2-4 choices for the reader. Format them as:
+
+**What do you do?**
+1. [First choice - brief action description]
+2. [Second choice - brief action description]
+3. [Third choice - brief action description]
+4. Something else...
+
+Make choices meaningful and distinct. They should lead to genuinely different story paths. The last option should always be "Something else..." to allow the reader to type their own action.`
+  }
+
+  // Standard narrative mode
   return `You are a creative story writer helping to create an engaging narrative. ${settingText}${styleText}${taskText}${goalText}Write in a natural, flowing style that draws the reader in. Focus on "show, don't tell" and include vivid descriptions, dialogue, and character thoughts where appropriate.
 
-IMPORTANT: 
+IMPORTANT:
 - Write ONLY a single story continuation turn
 - Write ONLY what the user's direction specifically asks for - do not add extra scenes, events, or content beyond what was requested
 - If the user asks for a conversation, write only that conversation - do not add events before or after

@@ -1,6 +1,7 @@
 import { Viewport } from 'pixi-viewport'
 import * as PIXI from 'pixi.js'
 import { Accessor } from 'solid-js'
+import { mapEditorStore } from '../../stores/mapEditorStore'
 import { Hyperlane } from '../../types/core'
 import { drawAllHyperlanes, drawPreviewSegment } from '../../utils/maps/hyperlaneRenderer'
 import { PixiContainers } from './usePixiMap'
@@ -13,8 +14,6 @@ export interface UseHyperlaneManagerOptions {
   mapSprite: Accessor<PIXI.Sprite | null>
   canvasContainer: Accessor<HTMLDivElement | undefined>
   onHyperlaneClick?: HyperlaneClickHandler
-  shouldStopPropagation?: () => boolean
-  interactive?: () => boolean
 }
 
 export interface UseHyperlaneManagerReturn {
@@ -26,10 +25,15 @@ export interface UseHyperlaneManagerReturn {
 }
 
 /**
- * Hook to manage hyperlane rendering on the map
+ * Hook to manage hyperlane rendering on the map.
+ * Reads interactivity state from mapEditorStore.
  */
 export function useHyperlaneManager(options: UseHyperlaneManagerOptions): UseHyperlaneManagerReturn {
-  const { containers, mapSprite, canvasContainer, onHyperlaneClick, shouldStopPropagation, interactive } = options
+  const { containers, mapSprite, canvasContainer, onHyperlaneClick } = options
+
+  // Read interactivity from store - hyperlanes are interactive only in select mode
+  const shouldStopPropagation = () => mapEditorStore.creationMode === 'select'
+  const interactive = () => mapEditorStore.creationMode === 'select'
 
   // Preview graphics for hyperlane creation
   let previewGraphics: PIXI.Graphics | null = null

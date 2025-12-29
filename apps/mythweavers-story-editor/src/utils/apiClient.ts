@@ -407,21 +407,23 @@ class ApiClient {
   }
 
   async getMapLandmarks(mapId: string): Promise<any[]> {
-    const response = await this.fetch(`/maps/${mapId}/landmarks`)
+    const response = await this.fetch(`/my/maps/${mapId}/landmarks`)
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Failed to fetch landmarks' }))
       throw new Error(errorData.error || `Failed to fetch landmarks: ${response.status} ${response.statusText}`)
     }
-    return response.json()
+    const data = await response.json()
+    return data.landmarks
   }
 
   async getMapHyperlanes(mapId: string): Promise<any[]> {
-    const response = await this.fetch(`/maps/${mapId}/hyperlanes`)
+    const response = await this.fetch(`/my/maps/${mapId}/paths?includeSegments=true`)
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Failed to fetch hyperlanes' }))
-      throw new Error(errorData.error || `Failed to fetch hyperlanes: ${response.status} ${response.statusText}`)
+      const errorData = await response.json().catch(() => ({ error: 'Failed to fetch paths' }))
+      throw new Error(errorData.error || `Failed to fetch paths: ${response.status} ${response.statusText}`)
     }
-    return response.json()
+    const data = await response.json()
+    return data.paths
   }
 
   async getMapFleets(mapId: string): Promise<any[]> {

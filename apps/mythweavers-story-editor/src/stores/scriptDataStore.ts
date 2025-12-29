@@ -11,6 +11,7 @@ import { contextItemsStore } from './contextItemsStore'
 import { currentStoryStore } from './currentStoryStore'
 import { messagesStore } from './messagesStore'
 import { nodeStore } from './nodeStore'
+import { plotPointsStore } from './plotPointsStore'
 
 // Script data can be arbitrary user-defined values
 type ScriptDataValue = string | number | boolean | null | undefined | ScriptDataObject | ScriptDataValue[]
@@ -33,11 +34,19 @@ interface NodeChangeSummary {
   finalState: ScriptDataObject
 }
 
+interface ScriptError {
+  messageId: string
+  nodeId: string
+  error: string
+}
+
 interface ScriptDataStore {
   // Map from message ID to the data state before and after that message's script
   dataStates: Record<string, ScriptDataState>
   // Map from node ID to cumulative changes in that node
   nodeChanges: Record<string, NodeChangeSummary>
+  // Track script execution errors by node ID
+  scriptErrors: Record<string, ScriptError[]>
   // Track if we need to recalculate
   isDirty: boolean
 }
@@ -45,6 +54,7 @@ interface ScriptDataStore {
 const [store, setStore] = createStore<ScriptDataStore>({
   dataStates: {},
   nodeChanges: {},
+  scriptErrors: {},
   isDirty: true,
 })
 
@@ -132,6 +142,56 @@ function initializeContextItemData(data: ScriptDataObject) {
   })
 }
 
+// Initialize plot points with default values from definitions
+function initializePlotPointData(data: ScriptDataObject) {
+  const definitions = plotPointsStore.definitions
+
+  // Initialize plotPoints object
+  if (!data.plotPoints || typeof data.plotPoints !== 'object' || Array.isArray(data.plotPoints)) {
+    data.plotPoints = {}
+  }
+
+  const plotPointsObj = data.plotPoints as Record<string, string | number | boolean>
+
+  // Set default values from definitions
+  definitions.forEach((def) => {
+    // Only set if not already defined (global script may have modified it)
+    if (plotPointsObj[def.key] === undefined) {
+      plotPointsObj[def.key] = def.default
+    }
+  })
+}
+
+// Apply plot point state overrides for a specific message
+function applyPlotPointOverrides(data: ScriptDataObject, messageId: string) {
+  const states = plotPointsStore.getStatesForMessage(messageId)
+  const definitions = plotPointsStore.definitions
+
+  if (states.length === 0) return
+
+  // Ensure plotPoints object exists
+  if (!data.plotPoints || typeof data.plotPoints !== 'object') {
+    data.plotPoints = {}
+  }
+
+  const plotPointsObj = data.plotPoints as Record<string, string | number | boolean>
+
+  // Apply each state override
+  states.forEach((state) => {
+    const def = definitions.find((d) => d.key === state.key)
+    if (def) {
+      // Parse value based on type
+      if (def.type === 'number') {
+        plotPointsObj[state.key] = Number(state.value)
+      } else if (def.type === 'boolean') {
+        plotPointsObj[state.key] = state.value === 'true'
+      } else {
+        plotPointsObj[state.key] = state.value
+      }
+    }
+  })
+}
+
 // Function to evaluate all scripts in sequence
 const evaluateAllScripts = () => {
   const messages = messagesStore.messages
@@ -142,6 +202,7 @@ const evaluateAllScripts = () => {
   let functions: Record<string, (...args: unknown[]) => unknown> = {}
   const newDataStates: Record<string, ScriptDataState> = {}
   const newNodeChanges: Record<string, NodeChangeSummary> = {}
+  const newScriptErrors: Record<string, ScriptError[]> = {}
 
   // Track the last explicitly set chapter time (separate from script-modified currentTime)
   let lastChapterBaseTime = 0
@@ -160,10 +221,11 @@ const evaluateAllScripts = () => {
         draft.currentDate = calendarStore.formatStoryTime(0) || ''
       }
 
-      // Initialize characters and context items from entity stores
+      // Initialize characters, context items, and plot points from entity stores
       // This makes character.birthdate and other entity properties available to scripts
       initializeCharacterData(draft)
       initializeContextItemData(draft)
+      initializePlotPointData(draft)
     })
 
     functions = result.functions || {}
@@ -173,15 +235,16 @@ const evaluateAllScripts = () => {
       after: JSON.parse(JSON.stringify(currentData)),
     }
   } else {
-    // Even if there's no global script, initialize characters and context items
+    // Even if there's no global script, initialize characters, context items, and plot points
     currentData = produce(currentData, (draft: any) => {
       // Initialize currentTime to 0
       draft.currentTime = 0
       draft.currentDate = calendarStore.formatStoryTime(0) || ''
 
-      // Initialize characters and context items from entity stores
+      // Initialize characters, context items, and plot points from entity stores
       initializeCharacterData(draft)
       initializeContextItemData(draft)
+      initializePlotPointData(draft)
     })
   }
 
@@ -191,18 +254,19 @@ const evaluateAllScripts = () => {
     batch(() => {
       setStore('dataStates', newDataStates)
       setStore('nodeChanges', newNodeChanges)
+      setStore('scriptErrors', newScriptErrors)
       setStore('isDirty', false)
     })
     return
   }
 
   // Log which message we're using as the target for script processing
-  if (!lastMessage.nodeId) {
+  if (!lastMessage.sceneId) {
     console.warn('[scriptDataStore] Last message has no nodeId', {
       messageId: lastMessage.id,
       type: lastMessage.type,
       role: lastMessage.role,
-      chapterId: lastMessage.chapterId,
+      chapterId: lastMessage.sceneId,
       order: lastMessage.order,
       content: `${lastMessage.content?.substring(0, 50)}...`,
     })
@@ -216,28 +280,29 @@ const evaluateAllScripts = () => {
     '[scriptDataStore] Processing messages in this order:',
     messagesInOrder.map((m) => ({
       id: m.id.substring(0, 8),
-      nodeId: m.nodeId?.substring(0, 8),
+      nodeId: m.sceneId?.substring(0, 8),
       order: m.order,
       hasScript: !!m.script,
       content: `${m.content?.substring(0, 30)}...`,
     })),
   )
 
-  // Track changes per node
-  let currentNodeId: string | null = null
+  // Track changes per scene (use sceneId, fall back to nodeId for legacy)
+  let currentSceneId: string | null = null
   let nodeStartData: ScriptDataObject = JSON.parse(JSON.stringify(currentData))
-  let currentNode = nodes.find((n) => n.id === currentNodeId)
+  let currentNode = nodes.find((n) => n.id === currentSceneId)
 
   // Execute each message's script in story order
   for (const message of messagesInOrder) {
-    // Check if we've moved to a new node
-    if (message.nodeId && message.nodeId !== currentNodeId) {
-      // Save the changes for the previous node if there was one
-      if (currentNodeId && currentNode) {
+    // Check if we've moved to a new scene
+    const messageSceneId = message.sceneId
+    if (messageSceneId && messageSceneId !== currentSceneId) {
+      // Save the changes for the previous scene if there was one
+      if (currentSceneId && currentNode) {
         const changes = detectChanges(nodeStartData, currentData)
         if (changes.length > 0) {
-          newNodeChanges[currentNodeId] = {
-            nodeId: currentNodeId,
+          newNodeChanges[currentSceneId] = {
+            nodeId: currentSceneId,
             nodeTitle: currentNode.title,
             changes,
             finalState: JSON.parse(JSON.stringify(currentData)),
@@ -245,9 +310,9 @@ const evaluateAllScripts = () => {
         }
       }
 
-      // Start tracking the new node
-      currentNodeId = message.nodeId
-      currentNode = nodes.find((n) => n.id === currentNodeId)
+      // Start tracking the new scene
+      currentSceneId = messageSceneId
+      currentNode = nodes.find((n) => n.id === currentSceneId)
       nodeStartData = JSON.parse(JSON.stringify(currentData))
 
       // Handle storyTime for the new node
@@ -270,6 +335,14 @@ const evaluateAllScripts = () => {
       }
     }
 
+    // Apply plot point state overrides for this message (before script execution)
+    const plotPointStatesForMessage = plotPointsStore.getStatesForMessage(message.id)
+    if (plotPointStatesForMessage.length > 0) {
+      currentData = produce({ ...currentData }, (draft: any) => {
+        applyPlotPointOverrides(draft, message.id)
+      })
+    }
+
     if (message.script && message.role === 'assistant' && !message.isQuery) {
       // Deep copy the current state as "before"
       const beforeData = JSON.parse(JSON.stringify(currentData))
@@ -277,6 +350,19 @@ const evaluateAllScripts = () => {
       // Execute the script with the functions from global script
       const result = executeScript(message.script, currentData, functions, false)
       currentData = result.data
+
+      // Track script errors by scene
+      const errorNodeId = message.sceneId
+      if (result.error && errorNodeId) {
+        if (!newScriptErrors[errorNodeId]) {
+          newScriptErrors[errorNodeId] = []
+        }
+        newScriptErrors[errorNodeId].push({
+          messageId: message.id,
+          nodeId: errorNodeId,
+          error: result.error,
+        })
+      }
 
       // Debug: Log changes to character ages
       if (beforeData.characters && result.data.characters) {
@@ -299,12 +385,12 @@ const evaluateAllScripts = () => {
     }
   }
 
-  // Save changes for the last node
-  if (currentNodeId && currentNode) {
+  // Save changes for the last scene
+  if (currentSceneId && currentNode) {
     const changes = detectChanges(nodeStartData, currentData)
     if (changes.length > 0) {
-      newNodeChanges[currentNodeId] = {
-        nodeId: currentNodeId,
+      newNodeChanges[currentSceneId] = {
+        nodeId: currentSceneId,
         nodeTitle: currentNode.title,
         changes,
         finalState: JSON.parse(JSON.stringify(currentData)),
@@ -315,6 +401,7 @@ const evaluateAllScripts = () => {
   batch(() => {
     setStore('dataStates', newDataStates)
     setStore('nodeChanges', newNodeChanges)
+    setStore('scriptErrors', newScriptErrors)
     setStore('isDirty', false)
   })
 }
@@ -324,8 +411,16 @@ createEffect(() => {
   // Track global script changes
   currentStoryStore.globalScript
 
-  // Track message script changes - accessing them triggers reactivity
-  messagesStore.messages.filter((m) => m.role === 'assistant' && !m.isQuery).forEach((m) => m.script)
+  // Track message count changes (for deletions)
+  messagesStore.messages.length
+
+  // Track message script changes - create a derived value to ensure reactivity
+  // Using JSON.stringify on the scripts array ensures we detect any script content changes
+  JSON.stringify(
+    messagesStore.messages
+      .filter((m) => m.role === 'assistant' && !m.isQuery)
+      .map((m) => ({ id: m.id, script: m.script }))
+  )
 
   // Track node changes (for proper story order and storyTime changes)
   nodeStore.nodesArray.length
@@ -349,6 +444,20 @@ createEffect(() => {
     i.name
     i.type
     i.isGlobal
+  })
+
+  // Track plot point changes - definitions and states affect script data
+  plotPointsStore.definitions.length
+  plotPointsStore.definitions.forEach((d) => {
+    d.key
+    d.type
+    d.default
+  })
+  plotPointsStore.states.length
+  plotPointsStore.states.forEach((s) => {
+    s.messageId
+    s.key
+    s.value
   })
 
   // This effect will re-run whenever scripts, node structure, or entities change
@@ -375,12 +484,27 @@ export const scriptDataStore = {
     return store.isDirty
   },
 
+  get scriptErrors() {
+    return store.scriptErrors
+  },
+
   getDataStateForMessage(messageId: string): ScriptDataState | undefined {
     return store.dataStates[messageId]
   },
 
   getNodeChanges(nodeId: string): NodeChangeSummary | undefined {
     return store.nodeChanges[nodeId]
+  },
+
+  // Get script errors for a specific node
+  getScriptErrors(nodeId: string): ScriptError[] {
+    return store.scriptErrors[nodeId] || []
+  },
+
+  // Check if a node has any script errors
+  hasScriptErrors(nodeId: string): boolean {
+    const errors = store.scriptErrors[nodeId]
+    return errors !== undefined && errors.length > 0
   },
 
   // Get all nodes that have script changes
@@ -412,7 +536,7 @@ export const scriptDataStore = {
     }
 
     // Fail if message has no nodeId
-    if (!targetMessage.nodeId) {
+    if (!targetMessage.sceneId) {
       return null
     }
 
@@ -427,17 +551,18 @@ export const scriptDataStore = {
       lastScriptData = store.dataStates.__global__.after
     }
 
-    // Track current node to detect chapter changes
-    let currentNodeId: string | null = null
+    // Track current scene to detect scene changes
+    let currentSceneId: string | null = null
     // Track the last explicitly set chapter time (separate from script-modified currentTime)
     let lastChapterBaseTime = 0
 
     // Walk through messages in order and find the last one with script data
     for (const message of messagesInOrder) {
-      // Check if we've moved to a new node - update currentTime if needed
-      if (message.nodeId && message.nodeId !== currentNodeId) {
-        currentNodeId = message.nodeId
-        const currentNode = nodes.find((n) => n.id === currentNodeId)
+      // Check if we've moved to a new scene - update currentTime if needed
+      const messageSceneId = message.sceneId
+      if (messageSceneId && messageSceneId !== currentSceneId) {
+        currentSceneId = messageSceneId
+        const currentNode = nodes.find((n) => n.id === currentSceneId)
 
         // Handle storyTime for the new node
         if (currentNode?.storyTime != null) {

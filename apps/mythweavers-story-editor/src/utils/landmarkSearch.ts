@@ -1,5 +1,6 @@
 import { settingsStore } from '../stores/settingsStore'
-import { LandmarkIndustry } from '../types/core'
+
+type LandmarkIndustry = 'farming' | 'political' | 'industry' | 'trade' | 'mining'
 
 interface LandmarkInfo {
   population?: string

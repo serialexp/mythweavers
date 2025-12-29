@@ -1,4 +1,4 @@
-import { batch, createEffect } from 'solid-js'
+import { createEffect } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import {
   getApiBaseUrl,
@@ -23,6 +23,7 @@ const [mapsState, setMapsState] = createStore({
   maps: [] as StoryMap[],
   showMaps: false,
   selectedMapId: null as string | null,
+  loadingMapId: null as string | null, // ID of map currently being loaded (for loading indicator)
   currentStoryTime: null as number | null, // null means "latest" (end of timeline), otherwise story time in minutes from 0 BBY
 })
 
@@ -39,13 +40,8 @@ const loadMaps = async (storyId?: string) => {
     // Load from local storage
     const saved = await storage.get<StoryMap[]>('story-maps')
     if (saved) {
-      batch(() => {
-        setMapsState('maps', saved)
-        // Select first map if available
-        if (saved.length > 0 && !mapsState.selectedMapId) {
-          setMapsState('selectedMapId', saved[0].id)
-        }
-      })
+      setMapsState('maps', saved)
+      // Don't auto-select - wait until user actually opens a map
     }
     mapsLoaded = true
   } catch (error) {
@@ -103,6 +99,9 @@ export const mapsStore = {
   },
   get currentStoryTime() {
     return mapsState.currentStoryTime
+  },
+  get loadingMapId() {
+    return mapsState.loadingMapId
   },
 
   // Actions
@@ -188,8 +187,13 @@ export const mapsStore = {
 
   selectMap: async (id: string) => {
     setMapsState('selectedMapId', id)
-    // Lazy-load map details when selected
-    await mapsStore.ensureMapDetails(id)
+    setMapsState('loadingMapId', id)
+    try {
+      // Lazy-load map details when selected
+      await mapsStore.ensureMapDetails(id)
+    } finally {
+      setMapsState('loadingMapId', null)
+    }
   },
 
   // Landmark actions
@@ -287,30 +291,23 @@ export const mapsStore = {
   },
 
   // Load basic map metadata from export data (server stories only)
-  loadFromExport: async (maps: Array<{ id: string; name: string; fileId: string | null; borderColor: string }>) => {
+  loadFromExport: async (
+    maps: Array<{ id: string; name: string; fileId: string | null; borderColor: string; landmarkCount?: number }>,
+  ) => {
     // Load only basic metadata - detailed data (landmarks, fleets, etc) will be lazy-loaded when map is opened
     const basicMaps: StoryMap[] = maps.map((map) => ({
       id: map.id,
       name: map.name,
       imageData: '', // Will be loaded lazily
       borderColor: map.borderColor,
+      landmarkCount: map.landmarkCount,
       landmarks: [], // Will be loaded lazily
       fleets: [], // Will be loaded lazily
       hyperlanes: [], // Will be loaded lazily
     }))
 
-    batch(() => {
-      setMapsState('maps', basicMaps)
-      // Select first map if available
-      if (basicMaps.length > 0 && !mapsState.selectedMapId) {
-        setMapsState('selectedMapId', basicMaps[0].id)
-      }
-    })
-
-    // Ensure details for the first map are loaded
-    if (basicMaps.length > 0) {
-      await mapsStore.ensureMapDetails(basicMaps[0].id)
-    }
+    setMapsState('maps', basicMaps)
+    // Don't auto-select or load details - wait until user actually opens a map
   },
 
   // Lazy-load detailed map data (landmarks, fleets, hyperlanes, image) when needed
@@ -320,14 +317,9 @@ export const mapsStore = {
       throw new Error(`Map ${mapId} not found`)
     }
 
-    // Check if we already have detailed data
-    const hasDetails =
-      (map.landmarks && map.landmarks.length > 0) ||
-      (map.fleets && map.fleets.length > 0) ||
-      (map.hyperlanes && map.hyperlanes.length > 0) ||
-      map.imageData
-
-    if (hasDetails) {
+    // Check if we already have the image loaded (the key required piece)
+    // Landmarks/fleets/hyperlanes might legitimately be empty arrays
+    if (map.imageData) {
       // Already loaded
       return
     }
@@ -354,13 +346,27 @@ export const mapsStore = {
           getMyMapsByMapIdPawns({ path: { mapId } })
             .then((r) => r.data?.pawns || [])
             .catch(() => []),
-          getMyMapsByMapIdPaths({ path: { mapId } })
+          getMyMapsByMapIdPaths({ path: { mapId }, query: { includeSegments: 'true' } } as any)
             .then((r) => r.data?.paths || [])
             .catch(() => []),
         ])
 
-        // Construct full image URL from file path
-        const imageData = fileMetadata?.path ? `${getApiBaseUrl()}${fileMetadata.path}` : ''
+        // Fetch image with credentials and create blob URL
+        let imageData = ''
+        if (fileMetadata?.path) {
+          try {
+            const imageUrl = `${getApiBaseUrl()}${fileMetadata.path}`
+            const response = await fetch(imageUrl, { credentials: 'include' })
+            if (response.ok) {
+              const blob = await response.blob()
+              imageData = URL.createObjectURL(blob)
+            } else {
+              console.error(`[mapsStore] Failed to fetch image: ${response.status}`)
+            }
+          } catch (err) {
+            console.error('[mapsStore] Error fetching image:', err)
+          }
+        }
 
         // Update the map with detailed data
         // Convert API types to local types using mappers

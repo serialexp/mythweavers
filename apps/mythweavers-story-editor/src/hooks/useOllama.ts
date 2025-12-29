@@ -24,6 +24,7 @@ import {
   getSentenceSummarizationPrompt,
   getSummarizationPrompt,
 } from '../utils/storyUtils'
+import { refineClichés } from '../utils/clicheRefinement'
 
 export const useOllama = () => {
   let currentAbortController: AbortController | null = null
@@ -297,8 +298,8 @@ Title:`
         return null
       }
 
-      const chapterNode = targetMessage.nodeId
-        ? ((nodeStore.getNode(targetMessage.nodeId) as Node | null) ?? undefined)
+      const chapterNode = targetMessage.sceneId
+        ? ((nodeStore.getNode(targetMessage.sceneId) as Node | null) ?? undefined)
         : undefined
 
       const templatedActive = getTemplatedActiveCharacters(
@@ -550,7 +551,25 @@ Title:`
           }
 
           // Extract think tags from the content
-          const { cleanedContent, thinkContent } = extractThinkTags(accumulatedContent)
+          let { cleanedContent, thinkContent } = extractThinkTags(accumulatedContent)
+
+          // Run cliche refinement if enabled and this is a story message
+          if (shouldSummarize && cleanedContent.trim() && settingsStore.refineClichés) {
+            try {
+              messagesStore.updateMessage(assistantMessageId, {
+                content: `${cleanedContent}\n\n[Refining clichés...]`,
+              })
+
+              const refinementResult = await refineClichés(cleanedContent, client, settingsStore.model)
+
+              if (refinementResult.wasRefined) {
+                cleanedContent = refinementResult.refinedContent
+              }
+            } catch (error) {
+              console.error('Failed to refine clichés:', error)
+              // Continue with original content if refinement fails
+            }
+          }
 
           const inputTokens = usage?.prompt_tokens || 0
           const outputTokens = usage?.completion_tokens || 0
@@ -851,7 +870,7 @@ Title:`
             // Generate next story beat instructions
             const nextInstructions = await generateNextStoryBeatInstructions(
               generateAnalysis,
-              settingsStore.paragraphsPerTurn,
+              currentStoryStore.paragraphsPerTurn,
             )
             // Generated auto-instructions
 
@@ -898,7 +917,7 @@ Title:`
 
     try {
       const nodeMessages = messagesStore.messages.filter(
-        (msg) => msg.nodeId === nodeId && msg.role === 'assistant' && !msg.isQuery && msg.type !== 'chapter',
+        (msg) => msg.sceneId === nodeId && msg.role === 'assistant' && !msg.isQuery && msg.type !== 'chapter',
       )
       const lastNodeMessageId = nodeMessages[nodeMessages.length - 1]?.id
 

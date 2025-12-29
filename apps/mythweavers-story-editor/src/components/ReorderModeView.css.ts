@@ -53,6 +53,25 @@ export const cancelButton = style({
   },
 })
 
+export const discardButton = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['1.5'],
+  padding: `${tokens.space['2']} ${tokens.space['4']}`,
+  borderRadius: tokens.radius.md,
+  fontSize: tokens.font.size.sm,
+  fontWeight: tokens.font.weight.medium,
+  cursor: 'pointer',
+  transition: `all ${tokens.duration.normal} ${tokens.easing.default}`,
+  background: tokens.color.semantic.error,
+  color: tokens.color.text.inverse,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.semantic.error}`,
+
+  ':hover': {
+    opacity: 0.9,
+  },
+})
+
 export const saveButton = style({
   display: 'flex',
   alignItems: 'center',

@@ -1,11 +1,23 @@
 import { batch } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
+import {
+  getMyStoriesByStoryIdLandmarkStates,
+  getMyStoriesByStoryIdLandmarkStatesAtByStoryTime,
+} from '../client/config'
 import { saveService } from '../services/saveService'
-import { LandmarkState } from '../types/core'
-import { apiClient } from '../utils/apiClient'
-import { getMessagesInStoryOrder } from '../utils/nodeTraversal'
-import { messagesStore } from './messagesStore'
-import { nodeStore } from './nodeStore'
+
+// Extract LandmarkState type from SDK response
+export type LandmarkState = {
+  id: string
+  storyId: string
+  mapId: string
+  landmarkId: string
+  storyTime: number | null
+  field: string
+  value: string
+  createdAt: string
+  updatedAt: string
+}
 
 interface LandmarkStatesStore {
   // All states for the current story
@@ -14,15 +26,15 @@ interface LandmarkStatesStore {
   accumulatedStates: Record<string, LandmarkState>
   // Loading state
   isLoading: boolean
-  // Current message ID for timeline position
-  currentMessageId: string | null
+  // Current story time for timeline position
+  currentStoryTime: number | null
 }
 
 const [statesStore, setStatesStore] = createStore<LandmarkStatesStore>({
   states: [],
   accumulatedStates: {},
   isLoading: false,
-  currentMessageId: null,
+  currentStoryTime: null,
 })
 
 // Helper to build a state key
@@ -39,14 +51,20 @@ export const landmarkStatesStore = {
   get isLoading() {
     return statesStore.isLoading
   },
-  get currentMessageId() {
-    return statesStore.currentMessageId
+  get currentStoryTime() {
+    return statesStore.currentStoryTime
   },
 
-  // Efficient getter for message IDs that have landmark states
-  // Returns a Set for O(1) lookup instead of requiring array scanning
-  get messageIdsWithStates(): Set<string> {
-    return new Set(statesStore.states.map((s) => s.messageId).filter((id): id is string => id != null))
+  // Get unique story times that have landmark states
+  // Returns an array of storyTime values for timeline indicators
+  get storyTimesWithStates(): number[] {
+    const times = new Set<number>()
+    for (const state of statesStore.states) {
+      if (state.storyTime !== null && state.storyTime !== undefined) {
+        times.add(state.storyTime)
+      }
+    }
+    return Array.from(times).sort((a, b) => a - b)
   },
 
   // Get the current value for a specific landmark and field
@@ -61,8 +79,10 @@ export const landmarkStatesStore = {
 
     setStatesStore('isLoading', true)
     try {
-      const states = await apiClient.getLandmarkStates(storyId)
-      setStatesStore('states', states)
+      const { data } = await getMyStoriesByStoryIdLandmarkStates({ path: { storyId } })
+      if (data?.states) {
+        setStatesStore('states', data.states as LandmarkState[])
+      }
     } catch (error) {
       console.error('Failed to load landmark states:', error)
     } finally {
@@ -70,32 +90,28 @@ export const landmarkStatesStore = {
     }
   },
 
-  // Load accumulated states for a specific message (accumulate on frontend)
-  async loadAccumulatedStates(storyId: string, messageId: string) {
-    if (!storyId || !messageId) return
+  // Load accumulated states at a specific story time (via backend API)
+  async loadAccumulatedStates(storyId: string, storyTime: number) {
+    if (!storyId || storyTime === null || storyTime === undefined) return
 
     setStatesStore('isLoading', true)
     try {
-      // Get all messages in story order up to and including the target message
-      const messagesInOrder = getMessagesInStoryOrder(messagesStore.messages, nodeStore.nodesArray, messageId)
+      const { data } = await getMyStoriesByStoryIdLandmarkStatesAtByStoryTime({
+        path: { storyId, storyTime },
+      })
 
-      // Build a set of message IDs that are at or before the target
-      const messageIds = new Set(messagesInOrder.map((m) => m.id))
-
-      // Filter states to only those at or before the target message
-      const relevantStates = statesStore.states.filter((state) => state.messageId && messageIds.has(state.messageId))
-
-      // Accumulate states (last value for each landmark/field wins)
+      // Build accumulated states map
       const accumulated: Record<string, LandmarkState> = {}
-
-      for (const state of relevantStates) {
-        const key = buildStateKey(state.mapId, state.landmarkId, state.field)
-        accumulated[key] = state
+      if (data?.states) {
+        for (const state of data.states as LandmarkState[]) {
+          const key = buildStateKey(state.mapId, state.landmarkId, state.field)
+          accumulated[key] = state
+        }
       }
 
       batch(() => {
         setStatesStore('accumulatedStates', reconcile(accumulated))
-        setStatesStore('currentMessageId', messageId)
+        setStatesStore('currentStoryTime', storyTime)
       })
     } catch (error) {
       console.error('Failed to load accumulated states:', error)
@@ -109,11 +125,11 @@ export const landmarkStatesStore = {
     storyId: string,
     mapId: string,
     landmarkId: string,
-    messageId: string,
+    storyTime: number,
     field: string,
     value: string | null,
   ) {
-    if (!storyId || !messageId) return
+    if (!storyId || storyTime === null || storyTime === undefined) return
 
     // Safety: Don't delete states if we haven't loaded them yet
     // This prevents accidental mass-deletion during initialization or HMR
@@ -127,12 +143,15 @@ export const landmarkStatesStore = {
     // Optimistically update local state
     if (value) {
       setStatesStore('accumulatedStates', key, {
+        id: `optimistic-${Date.now()}`,
         storyId,
         mapId,
         landmarkId,
-        messageId,
+        storyTime,
         field,
         value,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       })
     } else {
       // Remove state if value is null
@@ -144,90 +163,51 @@ export const landmarkStatesStore = {
     }
 
     try {
-      // Update on server
-      saveService.saveLandmarkState(storyId, mapId, landmarkId, messageId, field, value)
+      // Update on server via save service (queued)
+      saveService.saveLandmarkState(storyId, mapId, landmarkId, storyTime, field, value)
 
-      // For now, we'll assume success and update the local state
-      // The actual server response will come through the save queue
-      const result = {
-        storyId,
-        mapId,
-        landmarkId,
-        messageId,
-        field,
-        value,
-        deleted: !value,
-      }
-
-      // Update local states array
-      if (result?.deleted) {
+      // Also update the local states array optimistically
+      if (value === null) {
         // Remove from states array
         setStatesStore('states', (prev) =>
           prev.filter(
-            (s) =>
-              !(s.mapId === mapId && s.landmarkId === landmarkId && s.messageId === messageId && s.field === field),
+            (s) => !(s.mapId === mapId && s.landmarkId === landmarkId && s.storyTime === storyTime && s.field === field),
           ),
         )
-        // Also ensure it's removed from accumulated states
-        const key = buildStateKey(mapId, landmarkId, field)
-        setStatesStore('accumulatedStates', (prev) => {
-          const next = { ...prev }
-          delete next[key]
-          return next
-        })
-      } else if (result) {
+      } else {
         // Add or update in states array
         setStatesStore('states', (prev) => {
-          const existing = prev.findIndex(
-            (s) => s.mapId === mapId && s.landmarkId === landmarkId && s.messageId === messageId && s.field === field,
+          const existingIdx = prev.findIndex(
+            (s) => s.mapId === mapId && s.landmarkId === landmarkId && s.storyTime === storyTime && s.field === field,
           )
 
-          if (existing >= 0) {
+          const newState: LandmarkState = {
+            id: `optimistic-${Date.now()}`,
+            storyId,
+            mapId,
+            landmarkId,
+            storyTime,
+            field,
+            value,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+
+          if (existingIdx >= 0) {
             const next = [...prev]
-            next[existing] = result
+            next[existingIdx] = newState
             return next
           }
-          return [...prev, result]
+          return [...prev, newState]
         })
       }
     } catch (error) {
       console.error('Failed to set landmark state:', error)
 
       // Revert optimistic update on error
-      if (statesStore.currentMessageId) {
-        await this.loadAccumulatedStates(storyId, statesStore.currentMessageId)
+      if (statesStore.currentStoryTime !== null) {
+        await this.loadAccumulatedStates(storyId, statesStore.currentStoryTime)
       }
-    }
-  },
-
-  // Batch set multiple states
-  async batchSetStates(
-    storyId: string,
-    states: Array<{
-      mapId: string
-      landmarkId: string
-      messageId: string
-      field: string
-      value: string | null
-    }>,
-  ) {
-    if (!storyId || states.length === 0) return
-
-    try {
-      const results = await apiClient.batchSetLandmarkStates(storyId, states)
-
-      // Reload states after batch update
-      await this.loadStates(storyId)
-
-      // Reload accumulated states if we have a current message
-      if (statesStore.currentMessageId) {
-        await this.loadAccumulatedStates(storyId, statesStore.currentMessageId)
-      }
-
-      return results
-    } catch (error) {
-      console.error('Failed to batch set landmark states:', error)
-      throw error
     }
   },
 
@@ -236,7 +216,7 @@ export const landmarkStatesStore = {
     batch(() => {
       setStatesStore('states', [])
       setStatesStore('accumulatedStates', {})
-      setStatesStore('currentMessageId', null)
+      setStatesStore('currentStoryTime', null)
     })
   },
 }

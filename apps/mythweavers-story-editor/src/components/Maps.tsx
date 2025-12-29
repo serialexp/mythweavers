@@ -1,4 +1,6 @@
+import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
 import * as PIXI from 'pixi.js'
+import { BsArrowLeft, BsCheck, BsPencil, BsPlus, BsTrash, BsX } from 'solid-icons/bs'
 import { Component, Show, batch, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
 import { useFleetManager } from '../hooks/maps/useFleetManager'
 import { useHyperlaneManager } from '../hooks/maps/useHyperlaneManager'
@@ -9,12 +11,12 @@ import { usePathfinding } from '../hooks/maps/usePathfinding'
 import { usePixiMap } from '../hooks/maps/usePixiMap'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { landmarkStatesStore } from '../stores/landmarkStatesStore'
+import { mapEditorStore } from '../stores/mapEditorStore'
 import { mapsStore } from '../stores/mapsStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
-import { Fleet, Hyperlane, HyperlaneSegment, Landmark, LandmarkIndustry } from '../types/core'
-import { getActiveMovement } from '../utils/fleetUtils'
+import type { Fleet, Hyperlane, HyperlaneSegment, Landmark, StoryMap } from '../types/core'
 import { generateMessageId } from '../utils/id'
 import { searchLandmarkInfo } from '../utils/landmarkSearch'
 import { ColoredLandmark, parseColorToHex } from '../utils/maps/colorUtils'
@@ -27,24 +29,25 @@ import {
   drawStandardVoronoi,
 } from '../utils/maps/voronoiRenderer'
 import { evaluateTemplate } from '../utils/scriptEngine'
-import { getChapterAtStoryTime, getStoryTimeForMessage, getTimelineRange } from '../utils/timelineUtils'
+import { getChapterAtStoryTime, getTimelineRange } from '../utils/timelineUtils'
 import * as styles from './Maps.css'
-import { FactionOverlayControls } from './maps/FactionOverlayControls'
-import { FleetPopup } from './maps/FleetPopup'
-import { HyperlanePopup } from './maps/HyperlanePopup'
-import { LandmarkPopup } from './maps/LandmarkPopup'
+import { EJSCodeEditor } from './EJSCodeEditor'
+import { MapToolbar } from './maps/MapToolbar'
+import { PawnDetail } from './maps/PawnDetail'
+import { PathDetail } from './maps/PathDetail'
+import { LandmarkDetail } from './maps/LandmarkDetail'
 import { LandmarksList } from './maps/LandmarksList'
-import { MapControls } from './maps/MapControls'
 import { MapTimeline } from './maps/MapTimeline'
 import { createFleetMovementsFromPath } from './maps/fleetMovementHandler'
 
 export const Maps: Component = () => {
-  let canvasContainer: HTMLDivElement | undefined
+  const [canvasContainer, setCanvasContainer] = createSignal<HTMLDivElement | undefined>(undefined)
   let popupElement: HTMLDivElement | undefined
+  let panelRef: ListDetailPanelRef | undefined
 
   // Use the PIXI map hook
-  const pixiMap = usePixiMap(() => canvasContainer)
-  const { app, viewport, containers, initialize, isReady } = pixiMap
+  const pixiMap = usePixiMap(canvasContainer)
+  const { app, viewport, containers, initialize, isReady, render: renderPixi } = pixiMap
 
   // Use the map loader hook
   const mapLoader = useMapLoader()
@@ -54,104 +57,91 @@ export const Maps: Component = () => {
   const [newMapBorderColor, setNewMapBorderColor] = createSignal('')
   const [selectedFile, setSelectedFile] = createSignal<File | null>(null)
   const [selectedFileName, setSelectedFileName] = createSignal('')
-  const [showAddMap, setShowAddMap] = createSignal(false)
-  const [editingBorderColor, setEditingBorderColor] = createSignal(false)
-  const [editBorderColorValue, setEditBorderColorValue] = createSignal('')
-  const [selectedLandmark, setSelectedLandmark] = createSignal<Landmark | null>(null)
-  const [selectedFleet, setSelectedFleet] = createSignal<Fleet | null>(null)
-  const [selectedHyperlane, setSelectedHyperlane] = createSignal<Hyperlane | null>(null)
-  const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 })
-  const [isEditing, setIsEditing] = createSignal(false)
-  const [isAddingFleet, setIsAddingFleet] = createSignal(false)
-  const [editName, setEditName] = createSignal('')
-  const [editDescription, setEditDescription] = createSignal('')
-  const [editDesignation, setEditDesignation] = createSignal('')
-  const [editHyperdriveRating, setEditHyperdriveRating] = createSignal('1.0')
-  const [hyperdriveError, setHyperdriveError] = createSignal('')
-  const [editSpeedMultiplier, setEditSpeedMultiplier] = createSignal('10.0')
-  const [speedMultiplierError, setSpeedMultiplierError] = createSignal('')
-  const [editColor, setEditColor] = createSignal('#3498db')
-  const [editSize, setEditSize] = createSignal<'small' | 'medium' | 'large'>('medium')
-  const [editVariant, setEditVariant] = createSignal<'military' | 'transport' | 'scout'>('military')
-  const [editType, setEditType] = createSignal<'system' | 'station' | 'nebula' | 'junction'>('system')
-  const [editPopulation, setEditPopulation] = createSignal('')
-  const [editIndustry, setEditIndustry] = createSignal<LandmarkIndustry | ''>('')
-  const [editPlanetaryBodies, setEditPlanetaryBodies] = createSignal('')
-  const [editRegion, setEditRegion] = createSignal('')
-  const [editSector, setEditSector] = createSignal('')
-  const [populationError, setPopulationError] = createSignal('')
-  // Remember last used settings for new landmarks (with localStorage persistence)
-  const [lastUsedColor, setLastUsedColor] = createSignal(localStorage.getItem('lastLandmarkColor') || '#3498db')
-  const [lastUsedSize, setLastUsedSize] = createSignal<'small' | 'medium' | 'large'>(
-    (localStorage.getItem('lastLandmarkSize') as 'small' | 'medium' | 'large') || 'medium',
-  )
-  const [lastUsedType, setLastUsedType] = createSignal<'system' | 'station' | 'nebula' | 'junction'>(
-    (localStorage.getItem('lastLandmarkType') as 'system' | 'station' | 'nebula' | 'junction') || 'system',
-  )
-  const [isSaving, setIsSaving] = createSignal(false)
-  const [isDeleting, setIsDeleting] = createSignal(false)
-  const [isDeletingMovement, setIsDeletingMovement] = createSignal(false)
-  const [isAddingNew, setIsAddingNew] = createSignal(false)
-  const [newLandmarkPos, setNewLandmarkPos] = createSignal({ x: 0, y: 0 })
-  const [newFleetPos, setNewFleetPos] = createSignal({ x: 0, y: 0 })
-  const [sortAscending, setSortAscending] = createSignal(true)
-  const [pendingStoryTime, setPendingStoryTime] = createSignal<number | null>(null)
-  const [showFactionOverlay, setShowFactionOverlay] = createSignal(false)
-  const [overlayMethod, setOverlayMethod] = createSignal<'voronoi' | 'metaball' | 'blurred' | 'noise'>('voronoi')
-  const [paintModeEnabled, setPaintModeEnabled] = createSignal(false)
-  const [selectedPaintFaction, setSelectedPaintFaction] = createSignal<string | null>(null)
-  const [isShiftHeld, setIsShiftHeld] = createSignal(false)
-  const [isSavingAllegiance, setIsSavingAllegiance] = createSignal(false)
-  const [isFetchingLandmarkInfo, setIsFetchingLandmarkInfo] = createSignal(false)
-  const [distanceFieldAnimation, setDistanceFieldAnimation] = createSignal<AnimationHandle | null>(null)
-  const [isRendering, setIsRendering] = createSignal(false)
-  const [creationMode, setCreationMode] = createSignal<'landmark' | 'fleet' | 'hyperlane'>('landmark')
-  const [selectedFleetForMovement, setSelectedFleetForMovement] = createSignal<Fleet | null>(null)
+  const [editingMapBorderColor, setEditingMapBorderColor] = createSignal(false)
+  const [editMapBorderColorValue, setEditMapBorderColorValue] = createSignal('')
+  // Unified selection state
+  type Selection =
+    | { type: 'none' }
+    | { type: 'landmark'; id: string }
+    | { type: 'pawn'; id: string }
+    | { type: 'path'; id: string }
+    | { type: 'new-landmark' }
+    | { type: 'new-pawn' }
 
-  // Hyperlane creation state
-  const [isCreatingHyperlane, setIsCreatingHyperlane] = createSignal(false)
-  const [currentHyperlaneSegments, setCurrentHyperlaneSegments] = createSignal<HyperlaneSegment[]>([])
-  const [hyperlanePreviewEnd, setHyperlanePreviewEnd] = createSignal<{ x: number; y: number } | null>(null)
+  const [selection, setSelection] = createSignal<Selection>({ type: 'none' })
 
-  let timelineDebounceTimer: number | null = null
+  // Helper memos to get the actual selected objects from stores
+  const selectedLandmark = createMemo(() => {
+    const sel = selection()
+    if (sel.type !== 'landmark') return null
+    return mapsStore.selectedMap?.landmarks.find((lm) => lm.id === sel.id) || null
+  })
 
-  // Parse population string to number (removes commas, spaces, etc.)
-  const parsePopulation = (value: string): number | null => {
-    if (!value.trim()) return null
-    // Remove all non-digit characters except decimal point
-    const cleaned = value.replace(/[^\d.]/g, '')
-    const num = Number.parseFloat(cleaned)
-    return Number.isNaN(num) ? null : num
-  }
+  const selectedFleet = createMemo(() => {
+    const sel = selection()
+    if (sel.type !== 'pawn') return null
+    return mapsStore.selectedMap?.fleets?.find((f) => f.id === sel.id) || null
+  })
 
-  // Format number with thousand separators
-  const formatPopulation = (num: number): string => {
-    return new Intl.NumberFormat('en-US').format(num)
-  }
+  const selectedHyperlane = createMemo(() => {
+    const sel = selection()
+    if (sel.type !== 'path') return null
+    return mapsStore.selectedMap?.hyperlanes?.find((h) => h.id === sel.id) || null
+  })
 
-  // Validate population input
-  const validatePopulation = (value: string): boolean => {
-    if (!value.trim()) return true // Empty is valid (optional field)
-    const parsed = parsePopulation(value)
-    return parsed !== null && parsed >= 0
-  }
+  const isAddingNew = createMemo(() => selection().type === 'new-landmark')
+  const isAddingFleet = createMemo(() => selection().type === 'new-pawn')
 
-  // Handle population input change
-  const handlePopulationInput = (value: string) => {
-    setEditPopulation(value)
-    if (value.trim() && !validatePopulation(value)) {
-      setPopulationError('Please enter a valid number')
-    } else {
-      setPopulationError('')
+  // Wrapper functions for selection updates (for backwards compatibility during refactor)
+  const setSelectedLandmark = (lm: Landmark | null) => {
+    if (lm) {
+      setSelection({ type: 'landmark', id: lm.id })
+    } else if (selection().type === 'landmark') {
+      setSelection({ type: 'none' })
     }
   }
 
-  // Validate hyperdrive rating (0.5 - 2.0)
-  const validateHyperdriveRating = (value: string): boolean => {
-    if (!value.trim()) return false
-    const num = Number.parseFloat(value)
-    return !Number.isNaN(num) && num >= 0.5 && num <= 2.0
+  const setSelectedFleet = (fleet: Fleet | null) => {
+    if (fleet) {
+      setSelection({ type: 'pawn', id: fleet.id })
+    } else if (selection().type === 'pawn') {
+      setSelection({ type: 'none' })
+    }
   }
+
+  const setSelectedHyperlane = (hyperlane: Hyperlane | null) => {
+    if (hyperlane) {
+      setSelection({ type: 'path', id: hyperlane.id })
+    } else if (selection().type === 'path') {
+      setSelection({ type: 'none' })
+    }
+  }
+
+  const setIsAddingNew = (adding: boolean) => {
+    if (adding) {
+      setSelection({ type: 'new-landmark' })
+    } else if (selection().type === 'new-landmark') {
+      setSelection({ type: 'none' })
+    }
+  }
+
+  const setIsAddingFleet = (adding: boolean) => {
+    if (adding) {
+      setSelection({ type: 'new-pawn' })
+    } else if (selection().type === 'new-pawn') {
+      setSelection({ type: 'none' })
+    }
+  }
+
+  // Helper to clear all selection
+  const clearSelection = () => setSelection({ type: 'none' })
+
+  const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 })
+
+  // Local UI state (not in store)
+  const [isShiftHeld, setIsShiftHeld] = createSignal(false)
+  const [distanceFieldAnimation, setDistanceFieldAnimation] = createSignal<AnimationHandle | null>(null)
+  const [isRendering, setIsRendering] = createSignal(false)
 
   // Quick color picks
   const quickColors = [
@@ -165,25 +155,12 @@ export const Maps: Component = () => {
     { name: 'White', hex: '#ffffff' },
   ]
 
-  // Sorted landmarks for the list
-  const sortedLandmarks = createMemo(() => {
-    const map = mapsStore.selectedMap
-    if (!map) return []
-
-    const landmarks = [...map.landmarks]
-    landmarks.sort((a, b) => {
-      const comparison = a.name.localeCompare(b.name)
-      return sortAscending() ? comparison : -comparison
-    })
-    return landmarks
-  })
-
   // Hyperlane creation status text
   const hyperlaneCreationStatus = createMemo(() => {
-    if (!isCreatingHyperlane()) {
+    if (!mapEditorStore.isCreatingPath) {
       return 'Idle'
     }
-    const segmentCount = currentHyperlaneSegments().length
+    const segmentCount = mapEditorStore.currentPathSegments.length
     return `Creating - ${segmentCount} segment${segmentCount === 1 ? '' : 's'}`
   })
 
@@ -191,7 +168,7 @@ export const Maps: Component = () => {
   const timelineRange = createMemo(() => getTimelineRange(currentStoryStore, nodeStore.nodesArray))
 
   const currentStoryTime = createMemo(() => {
-    const pending = pendingStoryTime()
+    const pending = mapEditorStore.pendingStoryTime
     if (pending !== null) return pending
 
     const stored = mapsStore.currentStoryTime
@@ -202,157 +179,31 @@ export const Maps: Component = () => {
     return range.end
   })
 
-  // Find the active chapter and message at the current story time
+  // Get chapter at the current story time (for script data)
   const activeChapter = createMemo(() => {
     const storyTime = currentStoryTime()
     return getChapterAtStoryTime(storyTime, nodeStore.nodesArray)
   })
 
-  // Get current message ID based on active chapter
-  // For now, we'll use the last message of the active chapter
-  const currentMessageId = createMemo(() => {
+  // Get message ID at current timeline position (only used for script data evaluation)
+  // This finds the last message in the active chapter
+  const currentMessageIdForScripts = createMemo(() => {
     const chapter = activeChapter()
     if (!chapter) return null
 
     // Get messages for this chapter
     const messages = messagesStore.messages
-      .filter((m) => m.nodeId === chapter.id && m.role === 'assistant' && !m.isQuery)
+      .filter((m) => m.sceneId === chapter.id && m.role === 'assistant' && !m.isQuery)
       .sort((a, b) => a.order - b.order)
 
     // Return last message
     return messages.length > 0 ? messages[messages.length - 1].id : null
   })
 
-  // Convert landmark state message IDs to story times for timeline indicators
-  const storyTimesWithStates = createMemo(() => {
-    const messageIdsWithStates = landmarkStatesStore.messageIdsWithStates
-    const storyTimes: number[] = []
-
-    for (const messageId of messageIdsWithStates) {
-      const storyTime = getStoryTimeForMessage(messageId, messagesStore.messages, nodeStore.nodesArray)
-      if (storyTime !== null) {
-        storyTimes.push(storyTime)
-      }
-    }
-
-    return storyTimes
-  })
-
-  // Get all fleet movement story times for timeline indicators
-  const fleetMovementTimes = createMemo(() => {
-    const map = mapsStore.selectedMap
-    if (!map || !map.fleets) return []
-
-    const times: number[] = []
-    for (const fleet of map.fleets) {
-      for (const movement of fleet.movements) {
-        // Add both start and end times
-        times.push(movement.startStoryTime)
-        times.push(movement.endStoryTime)
-      }
-    }
-
-    return times
-  })
-
-  // Derive allegiance state reactively from the store (must be after currentMessageId)
-  const selectedAllegiance = createMemo(() => {
-    const landmark = selectedLandmark()
-    const map = mapsStore.selectedMap
-    if (!landmark || !map) return null
-
-    // Force reactivity by reading the entire accumulatedStates object inline
-    const key = `${map.id}:${landmark.id}:allegiance`
-    return landmarkStatesStore.accumulatedStates[key]?.value || null
-  })
-
-  const allegianceAtThisMessage = createMemo(() => {
-    const landmark = selectedLandmark()
-    const map = mapsStore.selectedMap
-    const messageId = currentMessageId()
-    if (!landmark || !map || !messageId) return null
-
-    // Force reactivity by reading states inline
-    const stateAtThisMessage = landmarkStatesStore.states.find(
-      (s) =>
-        s.mapId === map.id && s.landmarkId === landmark.id && s.messageId === messageId && s.field === 'allegiance',
-    )
-    return stateAtThisMessage?.value || null
-  })
-
-  const allegianceSourceMessageId = createMemo(() => {
-    const landmark = selectedLandmark()
-    const map = mapsStore.selectedMap
-    if (!landmark || !map) return null
-
-    const key = `${map.id}:${landmark.id}:allegiance`
-    // Force reactivity by reading accumulatedStates inline
-    return landmarkStatesStore.accumulatedStates[key]?.messageId || null
-  })
-
-  // Debounced story time update
-  const handleTimelineChange = (newStoryTime: number) => {
-    // Update pending time immediately for UI feedback
-    setPendingStoryTime(newStoryTime)
-
-    // Clear existing timer
-    if (timelineDebounceTimer !== null) {
-      clearTimeout(timelineDebounceTimer)
-    }
-
-    // Set new timer to update actual time after delay
-    timelineDebounceTimer = window.setTimeout(() => {
-      mapsStore.setCurrentStoryTime(newStoryTime)
-      setPendingStoryTime(null)
-      timelineDebounceTimer = null
-    }, 500) // 500ms delay
-  }
-
-  // Step forward/back in timeline (by granularity)
-  const stepTimeline = (direction: 'forward' | 'back') => {
-    const range = timelineRange()
-    const granularityMinutes = range.granularity === 'hour' ? 60 : 1440
-    const current = currentStoryTime()
-
-    let newTime = current
-    if (direction === 'forward') {
-      newTime = Math.min(current + granularityMinutes, range.end)
-    } else {
-      newTime = Math.max(current - granularityMinutes, range.start)
-    }
-
-    // Clear any pending changes
-    if (timelineDebounceTimer !== null) {
-      clearTimeout(timelineDebounceTimer)
-      timelineDebounceTimer = null
-    }
-    setPendingStoryTime(null)
-
-    // Update time directly
-    mapsStore.setCurrentStoryTime(newTime)
-  }
-
-  // Jump to a specific message's story time
-  const jumpToMessage = (messageId: string) => {
-    const storyTime = getStoryTimeForMessage(messageId, messagesStore.messages, nodeStore.nodesArray)
-
-    if (storyTime !== null) {
-      // Clear any pending changes
-      if (timelineDebounceTimer !== null) {
-        clearTimeout(timelineDebounceTimer)
-        timelineDebounceTimer = null
-      }
-      setPendingStoryTime(null)
-
-      // Update time directly
-      mapsStore.setCurrentStoryTime(storyTime)
-    }
-  }
-
   // Cache script execution data via scriptDataStore so we don't re-run scripts
   // for every landmark render (expensive with hundreds of landmarks)
   const scriptDataAtTimeline = createMemo(() => {
-    const messageId = currentMessageId()
+    const messageId = currentMessageIdForScripts()
     if (!messageId) {
       return {}
     }
@@ -401,112 +252,61 @@ export const Maps: Component = () => {
   }
 
   // Use the landmark manager hook
+  // Note: Hook now reads shouldStopPropagation and interactive from mapEditorStore directly
   const landmarkManager = useLandmarkManager({
+    app,
     viewport,
     containers,
     mapSprite,
-    canvasContainer: () => canvasContainer,
+    canvasContainer,
     evaluateBorderColor: evaluateLandmarkBorderColor,
-    shouldStopPropagation: () => {
-      // Don't stop propagation in fleet mode - allow clicks to pass through to map
-      return creationMode() !== 'fleet'
-    },
-    interactive: () => {
-      // Make landmarks non-interactive in fleet mode - allow clicks to pass through
-      return creationMode() !== 'fleet'
-    },
-    onLandmarkClick: (lm, screenPos, button) => {
-      // Ignore landmark clicks when in paint mode
-      if (paintModeEnabled()) return
+    onLandmarkClick: (lm, _screenPos, button) => {
+      // Only handle left clicks in select mode
+      if (button !== 0) return
+      if (mapEditorStore.creationMode !== 'select') return
+      if (mapEditorStore.paintModeEnabled) return
 
-      const mode = creationMode()
-
-      // In fleet mode, ignore all left-clicks on landmarks (only fleets should be selectable)
-      // Right clicks still snap for fleet movement waypoints
-      if (mode === 'fleet') {
-        return // Don't select landmarks in fleet mode
-      }
-
-      // In hyperlane mode, only handle left clicks (button 0)
-      // Right clicks are used for hyperlane creation
-      if (mode === 'hyperlane' && button !== 0) {
-        return
-      }
-
-      setSelectedLandmark(lm)
-      setSelectedFleet(null)
-      setIsEditing(false)
-      setIsAddingNew(false)
-      const isMobile = window.innerWidth < 768
-      setPopupPosition(calculateSafePopupPosition(screenPos.x, screenPos.y, isMobile))
+      // Select the landmark
+      setSelection({ type: 'landmark', id: lm.id })
+      mapEditorStore.cancelEditing()
     },
   })
 
   // Use the fleet manager hook
+  // Note: Hook now reads currentStoryTime and selectedFleetId from stores directly
   const fleetManager = useFleetManager({
     viewport,
     containers,
     mapSprite,
-    canvasContainer: () => canvasContainer,
-    currentStoryTime,
-    selectedFleetId: () => selectedFleetForMovement()?.id || null,
-    onFleetClick: (fleet, screenPos, button) => {
-      // In fleet mode, only handle left clicks (button 0)
-      // Right clicks are used for movement waypoints
-      if (creationMode() === 'fleet' && button !== 0) {
-        return
-      }
+    canvasContainer,
+    onFleetClick: (fleet, _screenPos, button) => {
+      // Only handle left clicks in select mode
+      if (button !== 0) return
+      if (mapEditorStore.creationMode !== 'select') return
 
-      // If clicking the same fleet that's selected for movement, just show popup
-      if (selectedFleetForMovement()?.id === fleet.id) {
-        setSelectedFleet(fleet)
-        setSelectedLandmark(null)
-        setIsEditing(false)
-        setIsAddingNew(false)
-        const isMobile = window.innerWidth < 768
-        setPopupPosition(calculateSafePopupPosition(screenPos.x, screenPos.y, isMobile))
-        return
-      }
-
-      // Select this fleet for movement and show popup
-      setSelectedFleetForMovement(fleet)
-      setSelectedFleet(fleet)
-      setSelectedLandmark(null)
-      setIsEditing(false)
-      setIsAddingNew(false)
-      const isMobile = window.innerWidth < 768
-      setPopupPosition(calculateSafePopupPosition(screenPos.x, screenPos.y, isMobile))
+      // Select the pawn
+      mapEditorStore.setSelectedFleetForMovement(fleet)
+      setSelection({ type: 'pawn', id: fleet.id })
+      mapEditorStore.cancelEditing()
     },
   })
 
   // Use the hyperlane manager hook
+  // Note: Hook now reads shouldStopPropagation and interactive from mapEditorStore directly
   const hyperlaneManager = useHyperlaneManager({
     viewport,
     containers,
     mapSprite,
-    canvasContainer: () => canvasContainer,
-    shouldStopPropagation: () => {
-      // Don't stop propagation in fleet mode - allow clicks to pass through to map
-      return creationMode() !== 'fleet'
-    },
-    interactive: () => {
-      // Make hyperlanes non-interactive in fleet mode - allow clicks to pass through
-      return creationMode() !== 'fleet'
-    },
-    onHyperlaneClick: (hyperlane, screenPos) => {
-      // Only handle hyperlane clicks in hyperlane mode
-      if (creationMode() !== 'hyperlane') {
+    canvasContainer,
+    onHyperlaneClick: (hyperlane, _screenPos) => {
+      // Only handle hyperlane clicks in select mode
+      if (mapEditorStore.creationMode !== 'select') {
         return
       }
 
-      setSelectedHyperlane(hyperlane)
-      setSelectedLandmark(null)
-      setSelectedFleet(null)
-      setIsEditing(false)
-      setIsAddingNew(false)
-      setIsAddingFleet(false)
-      const isMobile = window.innerWidth < 768
-      setPopupPosition(calculateSafePopupPosition(screenPos.x, screenPos.y, isMobile))
+      // Select the path
+      setSelection({ type: 'path', id: hyperlane.id })
+      mapEditorStore.cancelEditing()
     },
   })
 
@@ -566,7 +366,7 @@ export const Maps: Component = () => {
     const clickX = nearbyLandmark ? nearbyLandmark.x : position.normalizedX
     const clickY = nearbyLandmark ? nearbyLandmark.y : position.normalizedY
 
-    if (!isCreatingHyperlane()) {
+    if (!mapEditorStore.isCreatingPath) {
       // Start a new hyperlane
       console.log('Starting new hyperlane at', clickX, clickY)
 
@@ -581,6 +381,7 @@ export const Maps: Component = () => {
           type: 'junction',
           color: '#ffffff',
           size: 'small',
+          properties: {},
         })
         startLandmarkId = junction.id
         updateLandmarks()
@@ -592,7 +393,7 @@ export const Maps: Component = () => {
       // Initialize the first segment (just the start point, no end yet)
       // Use batch() to update all three signals atomically
       batch(() => {
-        setCurrentHyperlaneSegments([
+        mapEditorStore.setCurrentPathSegments([
           {
             id: generateMessageId(),
             hyperlaneId: '', // Will be set when saving
@@ -606,15 +407,15 @@ export const Maps: Component = () => {
             endLandmarkId: null,
           },
         ])
-        setIsCreatingHyperlane(true)
-        setHyperlanePreviewEnd({ x: clickX, y: clickY })
+        mapEditorStore.setIsCreatingPath(true)
+        mapEditorStore.setPathPreviewEnd({ x: clickX, y: clickY })
       })
 
       // Show initial preview (will update on mouse move)
       hyperlaneManager.showPreviewSegment(clickX, clickY, clickX, clickY)
     } else {
       // Continue or end the hyperlane
-      const segments = currentHyperlaneSegments()
+      const segments = mapEditorStore.currentPathSegments
       if (segments.length === 0) return
 
       const lastSegment = segments[segments.length - 1]
@@ -637,9 +438,9 @@ export const Maps: Component = () => {
 
         // Reset state atomically
         batch(() => {
-          setIsCreatingHyperlane(false)
-          setCurrentHyperlaneSegments([])
-          setHyperlanePreviewEnd(null)
+          mapEditorStore.setIsCreatingPath(false)
+          mapEditorStore.setCurrentPathSegments([])
+          mapEditorStore.setPathPreviewEnd(null)
         })
         hyperlaneManager.hidePreviewSegment()
         return
@@ -657,6 +458,7 @@ export const Maps: Component = () => {
         type: 'junction',
         color: '#ffffff',
         size: 'small',
+        properties: {},
       })
       updateLandmarks()
 
@@ -685,8 +487,8 @@ export const Maps: Component = () => {
 
       // Use batch() to update signals atomically
       batch(() => {
-        setCurrentHyperlaneSegments(updatedSegments)
-        setHyperlanePreviewEnd({ x: clickX, y: clickY })
+        mapEditorStore.setCurrentPathSegments(updatedSegments)
+        mapEditorStore.setPathPreviewEnd({ x: clickX, y: clickY })
       })
 
       // Show initial preview from new junction (will update on mouse move)
@@ -713,26 +515,29 @@ export const Maps: Component = () => {
   }
 
   // Use the map interactions hook
+  // Note: Hook now reads isEditing, isAddingNew, mapSelected, lastUsedType,
+  // creationMode, paintModeEnabled, selectedPaintFaction from stores directly
   const mapInteractions = useMapInteractions({
     viewport,
     containers,
     mapSprite,
-    canvasContainer: () => canvasContainer,
-    isEditing,
-    isAddingNew,
-    mapSelected: () => !!mapsStore.selectedMap,
-    lastUsedType,
-    creationMode,
-    paintModeEnabled,
+    canvasContainer,
     isShiftHeld,
-    selectedPaintFaction,
     onPaintClick: (screenX, screenY, faction) => applyAllegianceToBrush(screenX, screenY, faction),
     onMapClick: (position) => {
       const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      const mode = mapEditorStore.creationMode
 
-      // Deselect fleet for movement if clicking on empty map (not in fleet creation mode)
-      if (creationMode() !== 'fleet' && selectedFleetForMovement()) {
-        setSelectedFleetForMovement(null)
+      // In select mode, clicking empty map clears all selections
+      if (mode === 'select') {
+        clearSelection()
+        mapEditorStore.cancelEditing()
+        return
+      }
+
+      // Deselect fleet for movement if clicking on empty map (not in pawn creation mode)
+      if (mode !== 'pawn' && mapEditorStore.selectedFleetForMovement) {
+        mapEditorStore.setSelectedFleetForMovement(null)
         // Refresh fleets to remove selection indicator
         const map = mapsStore.selectedMap
         if (map?.fleets) {
@@ -741,10 +546,10 @@ export const Maps: Component = () => {
         }
       }
 
-      // Clear hyperlane selection when clicking on empty space in hyperlane mode
-      if (creationMode() === 'hyperlane' && selectedHyperlane()) {
+      // Clear hyperlane selection when clicking on empty space in path mode
+      if (mode === 'path' && selectedHyperlane()) {
         setSelectedHyperlane(null)
-        setIsEditing(false)
+        mapEditorStore.cancelEditing()
         // Refresh hyperlanes to remove selection highlight
         const map = mapsStore.selectedMap
         if (map?.hyperlanes) {
@@ -752,19 +557,16 @@ export const Maps: Component = () => {
         }
       }
 
-      // Check creation mode
-      const mode = creationMode()
-
-      if (mode === 'fleet') {
-        // Fleet creation mode
+      if (mode === 'pawn') {
+        // Pawn creation mode
         if (isAddingFleet()) {
           // If already adding a fleet, reposition or close
           const sprite = mapSprite()
           const vp = viewport()
 
           if (sprite && vp) {
-            const currentWorldX = newFleetPos().x * sprite.width
-            const currentWorldY = newFleetPos().y * sprite.height
+            const currentWorldX = mapEditorStore.newPawnPos.x * sprite.width
+            const currentWorldY = mapEditorStore.newPawnPos.y * sprite.height
             const currentScreen = vp.toScreen(currentWorldX, currentWorldY)
 
             const dx = position.x - currentScreen.x
@@ -773,31 +575,24 @@ export const Maps: Component = () => {
 
             if (distance > 30) {
               setIsAddingFleet(false)
-              setIsEditing(false)
+              mapEditorStore.cancelEditing()
               setSelectedFleet(null)
               return
             }
           }
 
           // Reposition
-          setNewFleetPos({ x: position.normalizedX, y: position.normalizedY })
+          mapEditorStore.setNewPawnPos({ x: position.normalizedX, y: position.normalizedY })
           const actualHeight = popupElement?.offsetHeight
           setPopupPosition(calculateSafePopupPosition(position.x, position.y, isTouchDevice, actualHeight))
           return
         }
 
         // Start adding a new fleet
-        setNewFleetPos({ x: position.normalizedX, y: position.normalizedY })
-        setEditName('')
-        setEditDescription('')
-        setEditDesignation('')
-        setEditHyperdriveRating('1.0')
-        setHyperdriveError('')
-        setEditColor('#00ff00')
-        setEditSize('medium')
-        setEditVariant('military')
+        mapEditorStore.setNewPawnPos({ x: position.normalizedX, y: position.normalizedY })
+        mapEditorStore.initEditForNewPawn()
+        mapEditorStore.setEditColor('#00ff00') // Use green for fleets
         setIsAddingFleet(true)
-        setIsEditing(true)
         setSelectedFleet(null)
         setSelectedLandmark(null)
 
@@ -814,8 +609,8 @@ export const Maps: Component = () => {
           const vp = viewport()
 
           if (sprite && vp) {
-            const currentWorldX = newLandmarkPos().x * sprite.width
-            const currentWorldY = newLandmarkPos().y * sprite.height
+            const currentWorldX = mapEditorStore.newLandmarkPos.x * sprite.width
+            const currentWorldY = mapEditorStore.newLandmarkPos.y * sprite.height
             const currentScreen = vp.toScreen(currentWorldX, currentWorldY)
 
             const dx = position.x - currentScreen.x
@@ -824,19 +619,19 @@ export const Maps: Component = () => {
 
             if (distance > 30) {
               setIsAddingNew(false)
-              setIsEditing(false)
+              mapEditorStore.cancelEditing()
               setSelectedLandmark(null)
               mapInteractions.hidePreview()
               return
             }
           }
 
-          setNewLandmarkPos({ x: position.normalizedX, y: position.normalizedY })
+          mapEditorStore.setNewLandmarkPos({ x: position.normalizedX, y: position.normalizedY })
           mapInteractions.updatePreview(
             { x: position.normalizedX, y: position.normalizedY },
-            editColor(),
-            editSize(),
-            editType(),
+            mapEditorStore.editColor,
+            mapEditorStore.editSize,
+            mapEditorStore.editType,
             'landmark',
           )
           const actualHeight = popupElement?.offsetHeight
@@ -846,29 +641,18 @@ export const Maps: Component = () => {
         }
 
         // Start adding a new landmark
-        setNewLandmarkPos({ x: position.normalizedX, y: position.normalizedY })
-        setEditName('')
-        setEditDescription('')
-        setEditPopulation('')
-        setEditIndustry('')
-        setEditPlanetaryBodies('')
-        setEditRegion('')
-        setEditSector('')
-        setPopulationError('')
-        setEditColor(lastUsedColor())
-        setEditSize(lastUsedSize())
-        setEditType(lastUsedType())
+        mapEditorStore.setNewLandmarkPos({ x: position.normalizedX, y: position.normalizedY })
+        mapEditorStore.initEditForNewLandmark()
         setIsAddingNew(true)
-        setIsEditing(true)
         setSelectedLandmark(null)
         setSelectedFleet(null)
 
         // Show preview sprite
         mapInteractions.updatePreview(
           { x: position.normalizedX, y: position.normalizedY },
-          lastUsedColor(),
-          lastUsedSize(),
-          lastUsedType(),
+          mapEditorStore.lastUsedColor,
+          mapEditorStore.lastUsedSize,
+          mapEditorStore.lastUsedType,
           'landmark',
         )
 
@@ -886,13 +670,13 @@ export const Maps: Component = () => {
       if (!map) return
 
       // Check if in hyperlane mode
-      if (creationMode() === 'hyperlane') {
+      if (mapEditorStore.creationMode === 'path') {
         handleHyperlaneRightClick(position)
         return
       }
 
       // Check if a fleet is selected for movement
-      const fleet = selectedFleetForMovement()
+      const fleet = mapEditorStore.selectedFleetForMovement
       if (!fleet) {
         console.log('No fleet selected for movement')
         return
@@ -1013,14 +797,14 @@ export const Maps: Component = () => {
     voronoiContainer.filters = []
 
     // Only draw if overlay is enabled
-    if (!showFactionOverlay()) return
+    if (!mapEditorStore.showFactionOverlay) return
 
     const landmarksWithColors = getLandmarksWithColors()
 
     // Need at least 1 point for metaballs, 2 for Voronoi
     if (landmarksWithColors.length === 0) return
 
-    switch (overlayMethod()) {
+    switch (mapEditorStore.overlayMethod) {
       case 'voronoi':
         if (landmarksWithColors.length >= 2) {
           renderStandardVoronoi(landmarksWithColors)
@@ -1064,6 +848,9 @@ export const Maps: Component = () => {
     }
 
     updateVoronoiOverlay()
+
+    // Trigger PIXI render after scene updates
+    renderPixi()
   }
 
   // Plain function to update landmarks incrementally (no reactivity)
@@ -1100,6 +887,9 @@ export const Maps: Component = () => {
     }
 
     updateVoronoiOverlay()
+
+    // Trigger PIXI render after scene updates
+    renderPixi()
   }
 
   // Wrapper to load map using the hook
@@ -1120,42 +910,45 @@ export const Maps: Component = () => {
         mapInteractions.setupInteractions()
       },
     )
+
+    // Trigger render after map is loaded
+    renderPixi()
   }
 
-  // Measure popup and update position when it's rendered or content changes
+  // Measure popup and update position when it's rendered or content changes (for fleets/hyperlanes)
   createEffect(() => {
     const vp = viewport()
     const sprite = mapSprite()
-    if (popupElement && (selectedLandmark() || isAddingNew()) && vp && sprite) {
-      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    const fleet = selectedFleet()
+    const hyperlane = selectedHyperlane()
 
-      // Get the actual height of the popup
+    // Only handle fleet and hyperlane popups (landmarks use inline detail now)
+    if (popupElement && (fleet || hyperlane || isAddingFleet()) && vp && sprite) {
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
       const actualHeight = popupElement.offsetHeight
 
-      // Get current position (either selected landmark or new landmark position)
       let worldX: number
       let worldY: number
-      if (isAddingNew()) {
-        const pos = newLandmarkPos()
+      if (isAddingFleet()) {
+        const pos = mapEditorStore.newLandmarkPos
         worldX = pos.x * sprite.width
         worldY = pos.y * sprite.height
-      } else if (selectedLandmark()) {
-        worldX = selectedLandmark()!.x * sprite.width
-        worldY = selectedLandmark()!.y * sprite.height
+      } else if (fleet) {
+        worldX = fleet.defaultX * sprite.width
+        worldY = fleet.defaultY * sprite.height
+      } else if (hyperlane && hyperlane.segments.length > 0) {
+        const seg = hyperlane.segments[0]
+        worldX = seg.startX * sprite.width
+        worldY = seg.startY * sprite.height
       } else {
         return
       }
 
-      // Convert to screen coordinates
       const screenPos = vp.toScreen(worldX, worldY)
-      const baseX = screenPos.x + (canvasContainer?.offsetLeft || 0)
-      const baseY = screenPos.y + (canvasContainer?.offsetTop || 0)
-
-      // Pass canvas-relative position for mobile
-      // Recalculate position with actual height
+      const baseX = screenPos.x + (canvasContainer()?.offsetLeft || 0)
+      const baseY = screenPos.y + (canvasContainer()?.offsetTop || 0)
       const newPosition = calculateSafePopupPosition(baseX, baseY, isTouchDevice, actualHeight)
 
-      // Only update if position changed significantly (to avoid infinite loops)
       const currentPos = popupPosition()
       if (Math.abs(newPosition.x - currentPos.x) > 1 || Math.abs(newPosition.y - currentPos.y) > 1) {
         setPopupPosition(newPosition)
@@ -1166,7 +959,7 @@ export const Maps: Component = () => {
   // Show placement indicator when adding new landmark
   createEffect(() => {
     if (isAddingNew()) {
-      mapInteractions.updatePreview(newLandmarkPos(), editColor(), editSize(), editType())
+      mapInteractions.updatePreview(mapEditorStore.newLandmarkPos, mapEditorStore.editColor, mapEditorStore.editSize, mapEditorStore.editType)
     } else {
       mapInteractions.hidePreview()
     }
@@ -1203,324 +996,39 @@ export const Maps: Component = () => {
     reader.readAsDataURL(file)
   }
 
-  // Save landmark (new or edit)
-  const saveLandmark = () => {
-    const name = editName().trim()
-    const description = editDescription().trim()
-
-    if (!name || isSaving()) return // Only name is required and prevent double-clicks
-
-    // Validate population if provided
-    if (editPopulation().trim() && !validatePopulation(editPopulation())) {
-      setPopulationError('Please enter a valid number')
-      return
-    }
-
-    setIsSaving(true)
-
-    try {
-      if (isAddingNew() && mapsStore.selectedMap) {
-        // Remember the settings for next time
-        setLastUsedColor(editColor())
-        setLastUsedSize(editSize())
-        setLastUsedType(editType())
-        localStorage.setItem('lastLandmarkColor', editColor())
-        localStorage.setItem('lastLandmarkSize', editSize())
-        localStorage.setItem('lastLandmarkType', editType())
-
-        // Add new landmark
-        mapsStore.addLandmark(mapsStore.selectedMap.id, {
-          x: newLandmarkPos().x,
-          y: newLandmarkPos().y,
-          name,
-          description,
-          type: editType(),
-          population: editPopulation() || undefined,
-          industry: (editIndustry() as LandmarkIndustry) || undefined,
-          planetaryBodies: editPlanetaryBodies() || undefined,
-          region: editRegion() || undefined,
-          sector: editSector() || undefined,
-          color: editColor(),
-          size: editSize(),
-        })
-        // Update landmarks to show the new one
-        updateLandmarks()
-      } else if (selectedLandmark() && mapsStore.selectedMap) {
-        // Update existing landmark
-        mapsStore.updateLandmark(mapsStore.selectedMap.id, selectedLandmark()!.id, {
-          name,
-          description,
-          type: editType(),
-          population: editPopulation() || undefined,
-          industry: (editIndustry() as LandmarkIndustry) || undefined,
-          planetaryBodies: editPlanetaryBodies() || undefined,
-          region: editRegion() || undefined,
-          sector: editSector() || undefined,
-          color: editColor(),
-          size: editSize(),
-        })
-        // Update landmarks to show the changes
-        updateLandmarks()
-      }
-
-      setIsEditing(false)
-      setIsAddingNew(false)
-      setSelectedLandmark(null)
-    } finally {
-      // Reset saving state after a short delay to provide UI feedback
-      setTimeout(() => setIsSaving(false), 200)
+  // Handle map selection from ListDetailPanel
+  const handleMapSelectionChange = (id: string | null) => {
+    if (id && id !== 'new') {
+      mapsStore.selectMap(id)
     }
   }
 
-  // Delete landmark
-  const deleteLandmark = () => {
-    if (selectedLandmark() && mapsStore.selectedMap && !isDeleting()) {
-      setIsDeleting(true)
-
-      try {
-        mapsStore.deleteLandmark(mapsStore.selectedMap.id, selectedLandmark()!.id)
-        setSelectedLandmark(null)
-
-        // Update landmarks to remove the deleted one
-        updateLandmarks()
-      } finally {
-        // Reset deleting state after a short delay to provide UI feedback
-        setTimeout(() => setIsDeleting(false), 200)
+  // Handle delete map
+  const handleDeleteMap = async () => {
+    if (mapsStore.selectedMapId) {
+      if (confirm('Are you sure you want to delete this map?')) {
+        await mapsStore.deleteMap(mapsStore.selectedMapId)
+        panelRef?.clearSelection()
       }
     }
   }
 
-  // Save fleet (new or edit)
-  const saveFleet = () => {
-    const name = editName().trim()
-    const description = editDescription().trim()
-    const designation = editDesignation().trim()
-
-    if (!name || isSaving()) return
-
-    // Validate hyperdrive rating
-    if (!validateHyperdriveRating(editHyperdriveRating())) {
-      setHyperdriveError('Must be between 0.5 and 2.0')
-      return
-    }
-
-    setIsSaving(true)
-
-    try {
-      if (isAddingFleet() && mapsStore.selectedMap) {
-        // Add new fleet
-        mapsStore.addFleet(mapsStore.selectedMap.id, {
-          defaultX: newFleetPos().x,
-          defaultY: newFleetPos().y,
-          name,
-          description,
-          designation: designation || undefined,
-          hyperdriveRating: Number.parseFloat(editHyperdriveRating()),
-          color: editColor(),
-          size: editSize(),
-          variant: editVariant(),
-        })
-        // Refresh fleets
-        const map = mapsStore.selectedMap
-        if (map?.fleets && map.fleets.length > 0) {
-          fleetManager.refreshAllFleets(map.fleets)
-          fleetManager.drawAllFleetPaths(map.fleets)
-        }
-      } else if (selectedFleet() && mapsStore.selectedMap) {
-        // Update existing fleet
-        mapsStore.updateFleet(mapsStore.selectedMap.id, selectedFleet()!.id, {
-          name,
-          description,
-          designation: designation || undefined,
-          hyperdriveRating: Number.parseFloat(editHyperdriveRating()),
-          color: editColor(),
-          size: editSize(),
-          variant: editVariant(),
-        })
-        // Refresh fleets
-        const map = mapsStore.selectedMap
-        if (map?.fleets && map.fleets.length > 0) {
-          fleetManager.refreshAllFleets(map.fleets)
-          fleetManager.drawAllFleetPaths(map.fleets)
-        }
-      }
-
-      setIsEditing(false)
-      setIsAddingFleet(false)
-      setSelectedFleet(null)
-    } finally {
-      setTimeout(() => setIsSaving(false), 200)
-    }
-  }
-
-  // Delete fleet
-  const deleteFleet = () => {
-    if (selectedFleet() && mapsStore.selectedMap && !isDeleting()) {
-      setIsDeleting(true)
-
-      try {
-        mapsStore.deleteFleet(mapsStore.selectedMap.id, selectedFleet()!.id)
-        setSelectedFleet(null)
-
-        // Refresh fleets
-        const map = mapsStore.selectedMap
-        if (map?.fleets) {
-          fleetManager.refreshAllFleets(map.fleets)
-          fleetManager.drawAllFleetPaths(map.fleets)
-        }
-      } finally {
-        setTimeout(() => setIsDeleting(false), 200)
-      }
-    }
-  }
-
-  // Delete active movement
-  const deleteActiveMovement = () => {
-    const fleet = selectedFleet()
-    const map = mapsStore.selectedMap
-    if (!fleet || !map || isDeletingMovement()) return
-
-    const activeMovement = getActiveMovement(fleet, currentStoryTime())
-    if (!activeMovement) return
-
-    setIsDeletingMovement(true)
-    try {
-      mapsStore.deleteFleetMovement(map.id, fleet.id, activeMovement.id)
-      // Refresh fleets
-      if (map.fleets) {
-        fleetManager.refreshAllFleets(map.fleets)
-        fleetManager.drawAllFleetPaths(map.fleets)
-      }
-    } finally {
-      setTimeout(() => setIsDeletingMovement(false), 200)
-    }
-  }
-
-  // Start editing existing fleet
-  const startEditingFleet = () => {
-    if (selectedFleet()) {
-      setEditName(selectedFleet()!.name)
-      setEditDescription(selectedFleet()!.description || '')
-      setEditDesignation(selectedFleet()!.designation || '')
-      setEditHyperdriveRating(selectedFleet()!.hyperdriveRating.toString())
-      setHyperdriveError('')
-      setEditColor(selectedFleet()!.color || '#00ff00')
-      setEditSize(selectedFleet()!.size || 'medium')
-      setEditVariant(selectedFleet()!.variant || 'military')
-      setIsEditing(true)
-      setIsAddingFleet(false)
-    }
-  }
-
-  // Cancel fleet editing
-  const cancelEditingFleet = () => {
-    setIsEditing(false)
-    setIsAddingFleet(false)
-    if (isAddingFleet()) {
-      setSelectedFleet(null)
-    }
-  }
-
-  // Validate speed multiplier (1.0 - 20.0)
-  const validateSpeedMultiplier = (value: string): boolean => {
-    if (!value.trim()) return false
-    const num = Number.parseFloat(value)
-    return !Number.isNaN(num) && num >= 1.0 && num <= 20.0
-  }
-
-  // Start editing existing hyperlane
-  const startEditingHyperlane = () => {
-    if (selectedHyperlane()) {
-      setEditSpeedMultiplier(selectedHyperlane()!.speedMultiplier.toString())
-      setSpeedMultiplierError('')
-      setIsEditing(true)
-    }
-  }
-
-  // Save hyperlane (edit only, creation is handled by saveHyperlane function)
-  const saveHyperlaneEdit = () => {
-    const hyperlane = selectedHyperlane()
-    const map = mapsStore.selectedMap
-
-    if (!hyperlane || !map || isSaving()) return
-
-    // Validate speed multiplier
-    if (!validateSpeedMultiplier(editSpeedMultiplier())) {
-      setSpeedMultiplierError('Must be between 1.0 and 20.0')
-      return
-    }
-
-    setIsSaving(true)
-
-    try {
-      mapsStore.updateHyperlane(map.id, hyperlane.id, {
-        speedMultiplier: Number.parseFloat(editSpeedMultiplier()),
+  // Handle save border color
+  const handleSaveBorderColor = async () => {
+    if (mapsStore.selectedMapId) {
+      await mapsStore.updateMap(mapsStore.selectedMapId, {
+        borderColor: editMapBorderColorValue() || undefined,
       })
-
-      // Refresh hyperlanes
-      if (map.hyperlanes) {
-        hyperlaneManager.refreshAllHyperlanes(map.hyperlanes)
-      }
-
-      setIsEditing(false)
-    } finally {
-      setTimeout(() => setIsSaving(false), 200)
+      setEditingMapBorderColor(false)
     }
   }
 
-  // Quick save speed multiplier directly (for quick select buttons)
-  const quickSaveSpeedMultiplier = (value: string) => {
-    const hyperlane = selectedHyperlane()
-    const map = mapsStore.selectedMap
-
-    if (!hyperlane || !map || isSaving()) return
-
-    // Validate speed multiplier
-    if (!validateSpeedMultiplier(value)) {
-      return
+  // Start editing border color
+  const startEditingBorderColor = () => {
+    if (mapsStore.selectedMap) {
+      setEditMapBorderColorValue(mapsStore.selectedMap.borderColor || '')
+      setEditingMapBorderColor(true)
     }
-
-    setIsSaving(true)
-
-    try {
-      mapsStore.updateHyperlane(map.id, hyperlane.id, {
-        speedMultiplier: Number.parseFloat(value),
-      })
-
-      // Refresh hyperlanes
-      if (map.hyperlanes) {
-        hyperlaneManager.refreshAllHyperlanes(map.hyperlanes)
-      }
-    } finally {
-      setTimeout(() => setIsSaving(false), 200)
-    }
-  }
-
-  // Delete hyperlane
-  const deleteHyperlaneEdit = () => {
-    const hyperlane = selectedHyperlane()
-    const map = mapsStore.selectedMap
-
-    if (!hyperlane || !map || isDeleting()) return
-
-    setIsDeleting(true)
-
-    try {
-      mapsStore.deleteHyperlane(map.id, hyperlane.id)
-      setSelectedHyperlane(null)
-
-      // Refresh hyperlanes
-      if (map.hyperlanes) {
-        hyperlaneManager.refreshAllHyperlanes(map.hyperlanes)
-      }
-    } finally {
-      setTimeout(() => setIsDeleting(false), 200)
-    }
-  }
-
-  // Cancel hyperlane editing
-  const cancelEditingHyperlane = () => {
-    setIsEditing(false)
   }
 
   // Calculate safe popup position that stays within viewport
@@ -1592,105 +1100,35 @@ export const Maps: Component = () => {
     return { x: finalX, y: finalY }
   }
 
-  // Focus on a landmark from the list
-  const focusOnLandmark = (landmark: Landmark) => {
-    // Ignore landmark selection when in paint mode
-    if (paintModeEnabled()) return
-
-    const vp = viewport()
-    const sprite = mapSprite()
-    if (!vp || !sprite) return
-
-    // Set as selected
-    setSelectedLandmark(landmark)
-    setIsEditing(false)
-    setIsAddingNew(false)
-
-    // Calculate world position from normalized coordinates
-    const worldX = landmark.x * sprite.width
-    const worldY = landmark.y * sprite.height
-
-    // Move to the landmark position
-    // Check if animate method exists (it's available in pixi-viewport)
-    const vpAny = vp as any
-    if (vpAny.animate) {
-      vpAny.animate({
-        position: { x: worldX, y: worldY },
-        scale: Math.max(1, vp.scale.x), // Ensure minimum zoom level
-        time: 500, // Animation duration in ms
-        ease: 'easeInOutSine',
-      })
-    } else {
-      // Fallback to immediate positioning
-      vpAny.moveCenter(worldX, worldY)
-    }
-
-    // Show the landmark popup
-    const screenPos = vp.toScreen(worldX, worldY)
-    const baseX = screenPos.x + (canvasContainer?.offsetLeft || 0)
-    const baseY = screenPos.y + (canvasContainer?.offsetTop || 0)
-    const isMobile = window.innerWidth < 768
-    setPopupPosition(calculateSafePopupPosition(baseX, baseY, isMobile))
-  }
-
-  // Start editing existing landmark
-  const startEditing = () => {
-    if (selectedLandmark()) {
-      setEditName(selectedLandmark()!.name)
-      setEditDescription(selectedLandmark()!.description)
-      setEditType(selectedLandmark()!.type || 'system')
-      setEditPopulation(selectedLandmark()!.population || '')
-      setEditIndustry(selectedLandmark()!.industry || '')
-      setEditPlanetaryBodies(selectedLandmark()!.planetaryBodies || '')
-      setEditRegion(selectedLandmark()!.region || '')
-      setEditSector(selectedLandmark()!.sector || '')
-      setPopulationError('')
-      setEditColor(selectedLandmark()!.color || '#3498db')
-      setEditSize(selectedLandmark()!.size || 'medium')
-      setIsEditing(true)
+  // Handle mode change from toolbar
+  const handleModeChange = (mode: 'select' | 'landmark' | 'pawn' | 'path') => {
+    // Clear all mode-specific state when switching modes
+    if (mode !== 'landmark') {
       setIsAddingNew(false)
+      setSelectedLandmark(null)
+      mapInteractions.hidePreview()
     }
-  }
-
-  // Save allegiance for selected landmark
-  const saveAllegiance = async (value: string | null) => {
-    const landmark = selectedLandmark()
-    const map = mapsStore.selectedMap
-    const messageId = currentMessageId()
-    const storyId = currentStoryStore.id
-
-    if (!landmark || !map || !messageId || !storyId) return
-
-    setIsSavingAllegiance(true)
-    try {
-      await landmarkStatesStore.setLandmarkState(storyId, map.id, landmark.id, messageId, 'allegiance', value)
-
-      // Reload accumulated states - the reactive memos will automatically update
-      await landmarkStatesStore.loadAccumulatedStates(storyId, messageId)
-
-      // Update the landmark visual (border color)
-      landmarkManager.updateLandmark(landmark, true)
-
-      // Update voronoi overlay if enabled
-      if (showFactionOverlay()) {
-        updateVoronoiOverlay()
-      }
-    } catch (error) {
-      console.error('Failed to save allegiance:', error)
-    } finally {
-      setIsSavingAllegiance(false)
+    if (mode !== 'pawn') {
+      setIsAddingFleet(false)
+      setSelectedFleet(null)
+    }
+    if (mode !== 'path') {
+      mapEditorStore.setIsCreatingPath(false)
+      mapEditorStore.setCurrentPathSegments([])
+      mapEditorStore.setPathPreviewEnd(null)
+      hyperlaneManager.hidePreviewSegment()
     }
   }
 
   // Batch apply allegiance to all landmarks within brush radius
   const applyAllegianceToBrush = async (screenX: number, screenY: number, faction: string | null) => {
     const map = mapsStore.selectedMap
-    const messageId = currentMessageId()
+    const storyTime = currentStoryTime()
     const storyId = currentStoryStore.id
     const sprite = mapSprite()
     const vp = viewport()
 
-    if (!map || !messageId || !storyId || !sprite || !vp) return
+    if (!map || storyTime === null || !storyId || !sprite || !vp) return
 
     // Find all landmarks within 100px screen radius
     const affectedLandmarks: Landmark[] = []
@@ -1716,11 +1154,11 @@ export const Maps: Component = () => {
 
     // Batch update all affected landmarks
     for (const landmark of affectedLandmarks) {
-      await landmarkStatesStore.setLandmarkState(storyId, map.id, landmark.id, messageId, 'allegiance', faction)
+      await landmarkStatesStore.setLandmarkState(storyId, map.id, landmark.id, storyTime, 'allegiance', faction)
     }
 
     // Reload accumulated states
-    await landmarkStatesStore.loadAccumulatedStates(storyId, messageId)
+    await landmarkStatesStore.loadAccumulatedStates(storyId, storyTime)
 
     // Update all affected landmark sprites
     for (const landmark of affectedLandmarks) {
@@ -1728,49 +1166,44 @@ export const Maps: Component = () => {
     }
 
     // Update voronoi overlay once after all landmarks (if enabled)
-    if (showFactionOverlay()) {
+    if (mapEditorStore.showFactionOverlay) {
       updateVoronoiOverlay()
     }
-  }
 
-  // Cancel editing
-  const cancelEditing = () => {
-    setIsEditing(false)
-    setIsAddingNew(false)
-    if (isAddingNew()) {
-      setSelectedLandmark(null)
-    }
+    // Trigger render after updates
+    renderPixi()
   }
 
   // Fetch landmark info from web search
   const fetchLandmarkInfo = async () => {
-    const name = editName().trim()
-    const type = editType()
-    if (!name || isFetchingLandmarkInfo()) return
+    const name = mapEditorStore.editName.trim()
+    const type = mapEditorStore.editType
+    if (!name || mapEditorStore.isFetchingLandmarkInfo) return
 
     // Only proceed if fields are empty
-    const hasExistingInfo = editPopulation() || editIndustry() || editDescription() || editPlanetaryBodies()
+    const getProperty = (key: string) => (mapEditorStore.editProperties[key] as string) || ''
+    const hasExistingInfo = getProperty('population') || getProperty('industry') || mapEditorStore.editDescription || getProperty('planetaryBodies')
     if (hasExistingInfo && !confirm('This will overwrite existing information. Continue?')) {
       return
     }
 
-    setIsFetchingLandmarkInfo(true)
+    mapEditorStore.setIsFetchingLandmarkInfo(true)
 
     try {
       const info = await searchLandmarkInfo(name, type)
 
       // Only update empty fields by default, unless user confirmed overwrite
-      if (!editPopulation() || hasExistingInfo) {
-        setEditPopulation(info.population || editPopulation())
+      if (!getProperty('population') || hasExistingInfo) {
+        mapEditorStore.setEditProperty('population', info.population || getProperty('population'))
       }
-      if (!editIndustry() || hasExistingInfo) {
-        setEditIndustry(info.industry || editIndustry())
+      if (!getProperty('industry') || hasExistingInfo) {
+        mapEditorStore.setEditProperty('industry', info.industry || getProperty('industry'))
       }
-      if (!editDescription() || hasExistingInfo) {
-        setEditDescription(info.description || editDescription())
+      if (!mapEditorStore.editDescription || hasExistingInfo) {
+        mapEditorStore.setEditDescription(info.description || mapEditorStore.editDescription)
       }
-      if (!editPlanetaryBodies() || hasExistingInfo) {
-        setEditPlanetaryBodies(info.planetaryBodies || editPlanetaryBodies())
+      if (!getProperty('planetaryBodies') || hasExistingInfo) {
+        mapEditorStore.setEditProperty('planetaryBodies', info.planetaryBodies || getProperty('planetaryBodies'))
       }
 
       console.log('Fetched landmark info:', info)
@@ -1778,29 +1211,96 @@ export const Maps: Component = () => {
       console.error('Failed to fetch landmark info:', error)
       alert('Failed to fetch landmark information. Please check your Anthropic API key and try again.')
     } finally {
-      setIsFetchingLandmarkInfo(false)
+      mapEditorStore.setIsFetchingLandmarkInfo(false)
     }
   }
 
   // Initialize Pixi when canvas container is available and map is selected
   createEffect(
     on(
-      () => [app(), mapsStore.selectedMap] as const,
-      ([pixiApp, map]) => {
-        if (canvasContainer && map && !pixiApp) {
+      () => [app(), mapsStore.selectedMap, canvasContainer()] as const,
+      ([pixiApp, map, container]) => {
+        if (container && map && !pixiApp) {
           initialize()
         }
       },
     ),
   )
 
+  // Register callbacks with mapEditorStore when PIXI is ready
+  createEffect(() => {
+    if (isReady()) {
+      mapEditorStore.registerCallbacks({
+        onLandmarksChanged: () => {
+          updateLandmarks()
+        },
+        onFleetsChanged: () => {
+          const map = mapsStore.selectedMap
+          if (map?.fleets) {
+            fleetManager.refreshAllFleets(map.fleets)
+            fleetManager.drawAllFleetPaths(map.fleets)
+          }
+        },
+        onPathsChanged: () => {
+          const map = mapsStore.selectedMap
+          if (map?.hyperlanes) {
+            hyperlaneManager.refreshAllHyperlanes(map.hyperlanes)
+          }
+        },
+        onFocusLandmark: (landmark) => {
+          // Handle viewport animation when focusing on a landmark
+          const vp = viewport()
+          const sprite = mapSprite()
+          if (!vp || !sprite) return
+
+          // Calculate world position from normalized coordinates
+          const worldX = landmark.x * sprite.width
+          const worldY = landmark.y * sprite.height
+
+          // Move to the landmark position with animation
+          const vpAny = vp as any
+          if (vpAny.animate) {
+            vpAny.animate({
+              position: { x: worldX, y: worldY },
+              scale: Math.max(1, vp.scale.x),
+              time: 500,
+              ease: 'easeInOutSine',
+            })
+          } else {
+            vpAny.moveCenter(worldX, worldY)
+          }
+
+          // Update popup position
+          const screenPos = vp.toScreen(worldX, worldY)
+          const baseX = screenPos.x + (canvasContainer()?.offsetLeft || 0)
+          const baseY = screenPos.y + (canvasContainer()?.offsetTop || 0)
+          const isMobile = window.innerWidth < 768
+          setPopupPosition(calculateSafePopupPosition(baseX, baseY, isMobile))
+        },
+        onAllegianceChanged: (landmark) => {
+          // Update the specific landmark's visual (border color)
+          landmarkManager.updateLandmark(landmark, true)
+
+          // Update voronoi overlay if enabled
+          if (mapEditorStore.showFactionOverlay) {
+            updateVoronoiOverlay()
+          }
+
+          // Trigger PIXI render
+          renderPixi()
+        },
+      })
+    }
+  })
+
   // Handle map selection change (wait for PIXI to be ready)
+  // Track imageData explicitly so the effect re-runs when it's loaded
   createEffect(
     on(
-      () => [mapsStore.selectedMap, isReady()] as const,
-      ([map, ready]) => {
-        if (map?.imageData && ready) {
-          loadMap(map.imageData)
+      () => [mapsStore.selectedMap?.id, mapsStore.selectedMap?.imageData, isReady()] as const,
+      ([mapId, imageData, ready]) => {
+        if (mapId && imageData && ready) {
+          loadMap(imageData)
         }
       },
     ),
@@ -1809,12 +1309,12 @@ export const Maps: Component = () => {
   // Load accumulated landmark states when timeline changes, then re-render
   createEffect(
     on(
-      () => [currentMessageId(), currentStoryStore.id] as const,
-      ([messageId, storyId]) => {
-        if (messageId && storyId && !isRendering()) {
+      () => [currentStoryTime(), currentStoryStore.id] as const,
+      ([storyTime, storyId]) => {
+        if (storyTime !== null && storyId && !isRendering()) {
           setIsRendering(true)
           landmarkStatesStore
-            .loadAccumulatedStates(storyId, messageId)
+            .loadAccumulatedStates(storyId, storyTime)
             .then(() => {
               renderAllLandmarks()
               setIsRendering(false)
@@ -1837,7 +1337,7 @@ export const Maps: Component = () => {
 
     const handlePointerDown = (e: PIXI.FederatedPointerEvent) => {
       // Only handle in fleet mode and for left-clicks (button 0)
-      if (creationMode() !== 'fleet' || e.button !== 0) return
+      if (mapEditorStore.creationMode !== 'pawn' || e.button !== 0) return
 
       // Record the pointer down position
       pointerDownPos = { x: e.global.x, y: e.global.y }
@@ -1860,7 +1360,7 @@ export const Maps: Component = () => {
 
     const handlePointerUp = (e: PIXI.FederatedPointerEvent) => {
       // Only handle in fleet mode and for left-clicks (button 0)
-      if (creationMode() !== 'fleet' || e.button !== 0 || !pointerDownPos) {
+      if (mapEditorStore.creationMode !== 'pawn' || e.button !== 0 || !pointerDownPos) {
         pointerDownPos = null
         isDragging = false
         return
@@ -1890,9 +1390,9 @@ export const Maps: Component = () => {
       }
 
       // Check if a fleet is already selected for movement
-      if (selectedFleetForMovement()) {
+      if (mapEditorStore.selectedFleetForMovement) {
         // Deselect the fleet instead of creating a new one
-        setSelectedFleetForMovement(null)
+        mapEditorStore.setSelectedFleetForMovement(null)
         const map = mapsStore.selectedMap
         if (map?.fleets) {
           fleetManager.refreshAllFleets(map.fleets)
@@ -1904,8 +1404,8 @@ export const Maps: Component = () => {
 
       // Get screen position
       const screenPos = vp.toScreen(worldPos)
-      const baseX = screenPos.x + (canvasContainer?.offsetLeft || 0)
-      const baseY = screenPos.y + (canvasContainer?.offsetTop || 0)
+      const baseX = screenPos.x + (canvasContainer()?.offsetLeft || 0)
+      const baseY = screenPos.y + (canvasContainer()?.offsetTop || 0)
 
       // Check for nearby landmark and snap
       const nearbyLandmark = findNearbyLandmark({
@@ -1919,17 +1419,10 @@ export const Maps: Component = () => {
       const finalY = nearbyLandmark ? nearbyLandmark.y : normalizedY
 
       // Start fleet creation dialog
-      setNewFleetPos({ x: finalX, y: finalY })
-      setEditName('')
-      setEditDescription('')
-      setEditDesignation('')
-      setEditHyperdriveRating('1.0')
-      setHyperdriveError('')
-      setEditColor('#00ff00')
-      setEditSize('medium')
-      setEditVariant('military')
+      mapEditorStore.setNewPawnPos({ x: finalX, y: finalY })
+      mapEditorStore.initEditForNewPawn()
+      mapEditorStore.setEditColor('#00ff00') // Use green for fleets
       setIsAddingFleet(true)
-      setIsEditing(true)
       setSelectedFleet(null)
       setSelectedLandmark(null)
 
@@ -1971,7 +1464,7 @@ export const Maps: Component = () => {
   // Refresh fleets when selection changes (to update blue circle indicator)
   createEffect(
     on(
-      () => selectedFleetForMovement()?.id,
+      () => mapEditorStore.selectedFleetForMovement?.id,
       () => {
         const map = mapsStore.selectedMap
         if (map?.fleets && map.fleets.length > 0) {
@@ -1985,26 +1478,20 @@ export const Maps: Component = () => {
   // Re-render overlay when toggle or method changes
   createEffect(
     on(
-      () => [showFactionOverlay(), overlayMethod()] as const,
+      () => [mapEditorStore.showFactionOverlay, mapEditorStore.overlayMethod] as const,
       () => {
         updateVoronoiOverlay()
+        renderPixi()
       },
       { defer: true },
     ),
   )
 
-  // Toggle landmark container interactivity based on creation mode
+  // Toggle landmark and hyperlane interactivity based on creation mode
   createEffect(() => {
-    const mode = creationMode()
-    // Landmarks should be non-interactive in fleet mode
-    landmarkManager.setInteractive(mode !== 'fleet')
-  })
-
-  // Toggle hyperlane container interactivity based on creation mode
-  createEffect(() => {
-    const mode = creationMode()
-    // Hyperlanes should be non-interactive in fleet mode
-    hyperlaneManager.setInteractive(mode !== 'fleet')
+    const isSelectMode = mapEditorStore.creationMode === 'select'
+    landmarkManager.setInteractive(isSelectMode)
+    hyperlaneManager.setInteractive(isSelectMode)
   })
 
   // Shift key detection for paint mode and Escape key for canceling operations
@@ -2015,10 +1502,10 @@ export const Maps: Component = () => {
       }
 
       // Cancel hyperlane creation with Escape
-      if (e.key === 'Escape' && isCreatingHyperlane()) {
-        setIsCreatingHyperlane(false)
-        setCurrentHyperlaneSegments([])
-        setHyperlanePreviewEnd(null)
+      if (e.key === 'Escape' && mapEditorStore.isCreatingPath) {
+        mapEditorStore.setIsCreatingPath(false)
+        mapEditorStore.setCurrentPathSegments([])
+        mapEditorStore.setPathPreviewEnd(null)
         hyperlaneManager.hidePreviewSegment()
         console.log('Hyperlane creation canceled')
       }
@@ -2044,9 +1531,10 @@ export const Maps: Component = () => {
   createEffect(() => {
     const brushSprite = containers().brush
     const vp = viewport()
-    const enabled = paintModeEnabled()
+    const enabled = mapEditorStore.paintModeEnabled
+    const container = canvasContainer()
 
-    if (!brushSprite || !vp || !canvasContainer) return
+    if (!brushSprite || !vp || !container) return
 
     if (enabled) {
       // Draw the brush circle (100px radius, semi-transparent)
@@ -2058,7 +1546,7 @@ export const Maps: Component = () => {
 
       // Add mouse move listener to update brush position
       const handleMouseMove = (e: MouseEvent) => {
-        const rect = canvasContainer!.getBoundingClientRect()
+        const rect = container.getBoundingClientRect()
         const screenX = e.clientX - rect.left
         const screenY = e.clientY - rect.top
 
@@ -2067,12 +1555,12 @@ export const Maps: Component = () => {
         brushSprite.position.set(worldPos.x, worldPos.y)
       }
 
-      canvasContainer.addEventListener('mousemove', handleMouseMove)
+      container.addEventListener('mousemove', handleMouseMove)
       brushSprite.visible = true
 
       // Cleanup function
       return () => {
-        canvasContainer?.removeEventListener('mousemove', handleMouseMove)
+        container.removeEventListener('mousemove', handleMouseMove)
         brushSprite.visible = false
       }
     }
@@ -2083,16 +1571,17 @@ export const Maps: Component = () => {
   createEffect(() => {
     const vp = viewport()
     const sprite = mapSprite()
-    const previewEnd = hyperlanePreviewEnd()
-    const creating = isCreatingHyperlane()
+    const previewEnd = mapEditorStore.pathPreviewEnd
+    const creating = mapEditorStore.isCreatingPath
+    const container = canvasContainer()
 
-    if (!vp || !sprite || !canvasContainer || !creating || !previewEnd) {
+    if (!vp || !sprite || !container || !creating || !previewEnd) {
       hyperlaneManager.hidePreviewSegment()
       // Return empty cleanup to ensure previous event listener is removed
       return () => {}
     }
 
-    const segments = currentHyperlaneSegments()
+    const segments = mapEditorStore.currentPathSegments
     if (segments.length === 0) {
       hyperlaneManager.hidePreviewSegment()
       // Return empty cleanup to ensure previous event listener is removed
@@ -2104,9 +1593,9 @@ export const Maps: Component = () => {
     // Add mouse move listener to update preview
     const handleMouseMove = (e: MouseEvent) => {
       // Don't show preview if not creating
-      if (!isCreatingHyperlane()) return
+      if (!mapEditorStore.isCreatingPath) return
 
-      const rect = canvasContainer!.getBoundingClientRect()
+      const rect = container.getBoundingClientRect()
       const screenX = e.clientX - rect.left
       const screenY = e.clientY - rect.top
 
@@ -2121,31 +1610,32 @@ export const Maps: Component = () => {
       hyperlaneManager.showPreviewSegment(lastSegment.startX, lastSegment.startY, normalizedX, normalizedY)
     }
 
-    canvasContainer.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('mousemove', handleMouseMove)
 
     // Cleanup function
     return () => {
-      canvasContainer?.removeEventListener('mousemove', handleMouseMove)
+      container.removeEventListener('mousemove', handleMouseMove)
     }
   })
 
   // Path preview effect - show path preview when fleet is selected and mouse moves
   createEffect(() => {
-    const fleet = selectedFleetForMovement()
+    const fleet = mapEditorStore.selectedFleetForMovement
     const vp = viewport()
     const sprite = mapSprite()
+    const container = canvasContainer()
 
-    if (!fleet || !vp || !sprite || !canvasContainer) {
+    if (!fleet || !vp || !sprite || !container) {
       pathfinding.hidePathPreview()
       return () => {}
     }
 
     // Add mouse move listener to show path preview
     const handleMouseMove = (e: MouseEvent) => {
-      const selectedFleet = selectedFleetForMovement()
+      const selectedFleet = mapEditorStore.selectedFleetForMovement
       if (!selectedFleet) return
 
-      const rect = canvasContainer!.getBoundingClientRect()
+      const rect = container.getBoundingClientRect()
       const screenX = e.clientX - rect.left
       const screenY = e.clientY - rect.top
 
@@ -2160,11 +1650,11 @@ export const Maps: Component = () => {
       pathfinding.showPathPreview(selectedFleet, normalizedX, normalizedY)
     }
 
-    canvasContainer.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('mousemove', handleMouseMove)
 
     // Cleanup function
     return () => {
-      canvasContainer?.removeEventListener('mousemove', handleMouseMove)
+      container.removeEventListener('mousemove', handleMouseMove)
       pathfinding.hidePathPreview()
     }
   })
@@ -2191,246 +1681,195 @@ export const Maps: Component = () => {
   })
 
   onCleanup(() => {
-    // Clean up timeline debounce timer
-    if (timelineDebounceTimer !== null) {
-      clearTimeout(timelineDebounceTimer)
-    }
     // Cancel any progressive rendering
     cancelAnimation(distanceFieldAnimation())
+    // Unregister callbacks
+    mapEditorStore.unregisterCallbacks()
   })
 
   return (
     <Show when={mapsStore.showMaps}>
-      <div class={styles.mapsPanel}>
-        <MapControls
-          showAddMap={showAddMap}
-          setShowAddMap={setShowAddMap}
-          newMapName={newMapName}
-          setNewMapName={setNewMapName}
-          newMapBorderColor={newMapBorderColor}
-          setNewMapBorderColor={setNewMapBorderColor}
-          selectedFileName={selectedFileName}
-          editingBorderColor={editingBorderColor}
-          setEditingBorderColor={setEditingBorderColor}
-          editBorderColorValue={editBorderColorValue}
-          setEditBorderColorValue={setEditBorderColorValue}
-          onFileSelect={handleFileSelect}
-          onAddMap={handleAddMap}
-        />
-
-        <MapTimeline
-          story={() => currentStoryStore}
-          nodes={() => nodeStore.nodesArray}
-          currentStoryTime={currentStoryTime}
-          pendingStoryTime={pendingStoryTime}
-          storyTimesWithStates={storyTimesWithStates}
-          fleetMovementTimes={fleetMovementTimes}
-          onTimelineChange={handleTimelineChange}
-          onStep={stepTimeline}
-          onReset={() => {
-            // Cancel any pending update
-            if (timelineDebounceTimer !== null) {
-              clearTimeout(timelineDebounceTimer)
-              timelineDebounceTimer = null
-            }
-            setPendingStoryTime(null)
-            mapsStore.resetStoryTime()
-          }}
-        />
-
-        <div class={styles.mapViewer}>
-          <div class={styles.mapContainer}>
-            <Show when={!mapsStore.selectedMap}>
-              <div class={styles.noMapMessage}>Select a map or add a new one to get started</div>
-            </Show>
-            <div
-              ref={canvasContainer}
-              class={styles.mapCanvas}
-              style={{ display: mapsStore.selectedMap ? 'block' : 'none' }}
+      <ListDetailPanel<StoryMap>
+        ref={(r) => (panelRef = r)}
+        items={mapsStore.maps}
+        class={styles.mapsPanel}
+        onSelectionChange={handleMapSelectionChange}
+        backIcon={<BsArrowLeft />}
+        emptyStateMessage="Select a map or add a new one to get started"
+        renderListItem={(map) => (
+          <div class={styles.mapListItem}>
+            <span class={styles.mapListItemName}>{map.name}</span>
+            <span class={styles.mapListItemLandmarks}>
+              {map.landmarks.length} landmark{map.landmarks.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
+        newItemTitle="Add New Map"
+        renderNewForm={() => (
+          <div class={styles.addMapForm}>
+            <input
+              type="text"
+              class={styles.mapNameInput}
+              value={newMapName()}
+              onInput={(e) => setNewMapName(e.target.value)}
+              placeholder="Map name"
             />
-            {/* Creation Mode Toggle */}
-            <Show when={mapsStore.selectedMap}>
-              <div class={styles.creationModeToggle}>
-                <button
-                  class={`${styles.modeButton} ${creationMode() === 'landmark' ? styles.active : ''}`}
-                  onClick={() => {
-                    setCreationMode('landmark')
-                    // Clear any ongoing fleet creation
-                    setIsAddingFleet(false)
-                    setSelectedFleet(null)
-                    // Clear any ongoing hyperlane creation
-                    setIsCreatingHyperlane(false)
-                    setCurrentHyperlaneSegments([])
-                    setHyperlanePreviewEnd(null)
-                    hyperlaneManager.hidePreviewSegment()
-                  }}
-                  title="Click map to add landmarks"
-                >
-                  Add Landmark
-                </button>
-                <button
-                  class={`${styles.modeButton} ${creationMode() === 'fleet' ? styles.active : ''}`}
-                  onClick={() => {
-                    setCreationMode('fleet')
-                    // Clear any ongoing landmark creation
-                    setIsAddingNew(false)
-                    setSelectedLandmark(null)
-                    mapInteractions.hidePreview()
-                    // Clear any ongoing hyperlane creation
-                    setIsCreatingHyperlane(false)
-                    setCurrentHyperlaneSegments([])
-                    setHyperlanePreviewEnd(null)
-                    hyperlaneManager.hidePreviewSegment()
-                  }}
-                  title="Click map to add fleets"
-                >
-                  Add Fleet
-                </button>
-                <button
-                  class={`${styles.modeButton} ${creationMode() === 'hyperlane' ? styles.active : ''}`}
-                  onClick={() => {
-                    setCreationMode('hyperlane')
-                    // Clear any ongoing landmark creation
-                    setIsAddingNew(false)
-                    setSelectedLandmark(null)
-                    mapInteractions.hidePreview()
-                    // Clear any ongoing fleet creation
-                    setIsAddingFleet(false)
-                    setSelectedFleet(null)
-                    // Reset hyperlane creation state (allows canceling and restarting)
-                    setIsCreatingHyperlane(false)
-                    setCurrentHyperlaneSegments([])
-                    setHyperlanePreviewEnd(null)
-                    hyperlaneManager.hidePreviewSegment()
-                  }}
-                  title="Right-click to draw hyperlane routes"
-                >
-                  Add Hyperlane
-                </button>
-                <Show when={creationMode() === 'hyperlane'}>
-                  <div class={styles.hyperlaneStatus}>Status: {hyperlaneCreationStatus()}</div>
-                </Show>
+
+            <EJSCodeEditor
+              value={newMapBorderColor()}
+              onChange={setNewMapBorderColor}
+              placeholder="Border color template (optional)"
+              minHeight="60px"
+            />
+
+            <div class={styles.fileUpload}>
+              <input
+                type="file"
+                id="map-file-input"
+                class={styles.fileInput}
+                accept="image/*"
+                onChange={handleFileSelect}
+              />
+              <label for="map-file-input" class={styles.fileInputLabel}>
+                {selectedFileName() || 'Choose map image...'}
+              </label>
+            </div>
+
+            <div class={styles.addMapFormActions}>
+              <button
+                class={styles.addMapButton}
+                onClick={handleAddMap}
+                disabled={!newMapName().trim() || !selectedFile()}
+              >
+                <BsPlus /> Add Map
+              </button>
+              <button class={styles.cancelButton} onClick={() => panelRef?.clearSelection()}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        detailTitle={(map) => (
+          <div class={styles.detailTitleContainer}>
+            <span class={styles.detailTitleText}>{map.name}</span>
+            <div class={styles.detailTitleActions}>
+              <button
+                class={styles.iconButton}
+                onClick={startEditingBorderColor}
+                title="Edit border color template"
+              >
+                <BsPencil />
+              </button>
+              <button
+                class={`${styles.iconButton} ${styles.deleteButton}`}
+                onClick={handleDeleteMap}
+                title="Delete map"
+              >
+                <BsTrash />
+              </button>
+            </div>
+          </div>
+        )}
+        renderDetail={(_map) => (
+          <div class={styles.mapDetailContent}>
+            {/* Loading Indicator */}
+            <Show when={mapsStore.loadingMapId}>
+              <div class={styles.loadingOverlay}>
+                <div class={styles.loadingSpinner} />
+                <span>Loading map...</span>
               </div>
             </Show>
 
-            <FactionOverlayControls
-              showFactionOverlay={showFactionOverlay}
-              setShowFactionOverlay={setShowFactionOverlay}
-              overlayMethod={overlayMethod}
-              setOverlayMethod={setOverlayMethod}
-              paintModeEnabled={paintModeEnabled}
-              setPaintModeEnabled={setPaintModeEnabled}
-              selectedPaintFaction={selectedPaintFaction}
-              setSelectedPaintFaction={setSelectedPaintFaction}
-            />
+            {/* Edit Border Color Form */}
+            <Show when={editingMapBorderColor()}>
+              <div class={styles.borderColorEditor}>
+                <h4>Edit Border Color Template</h4>
+                <EJSCodeEditor
+                  value={editMapBorderColorValue()}
+                  onChange={setEditMapBorderColorValue}
+                  placeholder="Border color template"
+                  minHeight="100px"
+                />
+                <div class={styles.borderColorActions}>
+                  <button class={styles.addMapButton} onClick={handleSaveBorderColor}>
+                    <BsCheck /> Save
+                  </button>
+                  <button class={styles.cancelButton} onClick={() => setEditingMapBorderColor(false)}>
+                    <BsX /> Cancel
+                  </button>
+                </div>
+              </div>
+            </Show>
+
+            {/* Map Timeline */}
+            <MapTimeline />
+
+            {/* Map Toolbar */}
+            <MapToolbar onModeChange={handleModeChange} />
+
+            {/* Path creation status */}
+            <Show when={mapEditorStore.creationMode === 'path'}>
+              <div class={styles.hyperlaneStatus}>Status: {hyperlaneCreationStatus()}</div>
+            </Show>
+
+            {/* Map Viewer Area */}
+            <div class={styles.mapViewer}>
+              <div class={styles.mapContainer}>
+                <div
+                  ref={setCanvasContainer}
+                  class={styles.mapCanvas}
+                />
+              </div>
+
+              <Show
+                when={selectedHyperlane()}
+                fallback={
+                  <Show
+                    when={selectedFleet() || isAddingFleet()}
+                    fallback={
+                      <Show
+                        when={selectedLandmark() || isAddingNew()}
+                        fallback={
+                          <LandmarksList />
+                        }
+                      >
+                        <LandmarkDetail
+                          selectedLandmark={selectedLandmark}
+                          quickColors={quickColors}
+                          onBack={() => {
+                            setSelectedLandmark(null)
+                            setIsAddingNew(false)
+                            mapEditorStore.cancelEditing()
+                          }}
+                          onFetchLandmarkInfo={fetchLandmarkInfo}
+                        />
+                      </Show>
+                    }
+                  >
+                    <PawnDetail
+                      selectedPawn={selectedFleet}
+                      quickColors={quickColors}
+                      onBack={() => {
+                        setSelectedFleet(null)
+                        setIsAddingFleet(false)
+                        mapEditorStore.cancelEditing()
+                      }}
+                    />
+                  </Show>
+                }
+              >
+                <PathDetail
+                  selectedPath={selectedHyperlane}
+                  onBack={() => {
+                    setSelectedHyperlane(null)
+                    mapEditorStore.cancelEditing()
+                  }}
+                />
+              </Show>
+            </div>
           </div>
-
-          <LandmarksList
-            sortedLandmarks={sortedLandmarks}
-            selectedLandmark={selectedLandmark}
-            sortAscending={sortAscending}
-            setSortAscending={setSortAscending}
-            onFocusLandmark={focusOnLandmark}
-          />
-        </div>
-
-        <LandmarkPopup
-          popupRef={popupElement}
-          selectedLandmark={selectedLandmark}
-          isAddingNew={isAddingNew}
-          popupPosition={popupPosition}
-          isEditing={isEditing}
-          isDeleting={isDeleting}
-          isSaving={isSaving}
-          isFetchingLandmarkInfo={isFetchingLandmarkInfo}
-          isSavingAllegiance={isSavingAllegiance}
-          editName={editName}
-          setEditName={setEditName}
-          editDescription={editDescription}
-          setEditDescription={setEditDescription}
-          editColor={editColor}
-          setEditColor={setEditColor}
-          editSize={editSize}
-          setEditSize={setEditSize}
-          editType={editType}
-          setEditType={setEditType}
-          editPopulation={editPopulation}
-          handlePopulationInput={handlePopulationInput}
-          populationError={populationError}
-          editIndustry={editIndustry}
-          setEditIndustry={setEditIndustry}
-          editPlanetaryBodies={editPlanetaryBodies}
-          setEditPlanetaryBodies={setEditPlanetaryBodies}
-          editRegion={editRegion}
-          setEditRegion={setEditRegion}
-          editSector={editSector}
-          setEditSector={setEditSector}
-          quickColors={quickColors}
-          parsePopulation={parsePopulation}
-          formatPopulation={formatPopulation}
-          validatePopulation={validatePopulation}
-          currentMessageId={currentMessageId}
-          selectedAllegiance={selectedAllegiance}
-          allegianceAtThisMessage={allegianceAtThisMessage}
-          allegianceSourceMessageId={allegianceSourceMessageId}
-          onStartEditing={startEditing}
-          onSaveLandmark={saveLandmark}
-          onCancelEditing={cancelEditing}
-          onDeleteLandmark={deleteLandmark}
-          onFetchLandmarkInfo={fetchLandmarkInfo}
-          onJumpToMessage={jumpToMessage}
-          onSaveAllegiance={saveAllegiance}
-        />
-
-        <FleetPopup
-          selectedFleet={selectedFleet}
-          isAddingFleet={isAddingFleet}
-          popupPosition={popupPosition}
-          isEditing={isEditing}
-          isDeleting={isDeleting}
-          isSaving={isSaving}
-          editName={editName}
-          setEditName={setEditName}
-          editDescription={editDescription}
-          setEditDescription={setEditDescription}
-          editDesignation={editDesignation}
-          setEditDesignation={setEditDesignation}
-          editHyperdriveRating={editHyperdriveRating}
-          setEditHyperdriveRating={setEditHyperdriveRating}
-          hyperdriveError={hyperdriveError}
-          editColor={editColor}
-          setEditColor={setEditColor}
-          editSize={editSize}
-          setEditSize={setEditSize}
-          editVariant={editVariant}
-          setEditVariant={setEditVariant}
-          quickColors={quickColors}
-          currentStoryTime={currentStoryTime}
-          isDeletingMovement={isDeletingMovement}
-          onStartEditing={startEditingFleet}
-          onSaveFleet={saveFleet}
-          onCancelEditing={cancelEditingFleet}
-          onDeleteFleet={deleteFleet}
-          onDeleteActiveMovement={deleteActiveMovement}
-        />
-
-        <HyperlanePopup
-          selectedHyperlane={selectedHyperlane}
-          popupPosition={popupPosition}
-          landmarks={() => mapsStore.selectedMap?.landmarks || []}
-          isEditing={isEditing}
-          isDeleting={isDeleting}
-          isSaving={isSaving}
-          editSpeedMultiplier={editSpeedMultiplier}
-          setEditSpeedMultiplier={setEditSpeedMultiplier}
-          speedMultiplierError={speedMultiplierError}
-          onStartEditing={startEditingHyperlane}
-          onSaveHyperlane={saveHyperlaneEdit}
-          onCancelEditing={cancelEditingHyperlane}
-          onDeleteHyperlane={deleteHyperlaneEdit}
-          onQuickSaveSpeedMultiplier={quickSaveSpeedMultiplier}
-        />
-      </div>
+        )}
+      />
     </Show>
   )
 }

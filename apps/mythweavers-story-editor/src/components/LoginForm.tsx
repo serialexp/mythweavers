@@ -101,7 +101,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
     <div class={styles.container}>
       <Card variant="elevated" style={{ width: '100%', 'max-width': '400px' }}>
         <CardBody padding="lg">
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} class={styles.form}>
             <h2 class={styles.title}>{isRegistering() ? 'Create Account' : 'Welcome Back'}</h2>
 
             <Show when={error()}>

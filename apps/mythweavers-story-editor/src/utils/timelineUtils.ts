@@ -22,20 +22,20 @@ export function getGranularityMinutes(granularity: TimelineGranularity): number 
 }
 
 /**
- * Auto-calculate timeline range from chapters with storyTime set
- * Returns null if no chapters have storyTime
+ * Auto-calculate timeline range from nodes (chapters or scenes) with storyTime set
+ * Returns null if no nodes have storyTime
  */
 export function autoCalculateTimelineRange(nodes: Node[]): { start: number; end: number } | null {
-  const chaptersWithTime = nodes
-    .filter((n) => n.type === 'chapter' && n.storyTime !== null && n.storyTime !== undefined)
+  const nodesWithTime = nodes
+    .filter((n) => (n.type === 'chapter' || n.type === 'scene') && n.storyTime !== null && n.storyTime !== undefined)
     .sort((a, b) => a.storyTime! - b.storyTime!)
 
-  if (chaptersWithTime.length === 0) {
+  if (nodesWithTime.length === 0) {
     return null
   }
 
-  const earliestTime = chaptersWithTime[0].storyTime!
-  const latestTime = chaptersWithTime[chaptersWithTime.length - 1].storyTime!
+  const earliestTime = nodesWithTime[0].storyTime!
+  const latestTime = nodesWithTime[nodesWithTime.length - 1].storyTime!
 
   // Add 7 days buffer on each side (7 * 24 * 60 = 10,080 minutes)
   const bufferMinutes = 7 * 1440
@@ -67,7 +67,7 @@ export function getTimelineRange(
     }
   }
 
-  // Auto-calculate from chapters
+  // Auto-calculate from nodes with storyTime
   const autoRange = autoCalculateTimelineRange(nodes)
   if (autoRange) {
     return {
@@ -112,61 +112,61 @@ export function storyTimeToSliderPosition(storyTime: number, start: number, gran
 }
 
 /**
- * Find the chapter that is active at a given story time
- * Returns the latest chapter that starts at or before the given time
+ * Find the node (chapter or scene) that is active at a given story time
+ * Returns the latest node that starts at or before the given time
  */
 export function getChapterAtStoryTime(storyTime: number, nodes: Node[]): Node | null {
-  // Get chapters sorted by storyTime
-  const chaptersWithTime = nodes
-    .filter((n) => n.type === 'chapter' && n.storyTime !== null && n.storyTime !== undefined)
+  // Get chapters/scenes sorted by storyTime
+  const nodesWithTime = nodes
+    .filter((n) => (n.type === 'chapter' || n.type === 'scene') && n.storyTime !== null && n.storyTime !== undefined)
     .sort((a, b) => a.storyTime! - b.storyTime!)
 
-  // Find the latest chapter that starts at or before this time
-  let activeChapter: Node | null = null
-  for (const chapter of chaptersWithTime) {
-    if (chapter.storyTime! <= storyTime) {
-      activeChapter = chapter
+  // Find the latest node that starts at or before this time
+  let activeNode: Node | null = null
+  for (const node of nodesWithTime) {
+    if (node.storyTime! <= storyTime) {
+      activeNode = node
     } else {
       break
     }
   }
 
-  return activeChapter
+  return activeNode
 }
 
 /**
- * Get story time for a message based on its chapter's storyTime
+ * Get story time for a message based on its node's (chapter or scene) storyTime
  */
 export function getStoryTimeForMessage(messageId: string, messages: Message[], nodes: Node[]): number | null {
   const message = messages.find((m) => m.id === messageId)
   if (!message) return null
 
-  // Find the chapter this message belongs to
-  const chapter = nodes.find((n) => n.id === message.nodeId && n.type === 'chapter')
-  if (!chapter) return null
+  // Find the node (chapter or scene) this message belongs to
+  const node = nodes.find((n) => n.id === message.sceneId && (n.type === 'chapter' || n.type === 'scene'))
+  if (!node) return null
 
-  return chapter.storyTime ?? null
+  return node.storyTime ?? null
 }
 
 /**
- * Get chapter markers for timeline display
- * Returns chapters with their positions as percentages (0-100)
+ * Get node markers (chapters/scenes) for timeline display
+ * Returns nodes with their positions as percentages (0-100)
  */
 export function getChapterMarkers(
   nodes: Node[],
   start: number,
   end: number,
 ): Array<{ chapter: Node; position: number }> {
-  const chaptersWithTime = nodes.filter(
-    (n) => n.type === 'chapter' && n.storyTime !== null && n.storyTime !== undefined,
+  const nodesWithTime = nodes.filter(
+    (n) => (n.type === 'chapter' || n.type === 'scene') && n.storyTime !== null && n.storyTime !== undefined,
   )
 
   const range = end - start
 
-  return chaptersWithTime
-    .map((chapter) => ({
-      chapter,
-      position: ((chapter.storyTime! - start) / range) * 100,
+  return nodesWithTime
+    .map((node) => ({
+      chapter: node, // Keep property name for backwards compatibility
+      position: ((node.storyTime! - start) / range) * 100,
     }))
     .filter((marker) => marker.position >= 0 && marker.position <= 100)
 }

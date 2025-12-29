@@ -1,6 +1,6 @@
 import { Button, ListDetailPanel, type ListDetailPanelRef, Stack } from '@mythweavers/ui'
 import { BsArrowLeft, BsCalendar, BsCheck, BsPencil, BsPlus, BsStar, BsStarFill, BsX } from 'solid-icons/bs'
-import { type Component, Show, batch, createSignal } from 'solid-js'
+import { type Component, Show, batch, createMemo, createSignal } from 'solid-js'
 import { calendarStore } from '../stores/calendarStore'
 import { charactersStore } from '../stores/charactersStore'
 import type { Character } from '../types/core'
@@ -38,6 +38,13 @@ export const Characters: Component<CharactersProps> = (props) => {
   let panelRef: ListDetailPanelRef | undefined
   let newEditorRef: { insertAtCursor: (text: string) => void } | null = null
   let editEditorRef: { insertAtCursor: (text: string) => void } | null = null
+
+  // Sort characters alphabetically by display name
+  const sortedCharacters = createMemo(() =>
+    [...charactersStore.characters].sort((a, b) =>
+      getCharacterDisplayName(a).localeCompare(getCharacterDisplayName(b))
+    )
+  )
 
   // Expose addNew method via ref
   props.ref?.({ addNew: () => panelRef?.select('new') })
@@ -187,7 +194,7 @@ export const Characters: Component<CharactersProps> = (props) => {
     <Show when={charactersStore.showCharacters}>
       <ListDetailPanel
         ref={(r) => (panelRef = r)}
-        items={charactersStore.characters}
+        items={sortedCharacters()}
         backIcon={<BsArrowLeft />}
         renderListItem={(character) => (
           <>
@@ -290,6 +297,7 @@ export const Characters: Component<CharactersProps> = (props) => {
                   currentTemplate={editDescription()}
                   onTemplateChange={setEditDescription}
                   placeholder="Describe how you want to change this character's description"
+                  includeStoryContent={true}
                 />
                 <EJSRenderer template={editDescription()} mode="preview-always" />
                 <div class={styles.marginTop}>
@@ -432,6 +440,7 @@ export const Characters: Component<CharactersProps> = (props) => {
               currentTemplate={newCharacterDescription()}
               onTemplateChange={setNewCharacterDescription}
               placeholder="Describe how you want to change this character's description"
+              includeStoryContent={true}
             />
             <EJSRenderer template={newCharacterDescription()} mode="preview-always" />
             <div class={styles.marginTop}>

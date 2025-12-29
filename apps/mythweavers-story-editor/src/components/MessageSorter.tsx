@@ -15,7 +15,7 @@ interface SortableItem {
   id: string
   type: 'message'
   content: string
-  nodeId: string
+  sceneId: string
   originalIndex: number
 }
 
@@ -37,7 +37,7 @@ export const MessageSorter: Component<MessageSorterProps> = (props) => {
         id: msg.id,
         type: 'message',
         content: msg.content,
-        nodeId: msg.nodeId || msg.chapterId || '',
+        sceneId: msg.sceneId || '',
         originalIndex: msg.order, // Use the order field from the message
       })
     })
@@ -136,7 +136,7 @@ export const MessageSorter: Component<MessageSorterProps> = (props) => {
       const originalMessage = messagesStore.messages.find((m) => m.id === item.id)
       return {
         messageId: item.id,
-        nodeId: originalMessage?.nodeId || item.nodeId, // Use original nodeId
+        sceneId: originalMessage?.sceneId || item.sceneId,
         order: index, // Include the order field
       }
     })

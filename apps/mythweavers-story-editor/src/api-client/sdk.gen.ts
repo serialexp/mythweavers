@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteMyArcsByIdData, DeleteMyArcsByIdErrors, DeleteMyArcsByIdResponses, DeleteMyBooksByIdData, DeleteMyBooksByIdErrors, DeleteMyBooksByIdResponses, DeleteMyCalendarsByIdData, DeleteMyCalendarsByIdErrors, DeleteMyCalendarsByIdResponses, DeleteMyChaptersByIdData, DeleteMyChaptersByIdErrors, DeleteMyChaptersByIdResponses, DeleteMyCharactersByCharacterIdInventoryByIdData, DeleteMyCharactersByCharacterIdInventoryByIdErrors, DeleteMyCharactersByCharacterIdInventoryByIdResponses, DeleteMyCharactersByIdData, DeleteMyCharactersByIdErrors, DeleteMyCharactersByIdResponses, DeleteMyContextItemsByIdData, DeleteMyContextItemsByIdErrors, DeleteMyContextItemsByIdResponses, DeleteMyFilesByIdData, DeleteMyFilesByIdErrors, DeleteMyFilesByIdResponses, DeleteMyLandmarksByIdData, DeleteMyLandmarksByIdErrors, DeleteMyLandmarksByIdResponses, DeleteMyMapsByIdData, DeleteMyMapsByIdErrors, DeleteMyMapsByIdResponses, DeleteMyMessagesByIdData, DeleteMyMessagesByIdErrors, DeleteMyMessagesByIdResponses, DeleteMyParagraphsByIdData, DeleteMyParagraphsByIdErrors, DeleteMyParagraphsByIdResponses, DeleteMyPathsByIdData, DeleteMyPathsByIdErrors, DeleteMyPathsByIdResponses, DeleteMyPathSegmentsByIdData, DeleteMyPathSegmentsByIdErrors, DeleteMyPathSegmentsByIdResponses, DeleteMyPawnsByIdData, DeleteMyPawnsByIdErrors, DeleteMyPawnsByIdResponses, DeleteMyScenesByIdData, DeleteMyScenesByIdErrors, DeleteMyScenesByIdResponses, DeleteMyStoriesByIdData, DeleteMyStoriesByIdErrors, DeleteMyStoriesByIdResponses, DeleteMyStoriesByStoryIdTagsByTagIdData, DeleteMyStoriesByStoryIdTagsByTagIdErrors, DeleteMyStoriesByStoryIdTagsByTagIdResponses, GetAuthSessionData, GetAuthSessionResponses, GetCalendarsPresetsData, GetCalendarsPresetsErrors, GetCalendarsPresetsResponses, GetHealthData, GetHealthResponses, GetMyArcsByArcIdChaptersData, GetMyArcsByArcIdChaptersErrors, GetMyArcsByArcIdChaptersResponses, GetMyArcsByIdData, GetMyArcsByIdErrors, GetMyArcsByIdResponses, GetMyBooksByBookIdArcsData, GetMyBooksByBookIdArcsErrors, GetMyBooksByBookIdArcsResponses, GetMyBooksByIdData, GetMyBooksByIdErrors, GetMyBooksByIdResponses, GetMyCalendarsByIdData, GetMyCalendarsByIdErrors, GetMyCalendarsByIdResponses, GetMyChaptersByChapterIdScenesData, GetMyChaptersByChapterIdScenesErrors, GetMyChaptersByChapterIdScenesResponses, GetMyChaptersByIdData, GetMyChaptersByIdErrors, GetMyChaptersByIdResponses, GetMyCharactersByCharacterIdInventoryByIdData, GetMyCharactersByCharacterIdInventoryByIdErrors, GetMyCharactersByCharacterIdInventoryByIdResponses, GetMyCharactersByCharacterIdInventoryData, GetMyCharactersByCharacterIdInventoryErrors, GetMyCharactersByCharacterIdInventoryResponses, GetMyCharactersByIdData, GetMyCharactersByIdErrors, GetMyCharactersByIdResponses, GetMyContextItemsByIdData, GetMyContextItemsByIdErrors, GetMyContextItemsByIdResponses, GetMyFilesByIdData, GetMyFilesByIdErrors, GetMyFilesByIdResponses, GetMyFilesData, GetMyFilesErrors, GetMyFilesResponses, GetMyLandmarksByIdData, GetMyLandmarksByIdErrors, GetMyLandmarksByIdResponses, GetMyMapsByIdData, GetMyMapsByIdErrors, GetMyMapsByIdResponses, GetMyMapsByMapIdLandmarksData, GetMyMapsByMapIdLandmarksErrors, GetMyMapsByMapIdLandmarksResponses, GetMyMapsByMapIdPathsData, GetMyMapsByMapIdPathsErrors, GetMyMapsByMapIdPathsResponses, GetMyMapsByMapIdPawnsData, GetMyMapsByMapIdPawnsErrors, GetMyMapsByMapIdPawnsResponses, GetMyMessageRevisionsByRevisionIdParagraphsData, GetMyMessageRevisionsByRevisionIdParagraphsErrors, GetMyMessageRevisionsByRevisionIdParagraphsResponses, GetMyMessagesByIdData, GetMyMessagesByIdErrors, GetMyMessagesByIdResponses, GetMyMessagesByMessageIdRevisionsData, GetMyMessagesByMessageIdRevisionsErrors, GetMyMessagesByMessageIdRevisionsResponses, GetMyParagraphsByIdData, GetMyParagraphsByIdErrors, GetMyParagraphsByIdResponses, GetMyParagraphsByParagraphIdRevisionsData, GetMyParagraphsByParagraphIdRevisionsErrors, GetMyParagraphsByParagraphIdRevisionsResponses, GetMyPathsByIdData, GetMyPathsByIdErrors, GetMyPathsByIdResponses, GetMyPathsByPathIdSegmentsData, GetMyPathsByPathIdSegmentsErrors, GetMyPathsByPathIdSegmentsResponses, GetMyPathSegmentsByIdData, GetMyPathSegmentsByIdErrors, GetMyPathSegmentsByIdResponses, GetMyPawnsByIdData, GetMyPawnsByIdErrors, GetMyPawnsByIdResponses, GetMyScenesByIdData, GetMyScenesByIdErrors, GetMyScenesByIdResponses, GetMyScenesBySceneIdMessagesData, GetMyScenesBySceneIdMessagesErrors, GetMyScenesBySceneIdMessagesResponses, GetMyStoriesByIdData, GetMyStoriesByIdErrors, GetMyStoriesByIdExportData, GetMyStoriesByIdExportErrors, GetMyStoriesByIdExportResponses, GetMyStoriesByIdResponses, GetMyStoriesByStoryIdBooksData, GetMyStoriesByStoryIdBooksErrors, GetMyStoriesByStoryIdBooksResponses, GetMyStoriesByStoryIdCalendarsData, GetMyStoriesByStoryIdCalendarsErrors, GetMyStoriesByStoryIdCalendarsResponses, GetMyStoriesByStoryIdCharactersData, GetMyStoriesByStoryIdCharactersErrors, GetMyStoriesByStoryIdCharactersResponses, GetMyStoriesByStoryIdContextItemsData, GetMyStoriesByStoryIdContextItemsErrors, GetMyStoriesByStoryIdContextItemsResponses, GetMyStoriesByStoryIdMapsData, GetMyStoriesByStoryIdMapsErrors, GetMyStoriesByStoryIdMapsResponses, GetMyStoriesByStoryIdTagsData, GetMyStoriesByStoryIdTagsErrors, GetMyStoriesByStoryIdTagsResponses, GetMyStoriesData, GetMyStoriesErrors, GetMyStoriesResponses, GetStoriesByIdChaptersByChapterIdData, GetStoriesByIdChaptersByChapterIdErrors, GetStoriesByIdChaptersByChapterIdResponses, GetStoriesByIdData, GetStoriesByIdErrors, GetStoriesByIdResponses, GetStoriesByIdStructureData, GetStoriesByIdStructureErrors, GetStoriesByIdStructureResponses, GetStoriesData, GetStoriesErrors, GetStoriesResponses, GetTagsData, GetTagsResponses, PatchMyArcsByIdData, PatchMyArcsByIdErrors, PatchMyArcsByIdResponses, PatchMyBooksByIdData, PatchMyBooksByIdErrors, PatchMyBooksByIdResponses, PatchMyChaptersByIdData, PatchMyChaptersByIdErrors, PatchMyChaptersByIdResponses, PatchMyCharactersByCharacterIdInventoryByIdData, PatchMyCharactersByCharacterIdInventoryByIdErrors, PatchMyCharactersByCharacterIdInventoryByIdResponses, PatchMyCharactersByIdData, PatchMyCharactersByIdErrors, PatchMyCharactersByIdResponses, PatchMyContextItemsByIdData, PatchMyContextItemsByIdErrors, PatchMyContextItemsByIdResponses, PatchMyMessagesByIdData, PatchMyMessagesByIdErrors, PatchMyMessagesByIdResponses, PatchMyParagraphsByIdData, PatchMyParagraphsByIdErrors, PatchMyParagraphsByIdResponses, PatchMyScenesByIdData, PatchMyScenesByIdErrors, PatchMyScenesByIdResponses, PatchMyStoriesByIdData, PatchMyStoriesByIdErrors, PatchMyStoriesByIdResponses, PostAuthLoginData, PostAuthLoginErrors, PostAuthLoginResponses, PostAuthLogoutData, PostAuthLogoutResponses, PostAuthRegisterData, PostAuthRegisterErrors, PostAuthRegisterResponses, PostMyArcsByArcIdChaptersData, PostMyArcsByArcIdChaptersErrors, PostMyArcsByArcIdChaptersResponses, PostMyBooksByBookIdArcsData, PostMyBooksByBookIdArcsErrors, PostMyBooksByBookIdArcsResponses, PostMyChaptersByChapterIdScenesData, PostMyChaptersByChapterIdScenesErrors, PostMyChaptersByChapterIdScenesResponses, PostMyCharactersByCharacterIdInventoryData, PostMyCharactersByCharacterIdInventoryErrors, PostMyCharactersByCharacterIdInventoryResponses, PostMyFilesData, PostMyFilesErrors, PostMyFilesResponses, PostMyMapsByMapIdLandmarksData, PostMyMapsByMapIdLandmarksErrors, PostMyMapsByMapIdLandmarksResponses, PostMyMapsByMapIdPathsData, PostMyMapsByMapIdPathsErrors, PostMyMapsByMapIdPathsResponses, PostMyMapsByMapIdPawnsData, PostMyMapsByMapIdPawnsErrors, PostMyMapsByMapIdPawnsResponses, PostMyMessageRevisionsByRevisionIdParagraphsData, PostMyMessageRevisionsByRevisionIdParagraphsErrors, PostMyMessageRevisionsByRevisionIdParagraphsResponses, PostMyMessagesByIdRegenerateData, PostMyMessagesByIdRegenerateErrors, PostMyMessagesByIdRegenerateResponses, PostMyPathsByPathIdSegmentsData, PostMyPathsByPathIdSegmentsErrors, PostMyPathsByPathIdSegmentsResponses, PostMyScenesBySceneIdMessagesData, PostMyScenesBySceneIdMessagesErrors, PostMyScenesBySceneIdMessagesResponses, PostMyStoriesByStoryIdBooksData, PostMyStoriesByStoryIdBooksErrors, PostMyStoriesByStoryIdBooksResponses, PostMyStoriesByStoryIdCalendarsData, PostMyStoriesByStoryIdCalendarsErrors, PostMyStoriesByStoryIdCalendarsResponses, PostMyStoriesByStoryIdCharactersData, PostMyStoriesByStoryIdCharactersErrors, PostMyStoriesByStoryIdCharactersResponses, PostMyStoriesByStoryIdContextItemsData, PostMyStoriesByStoryIdContextItemsErrors, PostMyStoriesByStoryIdContextItemsResponses, PostMyStoriesByStoryIdMapsData, PostMyStoriesByStoryIdMapsErrors, PostMyStoriesByStoryIdMapsResponses, PostMyStoriesByStoryIdTagsData, PostMyStoriesByStoryIdTagsErrors, PostMyStoriesByStoryIdTagsResponses, PostMyStoriesData, PostMyStoriesErrors, PostMyStoriesResponses, PostTagsData, PostTagsErrors, PostTagsResponses, PutMyCalendarsByIdData, PutMyCalendarsByIdErrors, PutMyCalendarsByIdResponses, PutMyLandmarksByIdData, PutMyLandmarksByIdErrors, PutMyLandmarksByIdResponses, PutMyMapsByIdData, PutMyMapsByIdErrors, PutMyMapsByIdResponses, PutMyPathsByIdData, PutMyPathsByIdErrors, PutMyPathsByIdResponses, PutMyPathSegmentsByIdData, PutMyPathSegmentsByIdErrors, PutMyPathSegmentsByIdResponses, PutMyPawnsByIdData, PutMyPawnsByIdErrors, PutMyPawnsByIdResponses, PutMyStoriesByStoryIdDefaultCalendarData, PutMyStoriesByStoryIdDefaultCalendarErrors, PutMyStoriesByStoryIdDefaultCalendarResponses } from './types.gen';
+import type { DeleteMyArcsByIdData, DeleteMyArcsByIdErrors, DeleteMyArcsByIdResponses, DeleteMyBooksByIdData, DeleteMyBooksByIdErrors, DeleteMyBooksByIdResponses, DeleteMyCalendarsByIdData, DeleteMyCalendarsByIdErrors, DeleteMyCalendarsByIdResponses, DeleteMyChaptersByIdData, DeleteMyChaptersByIdErrors, DeleteMyChaptersByIdResponses, DeleteMyCharactersByCharacterIdInventoryByIdData, DeleteMyCharactersByCharacterIdInventoryByIdErrors, DeleteMyCharactersByCharacterIdInventoryByIdResponses, DeleteMyCharactersByIdData, DeleteMyCharactersByIdErrors, DeleteMyCharactersByIdResponses, DeleteMyContextItemsByIdData, DeleteMyContextItemsByIdErrors, DeleteMyContextItemsByIdResponses, DeleteMyFilesByIdData, DeleteMyFilesByIdErrors, DeleteMyFilesByIdResponses, DeleteMyLandmarksByIdData, DeleteMyLandmarksByIdErrors, DeleteMyLandmarksByIdResponses, DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeData, DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeErrors, DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeResponses, DeleteMyMapsByIdData, DeleteMyMapsByIdErrors, DeleteMyMapsByIdResponses, DeleteMyMessagesByIdData, DeleteMyMessagesByIdErrors, DeleteMyMessagesByIdResponses, DeleteMyMessagesByMessageIdPlotPointStatesByKeyData, DeleteMyMessagesByMessageIdPlotPointStatesByKeyErrors, DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses, DeleteMyParagraphsByIdData, DeleteMyParagraphsByIdErrors, DeleteMyParagraphsByIdResponses, DeleteMyPathsByIdData, DeleteMyPathsByIdErrors, DeleteMyPathsByIdResponses, DeleteMyPathSegmentsByIdData, DeleteMyPathSegmentsByIdErrors, DeleteMyPathSegmentsByIdResponses, DeleteMyPawnsByIdData, DeleteMyPawnsByIdErrors, DeleteMyPawnsByIdResponses, DeleteMyScenesByIdData, DeleteMyScenesByIdErrors, DeleteMyScenesByIdResponses, DeleteMyStoriesByIdData, DeleteMyStoriesByIdErrors, DeleteMyStoriesByIdResponses, DeleteMyStoriesByStoryIdTagsByTagIdData, DeleteMyStoriesByStoryIdTagsByTagIdErrors, DeleteMyStoriesByStoryIdTagsByTagIdResponses, GetAuthSessionData, GetAuthSessionErrors, GetAuthSessionResponses, GetCalendarsPresetsData, GetCalendarsPresetsErrors, GetCalendarsPresetsResponses, GetHealthData, GetHealthResponses, GetMyArcsByArcIdChaptersData, GetMyArcsByArcIdChaptersErrors, GetMyArcsByArcIdChaptersResponses, GetMyArcsByIdData, GetMyArcsByIdErrors, GetMyArcsByIdResponses, GetMyBooksByBookIdArcsData, GetMyBooksByBookIdArcsErrors, GetMyBooksByBookIdArcsResponses, GetMyBooksByIdData, GetMyBooksByIdErrors, GetMyBooksByIdResponses, GetMyCalendarsByIdData, GetMyCalendarsByIdErrors, GetMyCalendarsByIdResponses, GetMyChaptersByChapterIdScenesData, GetMyChaptersByChapterIdScenesErrors, GetMyChaptersByChapterIdScenesResponses, GetMyChaptersByIdData, GetMyChaptersByIdErrors, GetMyChaptersByIdResponses, GetMyCharactersByCharacterIdInventoryByIdData, GetMyCharactersByCharacterIdInventoryByIdErrors, GetMyCharactersByCharacterIdInventoryByIdResponses, GetMyCharactersByCharacterIdInventoryData, GetMyCharactersByCharacterIdInventoryErrors, GetMyCharactersByCharacterIdInventoryResponses, GetMyCharactersByIdData, GetMyCharactersByIdErrors, GetMyCharactersByIdResponses, GetMyContextItemsByIdData, GetMyContextItemsByIdErrors, GetMyContextItemsByIdResponses, GetMyFilesBy__Data, GetMyFilesBy__Errors, GetMyFilesBy__Responses, GetMyFilesByIdData, GetMyFilesByIdErrors, GetMyFilesByIdResponses, GetMyFilesData, GetMyFilesErrors, GetMyFilesResponses, GetMyLandmarksByIdData, GetMyLandmarksByIdErrors, GetMyLandmarksByIdResponses, GetMyMapsByIdData, GetMyMapsByIdErrors, GetMyMapsByIdResponses, GetMyMapsByMapIdLandmarksData, GetMyMapsByMapIdLandmarksErrors, GetMyMapsByMapIdLandmarksResponses, GetMyMapsByMapIdPathsData, GetMyMapsByMapIdPathsErrors, GetMyMapsByMapIdPathsResponses, GetMyMapsByMapIdPawnsData, GetMyMapsByMapIdPawnsErrors, GetMyMapsByMapIdPawnsResponses, GetMyMessageRevisionsByRevisionIdParagraphsData, GetMyMessageRevisionsByRevisionIdParagraphsErrors, GetMyMessageRevisionsByRevisionIdParagraphsResponses, GetMyMessagesByIdData, GetMyMessagesByIdErrors, GetMyMessagesByIdResponses, GetMyMessagesByMessageIdRevisionsData, GetMyMessagesByMessageIdRevisionsErrors, GetMyMessagesByMessageIdRevisionsResponses, GetMyParagraphsByIdData, GetMyParagraphsByIdErrors, GetMyParagraphsByIdResponses, GetMyParagraphsByParagraphIdRevisionsData, GetMyParagraphsByParagraphIdRevisionsErrors, GetMyParagraphsByParagraphIdRevisionsResponses, GetMyPathsByIdData, GetMyPathsByIdErrors, GetMyPathsByIdResponses, GetMyPathsByPathIdSegmentsData, GetMyPathsByPathIdSegmentsErrors, GetMyPathsByPathIdSegmentsResponses, GetMyPathSegmentsByIdData, GetMyPathSegmentsByIdErrors, GetMyPathSegmentsByIdResponses, GetMyPawnsByIdData, GetMyPawnsByIdErrors, GetMyPawnsByIdResponses, GetMyScenesByIdData, GetMyScenesByIdErrors, GetMyScenesByIdResponses, GetMyScenesBySceneIdMessagesData, GetMyScenesBySceneIdMessagesErrors, GetMyScenesBySceneIdMessagesResponses, GetMyStoriesByIdData, GetMyStoriesByIdDeletedMessagesData, GetMyStoriesByIdDeletedMessagesErrors, GetMyStoriesByIdDeletedMessagesResponses, GetMyStoriesByIdDeletedNodesData, GetMyStoriesByIdDeletedNodesErrors, GetMyStoriesByIdDeletedNodesResponses, GetMyStoriesByIdErrors, GetMyStoriesByIdExportData, GetMyStoriesByIdExportErrors, GetMyStoriesByIdExportResponses, GetMyStoriesByIdResponses, GetMyStoriesByStoryIdBooksData, GetMyStoriesByStoryIdBooksErrors, GetMyStoriesByStoryIdBooksResponses, GetMyStoriesByStoryIdCalendarsData, GetMyStoriesByStoryIdCalendarsErrors, GetMyStoriesByStoryIdCalendarsResponses, GetMyStoriesByStoryIdCharactersData, GetMyStoriesByStoryIdCharactersErrors, GetMyStoriesByStoryIdCharactersResponses, GetMyStoriesByStoryIdContextItemsData, GetMyStoriesByStoryIdContextItemsErrors, GetMyStoriesByStoryIdContextItemsResponses, GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeData, GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeErrors, GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeResponses, GetMyStoriesByStoryIdLandmarkStatesData, GetMyStoriesByStoryIdLandmarkStatesErrors, GetMyStoriesByStoryIdLandmarkStatesResponses, GetMyStoriesByStoryIdMapsData, GetMyStoriesByStoryIdMapsErrors, GetMyStoriesByStoryIdMapsResponses, GetMyStoriesByStoryIdPlotPointStatesData, GetMyStoriesByStoryIdPlotPointStatesErrors, GetMyStoriesByStoryIdPlotPointStatesResponses, GetMyStoriesByStoryIdTagsData, GetMyStoriesByStoryIdTagsErrors, GetMyStoriesByStoryIdTagsResponses, GetMyStoriesData, GetMyStoriesErrors, GetMyStoriesResponses, GetStoriesByIdChaptersByChapterIdData, GetStoriesByIdChaptersByChapterIdErrors, GetStoriesByIdChaptersByChapterIdResponses, GetStoriesByIdData, GetStoriesByIdErrors, GetStoriesByIdResponses, GetStoriesByIdStructureData, GetStoriesByIdStructureErrors, GetStoriesByIdStructureResponses, GetStoriesData, GetStoriesErrors, GetStoriesResponses, GetTagsData, GetTagsResponses, PatchMyArcsByIdData, PatchMyArcsByIdErrors, PatchMyArcsByIdResponses, PatchMyBooksByIdData, PatchMyBooksByIdErrors, PatchMyBooksByIdResponses, PatchMyChaptersByIdData, PatchMyChaptersByIdErrors, PatchMyChaptersByIdResponses, PatchMyCharactersByCharacterIdInventoryByIdData, PatchMyCharactersByCharacterIdInventoryByIdErrors, PatchMyCharactersByCharacterIdInventoryByIdResponses, PatchMyCharactersByIdData, PatchMyCharactersByIdErrors, PatchMyCharactersByIdResponses, PatchMyContextItemsByIdData, PatchMyContextItemsByIdErrors, PatchMyContextItemsByIdResponses, PatchMyMessagesByIdData, PatchMyMessagesByIdErrors, PatchMyMessagesByIdResponses, PatchMyParagraphsByIdData, PatchMyParagraphsByIdErrors, PatchMyParagraphsByIdResponses, PatchMyScenesByIdData, PatchMyScenesByIdErrors, PatchMyScenesByIdResponses, PatchMyStoriesByIdData, PatchMyStoriesByIdErrors, PatchMyStoriesByIdResponses, PostAuthLoginData, PostAuthLoginErrors, PostAuthLoginResponses, PostAuthLogoutData, PostAuthLogoutErrors, PostAuthLogoutResponses, PostAuthRegisterData, PostAuthRegisterErrors, PostAuthRegisterResponses, PostMyArcsByArcIdChaptersData, PostMyArcsByArcIdChaptersErrors, PostMyArcsByArcIdChaptersResponses, PostMyBooksByBookIdArcsData, PostMyBooksByBookIdArcsErrors, PostMyBooksByBookIdArcsResponses, PostMyChaptersByChapterIdScenesData, PostMyChaptersByChapterIdScenesErrors, PostMyChaptersByChapterIdScenesResponses, PostMyCharactersByCharacterIdInventoryData, PostMyCharactersByCharacterIdInventoryErrors, PostMyCharactersByCharacterIdInventoryResponses, PostMyFilesData, PostMyFilesErrors, PostMyFilesResponses, PostMyLandmarksByLandmarkIdStatesData, PostMyLandmarksByLandmarkIdStatesErrors, PostMyLandmarksByLandmarkIdStatesResponses, PostMyMapsByMapIdLandmarksData, PostMyMapsByMapIdLandmarksErrors, PostMyMapsByMapIdLandmarksResponses, PostMyMapsByMapIdPathsData, PostMyMapsByMapIdPathsErrors, PostMyMapsByMapIdPathsResponses, PostMyMapsByMapIdPawnsData, PostMyMapsByMapIdPawnsErrors, PostMyMapsByMapIdPawnsResponses, PostMyMessageRevisionsByRevisionIdParagraphsData, PostMyMessageRevisionsByRevisionIdParagraphsErrors, PostMyMessageRevisionsByRevisionIdParagraphsResponses, PostMyMessagesByIdRegenerateData, PostMyMessagesByIdRegenerateErrors, PostMyMessagesByIdRegenerateResponses, PostMyMessagesByMessageIdPlotPointStatesData, PostMyMessagesByMessageIdPlotPointStatesErrors, PostMyMessagesByMessageIdPlotPointStatesResponses, PostMyPathsByPathIdSegmentsData, PostMyPathsByPathIdSegmentsErrors, PostMyPathsByPathIdSegmentsResponses, PostMyScenesBySceneIdMessagesData, PostMyScenesBySceneIdMessagesErrors, PostMyScenesBySceneIdMessagesResponses, PostMyStoriesByIdDeletedArcsByArcIdRestoreData, PostMyStoriesByIdDeletedArcsByArcIdRestoreErrors, PostMyStoriesByIdDeletedArcsByArcIdRestoreResponses, PostMyStoriesByIdDeletedBooksByBookIdRestoreData, PostMyStoriesByIdDeletedBooksByBookIdRestoreErrors, PostMyStoriesByIdDeletedBooksByBookIdRestoreResponses, PostMyStoriesByIdDeletedChaptersByChapterIdRestoreData, PostMyStoriesByIdDeletedChaptersByChapterIdRestoreErrors, PostMyStoriesByIdDeletedChaptersByChapterIdRestoreResponses, PostMyStoriesByIdDeletedMessagesByMessageIdRestoreData, PostMyStoriesByIdDeletedMessagesByMessageIdRestoreErrors, PostMyStoriesByIdDeletedMessagesByMessageIdRestoreResponses, PostMyStoriesByIdDeletedScenesBySceneIdRestoreData, PostMyStoriesByIdDeletedScenesBySceneIdRestoreErrors, PostMyStoriesByIdDeletedScenesBySceneIdRestoreResponses, PostMyStoriesByStoryIdBooksData, PostMyStoriesByStoryIdBooksErrors, PostMyStoriesByStoryIdBooksResponses, PostMyStoriesByStoryIdCalendarsData, PostMyStoriesByStoryIdCalendarsErrors, PostMyStoriesByStoryIdCalendarsResponses, PostMyStoriesByStoryIdCharactersData, PostMyStoriesByStoryIdCharactersErrors, PostMyStoriesByStoryIdCharactersResponses, PostMyStoriesByStoryIdContextItemsData, PostMyStoriesByStoryIdContextItemsErrors, PostMyStoriesByStoryIdContextItemsResponses, PostMyStoriesByStoryIdMapsData, PostMyStoriesByStoryIdMapsErrors, PostMyStoriesByStoryIdMapsResponses, PostMyStoriesByStoryIdMessagesBatchData, PostMyStoriesByStoryIdMessagesBatchErrors, PostMyStoriesByStoryIdMessagesBatchResponses, PostMyStoriesByStoryIdMessagesReorderData, PostMyStoriesByStoryIdMessagesReorderErrors, PostMyStoriesByStoryIdMessagesReorderResponses, PostMyStoriesByStoryIdNodesReorderData, PostMyStoriesByStoryIdNodesReorderErrors, PostMyStoriesByStoryIdNodesReorderResponses, PostMyStoriesByStoryIdTagsData, PostMyStoriesByStoryIdTagsErrors, PostMyStoriesByStoryIdTagsResponses, PostMyStoriesData, PostMyStoriesErrors, PostMyStoriesResponses, PostTagsData, PostTagsErrors, PostTagsResponses, PutMyCalendarsByIdData, PutMyCalendarsByIdErrors, PutMyCalendarsByIdResponses, PutMyLandmarksByIdData, PutMyLandmarksByIdErrors, PutMyLandmarksByIdResponses, PutMyMapsByIdData, PutMyMapsByIdErrors, PutMyMapsByIdResponses, PutMyPathsByIdData, PutMyPathsByIdErrors, PutMyPathsByIdResponses, PutMyPathSegmentsByIdData, PutMyPathSegmentsByIdErrors, PutMyPathSegmentsByIdResponses, PutMyPawnsByIdData, PutMyPawnsByIdErrors, PutMyPawnsByIdResponses, PutMyStoriesByStoryIdDefaultCalendarData, PutMyStoriesByStoryIdDefaultCalendarErrors, PutMyStoriesByStoryIdDefaultCalendarResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -50,12 +50,12 @@ export const postAuthLogin = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Logout and invalidate current session
  */
-export const postAuthLogout = <ThrowOnError extends boolean = false>(options?: Options<PostAuthLogoutData, ThrowOnError>) => (options?.client ?? client).post<PostAuthLogoutResponses, unknown, ThrowOnError>({ url: '/auth/logout', ...options });
+export const postAuthLogout = <ThrowOnError extends boolean = false>(options?: Options<PostAuthLogoutData, ThrowOnError>) => (options?.client ?? client).post<PostAuthLogoutResponses, PostAuthLogoutErrors, ThrowOnError>({ url: '/auth/logout', ...options });
 
 /**
  * Check current session status and get user info
  */
-export const getAuthSession = <ThrowOnError extends boolean = false>(options?: Options<GetAuthSessionData, ThrowOnError>) => (options?.client ?? client).get<GetAuthSessionResponses, unknown, ThrowOnError>({ url: '/auth/session', ...options });
+export const getAuthSession = <ThrowOnError extends boolean = false>(options?: Options<GetAuthSessionData, ThrowOnError>) => (options?.client ?? client).get<GetAuthSessionResponses, GetAuthSessionErrors, ThrowOnError>({ url: '/auth/session', ...options });
 
 /**
  * List all stories owned by the authenticated user
@@ -144,6 +144,109 @@ export const getMyStoriesByIdExport = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
+ * List all deleted messages for a story (for potential restoration)
+ */
+export const getMyStoriesByIdDeletedMessages = <ThrowOnError extends boolean = false>(options: Options<GetMyStoriesByIdDeletedMessagesData, ThrowOnError>) => (options.client ?? client).get<GetMyStoriesByIdDeletedMessagesResponses, GetMyStoriesByIdDeletedMessagesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{id}/deleted-messages',
+    ...options
+});
+
+/**
+ * Restore a previously deleted message
+ */
+export const postMyStoriesByIdDeletedMessagesByMessageIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByIdDeletedMessagesByMessageIdRestoreData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByIdDeletedMessagesByMessageIdRestoreResponses, PostMyStoriesByIdDeletedMessagesByMessageIdRestoreErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{id}/deleted-messages/{messageId}/restore',
+    ...options
+});
+
+/**
+ * List all deleted nodes (books, arcs, chapters, scenes) for a story
+ */
+export const getMyStoriesByIdDeletedNodes = <ThrowOnError extends boolean = false>(options: Options<GetMyStoriesByIdDeletedNodesData, ThrowOnError>) => (options.client ?? client).get<GetMyStoriesByIdDeletedNodesResponses, GetMyStoriesByIdDeletedNodesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{id}/deleted-nodes',
+    ...options
+});
+
+/**
+ * Restore a deleted scene and all its messages
+ */
+export const postMyStoriesByIdDeletedScenesBySceneIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByIdDeletedScenesBySceneIdRestoreData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByIdDeletedScenesBySceneIdRestoreResponses, PostMyStoriesByIdDeletedScenesBySceneIdRestoreErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{id}/deleted-scenes/{sceneId}/restore',
+    ...options
+});
+
+/**
+ * Restore a deleted chapter and all its scenes and messages
+ */
+export const postMyStoriesByIdDeletedChaptersByChapterIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByIdDeletedChaptersByChapterIdRestoreData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByIdDeletedChaptersByChapterIdRestoreResponses, PostMyStoriesByIdDeletedChaptersByChapterIdRestoreErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{id}/deleted-chapters/{chapterId}/restore',
+    ...options
+});
+
+/**
+ * Restore a deleted arc and all its chapters, scenes, and messages
+ */
+export const postMyStoriesByIdDeletedArcsByArcIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByIdDeletedArcsByArcIdRestoreData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByIdDeletedArcsByArcIdRestoreResponses, PostMyStoriesByIdDeletedArcsByArcIdRestoreErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{id}/deleted-arcs/{arcId}/restore',
+    ...options
+});
+
+/**
+ * Restore a deleted book and all its arcs, chapters, scenes, and messages
+ */
+export const postMyStoriesByIdDeletedBooksByBookIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByIdDeletedBooksByBookIdRestoreData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByIdDeletedBooksByBookIdRestoreResponses, PostMyStoriesByIdDeletedBooksByBookIdRestoreErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{id}/deleted-books/{bookId}/restore',
+    ...options
+});
+
+/**
+ * Bulk reorder nodes (books, arcs, chapters, scenes) within a story
+ */
+export const postMyStoriesByStoryIdNodesReorder = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByStoryIdNodesReorderData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByStoryIdNodesReorderResponses, PostMyStoriesByStoryIdNodesReorderErrors, ThrowOnError>({
+    url: '/my/stories/{storyId}/nodes/reorder',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List all books in a story
  */
 export const getMyStoriesByStoryIdBooks = <ThrowOnError extends boolean = false>(options: Options<GetMyStoriesByStoryIdBooksData, ThrowOnError>) => (options.client ?? client).get<GetMyStoriesByStoryIdBooksResponses, GetMyStoriesByStoryIdBooksErrors, ThrowOnError>({
@@ -174,7 +277,7 @@ export const postMyStoriesByStoryIdBooks = <ThrowOnError extends boolean = false
 });
 
 /**
- * Delete a book (must own the parent story)
+ * Delete a book. By default performs soft delete; use ?permanent=true for hard delete.
  */
 export const deleteMyBooksById = <ThrowOnError extends boolean = false>(options: Options<DeleteMyBooksByIdData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyBooksByIdResponses, DeleteMyBooksByIdErrors, ThrowOnError>({
     security: [{
@@ -247,7 +350,7 @@ export const postMyBooksByBookIdArcs = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * Delete an arc (must own the parent story)
+ * Delete an arc. By default performs soft delete; use ?permanent=true for hard delete.
  */
 export const deleteMyArcsById = <ThrowOnError extends boolean = false>(options: Options<DeleteMyArcsByIdData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyArcsByIdResponses, DeleteMyArcsByIdErrors, ThrowOnError>({
     security: [{
@@ -320,7 +423,7 @@ export const postMyArcsByArcIdChapters = <ThrowOnError extends boolean = false>(
 });
 
 /**
- * Delete a chapter (must own the parent story)
+ * Delete a chapter. By default performs soft delete; use ?permanent=true for hard delete.
  */
 export const deleteMyChaptersById = <ThrowOnError extends boolean = false>(options: Options<DeleteMyChaptersByIdData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyChaptersByIdResponses, DeleteMyChaptersByIdErrors, ThrowOnError>({
     security: [{
@@ -393,7 +496,7 @@ export const postMyChaptersByChapterIdScenes = <ThrowOnError extends boolean = f
 });
 
 /**
- * Delete a scene (must own the parent story)
+ * Delete a scene. By default performs soft delete; use ?permanent=true for hard delete.
  */
 export const deleteMyScenesById = <ThrowOnError extends boolean = false>(options: Options<DeleteMyScenesByIdData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyScenesByIdResponses, DeleteMyScenesByIdErrors, ThrowOnError>({
     security: [{
@@ -621,6 +724,30 @@ export const patchMyMessagesById = <ThrowOnError extends boolean = false>(option
 });
 
 /**
+ * Bulk reorder messages and optionally move them between scenes
+ */
+export const postMyStoriesByStoryIdMessagesReorder = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByStoryIdMessagesReorderData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByStoryIdMessagesReorderResponses, PostMyStoriesByStoryIdMessagesReorderErrors, ThrowOnError>({
+    url: '/my/stories/{storyId}/messages/reorder',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Batch create messages with their paragraphs in a single transaction. Ideal for importing large amounts of content.
+ */
+export const postMyStoriesByStoryIdMessagesBatch = <ThrowOnError extends boolean = false>(options: Options<PostMyStoriesByStoryIdMessagesBatchData, ThrowOnError>) => (options.client ?? client).post<PostMyStoriesByStoryIdMessagesBatchResponses, PostMyStoriesByStoryIdMessagesBatchErrors, ThrowOnError>({
+    url: '/my/stories/{storyId}/messages/batch',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List all MessageRevisions for a message (ordered by version DESC)
  */
 export const getMyMessagesByMessageIdRevisions = <ThrowOnError extends boolean = false>(options: Options<GetMyMessagesByMessageIdRevisionsData, ThrowOnError>) => (options.client ?? client).get<GetMyMessagesByMessageIdRevisionsResponses, GetMyMessagesByMessageIdRevisionsErrors, ThrowOnError>({ url: '/my/messages/{messageId}/revisions', ...options });
@@ -687,12 +814,17 @@ export const getMyParagraphsByParagraphIdRevisions = <ThrowOnError extends boole
 export const getMyFiles = <ThrowOnError extends boolean = false>(options?: Options<GetMyFilesData, ThrowOnError>) => (options?.client ?? client).get<GetMyFilesResponses, GetMyFilesErrors, ThrowOnError>({ url: '/my/files', ...options });
 
 /**
- * Upload a file (image for cover art, character pictures, etc.)
+ * Upload a file (image for cover art, character pictures, maps, etc.)
  */
 export const postMyFiles = <ThrowOnError extends boolean = false>(options?: Options<PostMyFilesData, ThrowOnError>) => (options?.client ?? client).post<PostMyFilesResponses, PostMyFilesErrors, ThrowOnError>({ url: '/my/files', ...options });
 
 /**
- * Delete a file (removes from database and filesystem)
+ * Get file content (for private files that require authentication)
+ */
+export const getMyFilesBy__ = <ThrowOnError extends boolean = false>(options: Options<GetMyFilesBy__Data, ThrowOnError>) => (options.client ?? client).get<GetMyFilesBy__Responses, GetMyFilesBy__Errors, ThrowOnError>({ url: '/my/files/{*}', ...options });
+
+/**
+ * Delete a file (removes from database and storage)
  */
 export const deleteMyFilesById = <ThrowOnError extends boolean = false>(options: Options<DeleteMyFilesByIdData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyFilesByIdResponses, DeleteMyFilesByIdErrors, ThrowOnError>({ url: '/my/files/{id}', ...options });
 
@@ -853,7 +985,7 @@ export const putMyMapsById = <ThrowOnError extends boolean = false>(options: Opt
 });
 
 /**
- * List all landmarks on a map
+ * List all landmarks on a map (minimal data for rendering)
  */
 export const getMyMapsByMapIdLandmarks = <ThrowOnError extends boolean = false>(options: Options<GetMyMapsByMapIdLandmarksData, ThrowOnError>) => (options.client ?? client).get<GetMyMapsByMapIdLandmarksResponses, GetMyMapsByMapIdLandmarksErrors, ThrowOnError>({ url: '/my/maps/{mapId}/landmarks', ...options });
 
@@ -875,7 +1007,7 @@ export const postMyMapsByMapIdLandmarks = <ThrowOnError extends boolean = false>
 export const deleteMyLandmarksById = <ThrowOnError extends boolean = false>(options: Options<DeleteMyLandmarksByIdData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyLandmarksByIdResponses, DeleteMyLandmarksByIdErrors, ThrowOnError>({ url: '/my/landmarks/{id}', ...options });
 
 /**
- * Get a single landmark by ID
+ * Get a single landmark by ID (full data including properties)
  */
 export const getMyLandmarksById = <ThrowOnError extends boolean = false>(options: Options<GetMyLandmarksByIdData, ThrowOnError>) => (options.client ?? client).get<GetMyLandmarksByIdResponses, GetMyLandmarksByIdErrors, ThrowOnError>({ url: '/my/landmarks/{id}', ...options });
 
@@ -890,6 +1022,33 @@ export const putMyLandmarksById = <ThrowOnError extends boolean = false>(options
         ...options.headers
     }
 });
+
+/**
+ * Get all landmark states for a story
+ */
+export const getMyStoriesByStoryIdLandmarkStates = <ThrowOnError extends boolean = false>(options: Options<GetMyStoriesByStoryIdLandmarkStatesData, ThrowOnError>) => (options.client ?? client).get<GetMyStoriesByStoryIdLandmarkStatesResponses, GetMyStoriesByStoryIdLandmarkStatesErrors, ThrowOnError>({ url: '/my/stories/{storyId}/landmark-states', ...options });
+
+/**
+ * Get accumulated landmark states at a specific story time
+ */
+export const getMyStoriesByStoryIdLandmarkStatesAtByStoryTime = <ThrowOnError extends boolean = false>(options: Options<GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeData, ThrowOnError>) => (options.client ?? client).get<GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeResponses, GetMyStoriesByStoryIdLandmarkStatesAtByStoryTimeErrors, ThrowOnError>({ url: '/my/stories/{storyId}/landmark-states/at/{storyTime}', ...options });
+
+/**
+ * Create or update a landmark state at a specific story time
+ */
+export const postMyLandmarksByLandmarkIdStates = <ThrowOnError extends boolean = false>(options: Options<PostMyLandmarksByLandmarkIdStatesData, ThrowOnError>) => (options.client ?? client).post<PostMyLandmarksByLandmarkIdStatesResponses, PostMyLandmarksByLandmarkIdStatesErrors, ThrowOnError>({
+    url: '/my/landmarks/{landmarkId}/states',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a landmark state at a specific story time
+ */
+export const deleteMyLandmarksByLandmarkIdStatesByFieldByStoryTime = <ThrowOnError extends boolean = false>(options: Options<DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeResponses, DeleteMyLandmarksByLandmarkIdStatesByFieldByStoryTimeErrors, ThrowOnError>({ url: '/my/landmarks/{landmarkId}/states/{field}/{storyTime}', ...options });
 
 /**
  * List all pawns on a map
@@ -1006,6 +1165,49 @@ export const putMyPathSegmentsById = <ThrowOnError extends boolean = false>(opti
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List all plot point states for a story
+ */
+export const getMyStoriesByStoryIdPlotPointStates = <ThrowOnError extends boolean = false>(options: Options<GetMyStoriesByStoryIdPlotPointStatesData, ThrowOnError>) => (options.client ?? client).get<GetMyStoriesByStoryIdPlotPointStatesResponses, GetMyStoriesByStoryIdPlotPointStatesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/stories/{storyId}/plot-point-states',
+    ...options
+});
+
+/**
+ * Set a plot point state at a message (creates or updates)
+ */
+export const postMyMessagesByMessageIdPlotPointStates = <ThrowOnError extends boolean = false>(options: Options<PostMyMessagesByMessageIdPlotPointStatesData, ThrowOnError>) => (options.client ?? client).post<PostMyMessagesByMessageIdPlotPointStatesResponses, PostMyMessagesByMessageIdPlotPointStatesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/messages/{messageId}/plot-point-states',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove a plot point state override at a message
+ */
+export const deleteMyMessagesByMessageIdPlotPointStatesByKey = <ThrowOnError extends boolean = false>(options: Options<DeleteMyMessagesByMessageIdPlotPointStatesByKeyData, ThrowOnError>) => (options.client ?? client).delete<DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses, DeleteMyMessagesByMessageIdPlotPointStatesByKeyErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionToken',
+            type: 'apiKey'
+        }],
+    url: '/my/messages/{messageId}/plot-point-states/{key}',
+    ...options
 });
 
 /**

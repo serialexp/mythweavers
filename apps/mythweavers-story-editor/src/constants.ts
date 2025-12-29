@@ -1,5 +1,15 @@
 import { StorySetting } from './types'
 
+export interface StoryFormat {
+  value: 'narrative' | 'cyoa'
+  label: string
+}
+
+export const STORY_FORMATS: StoryFormat[] = [
+  { value: 'narrative', label: 'Narrative' },
+  { value: 'cyoa', label: 'Choose Your Own Adventure' },
+]
+
 export const STORY_SETTINGS: StorySetting[] = [
   { value: '', label: 'No specific setting' },
   { value: 'fantasy', label: 'Fantasy' },

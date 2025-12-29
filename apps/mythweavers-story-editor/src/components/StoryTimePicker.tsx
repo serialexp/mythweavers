@@ -69,7 +69,7 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
         dayOfYear: dayOfYear(),
         hour: hour(),
         minute: minute(),
-        subdivisions: new Map(),
+        subdivisions: engine.getSubdivisions(dayOfYear(), year()),
       }
       return engine.formatDate(date, true)
     } catch {

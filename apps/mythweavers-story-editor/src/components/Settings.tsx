@@ -1,6 +1,7 @@
 import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
 import {
   BsArrowUpSquare,
+  BsChatLeftText,
   BsClock,
   BsDownload,
   BsGear,
@@ -13,13 +14,16 @@ import {
   BsUpload,
 } from 'solid-icons/bs'
 import { type Component, For, type JSX, Show, createMemo, createSignal, onMount } from 'solid-js'
-import { CONTEXT_SIZE_STEP, STORY_SETTINGS } from '../constants'
+import { CONTEXT_SIZE_STEP, STORY_FORMATS, STORY_SETTINGS } from '../constants'
 import { calendarStore } from '../stores/calendarStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { globalOperationStore } from '../stores/globalOperationStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
-import type { Model } from '../types/core'
+import { settingsStore } from '../stores/settingsStore'
+import type { Message, Model } from '../types/core'
+import { ClaudeChatImportModal } from './ClaudeChatImportModal'
+import { DeletedNodesModal } from './DeletedNodesModal'
 import { DeletedTurnsModal } from './DeletedTurnsModal'
 import { ModelSelector } from './ModelSelector'
 import * as styles from './Settings.css'
@@ -58,6 +62,13 @@ interface SettingsProps {
   onRewriteMessages: () => void
   onExportStory: () => void
   onImportStory: (storyText: string) => void
+  onImportClaudeChat: (
+    conversationName: string,
+    messages: Message[],
+    importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => Promise<void>
+  serverAvailable: boolean
   isLoading: boolean
   isGenerating: boolean
   provider: string
@@ -76,11 +87,13 @@ interface SettingsProps {
 
 export const Settings: Component<SettingsProps> = (props) => {
   const [showImportDialog, setShowImportDialog] = createSignal(false)
+  const [showClaudeChatImportModal, setShowClaudeChatImportModal] = createSignal(false)
   const [importText, setImportText] = createSignal('')
   const [showOpenRouterKey, setShowOpenRouterKey] = createSignal(false)
   const [showAnthropicKey, setShowAnthropicKey] = createSignal(false)
   const [showOpenAIKey, setShowOpenAIKey] = createSignal(false)
   const [showDeletedTurnsModal, setShowDeletedTurnsModal] = createSignal(false)
+  const [showDeletedNodesModal, setShowDeletedNodesModal] = createSignal(false)
   const [importError, setImportError] = createSignal('')
 
   let panelRef: ListDetailPanelRef | undefined
@@ -99,7 +112,7 @@ export const Settings: Component<SettingsProps> = (props) => {
         .length,
   )
   const orphanedMessagesCount = createMemo(
-    () => messagesStore.messages.filter((msg) => !msg.nodeId && !msg.chapterId).length,
+    () => messagesStore.messages.filter((msg) => !msg.sceneId).length,
   )
 
   const handleImportStory = () => {
@@ -260,6 +273,17 @@ export const Settings: Component<SettingsProps> = (props) => {
   const renderStorySection = () => (
     <div class={styles.section}>
       <div class={styles.settingRow}>
+        <label class={styles.label}>Story Format</label>
+        <select
+          value={currentStoryStore.storyFormat}
+          onChange={(e) => currentStoryStore.setStoryFormat(e.target.value as 'narrative' | 'cyoa')}
+          class={styles.select}
+        >
+          <For each={STORY_FORMATS}>{(format) => <option value={format.value}>{format.label}</option>}</For>
+        </select>
+      </div>
+
+      <div class={styles.settingRow}>
         <label class={styles.label}>Story Genre</label>
         <select
           value={currentStoryStore.storySetting}
@@ -296,20 +320,19 @@ export const Settings: Component<SettingsProps> = (props) => {
       </div>
 
       <div class={styles.settingRow}>
-        <label class={styles.label}>Paragraphs per Turn</label>
-        <select
-          value={currentStoryStore.paragraphsPerTurn}
-          onChange={(e) => currentStoryStore.setParagraphsPerTurn(Number.parseInt(e.target.value))}
-          class={styles.select}
-        >
-          <option value="0">No limit</option>
-          <option value="1">1 paragraph</option>
-          <option value="2">2 paragraphs</option>
-          <option value="3">3 paragraphs</option>
-          <option value="4">4 paragraphs</option>
-          <option value="5">5 paragraphs</option>
-          <option value="6">6 paragraphs</option>
-        </select>
+        <label class={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={settingsStore.refineClichés}
+            onChange={(e) => settingsStore.setRefineClichés(e.target.checked)}
+            class={styles.checkbox}
+          />
+          Refine clichés
+        </label>
+        <span class={styles.infoText}>
+          After generation, run a second pass to identify and remove clichés, purple prose, and melodramatic writing.
+          Uses more tokens but produces better quality content.
+        </span>
       </div>
     </div>
   )
@@ -516,6 +539,17 @@ export const Settings: Component<SettingsProps> = (props) => {
         </button>
       </div>
 
+      <div class={styles.settingRow}>
+        <button
+          onClick={() => setShowClaudeChatImportModal(true)}
+          disabled={props.isLoading || globalOperationStore.isOperationInProgress()}
+          class={styles.button}
+          title="Import a conversation from a Claude chat export"
+        >
+          <BsChatLeftText /> Import Claude Chat
+        </button>
+      </div>
+
       <Show when={currentStoryStore.storageMode === 'server'}>
         <div class={styles.settingRow}>
           <button
@@ -525,6 +559,16 @@ export const Settings: Component<SettingsProps> = (props) => {
             title="View and restore recently deleted story turns"
           >
             <BsTrash /> View Deleted Turns
+          </button>
+        </div>
+        <div class={styles.settingRow}>
+          <button
+            onClick={() => setShowDeletedNodesModal(true)}
+            disabled={props.isLoading || globalOperationStore.isOperationInProgress()}
+            class={styles.button}
+            title="View and restore recently deleted chapters, scenes, etc."
+          >
+            <BsTrash /> View Deleted Nodes
           </button>
         </div>
       </Show>
@@ -616,6 +660,23 @@ export const Settings: Component<SettingsProps> = (props) => {
         onRestore={() => {
           messagesStore.refreshMessages()
         }}
+      />
+
+      <DeletedNodesModal
+        show={showDeletedNodesModal()}
+        onClose={() => setShowDeletedNodesModal(false)}
+        onRestore={() => {
+          // Reload page to refresh nodes after restore
+          window.location.reload()
+        }}
+      />
+
+      <ClaudeChatImportModal
+        show={showClaudeChatImportModal()}
+        hasCurrentStory={currentStoryStore.isInitialized}
+        serverAvailable={props.serverAvailable}
+        onClose={() => setShowClaudeChatImportModal(false)}
+        onImport={props.onImportClaudeChat}
       />
     </>
   )

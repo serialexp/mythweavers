@@ -1,8 +1,11 @@
 import { Badge, Button, Card, CardBody, Modal, Spinner, Stack } from '@mythweavers/ui'
 import { BsArrowClockwise, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createResource, createSignal } from 'solid-js'
+import {
+  getMyStoriesByIdDeletedMessages,
+  postMyStoriesByIdDeletedMessagesByMessageIdRestore,
+} from '../client/config'
 import { currentStoryStore } from '../stores/currentStoryStore'
-import { apiClient } from '../utils/apiClient'
 import * as styles from './DeletedTurnsModal.css'
 
 interface DeletedTurnsModalProps {
@@ -18,7 +21,11 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
     () => props.show && currentStoryStore.id,
     async (storyId) => {
       if (!storyId) return []
-      return apiClient.getDeletedMessages(storyId, 50)
+      const { data } = await getMyStoriesByIdDeletedMessages({
+        path: { id: storyId },
+        query: { limit: 50 },
+      })
+      return data?.messages ?? []
     },
   )
 
@@ -28,7 +35,9 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
 
     setRestoringId(messageId)
     try {
-      await apiClient.restoreMessage(storyId, messageId)
+      await postMyStoriesByIdDeletedMessagesByMessageIdRestore({
+        path: { id: storyId, messageId },
+      })
       refetch()
       props.onRestore?.()
     } catch (error) {
@@ -81,21 +90,16 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
                     <CardBody>
                       <div class={styles.messageHeader}>
                         <div class={styles.messageMetaContainer}>
-                          <Badge variant="primary">Position #{message.order + 1}</Badge>
-                          <span class={styles.messageMeta}>{formatDate(message.timestamp)}</span>
-                          <Show when={message.model}>
-                            <Badge variant="secondary">{message.model}</Badge>
-                          </Show>
-                          <Show when={message.totalTokens}>
-                            <span class={styles.messageTokens}>{message.totalTokens} tokens</span>
-                          </Show>
+                          <Badge variant="primary">{message.chapterName}</Badge>
+                          <Badge variant="secondary">{message.sceneName}</Badge>
+                          <span class={styles.messageMeta}>{formatDate(message.updatedAt)}</span>
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRestore(message.id)}
                           disabled={restoringId() === message.id}
-                          title={`Restore this turn to position ${message.order + 1}`}
+                          title="Restore this message"
                         >
                           <BsArrowClockwise />
                           {restoringId() === message.id ? 'Restoring...' : 'Restore'}

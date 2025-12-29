@@ -27,9 +27,9 @@ const [settingsState, setSettingsState] = createStore({
   person: localStorage.getItem('story-person') || 'third',
   tense: localStorage.getItem('story-tense') || 'past',
   autoGenerate: localStorage.getItem('story-auto-generate') === 'true',
-  paragraphsPerTurn: Number.parseInt(localStorage.getItem('story-paragraphs-per-turn') || '3'),
   showEventMessages: localStorage.getItem('story-show-event-messages') !== 'false', // Default to true
   thinkingBudget: Number.parseInt(localStorage.getItem('story-thinking-budget') || '0'), // 0 = no budget
+  refineClichés: localStorage.getItem('story-refine-cliches') === 'true',
 })
 
 // Auto-save effects
@@ -85,15 +85,15 @@ createEffect(() => {
 })
 
 createEffect(() => {
-  localStorage.setItem('story-paragraphs-per-turn', settingsState.paragraphsPerTurn.toString())
-})
-
-createEffect(() => {
   localStorage.setItem('story-show-event-messages', settingsState.showEventMessages.toString())
 })
 
 createEffect(() => {
   localStorage.setItem('story-thinking-budget', settingsState.thinkingBudget.toString())
+})
+
+createEffect(() => {
+  localStorage.setItem('story-refine-cliches', settingsState.refineClichés.toString())
 })
 
 export const settingsStore = {
@@ -137,14 +137,14 @@ export const settingsStore = {
   get autoGenerate() {
     return settingsState.autoGenerate
   },
-  get paragraphsPerTurn() {
-    return settingsState.paragraphsPerTurn
-  },
   get showEventMessages() {
     return settingsState.showEventMessages
   },
   get thinkingBudget() {
     return settingsState.thinkingBudget
+  },
+  get refineClichés() {
+    return settingsState.refineClichés
   },
 
   // Actions
@@ -183,10 +183,10 @@ export const settingsStore = {
   setPerson: (person: string) => setSettingsState('person', person),
   setTense: (tense: string) => setSettingsState('tense', tense),
   setAutoGenerate: (enabled: boolean) => setSettingsState('autoGenerate', enabled),
-  setParagraphsPerTurn: (paragraphs: number) => setSettingsState('paragraphsPerTurn', paragraphs),
   setShowEventMessages: (show: boolean) => setSettingsState('showEventMessages', show),
   toggleEventMessages: () => setSettingsState('showEventMessages', !settingsState.showEventMessages),
   setThinkingBudget: (budget: number) => setSettingsState('thinkingBudget', budget),
+  setRefineClichés: (enabled: boolean) => setSettingsState('refineClichés', enabled),
 
   // Sync provider and model from story (called when loading a story)
   syncFromStory: (provider?: string, model?: string | null) => {

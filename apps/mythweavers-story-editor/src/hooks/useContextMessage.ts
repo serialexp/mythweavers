@@ -16,7 +16,7 @@ export function useContextMessage() {
 
     if (selectedNodeId) {
       // Find the last message in the selected node
-      const nodeMessages = messages.filter((m) => m.nodeId === selectedNodeId && m.role === 'assistant' && !m.isQuery)
+      const nodeMessages = messages.filter((m) => m.sceneId === selectedNodeId && m.role === 'assistant' && !m.isQuery)
       const lastNodeMessage = nodeMessages[nodeMessages.length - 1]
 
       if (lastNodeMessage) {

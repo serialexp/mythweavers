@@ -1,5 +1,5 @@
 import { Button, IconButton, Input, Stack, Textarea } from '@mythweavers/ui'
-import { BsArrowRight, BsCheckCircle, BsCircle, BsPencil, BsPlus, BsTrash } from 'solid-icons/bs'
+import { BsArrowRight, BsCheckCircle, BsCircle, BsPencil, BsPlus, BsSignpostSplit, BsTrash } from 'solid-icons/bs'
 import { ImTarget } from 'solid-icons/im'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -116,7 +116,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
   return (
     <div>
       <div class={styles.branchTitle}>
-        <span class={styles.branchTitleIcon}>🔀</span>
+        <span class={styles.branchTitleIcon}><BsSignpostSplit size={18} /></span>
         {props.message.content}
       </div>
 
@@ -133,7 +133,17 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
               const targetNode = nodeStore.nodesArray.find((n) => n.id === option.targetNodeId)
               const targetMessage = messagesStore.messages.find((m) => m.id === option.targetMessageId)
 
+              // Find parent chapter if target is a scene
+              let chapterName: string | null = null
+              if (targetNode?.parentId) {
+                const parentNode = nodeStore.nodesArray.find((n) => n.id === targetNode.parentId)
+                if (parentNode?.type === 'chapter') {
+                  chapterName = parentNode.title
+                }
+              }
+
               return {
+                chapterName,
                 nodeName: targetNode?.title || 'Unknown',
                 messageOrder: targetMessage?.order ?? '?',
               }
@@ -175,7 +185,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                           }
                         >
                           <span class={styles.targetText}>
-                            Target: {getTargetInfo()?.nodeName} (msg #{getTargetInfo()?.messageOrder})
+                            Target: {getTargetInfo()?.chapterName ? `${getTargetInfo()?.chapterName} → ` : ''}{getTargetInfo()?.nodeName} (msg #{getTargetInfo()?.messageOrder})
                           </span>
                         </Show>
                       </div>

@@ -50,6 +50,9 @@ export const currentStoryStore = {
   get storySetting() {
     return storyState.story?.storySetting || ''
   },
+  get storyFormat() {
+    return storyState.story?.storyFormat || 'narrative'
+  },
   get lastKnownUpdatedAt() {
     return storyState.story?.lastKnownUpdatedAt
   },
@@ -115,6 +118,13 @@ export const currentStoryStore = {
     setStoryState('story', 'storySetting', setting)
     // Save through saveService (handles local vs server)
     saveService.saveStorySettings(storyState.story.id, { storySetting: setting })
+  },
+
+  setStoryFormat: (format: 'narrative' | 'cyoa') => {
+    if (!storyState.story) return
+    setStoryState('story', 'storyFormat', format)
+    // Save through saveService (handles local vs server)
+    saveService.saveStorySettings(storyState.story.id, { format })
   },
 
   setGlobalScript: (script: string | undefined) => {
@@ -214,6 +224,7 @@ export const currentStoryStore = {
       person: 'third',
       tense: 'past',
       storySetting: '',
+      storyFormat: 'narrative',
       paragraphsPerTurn: 3,
       globalScript: undefined,
       branchChoices: {},
@@ -243,6 +254,7 @@ export const currentStoryStore = {
     person?: 'first' | 'second' | 'third',
     tense?: 'present' | 'past',
     storySetting?: string,
+    storyFormat?: 'narrative' | 'cyoa',
     paragraphsPerTurn?: number,
     globalScript?: string,
     timelineStartTime?: number | null,
@@ -260,6 +272,7 @@ export const currentStoryStore = {
       person: person || 'third',
       tense: tense || 'past',
       storySetting: storySetting || '',
+      storyFormat: storyFormat || 'narrative',
       paragraphsPerTurn: paragraphsPerTurn ?? 3,
       globalScript: globalScript,
       branchChoices: {}, // Start with empty, set later after data loads

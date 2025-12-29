@@ -231,8 +231,8 @@ const nodeIdsWithBranches = createMemo(() => {
   const nodeIds = new Set<string>()
 
   for (const msg of messagesState.messages) {
-    if (msg.type === 'branch' && (msg.nodeId || msg.chapterId)) {
-      nodeIds.add(msg.nodeId || msg.chapterId!)
+    if (msg.type === 'branch' && (msg.sceneId || msg.sceneId)) {
+      nodeIds.add(msg.sceneId || msg.sceneId!)
     }
   }
 
@@ -316,7 +316,7 @@ const reloadDataForStory = async (storyId: string) => {
       const chapterIds = new Set(story.chapters?.map((ch) => ch.id) || [])
       let orphanedMessages = 0
       messages.forEach((msg) => {
-        if (msg.chapterId && !chapterIds.has(msg.chapterId)) {
+        if (msg.sceneId && !chapterIds.has(msg.sceneId)) {
           // Message has invalid chapterId
           orphanedMessages++
         }
@@ -441,8 +441,8 @@ export const messagesStore = {
     // Look backwards from this position to find the most recent chapter marker
     for (let i = index; i >= 0; i--) {
       const msg = messages[i]
-      if (msg.type === 'chapter' && msg.chapterId) {
-        return msg.chapterId
+      if (msg.type === 'chapter' && msg.sceneId) {
+        return msg.sceneId
       }
     }
 
@@ -461,7 +461,7 @@ export const messagesStore = {
     const messages = messagesState.messages
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
-      return lastMessage.chapterId || lastMessage.nodeId
+      return lastMessage.sceneId
     }
 
     return undefined
@@ -481,11 +481,11 @@ export const messagesStore = {
     const messages = messagesState.messages
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
-      if (!lastMessage.nodeId) {
+      if (!lastMessage.sceneId) {
         // Last message does not have a nodeId
         throw new Error('Last message does not have a nodeId - this should not happen')
       }
-      return lastMessage.nodeId
+      return lastMessage.sceneId
     }
 
     return null
@@ -499,7 +499,7 @@ export const messagesStore = {
     // Find the last message that belongs to this node
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
-      if (msg.nodeId === nodeId) {
+      if (msg.sceneId === nodeId) {
         console.log('[messagesStore.getInsertAfterIdForNode] Found last message in node:', msg.id)
         return msg.id
       }
@@ -518,7 +518,7 @@ export const messagesStore = {
     // Find the last message that belongs to this chapter
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
-      if (msg.chapterId === chapterId || (msg.type === 'chapter' && msg.chapterId === chapterId)) {
+      if (msg.sceneId === chapterId || (msg.type === 'chapter' && msg.sceneId === chapterId)) {
         lastMessageIdInChapter = msg.id
         break
       }
@@ -530,7 +530,7 @@ export const messagesStore = {
     }
 
     // If no messages in chapter yet, find the chapter marker
-    const chapterMarkerIndex = messages.findIndex((msg) => msg.type === 'chapter' && msg.chapterId === chapterId)
+    const chapterMarkerIndex = messages.findIndex((msg) => msg.type === 'chapter' && msg.sceneId === chapterId)
 
     if (chapterMarkerIndex !== -1) {
       return messages[chapterMarkerIndex].id
@@ -545,11 +545,11 @@ export const messagesStore = {
     setMessagesState('messages', messages)
     const nodeMessages: Record<string, Record<string, number>> = {}
     messages.forEach((msg) => {
-      if (msg.nodeId) {
-        if (!nodeMessages[msg.nodeId]) {
-          nodeMessages[msg.nodeId] = {}
+      if (msg.sceneId) {
+        if (!nodeMessages[msg.sceneId]) {
+          nodeMessages[msg.sceneId] = {}
         }
-        nodeMessages[msg.nodeId][msg.id] = msg.content.split(' ').length
+        nodeMessages[msg.sceneId][msg.id] = msg.content.split(' ').length
       }
     })
 
@@ -564,7 +564,7 @@ export const messagesStore = {
   // Attach all orphaned messages (without nodeId) to a specific node
   attachOrphanedMessagesToNode: (targetNodeId: string) => {
     const messages = messagesState.messages
-    const orphanedMessages = messages.filter((m) => !m.nodeId && !m.chapterId)
+    const orphanedMessages = messages.filter((m) => !m.sceneId && !m.sceneId)
 
     if (orphanedMessages.length === 0) {
       console.log('[messagesStore.attachOrphanedMessagesToNode] No orphaned messages found')
@@ -574,23 +574,23 @@ export const messagesStore = {
     console.log('[messagesStore.attachOrphanedMessagesToNode] Found orphaned messages:', orphanedMessages.length)
 
     // Get the highest order in the target node
-    const targetNodeMessages = messages.filter((m) => m.nodeId === targetNodeId)
+    const targetNodeMessages = messages.filter((m) => m.sceneId === targetNodeId)
     const maxOrder = targetNodeMessages.length > 0 ? Math.max(...targetNodeMessages.map((m) => m.order)) : -1
 
     // Update all orphaned messages with the target nodeId and new order values
-    const updates: Array<{ messageId: string; nodeId: string; order: number }> = []
+    const updates: Array<{ messageId: string; sceneId: string; order: number }> = []
     const updatedMessages = messages.map((msg) => {
-      if (!msg.nodeId && !msg.chapterId) {
+      if (!msg.sceneId && !msg.sceneId) {
         const orphanIndex = orphanedMessages.indexOf(msg)
         const newOrder = maxOrder + 1 + orphanIndex
         updates.push({
           messageId: msg.id,
-          nodeId: targetNodeId,
+          sceneId: targetNodeId,
           order: newOrder,
         })
         return {
           ...msg,
-          nodeId: targetNodeId,
+          sceneId: targetNodeId,
           order: newOrder,
         }
       }
@@ -616,8 +616,7 @@ export const messagesStore = {
   appendMessage: (message: Message) => {
     console.log('[messagesStore.addMessage] Adding message:', {
       id: message.id,
-      chapterId: message.chapterId,
-      nodeId: message.nodeId,
+      sceneId: message.sceneId,
       isQuery: message.isQuery,
       type: message.type,
     })
@@ -640,15 +639,14 @@ export const messagesStore = {
     console.log('[messagesStore.insertMessage] Inserting message:', {
       id: message.id,
       afterMessageId,
-      chapterId: message.chapterId,
-      nodeId: message.nodeId,
+      sceneId: message.sceneId,
       isQuery: message.isQuery,
       type: message.type,
     })
 
     // Calculate the correct order for the new message
     let insertOrder = 0
-    const targetNodeId = message.nodeId || message.chapterId
+    const targetNodeId = message.sceneId
 
     if (afterMessageId) {
       // Find the message we're inserting after
@@ -657,7 +655,7 @@ export const messagesStore = {
         console.log('[insertMessage] afterMessage found:', {
           id: afterMessage.id.substring(0, 8),
           order: afterMessage.order,
-          nodeId: afterMessage.nodeId,
+          sceneId: afterMessage.sceneId,
           targetNodeId,
         })
         insertOrder = afterMessage.order + 1
@@ -666,7 +664,7 @@ export const messagesStore = {
         setMessagesState('messages', (messages) =>
           messages.map((msg) => {
             // Only update messages in the same node/chapter that have order >= insertOrder
-            const msgNodeId = msg.nodeId || msg.chapterId
+            const msgNodeId = msg.sceneId || msg.sceneId
             if (msgNodeId === targetNodeId && msg.order >= insertOrder) {
               return { ...msg, order: msg.order + 1 }
             }
@@ -679,7 +677,7 @@ export const messagesStore = {
       // Shift all messages in this node up by 1
       setMessagesState('messages', (messages) =>
         messages.map((msg) => {
-          const msgNodeId = msg.nodeId || msg.chapterId
+          const msgNodeId = msg.sceneId || msg.sceneId
           if (msgNodeId === targetNodeId) {
             return { ...msg, order: msg.order + 1 }
           }
@@ -695,7 +693,7 @@ export const messagesStore = {
       messageId: message.id,
       insertOrder,
       afterMessageId,
-      nodeId: targetNodeId,
+      sceneId: targetNodeId,
     })
 
     // Use the no-save version for the actual insert
@@ -730,11 +728,11 @@ export const messagesStore = {
   },
 
   updateMessage: (id: string, updates: Partial<Message>) => {
-    if (updates.chapterId !== undefined || updates.nodeId !== undefined) {
+    if (updates.sceneId !== undefined || updates.sceneId !== undefined) {
       console.log('[messagesStore.updateMessage] Updating message chapter/node:', {
         messageId: id,
-        chapterId: updates.chapterId,
-        nodeId: updates.nodeId,
+        chapterId: updates.sceneId,
+        sceneId: updates.sceneId,
       })
     }
     // Use the no-save version for the actual update
@@ -859,18 +857,18 @@ export const messagesStore = {
       return
     }
 
-    const sourceNodeId = messageToMove.nodeId
+    const sourceNodeId = messageToMove.sceneId
     const isMovingBetweenNodes = sourceNodeId !== targetNodeId
 
     // Get messages for affected nodes
     const sourceNodeMessages = sourceNodeId
-      ? messages.filter((m) => m.nodeId === sourceNodeId).sort((a, b) => a.order - b.order)
+      ? messages.filter((m) => m.sceneId === sourceNodeId).sort((a, b) => a.order - b.order)
       : []
 
-    let targetNodeMessages = messages.filter((m) => m.nodeId === targetNodeId).sort((a, b) => a.order - b.order)
+    let targetNodeMessages = messages.filter((m) => m.sceneId === targetNodeId).sort((a, b) => a.order - b.order)
 
     // Track all messages that need order updates
-    const updates: Array<{ messageId: string; nodeId: string; order: number }> = []
+    const updates: Array<{ messageId: string; sceneId: string; order: number }> = []
 
     // Remove message from source node and reorder remaining messages
     if (isMovingBetweenNodes && sourceNodeId) {
@@ -878,7 +876,7 @@ export const messagesStore = {
       remainingSourceMessages.forEach((msg, index) => {
         updates.push({
           messageId: msg.id,
-          nodeId: sourceNodeId,
+          sceneId: sourceNodeId,
           order: index,
         })
       })
@@ -907,14 +905,14 @@ export const messagesStore = {
     // Insert message at new position
     targetNodeMessages.splice(insertIndex, 0, {
       ...messageToMove,
-      nodeId: targetNodeId,
+      sceneId: targetNodeId,
     })
 
     // Reorder target node messages
     targetNodeMessages.forEach((msg, index) => {
       updates.push({
         messageId: msg.id,
-        nodeId: targetNodeId,
+        sceneId: targetNodeId,
         order: index,
       })
     })
@@ -922,7 +920,7 @@ export const messagesStore = {
     console.log(
       '[messagesStore.moveMessage] Order updates for target node:',
       updates
-        .filter((u) => u.nodeId === targetNodeId)
+        .filter((u) => u.sceneId === targetNodeId)
         .map((u) => ({
           id: u.messageId.substring(0, 8),
           order: u.order,
@@ -937,7 +935,7 @@ export const messagesStore = {
       if (update) {
         return {
           ...msg,
-          nodeId: update.nodeId,
+          sceneId: update.sceneId,
           order: update.order,
         }
       }
@@ -950,8 +948,8 @@ export const messagesStore = {
     console.log('[messagesStore.moveMessage] Setting updated messages, total:', updatedMessages.length)
     console.log('[messagesStore.moveMessage] Moved message details:', {
       id: movedMessage?.id,
-      nodeId: movedMessage?.nodeId,
-      chapterId: movedMessage?.chapterId,
+      sceneId: movedMessage?.sceneId,
+      chapterId: movedMessage?.sceneId,
       order: movedMessage?.order,
       content: movedMessage?.content?.substring(0, 50),
     })
@@ -965,7 +963,7 @@ export const messagesStore = {
         storyId,
         updates.map((u) => ({
           messageId: u.messageId,
-          nodeId: u.nodeId,
+          sceneId: u.sceneId,
           order: u.order,
         })),
       )
@@ -1289,7 +1287,7 @@ export const messagesStore = {
 
     // Find all messages for this chapter (including the chapter marker)
     const chapterMessages = messages.filter(
-      (msg) => (msg.type === 'chapter' && msg.chapterId === chapterId) || msg.chapterId === chapterId,
+      (msg) => (msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId,
     )
 
     if (chapterMessages.length === 0) return
@@ -1314,7 +1312,7 @@ export const messagesStore = {
 
     // Remove all chapter messages from their current positions
     const remainingMessages = messages.filter(
-      (msg) => !((msg.type === 'chapter' && msg.chapterId === chapterId) || msg.chapterId === chapterId),
+      (msg) => !((msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId),
     )
 
     // Insert chapter messages before the previous chapter
@@ -1333,7 +1331,7 @@ export const messagesStore = {
     if (currentStoryStore.storageMode === 'server' && currentStoryStore.id) {
       const items = reorderedMessages.map((msg) => ({
         messageId: msg.id,
-        nodeId: msg.nodeId || msg.chapterId || '',
+        sceneId: msg.sceneId || '',
         order: msg.order, // Include the explicit order field
       }))
       saveService.reorderMessages(currentStoryStore.id, items)
@@ -1345,7 +1343,7 @@ export const messagesStore = {
 
     // Find all messages for this chapter (including the chapter marker)
     const chapterMessages = messages.filter(
-      (msg) => (msg.type === 'chapter' && msg.chapterId === chapterId) || msg.chapterId === chapterId,
+      (msg) => (msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId,
     )
 
     if (chapterMessages.length === 0) return
@@ -1363,7 +1361,7 @@ export const messagesStore = {
     for (let i = chapterMarkerIndex + 1; i < messages.length; i++) {
       if (messages[i].type === 'chapter') {
         nextChapterMarkerIndex = i
-        nextChapterId = messages[i].chapterId
+        nextChapterId = messages[i].sceneId
         break
       }
     }
@@ -1372,12 +1370,12 @@ export const messagesStore = {
 
     // Find all messages for the next chapter
     const nextChapterMessages = messages.filter(
-      (msg) => (msg.type === 'chapter' && msg.chapterId === nextChapterId) || msg.chapterId === nextChapterId,
+      (msg) => (msg.type === 'chapter' && msg.sceneId === nextChapterId) || msg.sceneId === nextChapterId,
     )
 
     // Remove all chapter messages from their current positions
     const remainingMessages = messages.filter(
-      (msg) => !((msg.type === 'chapter' && msg.chapterId === chapterId) || msg.chapterId === chapterId),
+      (msg) => !((msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId),
     )
 
     // Find where the next chapter ends in the remaining messages
@@ -1400,7 +1398,7 @@ export const messagesStore = {
     if (currentStoryStore.storageMode === 'server' && currentStoryStore.id) {
       const items = reorderedMessages.map((msg) => ({
         messageId: msg.id,
-        nodeId: msg.nodeId || msg.chapterId || '',
+        sceneId: msg.sceneId || '',
         order: msg.order, // Include the explicit order field
       }))
       saveService.reorderMessages(currentStoryStore.id, items)
@@ -1414,7 +1412,7 @@ export const messagesStore = {
 
     if (afterMessageId) {
       const afterMessage = messagesState.messages.find((m) => m.id === afterMessageId)
-      targetNodeId = afterMessage?.nodeId
+      targetNodeId = afterMessage?.sceneId
     }
 
     // If we still don't have a nodeId, use the selected node
@@ -1429,7 +1427,7 @@ export const messagesStore = {
       content,
       script,
       order: 0, // Will be set properly by insertMessage
-      nodeId: targetNodeId,
+      sceneId: targetNodeId,
       timestamp: new Date(),
       isQuery: false,
     }
@@ -1447,7 +1445,7 @@ export const messagesStore = {
 
     if (!targetNodeId && afterMessageId) {
       const afterMessage = messagesState.messages.find((m) => m.id === afterMessageId)
-      targetNodeId = afterMessage?.nodeId
+      targetNodeId = afterMessage?.sceneId
     }
 
     // If we still don't have a nodeId, use the selected node
@@ -1462,7 +1460,7 @@ export const messagesStore = {
       content,
       options: [], // Start with no options, user will add them
       order: 0, // Will be set properly by insertMessage
-      nodeId: targetNodeId,
+      sceneId: targetNodeId,
       timestamp: new Date(),
       isQuery: false,
     }
@@ -1470,7 +1468,7 @@ export const messagesStore = {
     console.log('[createBranchMessage] Creating branch:', {
       id: branchMessage.id,
       afterMessageId,
-      nodeId: targetNodeId,
+      sceneId: targetNodeId,
     })
 
     // Always use insertMessage, which handles null afterMessageId correctly

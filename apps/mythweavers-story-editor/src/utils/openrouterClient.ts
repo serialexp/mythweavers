@@ -83,12 +83,34 @@ export const getLastOpenRouterDebugInfo = () => ({
   messagesWithCache: lastOpenRouterMessages,
 })
 
+export interface TokenEstimate {
+  tokens: number
+  isExact: boolean
+  method: 'api' | 'heuristic'
+}
+
 export class OpenRouterClient {
   private apiKey: string
   private baseUrl = 'https://openrouter.ai/api/v1'
 
   constructor(apiKey: string) {
     this.apiKey = apiKey
+  }
+
+  /**
+   * Estimate token count for messages.
+   * OpenRouter doesn't have a token counting API, so we use a heuristic.
+   * Returns approximately chars / 4 as a rough estimate.
+   */
+  estimateTokens(messages: ChatMessage[]): TokenEstimate {
+    const totalChars = messages.reduce((sum, msg) => sum + msg.content.length, 0)
+    // Rough heuristic: ~4 characters per token on average
+    const estimatedTokens = Math.ceil(totalChars / 4)
+    return {
+      tokens: estimatedTokens,
+      isExact: false,
+      method: 'heuristic',
+    }
   }
 
   async list() {

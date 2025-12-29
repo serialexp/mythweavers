@@ -11,6 +11,7 @@ import {
   deleteMyParagraphsById,
   deleteMyPathsById,
   deleteMyPawnsById,
+  deleteMyScenesById,
   patchMyArcsById,
   patchMyBooksById,
   patchMyChaptersById,
@@ -34,6 +35,11 @@ import {
   putMyMapsById,
   putMyPathsById,
   putMyPawnsById,
+  postMyStoriesByStoryIdMessagesReorder,
+  postMyStoriesByStoryIdNodesReorder,
+  postMyLandmarksByLandmarkIdStates,
+  postMyMessagesByMessageIdPlotPointStates,
+  deleteMyMessagesByMessageIdPlotPointStatesByKey,
 } from '../client/config'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { VersionConflictError } from '../types/api'
@@ -79,6 +85,7 @@ type SaveOperationType =
   | 'node-update'
   | 'node-delete'
   | 'node-bulk-update'
+  | 'node-reorder'
   | 'fleet-insert'
   | 'fleet-update'
   | 'fleet-delete'
@@ -389,6 +396,30 @@ export class SaveService {
         // Message inserted
         if (insertResponse.data?.message) {
           this.updateLastKnownTimestamp(insertResponse.data.message.updatedAt)
+
+          // If the message has content, create paragraphs for it (split on double newlines)
+          const revisionId = insertResponse.data.message.currentMessageRevisionId
+          if (revisionId && insertData.content) {
+            const paragraphTexts = insertData.content
+              .split(/\n\n+/)
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0)
+
+            // Create all paragraphs in parallel
+            const paragraphPromises = paragraphTexts.map((text, index) =>
+              postMyMessageRevisionsByRevisionIdParagraphs({
+                path: { revisionId },
+                body: {
+                  body: text,
+                  sortOrder: index,
+                } as any,
+              }).catch((err) => {
+                console.error(`[SaveService] Failed to create paragraph ${index}:`, err)
+              }),
+            )
+
+            await Promise.all(paragraphPromises)
+          }
         }
         break
       }
@@ -421,8 +452,20 @@ export class SaveService {
       }
 
       case 'message-reorder': {
-        const reorderResponse = await apiClient.reorderMessages(storyId, data)
-        this.updateLastKnownTimestamp(reorderResponse.updatedAt)
+        // Map sceneId to nodeId for the API
+        const reorderData = data as { items: Array<{ messageId: string; sceneId: string; order: number }> }
+        const items = reorderData.items.map((item) => ({
+          messageId: item.messageId,
+          nodeId: item.sceneId,
+          order: item.order,
+        }))
+        const { data: reorderResponse } = await postMyStoriesByStoryIdMessagesReorder({
+          path: { storyId },
+          body: { items },
+        })
+        if (reorderResponse?.updatedAt) {
+          this.updateLastKnownTimestamp(reorderResponse.updatedAt)
+        }
         break
       }
 
@@ -588,13 +631,9 @@ export class SaveService {
             name: landmarkData.name,
             description: landmarkData.description,
             type: landmarkData.type,
-            population: landmarkData.population,
-            industry: landmarkData.industry,
             color: landmarkData.color,
             size: landmarkData.size,
-            region: landmarkData.region,
-            sector: landmarkData.sector,
-            planetaryBodies: landmarkData.planetaryBodies,
+            properties: landmarkData.properties,
           },
         })
         break
@@ -610,13 +649,9 @@ export class SaveService {
             name: landmarkData.name,
             description: landmarkData.description,
             type: landmarkData.type,
-            population: landmarkData.population,
-            industry: landmarkData.industry,
             color: landmarkData.color,
             size: landmarkData.size,
-            region: landmarkData.region,
-            sector: landmarkData.sector,
-            planetaryBodies: landmarkData.planetaryBodies,
+            properties: landmarkData.properties,
           },
         })
         break
@@ -720,16 +755,16 @@ export class SaveService {
       }
 
       case 'node-delete': {
-        const nodeData = data as Node
+        const nodeData = data as Node & { permanent?: boolean }
+        const query = nodeData.permanent ? { permanent: 'true' as const } : undefined
         if (nodeData.type === 'book') {
-          await deleteMyBooksById({ path: { id: entityId } })
+          await deleteMyBooksById({ path: { id: entityId }, query })
         } else if (nodeData.type === 'arc') {
-          await deleteMyArcsById({ path: { id: entityId } })
+          await deleteMyArcsById({ path: { id: entityId }, query })
         } else if (nodeData.type === 'chapter') {
-          await deleteMyChaptersById({ path: { id: entityId } })
+          await deleteMyChaptersById({ path: { id: entityId }, query })
         } else if (nodeData.type === 'scene') {
-          const { deleteMyScenesById } = await import('../client/config')
-          await deleteMyScenesById({ path: { id: entityId } })
+          await deleteMyScenesById({ path: { id: entityId }, query })
         }
         break
       }
@@ -781,6 +816,20 @@ export class SaveService {
         break
       }
 
+      case 'node-reorder': {
+        const reorderData = data as {
+          items: Array<{ nodeId: string; nodeType: 'book' | 'arc' | 'chapter' | 'scene'; parentId: string | null; order: number }>
+        }
+        const { data: reorderResponse } = await postMyStoriesByStoryIdNodesReorder({
+          path: { storyId },
+          body: { items: reorderData.items },
+        })
+        if (reorderResponse?.updatedAt) {
+          this.updateLastKnownTimestamp(reorderResponse.updatedAt)
+        }
+        break
+      }
+
       case 'context-states': {
         const contextStatesResponse = await apiClient
           .fetch('/context-states/batch-update', {
@@ -797,8 +846,12 @@ export class SaveService {
       }
 
       case 'landmark-state': {
-        const stateResponse = await apiClient.setLandmarkState(storyId, data)
-        this.updateLastKnownTimestamp(stateResponse.updatedAt)
+        const { landmarkId, storyTime, field, value } = data
+        await postMyLandmarksByLandmarkIdStates({
+          path: { landmarkId },
+          body: { storyTime, field, value },
+        })
+        // Note: New API doesn't return updatedAt, but that's OK as this is now storyTime-based
         break
       }
 
@@ -914,20 +967,29 @@ export class SaveService {
           past: 'PAST',
           present: 'PRESENT',
         }
+        // Build the body, including plotPointDefaults which may not be in generated types yet
+        const updateBody: Record<string, unknown> = {
+          name: data.name,
+          genre: data.storySetting, // storySetting is the genre (fantasy, sci-fi, etc.)
+          defaultPerspective: data.person ? perspectiveMap[data.person] : undefined,
+          defaultTense: data.tense ? tenseMap[data.tense] : undefined,
+          paragraphsPerTurn: data.paragraphsPerTurn,
+          timelineStartTime: data.timelineStartTime,
+          timelineEndTime: data.timelineEndTime,
+          timelineGranularity: data.timelineGranularity,
+          provider: data.provider,
+          model: data.model,
+          globalScript: data.globalScript,
+          selectedNodeId: data.selectedNodeId,
+          branchChoices: data.branchChoices,
+        }
+        // Add plotPointDefaults if present (type will be updated when API client is regenerated)
+        if (data.plotPointDefaults !== undefined) {
+          updateBody.plotPointDefaults = data.plotPointDefaults
+        }
         const settingsResponse = await patchMyStoriesById({
           path: { id: storyId },
-          body: {
-            name: data.name,
-            genre: data.storySetting, // storySetting is the genre (fantasy, sci-fi, etc.)
-            defaultPerspective: data.person ? perspectiveMap[data.person] : undefined,
-            defaultTense: data.tense ? tenseMap[data.tense] : undefined,
-            paragraphsPerTurn: data.paragraphsPerTurn,
-            timelineStartTime: data.timelineStartTime,
-            timelineEndTime: data.timelineEndTime,
-            timelineGranularity: data.timelineGranularity,
-            provider: data.provider,
-            model: data.model,
-          },
+          body: updateBody as any,
         })
         console.log('[SaveService] Settings response:', settingsResponse)
         if (settingsResponse.data?.story.updatedAt) {
@@ -1178,16 +1240,16 @@ export class SaveService {
     storyId: string,
     mapId: string,
     landmarkId: string,
-    messageId: string,
+    storyTime: number,
     field: string,
     value: string | null,
   ) {
     this.queueSave({
       type: 'landmark-state',
       entityType: 'landmark-state',
-      entityId: `${mapId}-${landmarkId}-${field}`,
+      entityId: `${mapId}-${landmarkId}-${storyTime}-${field}`,
       storyId,
-      data: { mapId, landmarkId, messageId, field, value },
+      data: { mapId, landmarkId, storyTime, field, value },
     })
   }
 
@@ -1262,11 +1324,25 @@ export class SaveService {
   }
 
   // Reorder messages
-  reorderMessages(storyId: string, items: Array<{ messageId: string; nodeId: string; order: number }>) {
+  reorderMessages(storyId: string, items: Array<{ messageId: string; sceneId: string; order: number }>) {
     this.queueSave({
       type: 'message-reorder',
       entityType: 'message',
       entityId: 'reorder-batch', // Special ID for reorder operations
+      storyId,
+      data: { items },
+    })
+  }
+
+  // Reorder nodes (books, arcs, chapters, scenes)
+  reorderNodes(
+    storyId: string,
+    items: Array<{ nodeId: string; nodeType: 'book' | 'arc' | 'chapter' | 'scene'; parentId: string | null; order: number }>,
+  ) {
+    this.queueSave({
+      type: 'node-reorder',
+      entityType: 'node',
+      entityId: 'node-reorder-batch',
       storyId,
       data: { items },
     })
@@ -1280,6 +1356,7 @@ export class SaveService {
       person: 'first' | 'second' | 'third'
       tense: 'present' | 'past'
       storySetting: string
+      format: 'narrative' | 'cyoa'
       paragraphsPerTurn: number
       globalScript: string
       selectedChapterId: string | null
@@ -1524,72 +1601,210 @@ export class SaveService {
       `[SaveService.saveParagraphs] Changes: ${toCreate.length} create, ${toUpdate.length} update, ${toDelete.length} delete`,
     )
 
-    // Execute all operations
-    const errors: Error[] = []
-
-    // Create new paragraphs
-    for (let i = 0; i < toCreate.length; i++) {
-      const para = toCreate[i]
-      try {
-        // Note: id and contentSchema passed for client-side ID generation and rich text
-        await postMyMessageRevisionsByRevisionIdParagraphs({
-          path: { revisionId: messageRevisionId },
-          body: {
-            id: para.id,
-            body: para.body,
-            contentSchema: para.contentSchema,
-            state: para.state?.toUpperCase() as any,
-            sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
-          } as any,
+    // Execute all operations in parallel for better performance
+    const createPromises = toCreate.map((para) =>
+      postMyMessageRevisionsByRevisionIdParagraphs({
+        path: { revisionId: messageRevisionId },
+        body: {
+          id: para.id,
+          body: para.body,
+          contentSchema: para.contentSchema,
+          state: para.state?.toUpperCase() as any,
+          sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
+        } as any,
+      })
+        .then(() => ({ success: true, id: para.id }))
+        .catch((error) => {
+          console.error(`[SaveService.saveParagraphs] Failed to create paragraph ${para.id}:`, error)
+          return { success: false, id: para.id, error }
         })
-        console.log(`[SaveService.saveParagraphs] Created paragraph ${para.id}`)
-      } catch (error) {
-        console.error(`[SaveService.saveParagraphs] Failed to create paragraph ${para.id}:`, error)
-        errors.push(error as Error)
-      }
-    }
+    )
 
-    // Update changed paragraphs
-    for (const para of toUpdate) {
-      try {
-        // Note: contentSchema passed for rich text editing
-        await patchMyParagraphsById({
-          path: { id: para.id },
-          body: {
-            body: para.body,
-            contentSchema: para.contentSchema,
-            state: para.state?.toUpperCase() as any,
-            sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
-          } as any,
+    const updatePromises = toUpdate.map((para) =>
+      patchMyParagraphsById({
+        path: { id: para.id },
+        body: {
+          body: para.body,
+          contentSchema: para.contentSchema,
+          state: para.state?.toUpperCase() as any,
+          sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
+        } as any,
+      })
+        .then(() => ({ success: true, id: para.id }))
+        .catch((error) => {
+          console.error(`[SaveService.saveParagraphs] Failed to update paragraph ${para.id}:`, error)
+          return { success: false, id: para.id, error }
         })
-        console.log(`[SaveService.saveParagraphs] Updated paragraph ${para.id}`)
-      } catch (error) {
-        console.error(`[SaveService.saveParagraphs] Failed to update paragraph ${para.id}:`, error)
-        errors.push(error as Error)
-      }
-    }
+    )
 
-    // Delete removed paragraphs
-    for (const id of toDelete) {
-      try {
-        await deleteMyParagraphsById({
-          path: { id },
+    const deletePromises = toDelete.map((id) =>
+      deleteMyParagraphsById({
+        path: { id },
+      })
+        .then(() => ({ success: true, id }))
+        .catch((error) => {
+          console.error(`[SaveService.saveParagraphs] Failed to delete paragraph ${id}:`, error)
+          return { success: false, id, error }
         })
-        console.log(`[SaveService.saveParagraphs] Deleted paragraph ${id}`)
-      } catch (error) {
-        console.error(`[SaveService.saveParagraphs] Failed to delete paragraph ${id}:`, error)
-        errors.push(error as Error)
-      }
+    )
+
+    // Run all operations in parallel
+    const [createResults, updateResults, deleteResults] = await Promise.all([
+      Promise.all(createPromises),
+      Promise.all(updatePromises),
+      Promise.all(deletePromises),
+    ])
+
+    const createdCount = createResults.filter((r) => r.success).length
+    const updatedCount = updateResults.filter((r) => r.success).length
+    const deletedCount = deleteResults.filter((r) => r.success).length
+    const errorCount =
+      createResults.filter((r) => !r.success).length +
+      updateResults.filter((r) => !r.success).length +
+      deleteResults.filter((r) => !r.success).length
+
+    if (errorCount > 0) {
+      console.error(`[SaveService.saveParagraphs] ${errorCount} errors occurred during save`)
     }
 
-    if (errors.length > 0) {
-      console.error(`[SaveService.saveParagraphs] ${errors.length} errors occurred during save`)
-    }
+    console.log(
+      `[SaveService.saveParagraphs] Completed: ${createdCount} created, ${updatedCount} updated, ${deletedCount} deleted`,
+    )
 
     return {
-      created: toCreate.length - errors.filter((_, i) => i < toCreate.length).length,
-      updated: toUpdate.length,
-      deleted: toDelete.length,
+      created: createdCount,
+      updated: updatedCount,
+      deleted: deletedCount,
+    }
+  }
+
+  // ============================================================================
+  // PLOT POINT OPERATIONS
+  // ============================================================================
+
+  /**
+   * Save plot point defaults (definitions) to the story
+   * This updates the story's plotPointDefaults field
+   */
+  savePlotPointDefaults(storyId: string, definitions: any[]) {
+    this.queueSave({
+      type: 'story-settings',
+      entityType: 'story-settings',
+      entityId: `plot-point-defaults-${Date.now()}`,
+      storyId,
+      data: { plotPointDefaults: definitions },
+    })
+  }
+
+  /**
+   * Save a plot point state at a specific message
+   * This calls the API directly (not queued) for immediate feedback
+   */
+  async savePlotPointState(_storyId: string, messageId: string, key: string, value: string) {
+    try {
+      await postMyMessagesByMessageIdPlotPointStates({
+        path: { messageId },
+        body: { key, value },
+      })
+    } catch (error) {
+      console.error('[SaveService] Failed to save plot point state:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete a plot point state at a specific message
+   */
+  async deletePlotPointState(messageId: string, key: string) {
+    try {
+      await deleteMyMessagesByMessageIdPlotPointStatesByKey({
+        path: { messageId, key },
+      })
+    } catch (error) {
+      console.error('[SaveService] Failed to delete plot point state:', error)
+      throw error
+    }
+  }
+
+  // ============================================================================
+  // BATCH MESSAGE OPERATIONS
+  // ============================================================================
+
+  /**
+   * Batch create messages with their paragraphs in a single API call.
+   * This is much more efficient than creating messages one by one.
+   *
+   * @param storyId - The story ID
+   * @param messages - Array of messages to create with their content
+   * @returns Promise with the created message IDs
+   */
+  async saveMessagesBatch(
+    storyId: string,
+    messages: Array<{
+      id?: string
+      sceneId: string
+      sortOrder: number
+      instruction?: string
+      script?: string
+      content?: string // Will be split into paragraphs
+    }>,
+  ): Promise<{ created: number; messageIds: string[] }> {
+    // Check if this is a local story - if so, skip (handled elsewhere)
+    if (currentStoryStore.storageMode === 'local') {
+      console.log('[SaveService] Local storage mode, batch save not applicable')
+      return { created: 0, messageIds: [] }
+    }
+
+    // Don't batch save during a full save
+    if (this.state.isFullSaveInProgress) {
+      console.log('[SaveService] Full save in progress, skipping batch save')
+      return { created: 0, messageIds: [] }
+    }
+
+    // Import the batch endpoint
+    const { postMyStoriesByStoryIdMessagesBatch } = await import('../client/config')
+
+    // Transform messages to API format, splitting content into paragraphs
+    const batchMessages = messages.map((msg) => {
+      // Split content into paragraphs (double newline separation)
+      const paragraphs = msg.content
+        ? msg.content
+            .split(/\n\n+/)
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0)
+            .map((body, index) => ({
+              body,
+              sortOrder: index,
+            }))
+        : undefined
+
+      return {
+        id: msg.id,
+        sceneId: msg.sceneId,
+        sortOrder: msg.sortOrder,
+        instruction: msg.instruction,
+        script: msg.script,
+        paragraphs,
+      }
+    })
+
+    console.log(`[SaveService] Batch creating ${batchMessages.length} messages`)
+
+    const result = await postMyStoriesByStoryIdMessagesBatch({
+      path: { storyId },
+      body: { messages: batchMessages },
+    })
+
+    if (result.error) {
+      console.error('[SaveService] Batch save failed:', result.error)
+      throw new Error(result.error.error || 'Batch save failed')
+    }
+
+    console.log(`[SaveService] Batch created ${result.data?.created} messages`)
+
+    return {
+      created: result.data?.created ?? 0,
+      messageIds: result.data?.messageIds ?? [],
     }
   }
 

@@ -1,10 +1,12 @@
 import { Viewport } from 'pixi-viewport'
 import * as PIXI from 'pixi.js'
 import { Accessor } from 'solid-js'
+import { mapEditorStore } from '../../stores/mapEditorStore'
 import { Landmark } from '../../types/core'
 import { parseColorToHex } from '../../utils/maps/colorUtils'
 import {
   LandmarkSprite,
+  clearLandmarkTextureCache,
   createLabelText,
   createLandmarkSprite,
   landmarkHasChanged,
@@ -15,46 +17,50 @@ import { PixiContainers } from './usePixiMap'
 export type LandmarkClickHandler = (landmark: Landmark, screenPos: { x: number; y: number }, button: number) => void
 
 export interface UseLandmarkManagerOptions {
+  app: Accessor<PIXI.Application | null>
   viewport: Accessor<Viewport | null>
   containers: Accessor<PixiContainers>
   mapSprite: Accessor<PIXI.Sprite | null>
   canvasContainer: Accessor<HTMLDivElement | undefined>
   evaluateBorderColor: (landmarkName: string) => string
   onLandmarkClick?: LandmarkClickHandler
-  shouldStopPropagation?: () => boolean
-  interactive?: () => boolean
 }
 
 export interface UseLandmarkManagerReturn {
   addLandmark: (landmark: Landmark) => void
   removeLandmark: (landmarkId: string) => void
   updateLandmark: (landmark: Landmark, forceBorderColorCheck?: boolean) => void
-  clearAllLandmarks: () => void
+  clearAllLandmarks: (clearTextureCache?: boolean) => void
   refreshAllLandmarks: (landmarks: Landmark[]) => void
   updateLandmarkScales: (zoomLevel: number) => void
   setInteractive: (interactive: boolean) => void
 }
 
 /**
- * Hook to manage landmark sprites on the map
+ * Hook to manage landmark sprites on the map.
+ * Reads interactivity state from mapEditorStore.
  */
 export function useLandmarkManager(options: UseLandmarkManagerOptions): UseLandmarkManagerReturn {
   const {
+    app,
     viewport,
     containers,
     mapSprite,
     canvasContainer,
     evaluateBorderColor,
     onLandmarkClick,
-    shouldStopPropagation,
-    interactive,
   } = options
 
+  // Read interactivity from store - landmarks are interactive only in select mode
+  const shouldStopPropagation = () => mapEditorStore.creationMode === 'select'
+  const interactive = () => mapEditorStore.creationMode === 'select'
+
   const addLandmark = (landmark: Landmark) => {
+    const pixiApp = app()
     const landmarkContainer = containers().landmark
     const labelContainer = containers().label
     const sprite = mapSprite()
-    if (!landmarkContainer || !sprite) return
+    if (!pixiApp || !landmarkContainer || !sprite) return
 
     // Get border color from template (if any)
     const borderColor = evaluateBorderColor(landmark.name)
@@ -62,8 +68,9 @@ export function useLandmarkManager(options: UseLandmarkManagerOptions): UseLandm
     // Evaluate the interactive state at creation time
     const isInteractive = interactive ? interactive() : true
 
-    // Create the sprite using the imported utility
+    // Create the sprite using the imported utility (now uses cached textures)
     const landmarkSprite = createLandmarkSprite(landmark, {
+      app: pixiApp,
       borderColor,
       parseColorToHex,
       shouldStopPropagation: shouldStopPropagation ? shouldStopPropagation() : true,
@@ -147,7 +154,7 @@ export function useLandmarkManager(options: UseLandmarkManagerOptions): UseLandm
     }
   }
 
-  const clearAllLandmarks = () => {
+  const clearAllLandmarks = (clearTextureCache = false) => {
     const landmarkContainer = containers().landmark
     const labelContainer = containers().label
     if (landmarkContainer) {
@@ -155,6 +162,10 @@ export function useLandmarkManager(options: UseLandmarkManagerOptions): UseLandm
     }
     if (labelContainer) {
       labelContainer.removeChildren()
+    }
+    // Optionally clear texture cache when switching maps
+    if (clearTextureCache) {
+      clearLandmarkTextureCache()
     }
   }
 

@@ -200,15 +200,15 @@ describe('generateContextMessages', () => {
       ]
 
       const messages: Message[] = [
-        createMessage({ type: 'chapter', chapterId: 'ch-1', content: 'Chapter 1' }),
-        createMessage({ id: 'msg-1', chapterId: 'ch-1', content: 'Ch1 Message 1' }),
-        createMessage({ id: 'msg-2', chapterId: 'ch-1', content: 'Ch1 Message 2' }),
-        createMessage({ type: 'chapter', chapterId: 'ch-2', content: 'Chapter 2' }),
-        createMessage({ id: 'msg-3', chapterId: 'ch-2', content: 'Ch2 Message 1' }),
-        createMessage({ id: 'msg-4', chapterId: 'ch-2', content: 'Ch2 Message 2' }),
-        createMessage({ type: 'chapter', chapterId: 'ch-3', content: 'Chapter 3' }),
-        createMessage({ id: 'msg-5', chapterId: 'ch-3', content: 'Ch3 Message 1' }),
-        createMessage({ id: 'msg-6', chapterId: 'ch-3', content: 'Ch3 Message 2' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-1', content: 'Chapter 1' }),
+        createMessage({ id: 'msg-1', sceneId: 'ch-1', content: 'Ch1 Message 1' }),
+        createMessage({ id: 'msg-2', sceneId: 'ch-1', content: 'Ch1 Message 2' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-2', content: 'Chapter 2' }),
+        createMessage({ id: 'msg-3', sceneId: 'ch-2', content: 'Ch2 Message 1' }),
+        createMessage({ id: 'msg-4', sceneId: 'ch-2', content: 'Ch2 Message 2' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-3', content: 'Chapter 3' }),
+        createMessage({ id: 'msg-5', sceneId: 'ch-3', content: 'Ch3 Message 1' }),
+        createMessage({ id: 'msg-6', sceneId: 'ch-3', content: 'Ch3 Message 2' }),
       ]
 
       const options: ContextGenerationOptions = {
@@ -241,10 +241,10 @@ describe('generateContextMessages', () => {
       ]
 
       const messages: Message[] = [
-        createMessage({ type: 'chapter', chapterId: 'ch-1' }),
-        createMessage({ chapterId: 'ch-1', content: 'Ch1 content' }),
-        createMessage({ type: 'chapter', chapterId: 'ch-2' }),
-        createMessage({ id: 'target', chapterId: 'ch-2', content: 'Ch2 content' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-1' }),
+        createMessage({ sceneId: 'ch-1', content: 'Ch1 content' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-2' }),
+        createMessage({ id: 'target', sceneId: 'ch-2', content: 'Ch2 content' }),
       ]
 
       const options: ContextGenerationOptions = {
@@ -269,10 +269,10 @@ describe('generateContextMessages', () => {
 
       // Messages define the actual story order
       const messages: Message[] = [
-        createMessage({ type: 'chapter', chapterId: 'ch-1' }),
-        createMessage({ type: 'chapter', chapterId: 'ch-2' }),
-        createMessage({ type: 'chapter', chapterId: 'ch-3' }),
-        createMessage({ id: 'target', chapterId: 'ch-3' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-1' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-2' }),
+        createMessage({ type: 'chapter', sceneId: 'ch-3' }),
+        createMessage({ id: 'target', sceneId: 'ch-3' }),
       ]
 
       const options: ContextGenerationOptions = {

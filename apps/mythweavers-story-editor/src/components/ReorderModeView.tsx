@@ -1,11 +1,13 @@
-import { BsArrowsMove, BsCheck, BsChevronDown, BsChevronUp, BsScissors, BsX } from 'solid-icons/bs'
-import { For, createEffect, createSignal } from 'solid-js'
+import { BsArrowsMove, BsCheck, BsChevronDown, BsChevronUp, BsScissors, BsTrash, BsX } from 'solid-icons/bs'
+import { For, Show, createEffect, createMemo, createSignal } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
+import { nodeStore } from '../stores/nodeStore'
 import { uiStore } from '../stores/uiStore'
 import { viewModeStore } from '../stores/viewModeStore'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
+import { InsertControls } from './InsertControls'
 import * as styles from './ReorderModeView.css'
 
 interface ReorderModeViewProps {
@@ -15,13 +17,22 @@ interface ReorderModeViewProps {
 export function ReorderModeView(_props: ReorderModeViewProps) {
   const displayMessages = createDisplayMessagesMemo()
 
+  // Get the currently selected node (scene)
+  const selectedNode = createMemo(() => {
+    const node = nodeStore.getSelectedNode()
+    if (node && node.type === 'scene') {
+      return node
+    }
+    return null
+  })
+
   const [reorderItems, setReorderItems] = createSignal<
     Array<{
       id: string
       type: 'message'
       content: string
       summary?: string
-      nodeId: string
+      sceneId: string
       originalIndex: number
     }>
   >([])
@@ -30,6 +41,12 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
   const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null)
   const [expandedItems, setExpandedItems] = createSignal<Set<string>>(new Set())
 
+  // Get the last message ID for insert controls at the bottom
+  const lastMessageId = createMemo(() => {
+    const items = reorderItems()
+    return items.length > 0 ? items[items.length - 1].id : null
+  })
+
   // Initialize reorder items when component mounts
   createEffect(() => {
     const items: Array<{
@@ -37,7 +54,7 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
       type: 'message'
       content: string
       summary?: string
-      nodeId: string
+      sceneId: string
       originalIndex: number
     }> = []
 
@@ -48,7 +65,7 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
         type: 'message',
         content: msg.content,
         summary: msg.summary,
-        nodeId: msg.nodeId || msg.chapterId || '',
+        sceneId: msg.sceneId || '',
         originalIndex: msg.order,
       })
     })
@@ -148,7 +165,7 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
     // Prepare the reorder data for the API
     const reorderData = reorderedItems.map((item, index) => ({
       messageId: item.id,
-      nodeId: item.nodeId,
+      sceneId: item.sceneId,
       order: index,
     }))
 
@@ -159,10 +176,10 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
     const allMessages = messagesStore.messages.map((msg) => {
       const reorderInfo = reorderMap.get(msg.id)
       if (reorderInfo) {
-        // This message was reordered, update its order and nodeId
+        // This message was reordered, update its order and sceneId
         return {
           ...msg,
-          nodeId: reorderInfo.nodeId,
+          sceneId: reorderInfo.sceneId,
           order: reorderInfo.order,
         }
       }
@@ -187,6 +204,24 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
     viewModeStore.setViewMode('normal')
   }
 
+  const selectedCount = createMemo(() => uiStore.getCutMessageCount())
+
+  const discardSelected = () => {
+    const cutIds = Array.from(uiStore.cutMessageIds)
+    if (cutIds.length === 0) return
+
+    // Soft-delete each selected message
+    for (const messageId of cutIds) {
+      messagesStore.deleteMessage(messageId)
+    }
+
+    // Remove discarded items from the reorder list
+    setReorderItems((items) => items.filter((item) => !cutIds.includes(item.id)))
+
+    // Clear the selection
+    uiStore.clearCut()
+  }
+
   const handleCutToggle = (event: MouseEvent, messageId: string) => {
     event.stopPropagation()
 
@@ -198,7 +233,26 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
       uiStore.toggleCutMessage(messageId)
     } else {
       // On desktop: check for modifier keys
-      if (event.ctrlKey || event.metaKey) {
+      if (event.shiftKey && uiStore.hasCutMessage()) {
+        // Shift-click: select range from lowest selected to clicked
+        const items = reorderItems()
+        const clickedIndex = items.findIndex((item) => item.id === messageId)
+        if (clickedIndex === -1) return
+
+        // Find the lowest index (furthest up) among currently selected
+        const selectedIndices = items
+          .map((item, idx) => (uiStore.isCut(item.id) ? idx : -1))
+          .filter((idx) => idx !== -1)
+        const lowestSelectedIndex = Math.min(...selectedIndices)
+
+        // Select all between lowest selected and clicked (inclusive)
+        const startIdx = Math.min(lowestSelectedIndex, clickedIndex)
+        const endIdx = Math.max(lowestSelectedIndex, clickedIndex)
+
+        for (let i = startIdx; i <= endIdx; i++) {
+          uiStore.addCutMessage(items[i].id)
+        }
+      } else if (event.ctrlKey || event.metaKey) {
         uiStore.toggleCutMessage(messageId)
       } else {
         // Without modifier: replace selection
@@ -218,6 +272,11 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
           <BsArrowsMove /> Reorder Messages
         </h3>
         <div class={styles.reorderActions}>
+          <Show when={selectedCount() > 0}>
+            <button class={styles.discardButton} onClick={discardSelected}>
+              <BsTrash /> Discard Selected ({selectedCount()})
+            </button>
+          </Show>
           <button class={styles.cancelButton} onClick={cancelReorder}>
             <BsX /> Cancel
           </button>
@@ -226,6 +285,12 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
           </button>
         </div>
       </div>
+
+      {/* Insert controls at the beginning of scene */}
+      <Show when={selectedNode()}>
+        <InsertControls afterMessageId={null} nodeId={selectedNode()?.id} />
+      </Show>
+
       <ul class={styles.reorderList}>
         <For each={reorderItems()}>
           {(item, index) => (
@@ -301,6 +366,11 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
           )}
         </For>
       </ul>
+
+      {/* Insert controls at the end of scene */}
+      <Show when={selectedNode()}>
+        <InsertControls afterMessageId={lastMessageId()} nodeId={selectedNode()?.id} />
+      </Show>
     </>
   )
 }

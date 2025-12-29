@@ -69,6 +69,13 @@ interface StoryHeaderProps {
   onRewriteMessages: () => void
   onExportStory: () => void
   onImportStory: () => void
+  onImportClaudeChat: (
+    conversationName: string,
+    messages: Message[],
+    importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => Promise<void>
+  serverAvailable: boolean
   isGenerating: boolean
   contextSize: number
   charsPerToken: number
@@ -249,7 +256,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                   active={viewModeStore.viewMode() === 'reorder'}
                   onClick={() => viewModeStore.setViewMode('reorder')}
                 >
-                  Reorder Messages
+                  Reorder/Move Messages
                 </DropdownItem>
                 <DropdownItem
                   icon={<BsCodeSlash />}
@@ -417,6 +424,8 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           onRewriteMessages={props.onRewriteMessages}
           onExportStory={props.onExportStory}
           onImportStory={props.onImportStory}
+          onImportClaudeChat={props.onImportClaudeChat}
+          serverAvailable={props.serverAvailable}
           isLoading={messagesStore.isLoading}
           isGenerating={props.isGenerating}
           provider={settingsStore.provider}

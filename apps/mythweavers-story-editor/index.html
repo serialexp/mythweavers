@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;
+      worker-src 'self' blob:;
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob:;
+      img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://api.mythweavers.io;
       font-src 'self';
       connect-src 'self'
         https://api.mythweavers.io
@@ -21,7 +22,10 @@
         wss://localhost:*
         wss://127.0.0.1:*;
     " />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>MythWeavers</title>
     <!-- Runtime configuration -->

@@ -28,6 +28,7 @@ import { getCharacterDisplayName } from '../utils/character'
 import { buildNodeMarkdown, buildPrecedingContextMarkdown } from '../utils/nodeContentExport'
 import { getChaptersInStoryOrder } from '../utils/nodeTraversal'
 import { ChapterContextManager } from './ChapterContextManager'
+import { CharacterUpdateModal } from './CharacterUpdateModal'
 import * as styles from './NodeHeader.css'
 import { NodeStatusMenu } from './NodeStatusMenu'
 import { StoryTimePicker } from './StoryTimePicker'
@@ -55,6 +56,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
   const [isSelectingStorylines, setIsSelectingStorylines] = createSignal(false)
   const [isEditingGoal, setIsEditingGoal] = createSignal(false)
   const [editGoal, setEditGoal] = createSignal(props.node.goal || '')
+  const [showCharacterUpdateModal, setShowCharacterUpdateModal] = createSignal(false)
 
   const { generateNodeSummary } = useOllama()
 
@@ -265,8 +267,12 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
 
   const handleDelete = async (e: MouseEvent) => {
     e.stopPropagation()
-    if (confirm(`Delete ${props.node.type} "${props.node.title}" and all its contents?`)) {
-      nodeStore.deleteNode(props.node.id)
+    const permanent = e.shiftKey
+    const confirmMsg = permanent
+      ? `PERMANENTLY delete ${props.node.type} "${props.node.title}" and all its contents? This cannot be undone!`
+      : `Delete ${props.node.type} "${props.node.title}" and all its contents?`
+    if (confirm(confirmMsg)) {
+      nodeStore.deleteNode(props.node.id, permanent)
     }
     setShowDropdown(false)
   }
@@ -653,6 +659,18 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 </button>
               </Show>
 
+              <Show when={props.node.type === 'scene'}>
+                <button
+                  class={styles.dropdownButton}
+                  onClick={() => {
+                    setShowCharacterUpdateModal(true)
+                    setShowDropdown(false)
+                  }}
+                >
+                  <BsPeople /> Update Character Description
+                </button>
+              </Show>
+
               <Show when={props.node.type === 'scene' && !isSelectingViewpoint()}>
                 <button class={styles.dropdownButton} onClick={handleSelectViewpoint}>
                   <BsPeople />
@@ -858,6 +876,11 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
           chapterNode={props.node}
         />
       </Show>
+
+      <CharacterUpdateModal
+        isOpen={showCharacterUpdateModal()}
+        onClose={() => setShowCharacterUpdateModal(false)}
+      />
     </>
   )
 }

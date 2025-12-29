@@ -106,6 +106,7 @@ export const loadingContainer = style({
   justifyContent: 'center',
   height: '100vh',
   gap: tokens.space['6'],
+  backgroundColor: tokens.color.surface.default,
 })
 
 export const loadingText = style({

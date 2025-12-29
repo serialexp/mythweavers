@@ -45,10 +45,10 @@ export async function migrateChaptersToScenes(
     }
   }
 
-  // Group messages by chapter (using legacy chapterId/nodeId fields)
+  // Group messages by their scene
   const messagesByChapter = new Map<string, Message[]>()
   for (const message of messages) {
-    const chapterId = message.chapterId || message.nodeId
+    const chapterId = message.sceneId
     if (chapterId) {
       const existing = messagesByChapter.get(chapterId) || []
       existing.push(message)
@@ -127,7 +127,7 @@ export function needsSceneMigration(chapters: Node[], scenes: Node[], messages: 
   }
 
   for (const chapter of chapters.filter((n) => n.type === 'chapter')) {
-    const hasMessages = messages.some((m) => m.chapterId === chapter.id || m.nodeId === chapter.id)
+    const hasMessages = messages.some((m) => m.sceneId === chapter.id)
     const hasScenes = (scenesByChapter.get(chapter.id) || 0) > 0
 
     if (hasMessages && !hasScenes) {

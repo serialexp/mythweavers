@@ -38,9 +38,9 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
   // Helper function to get the chapter node from a message ID
   const getChapterNodeForMessage = (messageId: string): Node | undefined => {
     const message = messagesStore.messages.find((m) => m.id === messageId)
-    if (!message || !message.nodeId) return undefined
+    if (!message || !message.sceneId) return undefined
 
-    const node = nodeStore.nodesArray.find((n) => n.id === message.nodeId)
+    const node = nodeStore.nodesArray.find((n) => n.id === message.sceneId)
     if (!node || node.type !== 'chapter') return undefined
 
     return node
@@ -110,11 +110,12 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         messages,
         contextType: settingsStore.useSmartContext ? 'smart-story' : 'story',
         storySetting: currentStoryStore.storySetting,
+        storyFormat: currentStoryStore.storyFormat,
         person: currentStoryStore.person,
         tense: currentStoryStore.tense,
         protagonistName,
         viewpointCharacterName,
-        paragraphsPerTurn: settingsStore.paragraphsPerTurn,
+        paragraphsPerTurn: currentStoryStore.paragraphsPerTurn,
         characterContext: fullContext,
         characters: charactersStore.characters,
         contextItems: contextItemsStore.contextItems,
@@ -152,7 +153,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         // Generating auto-instructions
         const autoInstructions = await generateNextStoryBeatInstructions(
           generateAnalysis,
-          settingsStore.paragraphsPerTurn,
+          currentStoryStore.paragraphsPerTurn,
         )
         // Generated auto-instructions
 
@@ -192,9 +193,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         order: 0, // Will be set properly by insertMessage/addMessage
         isQuery: true,
         model: settingsStore.model,
-        // Use nodeId for new node-based navigation, chapterId for old chapters
-        nodeId: selectedNodeId || undefined,
-        chapterId: !selectedNodeId ? selectedChapterId || messagesStore.getCurrentChapterId() : undefined,
+        sceneId: selectedNodeId || selectedChapterId || messagesStore.getCurrentChapterId() || undefined,
       }
 
       // Insert query at the end of selected node
@@ -288,9 +287,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         order: 0, // Will be set properly by insertMessage/addMessage
         isQuery: false,
         model: settingsStore.model,
-        // Use nodeId for new node-based navigation, chapterId for old chapters
-        nodeId: selectedNodeId || undefined,
-        chapterId: !selectedNodeId ? selectedChapterId || messagesStore.getCurrentChapterId() : undefined,
+        sceneId: selectedNodeId || selectedChapterId || messagesStore.getCurrentChapterId() || undefined,
       }
       // If a node is selected, insert at the end of that node
       if (selectedNodeId) {

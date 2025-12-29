@@ -45,12 +45,12 @@ export function getDisplayMessages(): Message[] {
 
     // For chapters: filter by chapterId or nodeId (legacy)
     // Include messages that belong to this chapter via chapterId
-    if (msg.chapterId === selectedNode.id) {
+    if (msg.sceneId === selectedNode.id) {
       return true
     }
 
     // Include messages that belong to this chapter via nodeId
-    if (msg.nodeId === selectedNode.id) {
+    if (msg.sceneId === selectedNode.id) {
       return true
     }
 
@@ -72,8 +72,8 @@ export function getDisplayMessages(): Message[] {
     '[getDisplayMessages] First few message IDs:',
     sortedMessages.slice(0, 3).map((m) => ({
       id: m.id,
-      nodeId: m.nodeId,
-      chapterId: m.chapterId,
+      nodeId: m.sceneId,
+      chapterId: m.sceneId,
       order: m.order,
     })),
   )

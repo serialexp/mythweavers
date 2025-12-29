@@ -17,8 +17,11 @@ import { Calendar } from '../types/api'
 import { CalendarEditor } from './CalendarEditor'
 import * as styles from './CalendarManagement.css'
 
+// Extended Calendar type that includes isDefault from list response
+type CalendarWithDefault = Calendar & { isDefault: boolean }
+
 export const CalendarManagement: Component = () => {
-  const [calendars, setCalendars] = createSignal<Calendar[]>([])
+  const [calendars, setCalendars] = createSignal<CalendarWithDefault[]>([])
   const [defaultCalendarId, setDefaultCalendarId] = createSignal<string | null>(null)
   const [showAddCalendar, setShowAddCalendar] = createSignal(false)
   const [editingCalendarId, setEditingCalendarId] = createSignal<string | null>(null)
@@ -51,19 +54,27 @@ export const CalendarManagement: Component = () => {
               path: { id: cal.id },
             })
             if (fullResponse.data?.calendar) {
-              const config = fullResponse.data.calendar.config
+              const fullCal = fullResponse.data.calendar
+              const config = fullCal.config
               return {
-                ...cal,
+                id: fullCal.id,
+                storyId: fullCal.storyId,
                 config: typeof config === 'string' ? JSON.parse(config) : config,
-              }
+                createdAt: fullCal.createdAt,
+                updatedAt: fullCal.updatedAt,
+                // Preserve isDefault from list response since full response doesn't include it
+                isDefault: cal.isDefault,
+              } as CalendarWithDefault
             }
-            return cal
+            return null
           }),
         )
-        setCalendars(fullCalendars as Calendar[])
+        // Filter out null entries
+        const validCalendars = fullCalendars.filter((cal): cal is CalendarWithDefault => cal !== null)
+        setCalendars(validCalendars)
 
         // Find the default calendar
-        const defaultCal = fullCalendars.find((cal) => cal.isDefault)
+        const defaultCal = validCalendars.find((cal) => cal.isDefault)
         if (defaultCal) {
           setDefaultCalendarId(defaultCal.id)
         }

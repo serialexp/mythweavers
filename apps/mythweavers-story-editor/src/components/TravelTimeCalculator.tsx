@@ -1,44 +1,8 @@
 import { Alert, Button, Card, CardBody, FormField, Modal, Select, Spinner, Stack } from '@mythweavers/ui'
-import { Component, For, Show, createEffect, createSignal } from 'solid-js'
+import { Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js'
 import { mapsStore } from '../stores/mapsStore'
-import { apiClient } from '../utils/apiClient'
 import { type PathSegment, calculateOptimalPath, formatTravelTime } from '../utils/maps/pathfinding'
 import * as styles from './TravelTimeCalculator.css'
-
-interface Landmark {
-  id: string
-  mapId: string
-  name: string
-  x: number
-  y: number
-  description?: string
-  region?: string
-  sector?: string
-  type?: string
-  population?: string
-  industry?: string
-  planetaryBodies?: string
-  color?: string
-  size?: string
-}
-
-interface Hyperlane {
-  id: string
-  mapId: string
-  speedMultiplier: number
-  segments: {
-    id: string
-    hyperlaneId: string
-    mapId: string
-    order: number
-    startX: number
-    startY: number
-    endX: number
-    endY: number
-    startLandmarkId?: string | null
-    endLandmarkId?: string | null
-  }[]
-}
 
 interface TravelTimeCalculatorProps {
   isOpen: boolean
@@ -48,8 +12,6 @@ interface TravelTimeCalculatorProps {
 
 export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props) => {
   const [selectedMapId, setSelectedMapId] = createSignal<string>('')
-  const [landmarks, setLandmarks] = createSignal<Landmark[]>([])
-  const [hyperlanes, setHyperlanes] = createSignal<Hyperlane[]>([])
   const [fromLandmarkId, setFromLandmarkId] = createSignal<string>('')
   const [toLandmarkId, setToLandmarkId] = createSignal<string>('')
   const [hyperdriveRating, setHyperdriveRating] = createSignal<number>(1)
@@ -57,24 +19,22 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
   const [isLoading, setIsLoading] = createSignal(false)
   const [error, setError] = createSignal<string>('')
 
-  // Load map data when map is selected
+  // Get current map's landmarks and hyperlanes from mapsStore
+  const currentMap = createMemo(() => mapsStore.maps.find((m) => m.id === selectedMapId()))
+  const landmarks = createMemo(() => currentMap()?.landmarks || [])
+  const hyperlanes = createMemo(() => currentMap()?.hyperlanes || [])
+
+  // Load map details when map is selected
   createEffect(async () => {
     const mapId = selectedMapId()
     if (!mapId) {
-      setLandmarks([])
-      setHyperlanes([])
       return
     }
 
     setIsLoading(true)
     setError('')
     try {
-      const [landmarksData, hyperlanesData] = await Promise.all([
-        apiClient.getMapLandmarks(mapId),
-        apiClient.getMapHyperlanes(mapId),
-      ])
-      setLandmarks(landmarksData)
-      setHyperlanes(hyperlanesData)
+      await mapsStore.ensureMapDetails(mapId)
     } catch (err) {
       setError(`Failed to load map data: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
@@ -146,6 +106,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
   const handleClose = () => {
     setResult(null)
     setError('')
+    setSelectedMapId('')
     setFromLandmarkId('')
     setToLandmarkId('')
     setHyperdriveRating(1)
@@ -172,7 +133,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
               placeholder="Select start landmark..."
               options={landmarks().map((landmark) => ({
                 value: landmark.id,
-                label: landmark.name + (landmark.region ? ` (${landmark.region})` : ''),
+                label: landmark.name + (landmark.properties?.region ? ` (${landmark.properties.region})` : ''),
               }))}
             />
           </FormField>
@@ -184,7 +145,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
               placeholder="Select destination landmark..."
               options={landmarks().map((landmark) => ({
                 value: landmark.id,
-                label: landmark.name + (landmark.region ? ` (${landmark.region})` : ''),
+                label: landmark.name + (landmark.properties?.region ? ` (${landmark.properties.region})` : ''),
               }))}
             />
           </FormField>
@@ -192,7 +153,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
           <FormField
             label={
               <>
-                Hyperdrive Rating:{' '}
+                Speed Rating:{' '}
                 <span class={styles.ratingValue}>{hyperdriveRating()}</span>
               </>
             }
@@ -232,7 +193,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
                 <CardBody>
                   <strong>Total Travel Time:</strong>{' '}
                   <span class={styles.totalTime}>
-                    {r().totalTime} minutes ({formatTravelTime(r().totalTime)})
+                    {formatTravelTime(r().totalTime)}
                   </span>
                 </CardBody>
               </Card>
@@ -260,7 +221,7 @@ export const TravelTimeCalculator: Component<TravelTimeCalculatorProps> = (props
                               {from} → {to}
                             </div>
                             <div class={styles.segmentTime}>
-                              {segment.travelTime} minutes ({formatTravelTime(segment.travelTime)})
+                              {formatTravelTime(segment.travelTime)}
                             </div>
                           </div>
                         </div>

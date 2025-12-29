@@ -11,17 +11,99 @@ const SIZE_MAP = {
 // Junctions are even smaller
 const JUNCTION_RADIUS = 4
 
-// Extended LandmarkSprite interface
-export interface LandmarkSprite extends PIXI.Graphics {
+// Texture cache for landmark sprites - key is `${color}-${size}-${type}-${borderColor}`
+const textureCache = new Map<string, PIXI.Texture>()
+
+// Get or create a cached texture for a landmark appearance
+function getOrCreateLandmarkTexture(
+  app: PIXI.Application,
+  color: string,
+  size: 'small' | 'medium' | 'large',
+  type: 'system' | 'station' | 'nebula' | 'junction',
+  borderColor: string | undefined,
+  parseColorToHex: (color: string) => number,
+): PIXI.Texture {
+  const cacheKey = `${color}-${size}-${type}-${borderColor || 'none'}`
+
+  if (textureCache.has(cacheKey)) {
+    return textureCache.get(cacheKey)!
+  }
+
+  // Create a temporary graphics object to draw the landmark
+  const graphics = new PIXI.Graphics()
+  const radius = type === 'junction' ? JUNCTION_RADIUS : SIZE_MAP[size]
+
+  // Draw border if provided
+  const hasBorderColor = borderColor && borderColor !== ''
+  if (hasBorderColor) {
+    const borderColorHex = parseColorToHex(borderColor!)
+    graphics.circle(0, 0, radius - 1).stroke({ width: 2, color: 0xffffff, alpha: 1 })
+    graphics.circle(0, 0, radius - 1).fill({ color: borderColorHex })
+  }
+
+  // Draw main pin circle
+  const colorHex = Number.parseInt(color?.replace('#', '') || '3498db', 16)
+  const innerRadius = hasBorderColor ? radius - 3 : radius
+  graphics.circle(0, 0, innerRadius).stroke({ width: 1, color: 0xffffff, alpha: 0.5 }).fill({ color: colorHex })
+
+  // Add type-specific overlays
+  drawTypeOverlay(graphics, type, radius, colorHex)
+
+  // Calculate bounds for the texture (add padding for borders and overlays)
+  const padding = 4
+  const maxRadius = radius + padding
+  const textureSize = maxRadius * 2
+
+  // Render to texture
+  const renderTexture = PIXI.RenderTexture.create({
+    width: textureSize,
+    height: textureSize,
+    resolution: window.devicePixelRatio || 1,
+  })
+
+  // Position graphics at center of texture
+  graphics.x = maxRadius
+  graphics.y = maxRadius
+
+  // Create a temporary container to render
+  const container = new PIXI.Container()
+  container.addChild(graphics)
+
+  app.renderer.render({
+    container,
+    target: renderTexture,
+  })
+
+  // Clean up the temporary graphics
+  graphics.destroy()
+  container.destroy()
+
+  // Cache and return the texture
+  textureCache.set(cacheKey, renderTexture)
+  return renderTexture
+}
+
+// Clear the texture cache (call when switching maps or cleaning up)
+export function clearLandmarkTextureCache(): void {
+  for (const texture of textureCache.values()) {
+    texture.destroy(true)
+  }
+  textureCache.clear()
+}
+
+// Extended LandmarkSprite interface - now extends Sprite instead of Graphics
+export interface LandmarkSprite extends PIXI.Sprite {
   landmarkData?: Landmark
   labelText?: PIXI.Text
   baseScale?: number // Store the current zoom-based scale
+  cacheKey?: string // Track which texture this sprite uses
 }
 
 /**
  * Options for creating landmark sprites
  */
 export interface LandmarkRenderOptions {
+  app: PIXI.Application // Required for texture rendering
   borderColor?: string
   parseColorToHex: (color: string) => number
   onPointerDown?: (landmark: Landmark, e: PIXI.FederatedPointerEvent) => void
@@ -31,34 +113,28 @@ export interface LandmarkRenderOptions {
 
 /**
  * Create a landmark sprite with all visual elements and interactions
+ * Uses cached textures for better performance with many landmarks
  */
 export function createLandmarkSprite(landmark: Landmark, options: LandmarkRenderOptions): LandmarkSprite {
-  const sprite = new PIXI.Graphics() as LandmarkSprite
+  const color = landmark.color || '#3498db'
+  const size = landmark.size || 'medium'
+  const type = (landmark.type || 'system') as 'system' | 'station' | 'nebula' | 'junction'
+
+  // Get or create cached texture
+  const texture = getOrCreateLandmarkTexture(
+    options.app,
+    color,
+    size,
+    type,
+    options.borderColor,
+    options.parseColorToHex,
+  )
+
+  // Create sprite from texture
+  const sprite = new PIXI.Sprite(texture) as LandmarkSprite
+  sprite.anchor.set(0.5, 0.5) // Center the sprite
   sprite.landmarkData = { ...landmark }
-
-  // Use smaller radius for junctions
-  const radius = landmark.type === 'junction' ? JUNCTION_RADIUS : SIZE_MAP[landmark.size || 'medium']
-  sprite.clear()
-
-  // Draw border if provided
-  const hasBorderColor = options.borderColor && options.borderColor !== ''
-  if (hasBorderColor) {
-    const borderColorHex = options.parseColorToHex(options.borderColor!)
-
-    // White border ring
-    sprite.circle(0, 0, radius - 1).stroke({ width: 2, color: 0xffffff, alpha: 1 })
-
-    sprite.circle(0, 0, radius - 1).fill({ color: borderColorHex })
-  }
-
-  // Draw main pin circle
-  const color = Number.parseInt(landmark.color?.replace('#', '') || '3498db', 16)
-  const innerRadius = hasBorderColor ? radius - 3 : radius
-
-  sprite.circle(0, 0, innerRadius).stroke({ width: 1, color: 0xffffff, alpha: 0.5 }).fill({ color })
-
-  // Add type-specific overlays
-  drawTypeOverlay(sprite, landmark.type || 'system', radius, color)
+  sprite.cacheKey = `${color}-${size}-${type}-${options.borderColor || 'none'}`
 
   // Set initial appearance
   sprite.alpha = 0.8
@@ -109,6 +185,37 @@ export function createLandmarkSprite(landmark: Landmark, options: LandmarkRender
   }
 
   return sprite
+}
+
+/**
+ * Update a landmark sprite's texture if its appearance changed
+ */
+export function updateLandmarkSpriteTexture(
+  sprite: LandmarkSprite,
+  landmark: Landmark,
+  options: LandmarkRenderOptions,
+): void {
+  const color = landmark.color || '#3498db'
+  const size = landmark.size || 'medium'
+  const type = (landmark.type || 'system') as 'system' | 'station' | 'nebula' | 'junction'
+  const newCacheKey = `${color}-${size}-${type}-${options.borderColor || 'none'}`
+
+  // Only update texture if appearance changed
+  if (sprite.cacheKey !== newCacheKey) {
+    const texture = getOrCreateLandmarkTexture(
+      options.app,
+      color,
+      size,
+      type,
+      options.borderColor,
+      options.parseColorToHex,
+    )
+    sprite.texture = texture
+    sprite.cacheKey = newCacheKey
+  }
+
+  // Update landmark data
+  sprite.landmarkData = { ...landmark }
 }
 
 /**

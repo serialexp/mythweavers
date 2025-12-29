@@ -26,6 +26,12 @@ interface GenerateResponse {
   context?: any[]
 }
 
+export interface TokenEstimate {
+  tokens: number
+  isExact: boolean
+  method: 'api' | 'heuristic'
+}
+
 class OllamaClientWrapper {
   private ollama: Ollama
 
@@ -35,6 +41,22 @@ class OllamaClientWrapper {
 
   async list() {
     return this.ollama.list()
+  }
+
+  /**
+   * Estimate token count for messages.
+   * Ollama doesn't have a token counting API, so we use a heuristic.
+   * Returns approximately chars / 4 as a rough estimate.
+   */
+  estimateTokens(messages: ChatMessage[]): TokenEstimate {
+    const totalChars = messages.reduce((sum, msg) => sum + msg.content.length, 0)
+    // Rough heuristic: ~4 characters per token on average
+    const estimatedTokens = Math.ceil(totalChars / 4)
+    return {
+      tokens: estimatedTokens,
+      isExact: false,
+      method: 'heuristic',
+    }
   }
 
   async show(options: { model: string }) {

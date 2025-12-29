@@ -14,6 +14,7 @@ import { LoginForm } from './components/LoginForm'
 // SceneEditorWrapper import removed - component used via lazy loading or routes
 import { MessageList } from './components/MessageList'
 import { MessageRewriterDialog } from './components/MessageRewriterDialog'
+import { SingleRewriteDialog } from './components/SingleRewriteDialog'
 import { PendingEntitiesModal } from './components/PendingEntitiesModal'
 import { ResetPassword } from './components/ResetPassword'
 import { SearchModal } from './components/SearchModal'
@@ -38,6 +39,7 @@ import { headerStore } from './stores/headerStore'
 import { mapsStore } from './stores/mapsStore'
 import { messagesStore } from './stores/messagesStore'
 import { navigationStore } from './stores/navigationStore'
+import { plotPointsStore } from './stores/plotPointsStore'
 import { modelsStore } from './stores/modelsStore'
 import { nodeStore } from './stores/nodeStore'
 import { rewriteDialogStore } from './stores/rewriteDialogStore'
@@ -45,6 +47,7 @@ import { serverStore } from './stores/serverStore'
 import { settingsStore } from './stores/settingsStore'
 import { ApiStory } from './types/api'
 import { Chapter, Character, ContextItem, Message, Node } from './types/core'
+import { importClaudeChat } from './utils/claudeChatImporter'
 import { migrateChaptersToScenes, needsSceneMigration } from './utils/scenesMigration'
 import { storyManager } from './utils/storyManager'
 
@@ -191,8 +194,9 @@ const App: Component = () => {
         perspectiveMap[story.defaultPerspective || 'THIRD'],
         tenseMap[story.defaultTense || 'PAST'],
         story.genre || '', // genre is the storySetting field
+        (story.format as 'narrative' | 'cyoa') || 'narrative',
         story.paragraphsPerTurn ?? 3,
-        undefined, // globalScript - not in new schema
+        story.globalScript ?? undefined,
         story.timelineStartTime ?? undefined,
         story.timelineEndTime ?? undefined,
         story.timelineGranularity || 'hour',
@@ -219,6 +223,29 @@ const App: Component = () => {
         mapsStore.loadFromExport(maps)
       } else {
         mapsStore.clearMaps()
+      }
+
+      // Load plot point definitions from story
+      plotPointsStore.setDefinitions(story.plotPointDefaults || [])
+
+      // Fetch plot point states from API
+      try {
+        const { getMyStoriesByStoryIdPlotPointStates } = await import('./client/config')
+        const { data } = await getMyStoriesByStoryIdPlotPointStates({ path: { storyId } })
+        const plotPointStates = data?.plotPointStates ?? []
+        plotPointsStore.setStates(
+          plotPointStates.map((s) => ({
+            id: s.id,
+            storyId: s.storyId,
+            messageId: s.messageId,
+            key: s.key,
+            value: s.value,
+          })),
+        )
+      } catch (error) {
+        console.error('[loadServerStoryData] Failed to load plot point states:', error)
+        // Don't fail the whole load, just continue with empty states
+        plotPointsStore.setStates([])
       }
 
       // Transform the hierarchical data into flat arrays for the old system
@@ -272,6 +299,7 @@ const App: Component = () => {
               sortOrder: chapter.sortOrder,
               order: chapterIndex,
               nodeType: chapter.nodeType || 'story',
+              status: chapter.status,
               expanded: true,
               isOpen: true,
               createdAt: chapter.createdAt,
@@ -297,6 +325,8 @@ const App: Component = () => {
                 viewpointCharacterId: scene.viewpointCharacterId,
                 perspective: scene.perspective,
                 storyTime: scene.storyTime,
+                status: scene.status,
+                includeInFull: scene.includeInFull,
                 expanded: true,
                 isOpen: true,
                 createdAt: scene.createdAt,
@@ -331,9 +361,7 @@ const App: Component = () => {
                     script: message.script || undefined,
                     timestamp: new Date(message.createdAt),
                     order: message.sortOrder,
-                    sceneId: scene.id, // Link to scene (new)
-                    nodeId: chapter.id, // Keep for backward compat
-                    chapterId: chapter.id, // Keep for backward compat
+                    sceneId: scene.id,
                     currentMessageRevisionId: message.currentMessageRevisionId, // Needed for paragraph operations
                     isQuery: false,
                     think: message.revision.think || undefined,
@@ -341,6 +369,9 @@ const App: Component = () => {
                     tokensPerSecond: message.revision.tokensPerSecond || undefined,
                     totalTokens: message.revision.totalTokens || undefined,
                     promptTokens: message.revision.promptTokens || undefined,
+                    // Branch support
+                    type: message.type || undefined,
+                    options: message.options || undefined,
                   }
 
                   messages.push(messageWithParagraphs)
@@ -356,18 +387,32 @@ const App: Component = () => {
         messageCount: messages.length,
       })
 
+      // Transform characters to include image URLs
+      const { getApiBaseUrl } = await import('./client/config')
+      const baseUrl = getApiBaseUrl()
+      const transformedCharacters = (characters || []).map((char: any) => ({
+        ...char,
+        // If pictureFileUrl exists, construct the full URL for the image
+        profileImageData: char.pictureFileUrl ? `${baseUrl}${char.pictureFileUrl}` : null,
+      }))
+
       // Load the story data with transformed arrays
       handleLoadStory(
         messages,
-        characters || [],
+        transformedCharacters,
         '', // input - not stored in new schema
         '', // storySetting - not stored in new schema
         [], // chapters - converted to nodes
         null, // selectedChapterId
         contextItems || [],
         nodes,
-        null, // selectedNodeId - will auto-select first chapter
+        story.selectedNodeId || null, // Restore last selected node
       )
+
+      // Set branch choices after data is loaded
+      if (story.branchChoices) {
+        currentStoryStore.setBranchChoices(story.branchChoices)
+      }
 
       // Clean up any local duplicate
       console.log('[loadServerStoryData] Cleaning up local duplicate...')
@@ -395,6 +440,7 @@ const App: Component = () => {
     nodeStore.clear()
     currentStoryStore.clearStory()
     mapsStore.clearMaps()
+    plotPointsStore.clear()
   }
 
   // Load story by ID (used by story route)
@@ -479,6 +525,7 @@ const App: Component = () => {
         story.person,
         story.tense,
         story.storySetting,
+        story.storyFormat,
         story.paragraphsPerTurn,
         story.globalScript,
         story.timelineStartTime,
@@ -490,6 +537,11 @@ const App: Component = () => {
 
       // Sync provider and model from story to settingsStore
       settingsStore.syncFromStory(story.provider, story.model)
+
+      // Initialize plot points for local stories (definitions only, no API states)
+      // Local stories may have plotPointDefaults if they were synced from server
+      plotPointsStore.setDefinitions((story as any).plotPointDefaults || [])
+      plotPointsStore.setStates([]) // Local stories don't have API-stored states
 
       // Run scene migration if needed (local stories)
       let nodesToLoad = story.nodes || []
@@ -787,6 +839,25 @@ const App: Component = () => {
     // Story imported from text
   }
 
+  const handleImportClaudeChat = async (
+    conversationName: string,
+    messages: Message[],
+    importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => {
+    const { storyId } = await importClaudeChat({
+      conversationName,
+      messages,
+      importTarget,
+      storageMode,
+    })
+
+    // Navigate to the story if we created a new one
+    if (importTarget === 'new') {
+      window.location.href = `/story/${storyId}`
+    }
+  }
+
   const handleLoadStory = (
     messages: Message[],
     characters: Character[],
@@ -844,18 +915,7 @@ const App: Component = () => {
     if (nodes && nodes.length > 0) {
       nodeStore.setNodes(nodes)
 
-      // Ensure all messages have nodeId if they have chapterId
-      // This handles messages from the transition period
-      messagesWithDates = messagesWithDates.map((msg) => {
-        if (!msg.nodeId && msg.chapterId) {
-          // Check if there's a node with the same ID as the chapterId
-          const matchingNode = nodes.find((n) => n.id === msg.chapterId)
-          if (matchingNode) {
-            return { ...msg, nodeId: msg.chapterId }
-          }
-        }
-        return msg
-      })
+      // Messages should already have sceneId set from the backend
 
       // Select the saved node or auto-select first scene if none selected
       if (selectedNodeId) {
@@ -897,10 +957,10 @@ const App: Component = () => {
         nodeStore.setNodes([...nodeStore.nodesArray, newNode])
         chapterIdMap.set(chapter.id, chapter.id)
 
-        // Update messages that belong to this chapter
+        // Update messages that belong to this chapter to use sceneId
         messagesWithDates = messagesWithDates.map((msg) => {
-          if (msg.chapterId === chapter.id) {
-            return { ...msg, nodeId: chapter.id }
+          if ((msg as any).chapterId === chapter.id) {
+            return { ...msg, sceneId: chapter.id }
           }
           return msg
         })
@@ -1161,6 +1221,8 @@ const App: Component = () => {
                           onRewriteMessages={handleRewriteMessages}
                           onExportStory={handleExportStory}
                           onImportStory={handleImportStory}
+                          onImportClaudeChat={handleImportClaudeChat}
+                          serverAvailable={serverStore.isAvailable}
                           isGenerating={isGenerating() || ollamaExternallyBusy()}
                           contextSize={effectiveContextSize()}
                           charsPerToken={settingsStore.charsPerToken}
@@ -1239,6 +1301,8 @@ const App: Component = () => {
                         <PendingEntitiesModal />
 
                         <MessageRewriterDialog />
+
+                        <SingleRewriteDialog />
 
                         <CopyTokenModal />
 

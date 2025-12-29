@@ -1,6 +1,7 @@
 import { Viewport } from 'pixi-viewport'
 import * as PIXI from 'pixi.js'
 import { Accessor, createSignal, onCleanup, onMount } from 'solid-js'
+import { clearLandmarkTextureCache } from '../../utils/maps/landmarkRenderer'
 
 export interface PixiContainers {
   voronoi: PIXI.Container | null
@@ -19,6 +20,7 @@ export interface PixiMapReturn {
   containers: Accessor<PixiContainers>
   isReady: Accessor<boolean>
   initialize: () => Promise<void>
+  render: () => void
 }
 
 /**
@@ -39,6 +41,14 @@ export function usePixiMap(containerRef: Accessor<HTMLDivElement | undefined>): 
     brush: null,
   })
   const [isReady, setIsReady] = createSignal(false)
+
+  // Manual render function for immediate updates when needed
+  const render = () => {
+    const pixiApp = app()
+    if (pixiApp) {
+      pixiApp.render()
+    }
+  }
 
   // Exposed initialization function to be called from component
   const initialize = async () => {
@@ -76,6 +86,11 @@ export function usePixiMap(containerRef: Accessor<HTMLDivElement | undefined>): 
       minScale: 0.1,
       maxScale: 5,
     })
+
+    // Additional render triggers for viewport changes (ensures smooth updates)
+    const triggerRender = () => pixiApp.render()
+    vp.on('moved-end', triggerRender)
+    vp.on('zoomed-end', triggerRender)
 
     // Create containers in proper render order
     const voronoiContainer = new PIXI.Container()
@@ -120,6 +135,9 @@ export function usePixiMap(containerRef: Accessor<HTMLDivElement | undefined>): 
       brush: brushSprite,
     })
     setIsReady(true)
+
+    // Initial render
+    pixiApp.render()
   }
 
   // Handle resize
@@ -131,6 +149,7 @@ export function usePixiMap(containerRef: Accessor<HTMLDivElement | undefined>): 
     if (pixiApp && container && vp) {
       pixiApp.renderer.resize(container.clientWidth, container.clientHeight)
       vp.resize(container.clientWidth, container.clientHeight)
+      pixiApp.render()
     }
   }
 
@@ -142,6 +161,11 @@ export function usePixiMap(containerRef: Accessor<HTMLDivElement | undefined>): 
   // Cleanup
   onCleanup(() => {
     window.removeEventListener('resize', handleResize)
+
+    // Clear landmark texture cache before destroying the app
+    // (textures are tied to the renderer and become invalid when app is destroyed)
+    clearLandmarkTextureCache()
+
     const pixiApp = app()
     if (pixiApp) {
       pixiApp.destroy(true)
@@ -167,5 +191,6 @@ export function usePixiMap(containerRef: Accessor<HTMLDivElement | undefined>): 
     containers,
     isReady,
     initialize,
+    render,
   }
 }

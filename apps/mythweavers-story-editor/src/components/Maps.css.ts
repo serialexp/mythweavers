@@ -2,11 +2,16 @@ import { style, keyframes, globalStyle } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
 
 export const mapsPanel = style({
+  height: '100%',
+  overflow: 'hidden',
+  boxSizing: 'border-box',
+})
+
+// Override ListDetailPanel's detail content padding for maps (need full-bleed canvas)
+globalStyle(`${mapsPanel} > div:last-child > div:last-child`, {
+  padding: '0.5rem',
   display: 'flex',
   flexDirection: 'column',
-  height: '100%',
-  gap: '1rem',
-  padding: '1rem',
 })
 
 export const mapSelector = style({
@@ -60,7 +65,7 @@ export const iconButton = style({
   justifyContent: 'center',
   transition: 'background-color 0.2s',
   ':hover': {
-    background: 'var(--bg-quaternary)',
+    background: tokens.color.surface.hover,
   },
   ':disabled': {
     opacity: 0.5,
@@ -69,12 +74,12 @@ export const iconButton = style({
 })
 
 export const deleteButton = style({
-  background: 'var(--danger-bg)',
+  background: tokens.color.semantic.errorSubtle,
   color: tokens.color.semantic.error,
-  borderColor: 'var(--danger-border)',
+  borderColor: tokens.color.semantic.error,
   selectors: {
     '&:hover:not(:disabled)': {
-      background: 'var(--danger-bg-hover)',
+      background: tokens.color.semantic.error,
     },
   },
 })
@@ -124,7 +129,7 @@ export const fileInputLabel = style({
   textAlign: 'center',
   transition: 'all 0.2s',
   ':hover': {
-    background: 'var(--bg-quaternary)',
+    background: tokens.color.surface.hover,
     borderColor: tokens.color.accent.primary,
   },
 })
@@ -140,9 +145,9 @@ export const selectedFile = style({
 
 export const addMapButton = style({
   padding: '0.75rem',
-  background: 'var(--accent-bg)',
+  background: tokens.color.surface.selected,
   color: tokens.color.accent.primary,
-  border: '1px solid var(--accent-border)',
+  border: `1px solid ${tokens.color.accent.primary}`,
   borderRadius: '4px',
   cursor: 'pointer',
   fontWeight: 500,
@@ -153,7 +158,7 @@ export const addMapButton = style({
   transition: 'all 0.2s',
   selectors: {
     '&:hover:not(:disabled)': {
-      background: 'var(--accent-bg-hover)',
+      background: tokens.color.accent.primaryHover,
     },
   },
   ':disabled': {
@@ -169,7 +174,7 @@ export const mapViewer = style({
   border: `1px solid ${tokens.color.border.default}`,
   borderRadius: '4px',
   overflow: 'hidden',
-  minHeight: '400px',
+  minHeight: 0,
   display: 'flex',
   gap: 0,
 })
@@ -238,10 +243,11 @@ export const paintControls = style({
   top: '70px',
   right: '10px',
   zIndex: 100,
-  background: 'white',
+  background: tokens.color.bg.elevated,
+  border: `1px solid ${tokens.color.border.default}`,
   padding: '0.75rem',
-  borderRadius: 'var(--radius-md)',
-  boxShadow: 'var(--shadow-md)',
+  borderRadius: tokens.radius.md,
+  boxShadow: tokens.shadow.md,
   display: 'flex',
   alignItems: 'center',
   flexDirection: 'row',
@@ -256,7 +262,7 @@ export const paintToggle = style({
   fontSize: '0.875rem',
   fontWeight: 500,
   userSelect: 'none',
-  color: '#333',
+  color: tokens.color.text.primary,
 })
 
 globalStyle(`${paintToggle} input[type="checkbox"]`, {
@@ -268,7 +274,7 @@ export const paintFactionSelect = style({
   background: tokens.color.bg.raised,
   color: tokens.color.text.primary,
   border: `1px solid ${tokens.color.border.default}`,
-  borderRadius: 'var(--radius-sm)',
+  borderRadius: tokens.radius.sm,
   fontSize: '0.875rem',
   cursor: 'pointer',
   minWidth: '150px',
@@ -278,7 +284,9 @@ export const paintFactionSelect = style({
 })
 
 export const landmarksList = style({
-  width: '250px',
+  flex: '0 0 30%',
+  maxWidth: '350px',
+  minWidth: '200px',
   background: tokens.color.bg.base,
   borderLeft: `1px solid ${tokens.color.border.default}`,
   display: 'flex',
@@ -313,7 +321,7 @@ export const sortButton = style({
   fontSize: '0.8rem',
   transition: 'all 0.2s',
   ':hover': {
-    background: 'var(--bg-quaternary)',
+    background: tokens.color.surface.hover,
     color: tokens.color.text.primary,
   },
 })
@@ -326,7 +334,6 @@ export const landmarksListContent = style({
 
 export const landmarkListItem = style({
   padding: '0.5rem',
-  marginBottom: '0.25rem',
   background: tokens.color.bg.raised,
   border: `1px solid ${tokens.color.border.default}`,
   borderRadius: '4px',
@@ -335,6 +342,7 @@ export const landmarkListItem = style({
   display: 'flex',
   alignItems: 'center',
   gap: '0.5rem',
+  overflow: 'hidden',
   ':hover': {
     background: tokens.color.bg.elevated,
     borderColor: tokens.color.accent.primary,
@@ -342,8 +350,8 @@ export const landmarkListItem = style({
 })
 
 export const landmarkListItemSelected = style({
-  background: 'var(--accent-bg)',
-  borderColor: 'var(--accent-border)',
+  background: tokens.color.surface.selected,
+  borderColor: tokens.color.accent.primary,
   color: tokens.color.accent.primary,
 })
 
@@ -368,6 +376,60 @@ export const emptyLandmarksList = style({
   textAlign: 'center',
   color: tokens.color.text.secondary,
   fontSize: '0.85rem',
+})
+
+// Landmark detail panel (shown in place of list when landmark is selected)
+export const landmarkDetail = style({
+  flex: '0 0 30%',
+  maxWidth: '350px',
+  minWidth: '200px',
+  display: 'flex',
+  flexDirection: 'column',
+  background: tokens.color.bg.base,
+  borderLeft: `1px solid ${tokens.color.border.default}`,
+  overflow: 'hidden',
+  '@media': {
+    '(max-width: 768px)': {
+      display: 'none',
+    },
+  },
+})
+
+export const landmarkDetailHeader = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  padding: '0.5rem',
+  borderBottom: `1px solid ${tokens.color.border.default}`,
+  background: tokens.color.bg.raised,
+})
+
+export const backButton = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0.25rem',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: '4px',
+  color: tokens.color.text.secondary,
+  cursor: 'pointer',
+  ':hover': {
+    background: tokens.color.surface.hover,
+    color: tokens.color.text.primary,
+  },
+})
+
+export const landmarkDetailTitle = style({
+  fontSize: '0.85rem',
+  fontWeight: 600,
+  color: tokens.color.text.primary,
+})
+
+export const landmarkDetailContent = style({
+  flex: 1,
+  overflowY: 'auto',
+  padding: '0.75rem',
 })
 
 export const mapCanvas = style({
@@ -468,16 +530,16 @@ export const landmarkButton = style({
   fontSize: '0.85rem',
   transition: 'background-color 0.2s',
   ':hover': {
-    background: 'var(--bg-quaternary)',
+    background: tokens.color.surface.hover,
   },
 })
 
 export const landmarkButtonDelete = style({
-  background: 'var(--danger-bg)',
+  background: tokens.color.semantic.errorSubtle,
   color: tokens.color.semantic.error,
-  borderColor: 'var(--danger-border)',
+  borderColor: tokens.color.semantic.error,
   ':hover': {
-    background: 'var(--danger-bg-hover)',
+    background: tokens.color.semantic.error,
   },
 })
 
@@ -527,11 +589,11 @@ export const landmarkSelect = style({
 })
 
 export const inputError = style({
-  borderColor: '#e74c3c !important',
+  borderColor: `${tokens.color.semantic.error} !important`,
 })
 
 export const errorMessage = style({
-  color: '#e74c3c',
+  color: tokens.color.semantic.error,
   fontSize: '0.8rem',
   marginTop: '0.25rem',
   display: 'block',
@@ -646,14 +708,14 @@ export const sizeButton = style({
   transition: 'all 0.2s',
   minWidth: 0,
   ':hover': {
-    background: 'var(--bg-quaternary)',
+    background: tokens.color.surface.hover,
   },
 })
 
 export const sizeButtonSelected = style({
-  background: 'var(--accent-bg)',
+  background: tokens.color.surface.selected,
   color: tokens.color.accent.primary,
-  borderColor: 'var(--accent-border)',
+  borderColor: tokens.color.accent.primary,
 })
 
 // Alias for general "selected" state (used on buttons, color pickers, etc.)
@@ -668,16 +730,16 @@ export const landmarkFormActions = style({
 export const landmarkSaveButton = style({
   flex: 1,
   padding: '0.5rem',
-  background: 'var(--accent-bg)',
+  background: tokens.color.surface.selected,
   color: tokens.color.accent.primary,
-  border: '1px solid var(--accent-border)',
+  border: `1px solid ${tokens.color.accent.primary}`,
   borderRadius: '4px',
   cursor: 'pointer',
   fontWeight: 500,
   transition: 'background-color 0.2s',
   selectors: {
     '&:hover:not(:disabled)': {
-      background: 'var(--accent-bg-hover)',
+      background: tokens.color.accent.primaryHover,
     },
   },
   ':disabled': {
@@ -698,50 +760,50 @@ export const landmarkCancelButton = style({
   cursor: 'pointer',
   transition: 'background-color 0.2s',
   ':hover': {
-    background: 'var(--bg-quaternary)',
+    background: tokens.color.surface.hover,
   },
 })
 
 export const timelineSection = style({
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.5rem',
-  padding: '1rem',
+  gap: '0.35rem',
+  padding: '0.5rem',
   background: tokens.color.bg.raised,
   borderRadius: '4px',
   border: `1px solid ${tokens.color.border.default}`,
 })
 
-export const timelineHeader = style({
+export const timelineSliderRow = style({
   display: 'flex',
-  justifyContent: 'space-between',
   alignItems: 'center',
-  color: tokens.color.text.primary,
-  fontSize: '0.9rem',
+  gap: '0.5rem',
 })
 
-export const timelineActions = style({
+export const timelineInfoRow = style({
   display: 'flex',
   alignItems: 'center',
-  gap: '0.75rem',
+  gap: '0.5rem',
+  fontSize: '0.75rem',
+})
+
+export const timelineSpacer = style({
+  flex: 1,
 })
 
 export const zoomControls = style({
   display: 'flex',
   alignItems: 'center',
-  gap: '0.25rem',
-  background: tokens.color.bg.base,
-  border: `1px solid ${tokens.color.border.default}`,
-  borderRadius: '4px',
-  padding: '0.25rem',
+  gap: '0.125rem',
+  flexShrink: 0,
 })
 
 export const zoomButton = style({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: '24px',
-  height: '24px',
+  width: '20px',
+  height: '20px',
   padding: 0,
   background: 'transparent',
   color: tokens.color.text.primary,
@@ -761,30 +823,30 @@ export const zoomButton = style({
 })
 
 globalStyle(`${zoomButton} svg`, {
-  width: '14px',
-  height: '14px',
+  width: '12px',
+  height: '12px',
 })
 
 export const zoomLabel = style({
-  fontSize: '0.75rem',
+  fontSize: '0.7rem',
   color: tokens.color.text.secondary,
-  padding: '0 0.25rem',
-  minWidth: '60px',
+  minWidth: '50px',
   textAlign: 'center',
 })
 
 export const resetTimelineButton = style({
-  padding: '0.25rem 0.75rem',
+  padding: '0.2rem 0.5rem',
   background: tokens.color.bg.elevated,
   color: tokens.color.text.primary,
   border: `1px solid ${tokens.color.border.default}`,
-  borderRadius: '4px',
+  borderRadius: '3px',
   cursor: 'pointer',
-  fontSize: '0.85rem',
+  fontSize: '0.7rem',
   transition: 'background-color 0.2s',
+  flexShrink: 0,
   selectors: {
     '&:hover:not(:disabled)': {
-      background: 'var(--bg-quaternary)',
+      background: tokens.color.surface.hover,
     },
   },
   ':disabled': {
@@ -793,54 +855,30 @@ export const resetTimelineButton = style({
   },
 })
 
-export const timelineInfo = style({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.25rem',
-  flex: 1,
-})
-
 export const timelinePosition = style({
-  fontSize: '0.9rem',
+  fontSize: '0.75rem',
   fontWeight: 600,
   color: tokens.color.text.primary,
-})
-
-export const timelineRawTime = style({
-  fontSize: '0.75rem',
-  color: tokens.color.text.secondary,
-  fontFamily: '"Courier New", monospace',
-  opacity: 0.7,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 })
 
 export const timelineChapter = style({
-  fontSize: '0.85rem',
+  fontSize: '0.7rem',
   color: tokens.color.accent.primary,
   fontWeight: 500,
-})
-
-export const timelinePreview = style({
-  fontSize: '0.85rem',
-  color: tokens.color.text.secondary,
-  padding: '0.5rem 0',
-  lineHeight: 1.4,
-  borderTop: `1px solid ${tokens.color.border.default}`,
-  marginTop: '0.25rem',
-})
-
-export const timelineControls = style({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  marginTop: '0.5rem',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '150px',
 })
 
 export const timelineStepButton = style({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: '32px',
-  height: '32px',
+  width: '24px',
+  height: '24px',
   padding: 0,
   background: tokens.color.bg.elevated,
   color: tokens.color.text.primary,
@@ -851,7 +889,7 @@ export const timelineStepButton = style({
   flexShrink: 0,
   selectors: {
     '&:hover:not(:disabled)': {
-      background: 'var(--bg-quaternary)',
+      background: tokens.color.surface.hover,
       transform: 'scale(1.05)',
     },
   },
@@ -862,8 +900,8 @@ export const timelineStepButton = style({
 })
 
 globalStyle(`${timelineStepButton} svg`, {
-  width: '16px',
-  height: '16px',
+  width: '12px',
+  height: '12px',
 })
 
 export const timelineSliderContainer = style({
@@ -875,9 +913,9 @@ export const timelineSliderContainer = style({
 
 export const timelineSlider = style({
   flex: 1,
-  height: '24px',
+  height: '16px',
   background: tokens.color.bg.elevated,
-  borderRadius: '12px',
+  borderRadius: '8px',
   outline: 'none',
   WebkitAppearance: 'none',
   appearance: 'none',
@@ -886,23 +924,23 @@ export const timelineSlider = style({
 globalStyle(`${timelineSlider}::-webkit-slider-thumb`, {
   WebkitAppearance: 'none',
   appearance: 'none',
-  width: '20px',
-  height: '20px',
+  width: '14px',
+  height: '14px',
   background: tokens.color.accent.primary,
   borderRadius: '50%',
   cursor: 'pointer',
-  border: '2px solid var(--accent-border)',
+  border: `2px solid ${tokens.color.accent.primary}`,
   zIndex: 2,
   position: 'relative',
 })
 
 globalStyle(`${timelineSlider}::-moz-range-thumb`, {
-  width: '20px',
-  height: '20px',
+  width: '14px',
+  height: '14px',
   background: tokens.color.accent.primary,
   borderRadius: '50%',
   cursor: 'pointer',
-  border: '2px solid var(--accent-border)',
+  border: `2px solid ${tokens.color.accent.primary}`,
   zIndex: 2,
   position: 'relative',
 })
@@ -912,7 +950,7 @@ export const timelineIndicators = style({
   top: 0,
   left: 0,
   right: 0,
-  height: '24px',
+  height: '16px',
   pointerEvents: 'none',
   zIndex: 1,
 })
@@ -921,7 +959,7 @@ export const timelineIndicator = style({
   position: 'absolute',
   width: '6px',
   height: '6px',
-  background: 'var(--warning-color)',
+  background: tokens.color.semantic.warning,
   borderRadius: '50%',
   top: '50%',
   transform: 'translate(-50%, -50%)',
@@ -933,11 +971,11 @@ export const fleetIndicator = style({
   position: 'absolute',
   width: '6px',
   height: '6px',
-  background: '#00d4ff',
+  background: tokens.color.semantic.info,
   borderRadius: '50%',
   top: '50%',
   transform: 'translate(-50%, -50%)',
-  boxShadow: '0 0 4px rgba(0, 212, 255, 0.6)',
+  boxShadow: `0 0 4px ${tokens.color.semantic.info}`,
   pointerEvents: 'none',
 })
 
@@ -984,13 +1022,13 @@ export const jumpButton = style({
   padding: '0.25rem 0.5rem',
   background: tokens.color.bg.elevated,
   color: tokens.color.accent.primary,
-  border: '1px solid var(--accent-border)',
+  border: `1px solid ${tokens.color.accent.primary}`,
   borderRadius: '4px',
   fontSize: '0.75rem',
   cursor: 'pointer',
   transition: 'all 0.2s',
   ':hover': {
-    background: 'var(--accent-bg)',
+    background: tokens.color.surface.selected,
     transform: 'translateY(-1px)',
   },
 })
@@ -1061,7 +1099,7 @@ export const fetchInfoButton = style({
   gap: '0.5rem',
   padding: '0.5rem 1rem',
   background: tokens.color.accent.primary,
-  color: 'white',
+  color: tokens.color.text.inverse,
   border: 'none',
   borderRadius: '4px',
   cursor: 'pointer',
@@ -1070,11 +1108,12 @@ export const fetchInfoButton = style({
   marginBottom: '0.5rem',
   selectors: {
     '&:hover:not(:disabled)': {
-      background: 'var(--primary-hover)',
+      background: tokens.color.accent.primaryHover,
     },
   },
   ':disabled': {
     background: tokens.color.bg.elevated,
+    color: tokens.color.text.muted,
     opacity: 0.7,
     cursor: 'not-allowed',
   },
@@ -1115,12 +1154,15 @@ export const chapterMarker = style({
 })
 
 export const timelineRangeLabels = style({
+  position: 'absolute',
+  bottom: '-14px',
+  left: 0,
+  right: 0,
   display: 'flex',
   justifyContent: 'space-between',
-  marginTop: '0.5rem',
-  padding: '0 32px',
-  fontSize: '0.7rem',
+  fontSize: '0.65rem',
   color: tokens.color.text.secondary,
+  pointerEvents: 'none',
 })
 
 export const rangeLabel = style({
@@ -1160,7 +1202,7 @@ export const modeButton = style({
   transition: 'all 0.2s',
   whiteSpace: 'nowrap',
   ':hover': {
-    background: 'var(--bg-quaternary)',
+    background: tokens.color.surface.hover,
   },
   '@media': {
     '(max-width: 768px)': {
@@ -1171,9 +1213,9 @@ export const modeButton = style({
 })
 
 export const modeButtonActive = style({
-  background: 'var(--accent-bg)',
+  background: tokens.color.surface.selected,
   color: tokens.color.accent.primary,
-  borderColor: 'var(--accent-border)',
+  borderColor: tokens.color.accent.primary,
 })
 
 // Alias for compatibility with component usage
@@ -1216,4 +1258,191 @@ export const landmarkFormRow = style({
   flexDirection: 'column',
   gap: '0.25rem',
   width: '100%',
+})
+
+// === ListDetailPanel-based styles ===
+
+// Map list item in sidebar
+export const mapListItem = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.25rem',
+  flex: 1,
+  minWidth: 0,
+})
+
+export const mapListItemName = style({
+  fontWeight: 500,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+})
+
+export const mapListItemLandmarks = style({
+  fontSize: '0.75rem',
+  color: tokens.color.text.secondary,
+})
+
+// Add map form styles
+export const addMapForm = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+})
+
+export const addMapFormActions = style({
+  display: 'flex',
+  gap: '0.5rem',
+})
+
+export const cancelButton = style({
+  flex: 1,
+  padding: '0.5rem',
+  background: tokens.color.bg.elevated,
+  color: tokens.color.text.primary,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: '4px',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s',
+  ':hover': {
+    background: tokens.color.surface.hover,
+  },
+})
+
+// Detail title styles
+export const detailTitleContainer = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  flex: 1,
+})
+
+export const detailTitleText = style({
+  flex: 1,
+  fontWeight: 600,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+})
+
+export const detailTitleActions = style({
+  display: 'flex',
+  gap: '0.5rem',
+  flexShrink: 0,
+})
+
+// Map detail content area
+export const mapDetailContent = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  height: '100%',
+  minHeight: 0,
+  position: 'relative',
+})
+
+// Border color editor
+export const borderColorEditor = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  padding: '1rem',
+  background: tokens.color.bg.raised,
+  borderRadius: '4px',
+  border: `1px solid ${tokens.color.border.default}`,
+})
+
+globalStyle(`${borderColorEditor} h4`, {
+  margin: '0 0 0.5rem 0',
+  color: tokens.color.text.primary,
+})
+
+export const borderColorActions = style({
+  display: 'flex',
+  gap: '0.5rem',
+})
+
+// Loading overlay for map loading
+export const loadingOverlay = style({
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '1rem',
+  background: tokens.color.bg.overlay,
+  zIndex: 200,
+  color: tokens.color.text.primary,
+  fontSize: '1rem',
+})
+
+export const loadingSpinner = style({
+  width: '40px',
+  height: '40px',
+  border: `3px solid ${tokens.color.border.default}`,
+  borderTopColor: tokens.color.accent.primary,
+  borderRadius: '50%',
+  animation: `${spin} 1s linear infinite`,
+})
+
+// === Map Toolbar ===
+
+export const mapToolbar = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '0.5rem',
+  background: tokens.color.bg.raised,
+  borderRadius: '4px',
+  border: `1px solid ${tokens.color.border.default}`,
+  gap: '1rem',
+})
+
+export const toolbarLeft = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.25rem',
+})
+
+export const toolbarRight = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+})
+
+export const toolbarSelect = style({
+  padding: '0.4rem 0.6rem',
+  background: tokens.color.bg.elevated,
+  color: tokens.color.text.primary,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: '4px',
+  fontSize: '0.85rem',
+  cursor: 'pointer',
+  minWidth: '120px',
+  ':hover': {
+    background: tokens.color.surface.hover,
+  },
+})
+
+// Path detail styles
+export const quickSpeedButtons = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  marginTop: '0.5rem',
+})
+
+export const connectedLandmarks = style({
+  marginTop: '0.75rem',
+})
+
+export const connectedList = style({
+  margin: '0.25rem 0 0 0',
+  paddingLeft: '1.25rem',
+  fontSize: '0.85rem',
+  color: tokens.color.text.secondary,
 })

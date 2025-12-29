@@ -72,6 +72,37 @@
 - When creating a new server endpoint, be sure to add it to a new file
 - Please, for the love of god, stop importing everything dynamically.
 
+## API Client (Important!)
+
+- **ALWAYS** use the generated SDK from `src/client/config.ts` for API calls
+- The SDK is auto-generated from the backend OpenAPI spec using `pnpm generate:client`
+- **NEVER** write manual fetch calls to the backend - use the generated functions instead
+- Import functions from `../client/config` (this re-exports the configured SDK)
+
+**Example - Correct:**
+```typescript
+import { postMyStoriesByStoryIdMessagesReorder } from '../client/config'
+
+const { data } = await postMyStoriesByStoryIdMessagesReorder({
+  path: { storyId },
+  body: { items },
+})
+```
+
+**Example - Wrong (don't do this):**
+```typescript
+// DON'T manually call fetch - use the SDK instead
+const response = await fetch(`${baseUrl}/my/stories/${storyId}/messages/reorder`, {
+  method: 'POST',
+  body: JSON.stringify({ items }),
+})
+```
+
+**When adding new backend endpoints:**
+1. Add the endpoint to the backend
+2. Regenerate the SDK: `pnpm generate:client` (requires backend running on port 3201)
+3. Import and use the new generated function
+
 ## Saving Data (Important!)
 
 - **ALWAYS** use saveService for persisting any data, regardless of storage mode (local or server)

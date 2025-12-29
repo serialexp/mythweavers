@@ -55,9 +55,6 @@ export interface Message {
   options?: BranchOption[] // Branch options - only for branch messages
   sceneId?: string // References the scene this message belongs to
   currentMessageRevisionId?: string | null // ID of the current message revision (needed for paragraph operations)
-  // Legacy fields (deprecated - use sceneId)
-  chapterId?: string // OLD: References the chapter
-  nodeId?: string // OLD: References the node
 }
 
 export interface SceneAnalysis {
@@ -119,6 +116,23 @@ export interface ContextItem {
   type: 'theme' | 'location' | 'plot' // Distinguishes between thematic elements, physical locations, and plot threads
 }
 
+// Plot point definitions (stored at story level)
+export interface PlotPointDefinition {
+  key: string // Variable name (e.g., "ahsokaFeeling")
+  type: 'string' | 'number' | 'enum' | 'boolean' // Value type
+  default: string | number | boolean // Default value
+  options?: string[] // For enum type: list of valid options (e.g., ["happy", "sad", "neutral"])
+}
+
+// Plot point state override (stored at message level)
+export interface PlotPointState {
+  id?: string
+  storyId: string
+  messageId: string
+  key: string
+  value: string // Stored as string, parsed based on definition type
+}
+
 export type ChapterStatus = 'draft' | 'needs_work' | 'review' | 'done'
 export type NodeType = 'book' | 'arc' | 'chapter' | 'scene'
 export type NodeContentType = 'story' | 'non-story' | 'context' // API classification for content type
@@ -175,17 +189,38 @@ export interface Chapter {
   updatedAt: Date
 }
 
+// Property schema for dynamic landmark properties
+export interface PropertyDefinition {
+  key: string
+  label: string
+  type: 'text' | 'number' | 'enum' | 'color' | 'boolean'
+  options?: Array<{ value: string; label: string; color?: string }>
+  placeholder?: string
+  description?: string
+}
+
+export interface StateFieldDefinition {
+  key: string
+  label: string
+  options: Array<{ value: string; label: string; color: string }>
+}
+
+export interface PropertySchema {
+  properties: PropertyDefinition[]
+  stateFields: StateFieldDefinition[]
+}
+
 export interface StoryMap {
   id: string
   name: string
   imageData: string // Base64 encoded image or blob URL
   borderColor?: string // EJS template for landmark border colors
+  propertySchema?: PropertySchema // Schema for landmark properties and state fields
+  landmarkCount?: number // Number of landmarks (from list endpoint, before details loaded)
   landmarks: Landmark[]
   fleets: Fleet[]
   hyperlanes: Hyperlane[]
 }
-
-export type LandmarkIndustry = 'farming' | 'political' | 'industry' | 'trade' | 'mining'
 
 export interface Landmark {
   id: string
@@ -194,14 +229,10 @@ export interface Landmark {
   y: number // Y coordinate on map (0-1 normalized)
   name: string
   description: string
-  type?: 'system' | 'station' | 'nebula' | 'junction' // Type of landmark: system, station, nebula, or junction
-  population?: string // Population as string to handle large numbers
-  industry?: LandmarkIndustry // Primary industry
-  planetaryBodies?: string // Comma-separated list of planets/moons in the system
-  region?: string // Region the landmark belongs to
-  sector?: string // Sector the landmark belongs to
+  type?: string // Generic type: "point", "area", "region", etc.
   color?: string // Optional hex color for the pin
   size?: 'small' | 'medium' | 'large' // Size of the landmark pin
+  properties: Record<string, unknown> // Dynamic custom properties
 }
 
 export interface LandmarkState {
@@ -218,20 +249,40 @@ export interface LandmarkState {
   updatedAt?: string
 }
 
-// Predefined fields and their possible values
-export const LANDMARK_STATE_FIELDS = {
-  allegiance: {
-    label: 'Allegiance',
-    values: [
-      { value: 'republic', label: 'Republic', color: '#3498db' },
-      { value: 'separatist', label: 'Separatist', color: '#e74c3c' },
-      { value: 'contested', label: 'Contested', color: '#f39c12' },
-      { value: 'neutral', label: 'Neutral', color: '#95a5a6' },
-      { value: 'independent', label: 'Independent', color: '#7f8c8d' },
-    ],
-  },
-  // Add more fields here as needed
-} as const
+// Default property schema for backwards compatibility (Star Wars)
+export const DEFAULT_PROPERTY_SCHEMA: PropertySchema = {
+  properties: [
+    { key: 'population', label: 'Population', type: 'text' },
+    {
+      key: 'industry',
+      label: 'Industry',
+      type: 'enum',
+      options: [
+        { value: 'farming', label: 'Agricultural' },
+        { value: 'mining', label: 'Mining' },
+        { value: 'trade', label: 'Trade Hub' },
+        { value: 'political', label: 'Political' },
+        { value: 'industry', label: 'Industrial' },
+      ],
+    },
+    { key: 'region', label: 'Region', type: 'text' },
+    { key: 'sector', label: 'Sector', type: 'text' },
+    { key: 'planetaryBodies', label: 'Planetary Bodies', type: 'text' },
+  ],
+  stateFields: [
+    {
+      key: 'allegiance',
+      label: 'Allegiance',
+      options: [
+        { value: 'republic', label: 'Republic', color: '#3498db' },
+        { value: 'separatist', label: 'Separatist', color: '#e74c3c' },
+        { value: 'contested', label: 'Contested', color: '#f39c12' },
+        { value: 'neutral', label: 'Neutral', color: '#95a5a6' },
+        { value: 'independent', label: 'Independent', color: '#7f8c8d' },
+      ],
+    },
+  ],
+}
 
 export interface Fleet {
   id: string

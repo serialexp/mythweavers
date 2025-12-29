@@ -2,8 +2,47 @@ import { BranchOption, Message, Node } from '../types/core'
 import { generateMessageId } from './id'
 
 /**
- * Get all chapter nodes in story order.
+ * Get all scene nodes in story order.
  * Traverses the node hierarchy depth-first using each node's order value.
+ */
+export function getScenesInStoryOrder(nodes: Node[]): Node[] {
+  const result: Node[] = []
+
+  if (nodes.length === 0) {
+    return result
+  }
+
+  const childrenMap = new Map<string | null, Node[]>()
+  nodes.forEach((node) => {
+    const parentId = node.parentId || null
+    if (!childrenMap.has(parentId)) {
+      childrenMap.set(parentId, [])
+    }
+    childrenMap.get(parentId)!.push(node)
+  })
+
+  for (const children of childrenMap.values()) {
+    children.sort((a, b) => a.order - b.order)
+  }
+
+  const traverse = (parentId: string | null) => {
+    const children = childrenMap.get(parentId) || []
+    for (const child of children) {
+      if (child.type === 'scene') {
+        result.push(child)
+      }
+      traverse(child.id)
+    }
+  }
+
+  traverse(null)
+
+  return result
+}
+
+/**
+ * Get all chapter nodes in story order.
+ * @deprecated Use getScenesInStoryOrder instead - scenes now contain summaries
  */
 export function getChaptersInStoryOrder(nodes: Node[]): Node[] {
   const result: Node[] = []
@@ -41,9 +80,69 @@ export function getChaptersInStoryOrder(nodes: Node[]): Node[] {
 }
 
 /**
+ * Get all scene nodes that come before the specified node in story order.
+ * This includes all sibling scenes with lower order values and all scenes
+ * in parent nodes (chapters/arcs/books) that come before the current node's parent.
+ */
+export function getSceneNodesBeforeNode(nodes: Node[], currentNodeId: string): Node[] {
+  const result: Node[] = []
+  const currentNode = nodes.find((n) => n.id === currentNodeId)
+  if (!currentNode) return result
+
+  // Build a map of parent to children for easy traversal
+  const childrenMap = new Map<string | null, Node[]>()
+  nodes.forEach((node) => {
+    const parentId = node.parentId || null
+    if (!childrenMap.has(parentId)) {
+      childrenMap.set(parentId, [])
+    }
+    childrenMap.get(parentId)!.push(node)
+  })
+
+  // Sort children by order
+  for (const children of childrenMap.values()) {
+    children.sort((a, b) => a.order - b.order)
+  }
+
+  // Traverse the tree and collect all scene nodes before the current one
+  const traverse = (parentId: string | null, stopAtNode?: string): boolean => {
+    const children = childrenMap.get(parentId) || []
+
+    for (const child of children) {
+      if (child.id === stopAtNode) {
+        // Found the stop node, return true to indicate we should stop
+        return true
+      }
+
+      if (child.id === currentNodeId) {
+        // Found current node, stop traversing at this level
+        return true
+      }
+
+      // If it's a scene node, add it to results
+      if (child.type === 'scene') {
+        result.push(child)
+      }
+
+      // Traverse children, and if we hit the stop node, stop
+      if (traverse(child.id, currentNodeId)) {
+        // If current node was found in children, stop processing siblings
+        return true
+      }
+    }
+
+    return false
+  }
+
+  // Start traversal from root
+  traverse(null)
+
+  return result
+}
+
+/**
  * Get all chapter nodes that come before the specified node in story order.
- * This includes all sibling chapters with lower order values and all chapters
- * in parent nodes (arcs/books) that come before the current node's parent.
+ * @deprecated Use getSceneNodesBeforeNode instead - scenes now contain summaries
  */
 export function getChapterNodesBeforeNode(nodes: Node[], currentNodeId: string): Node[] {
   const result: Node[] = []
@@ -172,15 +271,15 @@ export function getMessagesInStoryOrder(messages: Message[], nodes: Node[], targ
   }
 
   // If the target message doesn't have a nodeId, fall back to array order
-  if (!targetMessage.nodeId) {
+  if (!targetMessage.sceneId) {
     console.warn('[getMessagesInStoryOrder] Target message has no nodeId, falling back to array order', {
       targetMessageId: targetMessageId,
       targetMessage: {
         id: targetMessage.id,
         type: targetMessage.type,
         role: targetMessage.role,
-        nodeId: targetMessage.nodeId,
-        chapterId: targetMessage.chapterId,
+        nodeId: targetMessage.sceneId,
+        chapterId: targetMessage.sceneId,
         content: `${targetMessage.content?.substring(0, 50)}...`,
         order: targetMessage.order,
         isQuery: targetMessage.isQuery,
@@ -193,20 +292,20 @@ export function getMessagesInStoryOrder(messages: Message[], nodes: Node[], targ
   }
 
   // Get all nodes up to and including the target message's node
-  const nodesInOrder = getAllNodesUpToNode(nodes, targetMessage.nodeId)
+  const nodesInOrder = getAllNodesUpToNode(nodes, targetMessage.sceneId)
   const nodeIds = new Set(nodesInOrder.map((n) => n.id))
 
   // Filter messages to only those in the nodes we've traversed
-  const messagesInNodes = messages.filter((m) => m.nodeId && nodeIds.has(m.nodeId))
+  const messagesInNodes = messages.filter((m) => m.sceneId && nodeIds.has(m.sceneId))
 
   // Group messages by node
   const messagesByNode = new Map<string, Message[]>()
   messagesInNodes.forEach((msg) => {
-    if (!msg.nodeId) return
-    if (!messagesByNode.has(msg.nodeId)) {
-      messagesByNode.set(msg.nodeId, [])
+    if (!msg.sceneId) return
+    if (!messagesByNode.has(msg.sceneId)) {
+      messagesByNode.set(msg.sceneId, [])
     }
-    messagesByNode.get(msg.nodeId)!.push(msg)
+    messagesByNode.get(msg.sceneId)!.push(msg)
   })
 
   // Sort messages within each node by order
@@ -219,7 +318,7 @@ export function getMessagesInStoryOrder(messages: Message[], nodes: Node[], targ
   for (const node of nodesInOrder) {
     const nodeMessages = messagesByNode.get(node.id) || []
 
-    if (node.id === targetMessage.nodeId) {
+    if (node.id === targetMessage.sceneId) {
       // For the target node, only include messages up to and including the target
       for (const msg of nodeMessages) {
         result.push(msg)
@@ -265,11 +364,11 @@ export function calculateActivePath(
   // Build a map of messages by node for quick lookup
   const messagesByNode = new Map<string, Message[]>()
   messages.forEach((msg) => {
-    if (!msg.nodeId) return
-    if (!messagesByNode.has(msg.nodeId)) {
-      messagesByNode.set(msg.nodeId, [])
+    if (!msg.sceneId) return
+    if (!messagesByNode.has(msg.sceneId)) {
+      messagesByNode.set(msg.sceneId, [])
     }
-    messagesByNode.get(msg.nodeId)!.push(msg)
+    messagesByNode.get(msg.sceneId)!.push(msg)
   })
 
   // Sort messages within each node by order
@@ -295,8 +394,8 @@ export function calculateActivePath(
     const currentNode = nodesInOrder[currentNodeIndex]
     const nodeMessages = messagesByNode.get(currentNode.id) || []
 
-    // Only chapter nodes have messages
-    if (currentNode.type !== 'chapter' || nodeMessages.length === 0) {
+    // Only scene nodes have messages
+    if (currentNode.type !== 'scene' || nodeMessages.length === 0) {
       currentNodeIndex++
       continue
     }
@@ -425,7 +524,7 @@ export function findNextMessageInPath(
   branchChoices: Record<string, string>,
 ): string | null {
   const currentMessage = messages.find((m) => m.id === currentMessageId)
-  if (!currentMessage || !currentMessage.nodeId) return null
+  if (!currentMessage || !currentMessage.sceneId) return null
 
   // If current message is a branch, follow the selected option
   if (currentMessage.type === 'branch' && currentMessage.options && currentMessage.options.length > 0) {
@@ -447,7 +546,7 @@ export function findNextMessageInPath(
   }
 
   // Get all messages in the current node, sorted by order
-  const nodeMessages = messages.filter((m) => m.nodeId === currentMessage.nodeId).sort((a, b) => a.order - b.order)
+  const nodeMessages = messages.filter((m) => m.sceneId === currentMessage.sceneId).sort((a, b) => a.order - b.order)
 
   const currentIndex = nodeMessages.findIndex((m) => m.id === currentMessageId)
 
@@ -458,16 +557,16 @@ export function findNextMessageInPath(
 
   // Otherwise, move to the next node
   const nodesInOrder = getAllNodesInStoryOrder(nodes)
-  const currentNodeIndex = nodesInOrder.findIndex((n) => n.id === currentMessage.nodeId)
+  const currentNodeIndex = nodesInOrder.findIndex((n) => n.id === currentMessage.sceneId)
 
   if (currentNodeIndex === -1) return null
 
-  // Find next chapter node with messages
+  // Find next scene node with messages
   for (let i = currentNodeIndex + 1; i < nodesInOrder.length; i++) {
     const nextNode = nodesInOrder[i]
-    if (nextNode.type !== 'chapter') continue
+    if (nextNode.type !== 'scene') continue
 
-    const nextNodeMessages = messages.filter((m) => m.nodeId === nextNode.id).sort((a, b) => a.order - b.order)
+    const nextNodeMessages = messages.filter((m) => m.sceneId === nextNode.id).sort((a, b) => a.order - b.order)
 
     if (nextNodeMessages.length > 0) {
       return nextNodeMessages[0].id
@@ -503,11 +602,11 @@ export function detectPathLoop(
   // Build a map of messages by node
   const messagesByNode = new Map<string, Message[]>()
   messages.forEach((msg) => {
-    if (!msg.nodeId) return
-    if (!messagesByNode.has(msg.nodeId)) {
-      messagesByNode.set(msg.nodeId, [])
+    if (!msg.sceneId) return
+    if (!messagesByNode.has(msg.sceneId)) {
+      messagesByNode.set(msg.sceneId, [])
     }
-    messagesByNode.get(msg.nodeId)!.push(msg)
+    messagesByNode.get(msg.sceneId)!.push(msg)
   })
 
   // Sort messages within each node by order
@@ -528,7 +627,7 @@ export function detectPathLoop(
     const currentNode = nodesInOrder[currentNodeIndex]
     const nodeMessages = messagesByNode.get(currentNode.id) || []
 
-    if (currentNode.type !== 'chapter' || nodeMessages.length === 0) {
+    if (currentNode.type !== 'scene' || nodeMessages.length === 0) {
       currentNodeIndex++
       continue
     }
@@ -626,7 +725,7 @@ export function createBranchOptionToNode(
   description?: string,
 ): BranchOption | null {
   // Find the first message in the target node
-  const targetMessages = messages.filter((m) => m.nodeId === targetNodeId).sort((a, b) => a.order - b.order)
+  const targetMessages = messages.filter((m) => m.sceneId === targetNodeId).sort((a, b) => a.order - b.order)
 
   if (targetMessages.length === 0) {
     console.warn('[createBranchOptionToNode] No messages found in target node:', targetNodeId)

@@ -1,6 +1,7 @@
-import { Button, IconButton, Textarea } from '@mythweavers/ui'
+import { Button, ButtonGroup, IconButton, Textarea, ToggleButton } from '@mythweavers/ui'
 import { BsEye, BsStopFill, BsX } from 'solid-icons/bs'
-import { Component, Show, createMemo } from 'solid-js'
+import { Component, For, Show, createMemo, createSignal } from 'solid-js'
+import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { settingsStore } from '../stores/settingsStore'
@@ -19,7 +20,18 @@ interface StoryInputProps {
   onShowContextPreview: () => void
 }
 
+const PARAGRAPH_OPTIONS = [1, 2, 3, 4, 5, 6, 0] as const
+const THINKING_OPTIONS = [
+  { value: 0, label: 'Off' },
+  { value: 1024, label: 'Low' },
+  { value: 2048, label: 'Med' },
+  { value: 4096, label: 'High' },
+] as const
+
 export const StoryInput: Component<StoryInputProps> = (props) => {
+  const [paragraphsExpanded, setParagraphsExpanded] = createSignal(false)
+  const [thinkingExpanded, setThinkingExpanded] = createSignal(false)
+
   // Check if a writable node (chapter or scene) is selected
   const selectedNode = createMemo(() => nodeStore.getSelectedNode())
   const isWritableNodeSelected = createMemo(() => {
@@ -31,6 +43,16 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
       e.preventDefault()
       props.onSubmit(false)
     }
+  }
+
+  const currentParagraphLabel = () => {
+    const count = currentStoryStore.paragraphsPerTurn
+    return count === 0 ? '∞' : String(count)
+  }
+
+  const currentThinkingLabel = () => {
+    const option = THINKING_OPTIONS.find((o) => o.value === settingsStore.thinkingBudget)
+    return option?.label ?? 'Off'
   }
 
   return (
@@ -77,32 +99,75 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
         <div class={styles.buttons}>
           <div class={styles.paragraphSelector}>
             <span class={styles.paragraphLabel}>Paragraphs:</span>
-            {[1, 2, 3, 4, 5, 6, 0].map((count) => (
-              <button
-                class={settingsStore.paragraphsPerTurn === count ? styles.paragraphButtonActive : styles.paragraphButton}
-                onClick={() => settingsStore.setParagraphsPerTurn(count)}
-                title={count === 0 ? 'No paragraph limit' : `Generate ${count} paragraph${count !== 1 ? 's' : ''}`}
-              >
-                {count === 0 ? '∞' : count}
-              </button>
-            ))}
+            <Show
+              when={paragraphsExpanded()}
+              fallback={
+                <ToggleButton
+                  active
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setParagraphsExpanded(true)}
+                  title="Click to change paragraph count"
+                >
+                  {currentParagraphLabel()}
+                </ToggleButton>
+              }
+            >
+              <ButtonGroup>
+                <For each={[...PARAGRAPH_OPTIONS]}>
+                  {(count) => (
+                    <ToggleButton
+                      active={currentStoryStore.paragraphsPerTurn === count}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        currentStoryStore.setParagraphsPerTurn(count)
+                        setParagraphsExpanded(false)
+                      }}
+                      title={count === 0 ? 'No paragraph limit' : `Generate ${count} paragraph${count !== 1 ? 's' : ''}`}
+                    >
+                      {count === 0 ? '∞' : count}
+                    </ToggleButton>
+                  )}
+                </For>
+              </ButtonGroup>
+            </Show>
           </div>
-          <div class={styles.paragraphSelectorNoMargin}>
+          <div class={styles.thinkingSelector}>
             <span class={styles.paragraphLabel}>Thinking:</span>
-            {[
-              { value: 0, label: 'Off' },
-              { value: 1024, label: 'Low' },
-              { value: 2048, label: 'Med' },
-              { value: 4096, label: 'High' },
-            ].map((option) => (
-              <button
-                class={settingsStore.thinkingBudget === option.value ? styles.paragraphButtonActive : styles.paragraphButton}
-                onClick={() => settingsStore.setThinkingBudget(option.value)}
-                title={option.value === 0 ? 'No extended thinking' : `Thinking budget: ${option.value} tokens`}
-              >
-                {option.label}
-              </button>
-            ))}
+            <Show
+              when={thinkingExpanded()}
+              fallback={
+                <ToggleButton
+                  active
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setThinkingExpanded(true)}
+                  title="Click to change thinking budget"
+                >
+                  {currentThinkingLabel()}
+                </ToggleButton>
+              }
+            >
+              <ButtonGroup>
+                <For each={[...THINKING_OPTIONS]}>
+                  {(option) => (
+                    <ToggleButton
+                      active={settingsStore.thinkingBudget === option.value}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        settingsStore.setThinkingBudget(option.value)
+                        setThinkingExpanded(false)
+                      }}
+                      title={option.value === 0 ? 'No extended thinking' : `Thinking budget: ${option.value} tokens`}
+                    >
+                      {option.label}
+                    </ToggleButton>
+                  )}
+                </For>
+              </ButtonGroup>
+            </Show>
           </div>
           <Show when={props.isLoading || props.isAnalyzing}>
             <Button variant="danger" size="sm" onClick={props.onAbort}>

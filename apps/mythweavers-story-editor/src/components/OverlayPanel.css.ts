@@ -31,7 +31,7 @@ export const header = style({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '15px 20px',
+  padding: tokens.space['3'],
   background: tokens.color.bg.raised,
   borderBottom: `1px solid ${tokens.color.border.default}`,
   flexShrink: 0,

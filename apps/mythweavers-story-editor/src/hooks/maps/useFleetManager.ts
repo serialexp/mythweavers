@@ -1,6 +1,8 @@
 import { Viewport } from 'pixi-viewport'
 import * as PIXI from 'pixi.js'
 import { Accessor } from 'solid-js'
+import { mapEditorStore } from '../../stores/mapEditorStore'
+import { mapsStore } from '../../stores/mapsStore'
 import { Fleet } from '../../types/core'
 import { getFleetPositionAtTime } from '../../utils/fleetUtils'
 import { parseColorToHex } from '../../utils/maps/colorUtils'
@@ -21,8 +23,6 @@ export interface UseFleetManagerOptions {
   containers: Accessor<PixiContainers>
   mapSprite: Accessor<PIXI.Sprite | null>
   canvasContainer: Accessor<HTMLDivElement | undefined>
-  currentStoryTime: Accessor<number>
-  selectedFleetId?: Accessor<string | null>
   onFleetClick?: FleetClickHandler
 }
 
@@ -37,10 +37,21 @@ export interface UseFleetManagerReturn {
 }
 
 /**
- * Hook to manage fleet sprites on the map
+ * Hook to manage fleet sprites on the map.
+ * Reads currentStoryTime and selectedFleetId from stores.
  */
 export function useFleetManager(options: UseFleetManagerOptions): UseFleetManagerReturn {
-  const { viewport, containers, mapSprite, canvasContainer, currentStoryTime, selectedFleetId, onFleetClick } = options
+  const { viewport, containers, mapSprite, canvasContainer, onFleetClick } = options
+
+  // Read from stores - compute current story time with pending override
+  const currentStoryTime = (): number => {
+    const pending = mapEditorStore.pendingStoryTime
+    if (pending !== null) return pending
+    return mapsStore.currentStoryTime ?? 0
+  }
+
+  // Selected fleet for movement highlighting
+  const selectedFleetId = (): string | null => mapEditorStore.selectedFleetForMovement?.id ?? null
 
   // Get a container for fleets (dedicated fleet container)
   const getFleetContainer = () => {

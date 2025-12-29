@@ -32,6 +32,7 @@ export interface ApiPath {
   id: string
   mapId: string
   speedMultiplier: number
+  segments?: ApiPathSegment[] // Optional - only included when includeSegments=true
 }
 
 /**
@@ -52,6 +53,8 @@ export interface ApiPathSegment {
 
 /**
  * API Landmark type (from unified backend)
+ * Note: description and properties are optional because the list endpoint
+ * returns minimal data without these fields for performance.
  */
 export interface ApiLandmark {
   id: string
@@ -59,15 +62,11 @@ export interface ApiLandmark {
   x: number
   y: number
   name: string
-  description: string
+  description?: string // Optional in list response
   type: string
-  population: string | null
-  industry: string | null
   color: string | null
   size: string | null
-  planetaryBodies: string | null
-  region: string | null
-  sector: string | null
+  properties?: Record<string, unknown> // Optional in list response
 }
 
 /**
@@ -93,12 +92,15 @@ export function pawnToFleet(pawn: ApiPawn): Fleet {
 /**
  * Convert API Path + segments to local Hyperlane type
  */
-export function pathToHyperlane(path: ApiPath, segments: ApiPathSegment[] = []): Hyperlane {
+export function pathToHyperlane(path: ApiPath, segments?: ApiPathSegment[]): Hyperlane {
+  // Use inline segments if available (from includeSegments=true), otherwise use provided segments
+  const pathSegments = path.segments || segments || []
+
   return {
     id: path.id,
     mapId: path.mapId,
     speedMultiplier: path.speedMultiplier,
-    segments: segments
+    segments: pathSegments
       .filter((s) => s.pathId === path.id)
       .sort((a, b) => a.order - b.order)
       .map((s) => ({
@@ -126,15 +128,11 @@ export function apiLandmarkToLandmark(landmark: ApiLandmark): Landmark {
     x: landmark.x,
     y: landmark.y,
     name: landmark.name,
-    description: landmark.description,
-    type: (landmark.type as Landmark['type']) ?? undefined,
-    population: landmark.population ?? undefined,
-    industry: (landmark.industry as Landmark['industry']) ?? undefined,
-    planetaryBodies: landmark.planetaryBodies ?? undefined,
-    region: landmark.region ?? undefined,
-    sector: landmark.sector ?? undefined,
+    description: landmark.description ?? '', // Default to empty string if not provided
+    type: landmark.type ?? undefined,
     color: landmark.color ?? undefined,
     size: (landmark.size as Landmark['size']) ?? undefined,
+    properties: landmark.properties ?? {}, // Default to empty object if not provided
   }
 }
 

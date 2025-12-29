@@ -12,9 +12,15 @@ export const container = style({
 
 export const title = style({
   textAlign: 'center',
-  marginBottom: '2rem',
+  marginBottom: '0.5rem',
   color: tokens.color.text.primary,
   fontSize: '1.5rem',
+})
+
+export const form = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
 })
 
 export const switchModeText = style({

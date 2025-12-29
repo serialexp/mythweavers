@@ -46,7 +46,30 @@ export function useMapLoader(): UseMapLoaderReturn {
     }
 
     // Load new map texture
-    const texture = await PIXI.Assets.load(imageData)
+    let texture: PIXI.Texture
+
+    // For blob URLs, we need to load the image manually since PIXI can't detect the type
+    if (imageData.startsWith('blob:')) {
+      texture = await new Promise<PIXI.Texture>((resolve, reject) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          resolve(PIXI.Texture.from(img))
+        }
+        img.onerror = (err) => {
+          reject(new Error(`Failed to load image: ${err}`))
+        }
+        img.src = imageData
+      })
+    } else {
+      // For regular URLs with extensions, use PIXI.Assets
+      texture = await PIXI.Assets.load(imageData)
+    }
+
+    if (!texture) {
+      console.error('[useMapLoader] Failed to load texture')
+      return
+    }
     const sprite = new PIXI.Sprite(texture)
 
     // Add map to viewport (behind landmarks) before accessing dimensions

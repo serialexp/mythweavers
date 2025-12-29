@@ -69,15 +69,6 @@ export const metaDate = style({
   marginLeft: 'auto',
 })
 
-export const storySetting = style({
-  fontSize: '0.9rem',
-  color: tokens.color.text.secondary,
-  fontStyle: 'italic',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-})
-
 export const currentStoryBorder = style({
   borderColor: tokens.color.accent.primary,
 })

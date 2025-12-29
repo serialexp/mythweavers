@@ -30,8 +30,11 @@ import { mapsStore } from '../stores/mapsStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
+import { importClaudeChat } from '../utils/claudeChatImporter'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
 import { StoryMetadata, storyManager } from '../utils/storyManager'
+import type { Message } from '../types/core'
+import { ClaudeChatImportModal } from './ClaudeChatImportModal'
 import { NewStoryForm } from './NewStoryForm'
 import { StoryList, StoryListItem } from './StoryList'
 import * as styles from './StoryLandingPage.css'
@@ -48,6 +51,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
   const [syncing, setSyncing] = createSignal<string | null>(null)
   const [activeTab, setActiveTab] = createSignal<'new' | 'load'>('new')
   const [localFingerprints, setLocalFingerprints] = createSignal<Map<string, string>>(new Map())
+  const [showClaudeChatImport, setShowClaudeChatImport] = createSignal(false)
 
   // Combined stories list
   const combinedStories = createMemo((): StoryListItem[] => {
@@ -254,6 +258,24 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     props.onSelectStory(storyId)
   }
 
+  const handleImportClaudeChat = async (
+    conversationName: string,
+    messages: Message[],
+    _importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => {
+    // Always create a new story from the landing page (no current story exists)
+    const { storyId } = await importClaudeChat({
+      conversationName,
+      messages,
+      importTarget: 'new',
+      storageMode,
+    })
+
+    setShowClaudeChatImport(false)
+    navigate(`/story/${storyId}`)
+  }
+
   const handleDeleteStory = async (storyId: string, type: 'local' | 'server') => {
     try {
       if (type === 'server') {
@@ -374,6 +396,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         <Tabs
           activeTab={activeTab()}
           onTabChange={(id) => setActiveTab(id as 'new' | 'load')}
+          size="md"
           style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
         >
           <TabList style={{ 'flex-shrink': '0' }}>
@@ -384,6 +407,15 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           <TabPanel id="new" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
             <CardBody>
               <NewStoryForm serverAvailable={serverAvailable()} onCreateStory={handleCreateStory} />
+
+              <div style={{ 'margin-top': '2rem', 'padding-top': '1.5rem', 'border-top': '1px solid var(--color-border-default)' }}>
+                <Text size="sm" color="secondary" style={{ 'margin-bottom': '0.75rem' }}>
+                  Or import from external source:
+                </Text>
+                <Button variant="secondary" onClick={() => setShowClaudeChatImport(true)}>
+                  Import Claude Chat
+                </Button>
+              </div>
             </CardBody>
           </TabPanel>
 
@@ -436,6 +468,14 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         </Tabs>
       </Card>
       </div>
+
+      <ClaudeChatImportModal
+        show={showClaudeChatImport()}
+        hasCurrentStory={false}
+        serverAvailable={serverAvailable()}
+        onClose={() => setShowClaudeChatImport(false)}
+        onImport={handleImportClaudeChat}
+      />
     </div>
   )
 }

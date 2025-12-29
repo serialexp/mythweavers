@@ -95,7 +95,8 @@ function parseIdArray(value: unknown): string[] {
 }
 
 function normalizeIncomingNode(node: IncomingNode): Node {
-  const includeInFull = node.includeInFull ?? 1
+  // Only scene nodes have content, so default to 2 (full) for scenes, 0 for others
+  const includeInFull = node.includeInFull ?? (node.type === 'scene' ? 2 : 0)
   const expanded = node.expanded ?? true
 
   return {
@@ -204,9 +205,10 @@ export const nodeStore = {
       // Convert array to hash map and set defaults
       const nodesMap: Record<string, Node> = {}
       nodes.forEach((node) => {
-        // Set default includeInFull value if undefined (1 = summary mode)
+        // Set default includeInFull value if undefined
+        // Only scene nodes have content, so default to 2 (full) for scenes, 0 for others
         if (node.includeInFull === undefined) {
-          node.includeInFull = 1
+          node.includeInFull = node.type === 'scene' ? 2 : 0
         }
 
         // Parse JSON string fields into arrays
@@ -454,7 +456,14 @@ export const nodeStore = {
   },
 
   // Delete a node and its children
-  deleteNode(nodeId: string) {
+  // If permanent is true, hard delete (no recovery); otherwise soft delete
+  deleteNode(nodeId: string, permanent = false) {
+    // Get node data BEFORE deleting from local state (needed for save)
+    const node = nodeState.nodes[nodeId]
+    if (!node) {
+      return
+    }
+
     const removedNodeIds = this.deleteNodeNoSave(nodeId)
     if (removedNodeIds.size === 0) {
       return
@@ -463,7 +472,8 @@ export const nodeStore = {
     // Always trigger save through saveService (it handles storage mode internally)
     // Only save the root node deletion - backend will handle deleting descendants
     if (currentStoryStore.isInitialized) {
-      saveService.saveNode(currentStoryStore.id, nodeId, {}, 'delete')
+      const nodeWithPermanent = permanent ? { ...node, permanent } : node
+      saveService.saveNode(currentStoryStore.id, nodeId, nodeWithPermanent, 'delete')
     }
   },
 
@@ -503,32 +513,57 @@ export const nodeStore = {
       if (ancestors.includes(nodeId)) return
     }
 
-    const affectedNodeIds = new Set<string>([nodeId])
+    const oldParentId = node.parentId
 
     batch(() => {
       // Update the moved node
       setNodeState('nodes', nodeId, 'parentId', newParentId)
       setNodeState('nodes', nodeId, 'order', newOrder)
 
-      // Update orders of siblings
-      const siblings = Object.values(nodeState.nodes).filter((n) => n.parentId === newParentId && n.id !== nodeId)
-      siblings.sort((a, b) => a.order - b.order)
-      siblings.forEach((sibling, index) => {
+      // Update orders of siblings in the new parent
+      const newSiblings = Object.values(nodeState.nodes).filter((n) => n.parentId === newParentId && n.id !== nodeId)
+      newSiblings.sort((a, b) => a.order - b.order)
+      newSiblings.forEach((sibling, index) => {
         const targetOrder = index >= newOrder ? index + 1 : index
         if (sibling.order !== targetOrder) {
           setNodeState('nodes', sibling.id, 'order', targetOrder)
-          affectedNodeIds.add(sibling.id)
         }
       })
+
+      // If moving between parents, reorder old parent's children to close gaps
+      if (oldParentId !== newParentId) {
+        const oldSiblings = Object.values(nodeState.nodes).filter((n) => n.parentId === oldParentId && n.id !== nodeId)
+        oldSiblings.sort((a, b) => a.order - b.order)
+        oldSiblings.forEach((sibling, index) => {
+          if (sibling.order !== index) {
+            setNodeState('nodes', sibling.id, 'order', index)
+          }
+        })
+      }
 
       setNodeState('tree', buildTree(nodeState.nodes))
     })
 
     // Always trigger save through saveService (it handles storage mode internally)
+    // Use bulk reorder endpoint to update all nodes in affected parent(s) in a single request
     if (currentStoryStore.isInitialized) {
-      const nodesToSave = Object.values(nodeState.nodes).filter((n) => affectedNodeIds.has(n.id))
-      if (nodesToSave.length > 0) {
-        saveService.saveNodesBulk(currentStoryStore.id, nodesToSave)
+      const allNodesInNewParent = Object.values(nodeState.nodes).filter((n) => n.parentId === newParentId)
+      const nodesToReorder = [...allNodesInNewParent]
+
+      // Also include nodes in old parent if moving between parents
+      if (oldParentId !== newParentId) {
+        const allNodesInOldParent = Object.values(nodeState.nodes).filter((n) => n.parentId === oldParentId)
+        nodesToReorder.push(...allNodesInOldParent)
+      }
+
+      if (nodesToReorder.length > 0) {
+        const reorderItems = nodesToReorder.map((n) => ({
+          nodeId: n.id,
+          nodeType: n.type as 'book' | 'arc' | 'chapter' | 'scene',
+          parentId: n.parentId ?? null,
+          order: n.order,
+        }))
+        saveService.reorderNodes(currentStoryStore.id, reorderItems)
       }
     }
   },
@@ -606,7 +641,7 @@ export const nodeStore = {
     }
   },
 
-  // Generate summary for a node (chapter type)
+  // Generate summary for a node (scene or chapter type)
   async generateNodeSummary(
     nodeId: string,
     generateSummaryFn: (params: {
@@ -621,8 +656,8 @@ export const nodeStore = {
       throw new Error('Node not found')
     }
 
-    if (node.type !== 'chapter') {
-      throw new Error('Only chapter nodes can have summaries')
+    if (node.type !== 'chapter' && node.type !== 'scene') {
+      throw new Error('Only scene or chapter nodes can have summaries')
     }
 
     try {
@@ -632,13 +667,13 @@ export const nodeStore = {
       // Get all messages in this node
       const { messagesStore } = await import('./messagesStore')
       const nodeMessages = messagesStore.messages.filter(
-        (msg) => msg.nodeId === nodeId && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
+        (msg) => msg.sceneId === nodeId && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
       )
 
       console.log(`[generateNodeSummary] Found ${nodeMessages.length} messages in node ${nodeId}`)
 
       if (nodeMessages.length === 0) {
-        throw new Error('No messages found in this chapter to summarize')
+        throw new Error('No messages found in this node to summarize')
       }
 
       // Combine all node content
@@ -676,7 +711,42 @@ export const nodeStore = {
     }
   },
 
-  // Get all chapter nodes that appear before the given node in tree order
+  // Get all scene nodes that appear before the given node in tree order
+  getPrecedingScenes(nodeId: string): Node[] {
+    const allScenes: Node[] = []
+    const targetNode = nodeState.nodes[nodeId]
+    if (!targetNode) return []
+
+    // Traverse tree in order and collect scenes until we hit the target
+    const collectScenes = (treeNodes: TreeNode[]): boolean => {
+      for (const treeNode of treeNodes) {
+        if (treeNode.id === nodeId) {
+          // Found target, stop collecting
+          return true
+        }
+
+        const node = nodeState.nodes[treeNode.id]
+        if (node && node.type === 'scene') {
+          allScenes.push(node)
+        }
+
+        // Recursively check children
+        if (treeNode.children.length > 0) {
+          const found = collectScenes(treeNode.children)
+          if (found) return true
+        }
+      }
+      return false
+    }
+
+    collectScenes(nodeState.tree)
+    return allScenes
+  },
+
+  /**
+   * Get all chapter nodes that appear before the given node in tree order
+   * @deprecated Use getPrecedingScenes instead - scenes now contain summaries
+   */
   getPrecedingChapters(nodeId: string): Node[] {
     const allChapters: Node[] = []
     const targetNode = nodeState.nodes[nodeId]
@@ -708,7 +778,10 @@ export const nodeStore = {
     return allChapters
   },
 
-  // Set includeInFull for all preceding chapters
+  /**
+   * Set includeInFull for all preceding chapters
+   * @deprecated Use setIncludeForPrecedingScenes instead - scenes now contain content
+   */
   setIncludeForPrecedingChapters(nodeId: string, includeValue: number) {
     const precedingChapters = this.getPrecedingChapters(nodeId)
     if (precedingChapters.length === 0) return
@@ -719,6 +792,29 @@ export const nodeStore = {
       precedingChapters.forEach((chapter) => {
         setNodeState('nodes', chapter.id, 'includeInFull', includeValue)
         affectedNodeIds.add(chapter.id)
+      })
+    })
+
+    // Always trigger save through saveService (it handles storage mode internally)
+    if (currentStoryStore.isInitialized) {
+      const nodesToSave = Object.values(nodeState.nodes).filter((n) => affectedNodeIds.has(n.id))
+      if (nodesToSave.length > 0) {
+        saveService.saveNodesBulk(currentStoryStore.id, nodesToSave)
+      }
+    }
+  },
+
+  // Set includeInFull for all preceding scenes
+  setIncludeForPrecedingScenes(nodeId: string, includeValue: number) {
+    const precedingScenes = this.getPrecedingScenes(nodeId)
+    if (precedingScenes.length === 0) return
+
+    const affectedNodeIds = new Set<string>()
+
+    batch(() => {
+      precedingScenes.forEach((scene) => {
+        setNodeState('nodes', scene.id, 'includeInFull', includeValue)
+        affectedNodeIds.add(scene.id)
       })
     })
 

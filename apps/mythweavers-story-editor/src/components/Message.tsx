@@ -14,6 +14,7 @@ import {
   BsRewindBtnFill,
   BsX,
 } from 'solid-icons/bs'
+import { ImTarget } from 'solid-icons/im'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import * as styles from './Message.css'
 import { useOllama } from '../hooks/useOllama'
@@ -22,7 +23,7 @@ import { saveService } from '../services/saveService'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
-import { rewriteDialogStore } from '../stores/rewriteDialogStore'
+import { singleRewriteDialogStore } from '../stores/singleRewriteDialogStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
 import { uiStore } from '../stores/uiStore'
 import type { SummaryViewMode } from '../stores/uiStore'
@@ -484,7 +485,7 @@ export const Message: Component<MessageProps> = (props) => {
       opt.id === targetingMode.optionId
         ? {
             ...opt,
-            targetNodeId: props.message.nodeId || '',
+            targetNodeId: props.message.sceneId || '',
             targetMessageId: props.message.id,
           }
         : opt,
@@ -505,13 +506,13 @@ export const Message: Component<MessageProps> = (props) => {
 
     // Get the target node ID (where we're pasting)
     // Use the current message's nodeId, or if it doesn't have one, use the selected node
-    const targetNodeId = props.message.nodeId || nodeStore.selectedNodeId || ''
+    const targetNodeId = props.message.sceneId || nodeStore.selectedNodeId || ''
 
     console.log('[handlePasteBefore] Pasting messages:', {
       cutMessageIds,
       targetNodeId,
       currentMessageId: props.message.id,
-      currentMessageNodeId: props.message.nodeId,
+      currentMessageNodeId: props.message.sceneId,
       selectedNodeId: nodeStore.selectedNodeId,
     })
 
@@ -549,13 +550,13 @@ export const Message: Component<MessageProps> = (props) => {
     if (cutMessageIds.length === 0) return
 
     // Get the target node ID (where we're pasting)
-    const targetNodeId = props.message.nodeId || nodeStore.selectedNodeId || ''
+    const targetNodeId = props.message.sceneId || nodeStore.selectedNodeId || ''
 
     console.log('[handlePasteAfter] Pasting messages:', {
       cutMessageIds,
       targetNodeId,
       currentMessageId: props.message.id,
-      currentMessageNodeId: props.message.nodeId,
+      currentMessageNodeId: props.message.sceneId,
       selectedNodeId: nodeStore.selectedNodeId,
     })
 
@@ -1005,7 +1006,7 @@ export const Message: Component<MessageProps> = (props) => {
                 {
                   // Message metadata
                   id: props.message.id,
-                  chapterId: props.message.chapterId || 'none',
+                  chapterId: props.message.sceneId || 'none',
 
                   // Model info
                   model: props.message.model || 'unknown',
@@ -1150,7 +1151,7 @@ export const Message: Component<MessageProps> = (props) => {
                 onClick={handleSetAsTarget}
                 title="Set as target for branch option"
               >
-                🎯 Set as Target
+                <ImTarget size={16} /> Set as Target
               </Button>
             </Show>
             <Show when={props.message.role === 'assistant' && !isEditing()}>
@@ -1171,7 +1172,7 @@ export const Message: Component<MessageProps> = (props) => {
                   onAnalyze={() => handleAnalyzeMessage(props.message.id)}
                   onToggleDebug={() => setShowAnalysisDebug(!showAnalysisDebug())}
                   onEditScript={props.message.script ? undefined : () => setShowScriptModal(true)}
-                  onRewrite={() => rewriteDialogStore.show([props.message.id])}
+                  onRewrite={() => singleRewriteDialogStore.show(props.message.id)}
                   onCut={handleCut}
                   onUncut={handleUncut}
                   isCut={uiStore.isCut(props.message.id)}

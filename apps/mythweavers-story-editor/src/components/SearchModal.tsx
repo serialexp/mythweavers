@@ -34,13 +34,13 @@ export function SearchModal() {
       .filter((msg) => msg.role === 'assistant' && !msg.isQuery)
       .map((msg) => {
         // Find the chapter/node this message belongs to
-        const node = nodeStore.getNode(msg.nodeId || msg.chapterId || '')
+        const node = nodeStore.getNode(msg.sceneId || '')
         const chapterName = node?.title || 'Unknown Chapter'
 
         // Calculate message index within its chapter
         const chapterMessages = messagesStore.messages
           .filter(
-            (m) => (m.nodeId === msg.nodeId || m.chapterId === msg.chapterId) && m.role === 'assistant' && !m.isQuery,
+            (m) => (m.sceneId === msg.sceneId) && m.role === 'assistant' && !m.isQuery,
           )
           .sort((a, b) => a.order - b.order)
         const messageIndex = chapterMessages.findIndex((m) => m.id === msg.id) + 1
@@ -350,7 +350,7 @@ export function SearchModal() {
     const message = messagesStore.messages.find((m) => m.id === result.messageId)
     if (!message) return
 
-    const nodeId = message.nodeId || message.chapterId
+    const nodeId = message.sceneId
     if (nodeId) {
       // Select the chapter/node
       nodeStore.selectNode(nodeId)

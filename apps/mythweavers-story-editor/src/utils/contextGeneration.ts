@@ -1,6 +1,6 @@
 import { Chapter, Character, ContextItem, Message, Node } from '../types/core'
 import { generateAnalysis } from './analysisClient'
-import { calculateActivePath, getChapterNodesBeforeNode } from './nodeTraversal'
+import { calculateActivePath, getSceneNodesBeforeNode } from './nodeTraversal'
 import { buildSmartContext } from './smartContext'
 import { ChatMessage } from './storyUtils'
 import { getStoryPrompt } from './storyUtils'
@@ -17,6 +17,7 @@ export interface ContextGenerationOptions {
 
   // Story-specific options
   storySetting?: string
+  storyFormat?: 'narrative' | 'cyoa'
   person?: string
   tense?: string
   protagonistName?: string
@@ -57,9 +58,9 @@ function getChapterOrder(messages: Message[]): string[] {
   const seenChapters = new Set<string>()
 
   for (const msg of messages.filter((msg) => !msg.isQuery)) {
-    if (msg.chapterId && !seenChapters.has(msg.chapterId)) {
-      chapterOrder.push(msg.chapterId)
-      seenChapters.add(msg.chapterId)
+    if (msg.sceneId && !seenChapters.has(msg.sceneId)) {
+      chapterOrder.push(msg.sceneId)
+      seenChapters.add(msg.sceneId)
     }
   }
 
@@ -115,7 +116,7 @@ function addChapterSummaries(
     if (chapter.includeInFull === 2 && allMessages) {
       // Get all messages for this chapter
       const chapterMessages = allMessages.filter(
-        (msg) => msg.chapterId === chapterId && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
+        (msg) => msg.sceneId === chapterId && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
       )
 
       if (chapterMessages.length > 0) {
@@ -204,6 +205,7 @@ export async function generateContextMessages(options: ContextGenerationOptions)
     messages,
     contextType,
     storySetting = '',
+    storyFormat = 'narrative',
     person,
     tense,
     protagonistName,
@@ -254,20 +256,20 @@ export async function generateContextMessages(options: ContextGenerationOptions)
   })
   console.log('[generateContextMessages] Filtered story messages:', storyMessages.length)
 
-  // Determine current node and chapter goal
+  // Determine current node and scene goal
   let currentNodeId: string | undefined
-  let chapterGoal: string | undefined
+  let sceneGoal: string | undefined
 
   if (targetMessageId) {
     const targetMessage = messages.find((msg) => msg.id === targetMessageId)
-    currentNodeId = targetMessage?.nodeId
+    currentNodeId = targetMessage?.sceneId
   }
 
   if (!currentNodeId && storyMessages.length > 0) {
     // Find from the last story message with a nodeId
     for (let i = storyMessages.length - 1; i >= 0; i--) {
-      if (storyMessages[i].nodeId) {
-        currentNodeId = storyMessages[i].nodeId
+      if (storyMessages[i].sceneId) {
+        currentNodeId = storyMessages[i].sceneId
         break
       }
     }
@@ -275,8 +277,8 @@ export async function generateContextMessages(options: ContextGenerationOptions)
 
   if (currentNodeId && nodes.length > 0) {
     const currentNode = nodes.find((n) => n.id === currentNodeId)
-    if (currentNode?.type === 'chapter' && currentNode.goal) {
-      chapterGoal = currentNode.goal
+    if (currentNode?.type === 'scene' && currentNode.goal) {
+      sceneGoal = currentNode.goal
     }
   }
 
@@ -295,7 +297,8 @@ export async function generateContextMessages(options: ContextGenerationOptions)
       protagonistName,
       isNewStory,
       viewpointCharacterName,
-      chapterGoal,
+      sceneGoal,
+      storyFormat,
     )
     chatMessages.push({ role: 'system', content: systemContent })
   }
@@ -354,54 +357,54 @@ export async function generateContextMessages(options: ContextGenerationOptions)
       let currentNodeId: string | undefined
       if (targetMessageId) {
         const targetMessage = messages.find((msg) => msg.id === targetMessageId)
-        currentNodeId = targetMessage?.nodeId
+        currentNodeId = targetMessage?.sceneId
         console.log('[generateContextMessages] Current node from target message:', currentNodeId)
       }
 
       if (!currentNodeId) {
         // Find from the last story message with a nodeId
         for (let i = storyMessages.length - 1; i >= 0; i--) {
-          if (storyMessages[i].nodeId) {
-            currentNodeId = storyMessages[i].nodeId
+          if (storyMessages[i].sceneId) {
+            currentNodeId = storyMessages[i].sceneId
             console.log('[generateContextMessages] Current node from last story message:', currentNodeId)
             break
           }
         }
       }
 
-      // Get all chapter nodes that come before the current node in story order
-      let chapterNodesBeforeCurrent = getChapterNodesBeforeNode(nodes, currentNodeId || '')
+      // Get all scene nodes that come before the current node in story order
+      let sceneNodesBeforeCurrent = getSceneNodesBeforeNode(nodes, currentNodeId || '')
 
       // Filter by active path if we have branch choices
       if (activeNodeIds) {
-        const beforeFiltering = chapterNodesBeforeCurrent.length
-        chapterNodesBeforeCurrent = chapterNodesBeforeCurrent.filter((node) => activeNodeIds.has(node.id))
+        const beforeFiltering = sceneNodesBeforeCurrent.length
+        sceneNodesBeforeCurrent = sceneNodesBeforeCurrent.filter((node) => activeNodeIds.has(node.id))
         console.log(
-          '[generateContextMessages] Filtered chapter nodes by active path:',
+          '[generateContextMessages] Filtered scene nodes by active path:',
           beforeFiltering,
           '->',
-          chapterNodesBeforeCurrent.length,
+          sceneNodesBeforeCurrent.length,
         )
       }
 
       const currentNode = nodes.find((n) => n.id === currentNodeId)
 
-      // Include current node if it's a chapter (for full message inclusion)
-      // Always include current node even if it's not in activeNodeIds (e.g., empty chapter)
-      const chapterNodes =
-        currentNode?.type === 'chapter' ? [...chapterNodesBeforeCurrent, currentNode] : chapterNodesBeforeCurrent
+      // Include current node if it's a scene (for full message inclusion)
+      // Always include current node even if it's not in activeNodeIds (e.g., empty scene)
+      const sceneNodes =
+        currentNode?.type === 'scene' ? [...sceneNodesBeforeCurrent, currentNode] : sceneNodesBeforeCurrent
 
       console.log(
         '[generateContextMessages] Found',
-        chapterNodes.length,
-        'chapter nodes in story order before/including current',
+        sceneNodes.length,
+        'scene nodes in story order before/including current',
       )
 
       // Check nodes that come BEFORE current for missing summaries
       const nodesWithoutSummaries: string[] = []
-      for (const node of chapterNodesBeforeCurrent) {
+      for (const node of sceneNodesBeforeCurrent) {
         if (!node.summary) {
-          const nodeMessages = storyMessages.filter((msg) => msg.nodeId === node.id)
+          const nodeMessages = storyMessages.filter((msg) => msg.sceneId === node.id)
           const hasMeaningfulContent = nodeMessages.some((msg) => msg.content.trim().length > 0)
           if (hasMeaningfulContent) {
             nodesWithoutSummaries.push(node.title)
@@ -412,19 +415,27 @@ export async function generateContextMessages(options: ContextGenerationOptions)
       // If there are nodes without summaries and we're not forcing, throw an error listing all of them
       if (nodesWithoutSummaries.length > 0 && !options.forceMissingSummaries) {
         const missingNodeTitles = nodesWithoutSummaries.join(', ')
-        const errorMsg = `Cannot generate story continuation. The following previous chapters need summaries first: ${missingNodeTitles}`
+        const errorMsg = `Cannot generate story continuation. The following previous scenes need summaries first: ${missingNodeTitles}`
         console.error('[generateContextMessages] Nodes missing summaries:', nodesWithoutSummaries)
         throw new Error(errorMsg)
       }
 
-      // Add node summaries for all previous chapters
-      for (const node of chapterNodes) {
+      // Add node summaries for all previous scenes
+      for (const node of sceneNodes) {
         if (node.id === currentNodeId) {
           // Current node - add full messages
           console.log('[generateContextMessages] Adding full messages for current node:', node.title)
-          const nodeMessages = storyMessages.filter((msg) => msg.nodeId === node.id)
+          const nodeMessages = storyMessages.filter((msg) => msg.sceneId === node.id)
           nodeMessages.forEach((msg, index) => {
             if (msg.content?.trim()) {
+              // In CYOA mode, add user instruction as a separate message before the assistant response
+              if (storyFormat === 'cyoa' && msg.instruction?.trim()) {
+                chatMessages.push({
+                  role: 'user',
+                  content: msg.instruction,
+                })
+              }
+
               const message: ChatMessage = {
                 role: 'assistant',
                 content: msg.content,
@@ -444,18 +455,26 @@ export async function generateContextMessages(options: ContextGenerationOptions)
         } else if (node.includeInFull === 2) {
           // Previous node marked for full inclusion - add all messages
           console.log('[generateContextMessages] Adding full messages for node (includeInFull=2):', node.title)
-          const nodeMessages = storyMessages.filter((msg) => msg.nodeId === node.id)
+          const nodeMessages = storyMessages.filter((msg) => msg.sceneId === node.id)
 
-          // Add a chapter header first
+          // Add a scene header first
           if (nodeMessages.length > 0) {
             chatMessages.push({
               role: 'assistant',
-              content: `[Chapter: ${node.title}]`,
+              content: `[Scene: ${node.title}]`,
             })
 
             // Then add all the messages
             nodeMessages.forEach((msg) => {
               if (msg.content?.trim()) {
+                // In CYOA mode, add user instruction as a separate message before the assistant response
+                if (storyFormat === 'cyoa' && msg.instruction?.trim()) {
+                  chatMessages.push({
+                    role: 'user',
+                    content: msg.instruction,
+                  })
+                }
+
                 chatMessages.push({
                   role: 'assistant',
                   content: msg.content,
@@ -468,7 +487,7 @@ export async function generateContextMessages(options: ContextGenerationOptions)
           console.log('[generateContextMessages] Adding summary for node (includeInFull=1):', node.title)
           chatMessages.push({
             role: 'assistant',
-            content: `[Chapter: ${node.title}]\n${node.summary}`,
+            content: `[Scene: ${node.title}]\n${node.summary}`,
           })
         }
       }
@@ -481,13 +500,13 @@ export async function generateContextMessages(options: ContextGenerationOptions)
       if (chapters.length > 0) {
         if (targetMessageId) {
           const targetMessage = messages.find((msg) => msg.id === targetMessageId)
-          currentChapterId = targetMessage?.chapterId
+          currentChapterId = targetMessage?.sceneId
           console.log('[generateContextMessages] Current chapter from target message:', currentChapterId)
         } else {
           // Find from the last story message
           for (let i = storyMessages.length - 1; i >= 0; i--) {
-            if (storyMessages[i].chapterId) {
-              currentChapterId = storyMessages[i].chapterId
+            if (storyMessages[i].sceneId) {
+              currentChapterId = storyMessages[i].sceneId
               console.log('[generateContextMessages] Current chapter from last story message:', currentChapterId)
               break
             }
@@ -515,7 +534,7 @@ export async function generateContextMessages(options: ContextGenerationOptions)
         if (contextType === 'story') {
           const chaptersWithContent = previousChapters.filter((chapter) => {
             const chapterMessages = storyMessages.filter(
-              (msg) => msg.chapterId === chapter.id && msg.type !== 'chapter' && !msg.isQuery,
+              (msg) => msg.sceneId === chapter.id && msg.type !== 'chapter' && !msg.isQuery,
             )
             return chapterMessages.length > 0
           })
@@ -539,7 +558,7 @@ export async function generateContextMessages(options: ContextGenerationOptions)
         addChapterSummaries(chatMessages, previousChapters, chapterOrder, currentIndex, messages)
 
         // Filter messages to current chapter
-        const currentChapterMessages = storyMessages.filter((msg) => msg.chapterId === currentChapterId)
+        const currentChapterMessages = storyMessages.filter((msg) => msg.sceneId === currentChapterId)
         console.log('[generateContextMessages] Current chapter messages:', currentChapterMessages.length)
 
         // Add current chapter messages with summarization
@@ -554,6 +573,14 @@ export async function generateContextMessages(options: ContextGenerationOptions)
           )
 
           if (content?.trim()) {
+            // In CYOA mode, add user instruction as a separate message before the assistant response
+            if (storyFormat === 'cyoa' && msg.instruction?.trim()) {
+              chatMessages.push({
+                role: 'user',
+                content: msg.instruction,
+              })
+            }
+
             const message: ChatMessage = {
               role: 'assistant',
               content: content,
@@ -592,6 +619,14 @@ export async function generateContextMessages(options: ContextGenerationOptions)
           const content = applySummarization(msg, index + 1, storyMessages.length, isClaudeModel || false, false)
 
           if (content?.trim()) {
+            // In CYOA mode, add user instruction as a separate message before the assistant response
+            if (storyFormat === 'cyoa' && msg.instruction?.trim()) {
+              chatMessages.push({
+                role: 'user',
+                content: msg.instruction,
+              })
+            }
+
             const message: ChatMessage = {
               role: 'assistant',
               content: content,
@@ -646,7 +681,14 @@ export async function generateContextMessages(options: ContextGenerationOptions)
       role: 'user',
       content: `Question: ${inputText}`,
     })
+  } else if (storyFormat === 'cyoa') {
+    // CYOA mode: user input is their choice, not a meta-instruction
+    chatMessages.push({
+      role: 'user',
+      content: inputText,
+    })
   } else {
+    // Narrative mode: wrap user input as a meta-instruction
     const continueOrBegin = storyMessages.length === 0 ? 'Begin' : 'Continue'
     const paragraphGuidance =
       paragraphsPerTurn && paragraphsPerTurn > 0

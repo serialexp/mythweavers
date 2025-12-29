@@ -97,58 +97,21 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     // TODO: Update message in messagesStore
   }
 
-  const handleParagraphMoveUp = (paragraphId: string) => {
-    console.log('[SceneEditorWrapper] Moving paragraph up:', paragraphId)
-    // TODO: Reorder messages
-  }
-
-  const handleParagraphMoveDown = (paragraphId: string) => {
-    console.log('[SceneEditorWrapper] Moving paragraph down:', paragraphId)
-    // TODO: Reorder messages
-  }
-
   const handleSelectedParagraphChange = (paragraphId: string) => {
     setSelectedParagraphId(paragraphId)
-  }
-
-  const handleViewpointChange = (characterId: string | null) => {
-    console.log('[SceneEditorWrapper] Viewpoint changed:', characterId)
-    // TODO: Update scene node's viewpointCharacterId
-  }
-
-  const handleActiveCharactersChange = (characterIds: string[]) => {
-    console.log('[SceneEditorWrapper] Active characters changed:', characterIds)
-    // TODO: Update scene node's activeCharacterIds
-  }
-
-  const handleGoalChange = (goal: string | null) => {
-    console.log('[SceneEditorWrapper] Goal changed:', goal)
-    // TODO: Update scene node's goal
   }
 
   return (
     <SceneEditor
       scene={editorScene()}
       characters={editorCharacters()}
-      locations={{}} // Empty record for now
+      locations={{}}
       sceneId={props.messageId}
-      // Callbacks
       onParagraphsChange={handleParagraphsChange}
       onParagraphCreate={handleParagraphCreate}
-      // Note: The SceneEditor also calls onParagraphsChange which updates our parent
       onParagraphDelete={handleParagraphDelete}
       onParagraphUpdate={handleParagraphUpdate}
-      onParagraphMoveUp={handleParagraphMoveUp}
-      onParagraphMoveDown={handleParagraphMoveDown}
       onSelectedParagraphChange={handleSelectedParagraphChange}
-      onViewpointChange={handleViewpointChange}
-      onActiveCharactersChange={handleActiveCharactersChange}
-      onGoalChange={handleGoalChange}
-      // AI not connected yet
-      onAiHelp={async () => {}}
-      onAiRewrite={async () => {}}
-      onAiTranslate={async () => {}}
-      onAiBetween={async () => {}}
     />
   )
 }

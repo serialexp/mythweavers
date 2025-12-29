@@ -12,6 +12,7 @@ import {
   BsFileEarmarkTextFill,
   BsFileText,
   BsPencil,
+  BsPeople,
   BsPlusCircle,
   BsThreeDots,
   BsTrash,
@@ -19,16 +20,22 @@ import {
 import { FaRegularCircle, FaSolidBookOpen, FaSolidCircleCheck, FaSolidCircleHalfStroke } from 'solid-icons/fa'
 import { VsCode } from 'solid-icons/vs'
 import { Dropdown, DropdownItem } from '@mythweavers/ui'
-import { Component, For, Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { useOllama } from '../hooks/useOllama'
 import { copyPreviewStore } from '../stores/copyPreviewStore'
 import { messagesStore } from '../stores/messagesStore'
+import { modelsStore } from '../stores/modelsStore'
 import { navigationStore } from '../stores/navigationStore'
 import { TreeNode, nodeStore } from '../stores/nodeStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
+import { settingsStore } from '../stores/settingsStore'
 import { statsStore } from '../stores/statsStore'
 import { Node, NodeType } from '../types/core'
 import { buildNodeMarkdown, buildPrecedingContextMarkdown, buildTreeMarkdown } from '../utils/nodeContentExport'
+import { estimateTokensFromText } from '../utils/templateAI'
+import { createAnthropicClient } from '../utils/anthropicClient'
+import { CharacterUpdateModal } from './CharacterUpdateModal'
+import { ContextItemGenerateModal } from './ContextItemGenerateModal'
 import { NodeStatusMenu } from './NodeStatusMenu'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
@@ -160,6 +167,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   } = useTreeDragDrop()
   const [isEditing, setIsEditing] = createSignal(false)
   let dragPreviewEl: HTMLDivElement | null = null
+  let editInputRef: HTMLInputElement | undefined
 
   // Get the Ollama hook for summary generation
   const { generateNodeSummary } = useOllama()
@@ -194,32 +202,47 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     return `Script changes: ${nodeChanges.changes.map((c) => c.key).join(', ')}`
   }
 
-  // Check if chapter has content but no summary
+  // Check if this node has script errors
+  const hasScriptErrors = () => {
+    return scriptDataStore.hasScriptErrors(props.treeNode.id)
+  }
+
+  // Get a tooltip for script errors
+  const getScriptErrorsTooltip = () => {
+    const errors = scriptDataStore.getScriptErrors(props.treeNode.id)
+    if (errors.length === 0) return ''
+    if (errors.length === 1) {
+      return `Script error: ${errors[0].error}`
+    }
+    return `${errors.length} script errors:\n${errors.map((e) => `• ${e.error}`).join('\n')}`
+  }
+
+  // Check if scene has content but no summary
   const needsSummary = () => {
     const n = node()
-    if (!n || n.type !== 'chapter') return false
+    if (!n || (n.type !== 'chapter' && n.type !== 'scene')) return false
 
     // Check if node has a summary
     const summary = n.summary
     if (summary && summary.trim().length > 0) return false
 
-    // Check if chapter has any messages with content
-    const chapterMessages = messagesStore.messages.filter(
+    // Check if scene has any messages with content
+    const sceneMessages = messagesStore.messages.filter(
       (msg) =>
-        (msg.nodeId === props.treeNode.id || msg.chapterId === props.treeNode.id) &&
+        (msg.sceneId === props.treeNode.id) &&
         msg.role === 'assistant' &&
         !msg.isQuery &&
         msg.content &&
         msg.content.trim().length > 0,
     )
 
-    return chapterMessages.length > 0
+    return sceneMessages.length > 0
   }
 
-  // Check if chapter has any branch messages
+  // Check if scene has any branch messages
   const hasBranches = () => {
     const n = node()
-    if (!n || n.type !== 'chapter') return false
+    if (!n || n.type !== 'scene') return false
 
     // Use pre-computed Set for O(1) lookup instead of filtering all messages
     return messagesStore.hasNodeBranches(props.treeNode.id)
@@ -232,46 +255,46 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     return n.storyTime === undefined || n.storyTime === null
   }
 
-  // Check if chapter matches the active storyline filter
+  // Check if scene matches the active storyline filter
   const matchesStorylineFilter = () => {
     const selectedId = navigationStore.selectedStorylineId
     if (!selectedId) return false // No filter active
 
     const n = node()
-    if (!n || n.type !== 'chapter') return false
+    if (!n || n.type !== 'scene') return false
 
     return (n.activeContextItemIds || []).includes(selectedId)
   }
 
-  // Get word count for this chapter (pre-calculated by backend)
+  // Get word count for this scene (pre-calculated by backend)
   const wordCount = () => {
     const n = node()
-    if (!n || n.type !== 'chapter') return 0
+    if (!n || n.type !== 'scene') return 0
     return n.wordCount || 0
   }
 
   // Determine color based on word count relative to average
   const getWordCountColor = () => {
     const n = node()
-    if (!n || n.type !== 'chapter') return undefined
+    if (!n || n.type !== 'scene') return undefined
     const count = wordCount()
-    if (count === 0) return '#6b7280' // gray for empty chapters
+    if (count === 0) return '#6b7280' // gray for empty scenes
 
     const stats = statsStore.wordCountStats
     if (stats.average === 0) return '#22c55e' // green if no baseline
 
     const ratio = count / stats.average
 
-    if (ratio >= 1.5) return '#ef4444' // red for very long chapters
+    if (ratio >= 1.5) return '#ef4444' // red for very long scenes
     if (ratio >= 1.0) return '#f97316' // orange for above average
     if (ratio >= 0.5) return '#eab308' // yellow for average
-    return '#22c55e' // green for short chapters
+    return '#22c55e' // green for short scenes
   }
 
   // Get the icon based on includeInFull state
   const getIncludeIcon = () => {
     const n = node()
-    const includeVal = n?.includeInFull ?? 1 // default to summary
+    const includeVal = n?.includeInFull ?? 2 // default to full content
     switch (includeVal) {
       case 0:
         return <FaRegularCircle /> // Not included
@@ -288,24 +311,37 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   const getIncludeTooltip = () => {
     const count = wordCount()
     const n = node()
-    const includeVal = n?.includeInFull ?? 1
+    const includeVal = n?.includeInFull ?? 2
+    const hasSummary = !!n?.summary
     const stateText = includeVal === 0 ? 'Not included' : includeVal === 2 ? 'Full content' : 'Summary only'
-    return `${count.toLocaleString()} words • ${stateText}\nClick to cycle`
+    const summaryNote = !hasSummary ? '\n(No summary available)' : ''
+    return `${count.toLocaleString()} words • ${stateText}${summaryNote}\nClick to cycle`
   }
 
   // Cycle through includeInFull states: 1 -> 2 -> 0 -> 1
+  // If node has no summary, skip state 1 (summary): 2 -> 0 -> 2
   const handleCycleInclude = (e: MouseEvent) => {
     e.stopPropagation()
     const n = node()
-    if (!n || n.type !== 'chapter') return
+    if (!n || n.type !== 'scene') return
 
-    const currentVal = n.includeInFull ?? 1
+    const currentVal = n.includeInFull ?? 2
+    const hasSummary = !!n.summary
     let nextVal: number
-    if (currentVal === 1)
-      nextVal = 2 // summary -> full
-    else if (currentVal === 2)
-      nextVal = 0 // full -> not included
-    else nextVal = 1 // not included -> summary
+
+    if (hasSummary) {
+      // Full cycle: full -> summary -> not included -> full
+      if (currentVal === 2)
+        nextVal = 1 // full -> summary
+      else if (currentVal === 1)
+        nextVal = 0 // summary -> not included
+      else nextVal = 2 // not included -> full
+    } else {
+      // No summary available, skip summary state: full -> not included -> full
+      if (currentVal === 2)
+        nextVal = 0 // full -> not included
+      else nextVal = 2 // not included (or summary) -> full
+    }
 
     nodeStore.updateNode(props.treeNode.id, { includeInFull: nextVal })
   }
@@ -396,11 +432,16 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     nodeStore.addNode(props.treeNode.id, childType)
   }
 
-  const handleEdit = () => {
+  const handleEdit = (e?: MouseEvent) => {
+    e?.stopPropagation()
     const n = node()
     if (!n) return
     setIsEditing(true)
     setEditTitle(n.title)
+    // Select the text after the input is rendered
+    requestAnimationFrame(() => {
+      editInputRef?.select()
+    })
   }
 
   const handleCopyAsMarkdown = async () => {
@@ -464,11 +505,15 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     dragPreviewEl = null
   })
 
-  const handleDelete = () => {
+  const handleDelete = (e?: MouseEvent) => {
     const n = node()
     if (!n) return
-    if (confirm(`Delete ${n.type} "${n.title}" and all its contents?`)) {
-      nodeStore.deleteNode(props.treeNode.id)
+    const permanent = e?.shiftKey ?? false
+    const confirmMsg = permanent
+      ? `PERMANENTLY delete ${n.type} "${n.title}" and all its contents? This cannot be undone!`
+      : `Delete ${n.type} "${n.title}" and all its contents?`
+    if (confirm(confirmMsg)) {
+      nodeStore.deleteNode(props.treeNode.id, permanent)
     }
   }
 
@@ -822,7 +867,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     <div class={isDragging() ? `${styles.nodeItem} ${styles.nodeItemDragging}` : styles.nodeItem}>
       <div
         class={getNodeHeaderClasses()}
-        style={{ 'padding-left': `${props.level * 16 + 4}px` }}
+        style={{ 'padding-left': `${props.level * 8 + 4}px` }}
         data-selected={isSelected() ? 'true' : undefined}
         onClick={handleSelect}
         draggable={!isEditing()}
@@ -848,6 +893,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             class={styles.nodeTitle}
             style={{ color: matchesStorylineFilter() ? 'var(--primary-color)' : getStatusColor() }}
             title={`ID: ${props.treeNode.id}`}
+            onDblClick={handleEdit}
           >
             {node()?.title}{' '}
             <span style={{ opacity: 0.5, 'font-size': '0.8em' }}>({props.treeNode.id.slice(0, 8)})</span>
@@ -856,11 +902,12 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
         <Show when={isEditing()}>
           <input
+            ref={editInputRef}
             class={styles.editInput}
             value={editTitle()}
             onInput={(e) => setEditTitle(e.currentTarget.value)}
             onClick={(e) => e.stopPropagation()}
-            onKeyPress={(e) => {
+            onKeyDown={(e) => {
               if (e.key === 'Enter') handleSaveEdit()
               if (e.key === 'Escape') handleCancelEdit()
             }}
@@ -871,7 +918,17 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
         <div class={styles.nodeControls}>
           <div class={styles.nodeIndicators}>
-            <Show when={hasScriptChanges()}>
+            <Show when={hasScriptErrors()}>
+              <span
+                class={styles.indicatorIcon}
+                title={getScriptErrorsTooltip()}
+                style={{ color: '#ef4444' }}
+              >
+                <VsCode />
+              </span>
+            </Show>
+
+            <Show when={hasScriptChanges() && !hasScriptErrors()}>
               <span
                 class={styles.indicatorIcon}
                 title={getScriptChangesTooltip()}
@@ -884,7 +941,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             <Show when={hasBranches()}>
               <span
                 class={styles.indicatorIcon}
-                title="This chapter contains branch points"
+                title="This scene contains branch points"
                 style={{ color: '#06b6d4' }}
               >
                 <BsDiagram3 />
@@ -904,14 +961,14 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             <Show when={needsSummary()}>
               <span
                 class={styles.indicatorIcon}
-                title="This chapter has content but no summary"
+                title="This scene has content but no summary"
                 style={{ color: '#f59e0b' }}
               >
                 <BsExclamationTriangle />
               </span>
             </Show>
 
-            <Show when={node()?.type === 'chapter'}>
+            <Show when={node()?.type === 'scene'}>
               <span
                 class={styles.indicatorIcon}
                 title={getIncludeTooltip()}
@@ -952,15 +1009,10 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             <DropdownItem icon={<BsPencil />} onClick={handleEdit}>
               Edit Title
             </DropdownItem>
-            <Show when={node()?.type === 'book' || node()?.type === 'arc' || node()?.type === 'chapter'}>
-              <DropdownItem icon={<BsFileEarmarkText />} onClick={handleCopyAsMarkdown}>
-                Copy as Markdown
-              </DropdownItem>
-            </Show>
-            <Show when={node()?.type === 'chapter'}>
-              <DropdownItem icon={<BsFileEarmarkTextFill />} onClick={handleCopyPreviousContext}>
-                Copy Previous Context
-              </DropdownItem>
+            <DropdownItem icon={<BsFileEarmarkText />} onClick={handleCopyAsMarkdown}>
+              Copy as Markdown
+            </DropdownItem>
+            <Show when={node()?.type === 'chapter' || node()?.type === 'scene'}>
               <DropdownItem
                 icon={
                   node()?.isSummarizing ? undefined : node()?.summary ? <BsCheckCircle /> : <BsFileText />
@@ -974,19 +1026,26 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                     ? 'Regenerate Summary'
                     : 'Generate Summary'}
               </DropdownItem>
+              <DropdownItem icon={<BsFileEarmarkTextFill />} onClick={handleCopyPreviousContext}>
+                Copy Previous Context
+              </DropdownItem>
+            </Show>
+            <Show when={node()?.type === 'chapter'}>
               <NodeStatusMenu
                 currentStatus={node()?.status}
                 onSelect={(status) => nodeStore.updateNode(props.treeNode.id, { status })}
               />
+            </Show>
+            <Show when={node()?.type === 'scene'}>
               <DropdownItem
                 icon={<FaSolidCircleHalfStroke />}
-                onClick={() => nodeStore.setIncludeForPrecedingChapters(props.treeNode.id, 1)}
+                onClick={() => nodeStore.setIncludeForPrecedingScenes(props.treeNode.id, 1)}
               >
                 Use Summaries Before
               </DropdownItem>
               <DropdownItem
                 icon={<FaRegularCircle />}
-                onClick={() => nodeStore.setIncludeForPrecedingChapters(props.treeNode.id, 0)}
+                onClick={() => nodeStore.setIncludeForPrecedingScenes(props.treeNode.id, 0)}
               >
                 Exclude All Before
               </DropdownItem>
@@ -1035,6 +1094,127 @@ interface StoryNavigationProps {
 
 export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   let treeContainerRef: HTMLDivElement | undefined
+  const [showCharacterUpdateModal, setShowCharacterUpdateModal] = createSignal(false)
+  const [showContextItemGenerateModal, setShowContextItemGenerateModal] = createSignal(false)
+
+  // Signal to hold the async token count result
+  const [tokenCountResult, setTokenCountResult] = createSignal<{
+    tokens: number
+    isExact: boolean
+    isLoading: boolean
+  } | null>(null)
+
+  // Fingerprint memo: captures the relevant state for token counting
+  // Only changes when includeInFull values or content actually changes
+  const contextFingerprint = createMemo(() => {
+    const nodes = nodeStore.nodesArray
+    const fullContentNodes = nodes.filter((n) => n.includeInFull === 2)
+    const summaryNodes = nodes.filter((n) => n.includeInFull === 1 && n.summary)
+
+    if (fullContentNodes.length === 0 && summaryNodes.length === 0) {
+      return null
+    }
+
+    // Build a fingerprint that includes:
+    // - node IDs and their includeInFull values
+    // - content length (as a proxy for content changes)
+    // - provider and model (to know when to use API vs heuristic)
+    const nodeFingerprints = [
+      ...fullContentNodes.map((n) => `${n.id}:2:${n.wordCount || 0}`),
+      ...summaryNodes.map((n) => `${n.id}:1:${(n.summary || '').length}`),
+    ].sort()
+
+    return {
+      fingerprint: nodeFingerprints.join('|'),
+      provider: settingsStore.provider,
+      model: settingsStore.model,
+      fullContentNodes,
+      summaryNodes,
+    }
+  })
+
+  // Effect that watches the fingerprint and triggers token counting
+  createEffect(() => {
+    const fp = contextFingerprint()
+    if (!fp) {
+      setTokenCountResult(null)
+      return
+    }
+
+    const { provider, model, fullContentNodes, summaryNodes } = fp
+
+    // Build content for token counting
+    let totalContent = ''
+    for (const node of fullContentNodes) {
+      const markdown = buildNodeMarkdown(node.id)
+      if (markdown) {
+        totalContent += `## ${node.title}\n\n${markdown}\n\n`
+      }
+    }
+    for (const node of summaryNodes) {
+      if (node.summary) {
+        totalContent += `## ${node.title} (Summary)\n\n${node.summary}\n\n`
+      }
+    }
+
+    // For Anthropic, use the API; otherwise use heuristic
+    if (provider === 'anthropic' && model && settingsStore.anthropicApiKey) {
+      // Set loading state
+      setTokenCountResult({ tokens: 0, isExact: false, isLoading: true })
+
+      const client = createAnthropicClient()
+      client
+        .countTokens([{ role: 'user', content: totalContent }], model)
+        .then((tokens) => {
+          setTokenCountResult({ tokens, isExact: true, isLoading: false })
+        })
+        .catch((err) => {
+          console.error('Failed to count tokens via Anthropic API:', err)
+          // Fall back to heuristic on error
+          const tokens = estimateTokensFromText(totalContent)
+          setTokenCountResult({ tokens, isExact: false, isLoading: false })
+        })
+    } else {
+      // Use heuristic for non-Anthropic providers
+      const tokens = estimateTokensFromText(totalContent)
+      setTokenCountResult({ tokens, isExact: false, isLoading: false })
+    }
+  })
+
+  // Derived memo for the full context estimate (combines token count with context limits)
+  const contextTokenEstimate = createMemo(() => {
+    const fp = contextFingerprint()
+    const tokenResult = tokenCountResult()
+
+    if (!fp || !tokenResult) {
+      return null
+    }
+
+    const { fullContentNodes, summaryNodes } = fp
+    const { tokens, isExact, isLoading } = tokenResult
+
+    // Get model context limit
+    const model = settingsStore.model
+    const modelInfo = modelsStore.availableModels.find((m: { name: string }) => m.name === model)
+    const contextLimit = modelInfo?.context_length || 4096
+
+    // Reserve tokens for prompt overhead (~2000) and output (~4096)
+    const reserved = 6096
+    const availableForContent = Math.max(0, contextLimit - reserved)
+    const percentUsed = availableForContent > 0 ? Math.round((tokens / availableForContent) * 100) : 100
+
+    return {
+      tokens,
+      isExact,
+      isLoading,
+      contextLimit,
+      availableForContent,
+      percentUsed,
+      fitsInContext: tokens <= availableForContent,
+      fullContentCount: fullContentNodes.length,
+      summaryCount: summaryNodes.length,
+    }
+  })
 
   const handleAddBook = () => {
     nodeStore.addNode(null, 'book', 'New Book')
@@ -1101,9 +1281,43 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
 
         <Show when={nodeStore.tree.length > 0}>
           <div class={styles.footer}>
+            {/* Token estimate for context selection */}
+            <Show when={contextTokenEstimate()}>
+              {(() => {
+                const est = contextTokenEstimate()!
+                const statusClass = !est.fitsInContext
+                  ? styles.tokenEstimateError
+                  : est.percentUsed > 80
+                    ? styles.tokenEstimateWarning
+                    : ''
+                const tokenPrefix = est.isLoading ? '...' : est.isExact ? '' : '~'
+                return (
+                  <div class={`${styles.tokenEstimate} ${statusClass}`}>
+                    <span>
+                      Context: {tokenPrefix}{est.isLoading ? '' : est.tokens.toLocaleString()} tokens ({est.percentUsed}%)
+                    </span>
+                    <span class={styles.tokenEstimateDetail}>
+                      {est.fullContentCount > 0 && `${est.fullContentCount} full`}
+                      {est.fullContentCount > 0 && est.summaryCount > 0 && ', '}
+                      {est.summaryCount > 0 && `${est.summaryCount} summary`}
+                    </span>
+                    <Show when={!est.fitsInContext}>
+                      <span class={styles.tokenEstimateError}>exceeds limit!</span>
+                    </Show>
+                  </div>
+                )
+              })()}
+            </Show>
+
             <div class={styles.footerButtons}>
               <button class={styles.addButton} onClick={handleCopyTreeMarkdown}>
                 <BsDiagram3 /> Copy Tree as Markdown
+              </button>
+              <button class={styles.addButton} onClick={() => setShowCharacterUpdateModal(true)}>
+                <BsPeople /> Update Character
+              </button>
+              <button class={styles.addButton} onClick={() => setShowContextItemGenerateModal(true)}>
+                <BsFileText /> Generate Context
               </button>
               <button class={styles.addButton} onClick={handleAddBook}>
                 <BsPlusCircle /> Add Book
@@ -1112,6 +1326,16 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
           </div>
         </Show>
       </div>
+
+      <CharacterUpdateModal
+        isOpen={showCharacterUpdateModal()}
+        onClose={() => setShowCharacterUpdateModal(false)}
+      />
+
+      <ContextItemGenerateModal
+        isOpen={showContextItemGenerateModal()}
+        onClose={() => setShowContextItemGenerateModal(false)}
+      />
     </TreeDragDropProvider>
   )
 }

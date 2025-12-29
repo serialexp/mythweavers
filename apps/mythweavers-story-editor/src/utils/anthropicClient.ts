@@ -63,12 +63,42 @@ interface GenerateResponse {
   error?: string
 }
 
+export interface TokenEstimate {
+  tokens: number
+  isExact: boolean
+  method: 'api' | 'heuristic'
+}
+
 export class AnthropicClient {
   private apiKey: string
   private baseUrl = 'https://api.anthropic.com/v1'
 
   constructor(apiKey: string) {
     this.apiKey = apiKey
+  }
+
+  /**
+   * Estimate token count for messages using Anthropic's token counting API.
+   * Returns an exact count since Anthropic provides this API.
+   */
+  async estimateTokens(messages: ChatMessage[], model: string): Promise<TokenEstimate> {
+    try {
+      const tokens = await this.countTokens(messages, model)
+      return {
+        tokens,
+        isExact: true,
+        method: 'api',
+      }
+    } catch (error) {
+      // Fallback to heuristic if API call fails
+      console.warn('Anthropic token count API failed, falling back to heuristic:', error)
+      const totalChars = messages.reduce((sum, msg) => sum + msg.content.length, 0)
+      return {
+        tokens: Math.ceil(totalChars / 4),
+        isExact: false,
+        method: 'heuristic',
+      }
+    }
   }
 
   private prepareMessages(

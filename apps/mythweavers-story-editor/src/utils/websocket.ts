@@ -151,12 +151,11 @@ export const websocketManager = {
     // Check if this is for the current story
     if (data.storyId !== currentStoryId) return
 
-    // Convert timestamp to Date object and ensure nodeId is set
+    // Convert timestamp to Date object
     const message: Message = {
       ...data.message,
       timestamp: new Date(data.message.timestamp),
-      // If message has chapterId but no nodeId, use chapterId as nodeId
-      nodeId: data.message.nodeId || data.message.chapterId,
+      sceneId: data.message.sceneId,
     }
 
     // Check if the message is currently being edited by the user
@@ -175,12 +174,11 @@ export const websocketManager = {
     // Check if this is for the current story
     if (data.storyId !== currentStoryId) return
 
-    // Convert timestamp to Date object and ensure nodeId is set
+    // Convert timestamp to Date object
     const message: Message = {
       ...data.message,
       timestamp: new Date(data.message.timestamp),
-      // If message has chapterId but no nodeId, use chapterId as nodeId
-      nodeId: data.message.nodeId || data.message.chapterId,
+      sceneId: data.message.sceneId,
     }
 
     // Insert the message at the correct position without triggering save
