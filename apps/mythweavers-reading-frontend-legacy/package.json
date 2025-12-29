@@ -1,5 +1,5 @@
 {
-  "name": "@mythweavers/reading-frontend",
+  "name": "@mythweavers/reading-frontend-legacy",
   "type": "module",
   "scripts": {
     "dev": "vinxi dev",
