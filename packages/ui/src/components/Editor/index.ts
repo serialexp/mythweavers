@@ -43,7 +43,6 @@ export type {
   EditorLocation,
   EditorScene,
   EditorTreeNode,
-  AiHelpType,
 } from './SceneEditorProps'
 export type { ProseMirrorEditorProps } from './components/ProseMirrorEditor'
 export type { TranslationLanguage, InlineMenuConfig } from './prosemirror-plugins/inline-menu'

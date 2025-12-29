@@ -9,7 +9,6 @@ export const card = recipe({
     backgroundColor: tokens.color.bg.raised,
     borderRadius: tokens.radius.lg,
     border: `${tokens.borderWidth.default} solid ${tokens.color.border.subtle}`,
-    overflow: 'hidden',
     transition: `all ${tokens.duration.normal} ${tokens.easing.default}`,
   },
 

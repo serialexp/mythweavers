@@ -23,12 +23,13 @@ export const menu = style({
   left: 0,
   marginTop: tokens.space['1'],
   minWidth: '160px',
+  maxHeight: 'calc(100vh - 16px)', // Fallback max-height for non-portal mode
   backgroundColor: tokens.color.bg.elevated,
   border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
   borderRadius: tokens.radius.md,
   boxShadow: tokens.shadow.md,
   zIndex: tokens.zIndex.dropdown,
-  overflow: 'hidden',
+  overflowY: 'auto',
   animation: `${fadeIn} ${tokens.duration.fast} ${tokens.easing.out}`,
 })
 

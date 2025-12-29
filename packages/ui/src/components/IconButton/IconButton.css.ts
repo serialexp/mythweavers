@@ -1,11 +1,6 @@
-import { keyframes, style } from '@vanilla-extract/css'
+import { style } from '@vanilla-extract/css'
 import { type RecipeVariants, recipe } from '@vanilla-extract/recipes'
 import { tokens } from '../../theme/tokens.css'
-
-const _scaleUp = keyframes({
-  '0%': { transform: 'scale(1)' },
-  '100%': { transform: 'scale(1.1)' },
-})
 
 const base = style({
   position: 'relative',

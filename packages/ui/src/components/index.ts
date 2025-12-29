@@ -1,6 +1,7 @@
 export * from './Alert'
 export * from './Button'
 export * from './ButtonGroup'
+export * from './SplitButton'
 export * from './Card'
 export * from './Heading'
 export * from './IconButton'

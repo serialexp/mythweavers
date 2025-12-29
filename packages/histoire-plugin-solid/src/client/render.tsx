@@ -42,20 +42,12 @@ export default _defineComponent({
   },
 
   setup(props, { emit }) {
-    console.log('[histoire-plugin-solid] RenderStory setup() called!', {
-      slotName: props.slotName,
-      story: props.story?.title,
-      variant: props.variant?.title,
-    })
-
     const el = _ref<HTMLDivElement>()
     let dispose: (() => void) | null = null
     let target: HTMLDivElement | null = null
     let stopSync: (() => void) | null = null
 
     async function mountStory() {
-      console.log('[histoire-plugin-solid] mountStory called', { story: props.story, variant: props.variant })
-
       target = document.createElement('div')
       el.value?.appendChild(target)
 
@@ -66,7 +58,6 @@ export default _defineComponent({
       stopSync = stop
 
       const Comp = props.story.file?.component
-      console.log('[histoire-plugin-solid] Component:', Comp, 'file:', props.story.file)
 
       if (!Comp) {
         console.error('[histoire-plugin-solid] No component found!')
@@ -87,8 +78,6 @@ export default _defineComponent({
         )
       }, target)
 
-      console.log('[histoire-plugin-solid] render() called, dispose:', dispose)
-
       // Call setup functions
       if (typeof generatedSetup?.setupSolid === 'function') {
         const setupFn = generatedSetup.setupSolid as SolidStorySetupHandler
@@ -105,7 +94,6 @@ export default _defineComponent({
         await setupFn({ story: props.story, variant: props.variant })
       }
 
-      console.log('[histoire-plugin-solid] emitting ready event')
       emit('ready')
     }
 
@@ -129,7 +117,6 @@ export default _defineComponent({
     )
 
     _onMounted(async () => {
-      console.log('[histoire-plugin-solid] onMounted - mounting story')
       await mountStory()
     })
 
@@ -144,7 +131,7 @@ export default _defineComponent({
 
   render() {
     return _h('div', {
-      ref: 'el',
+      ref: 'el' as any,
     })
   },
 })

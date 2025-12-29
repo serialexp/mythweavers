@@ -43,9 +43,6 @@ export const tab = recipe({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: tokens.space['1'],
-    padding: `${tokens.space['1']} 0`,
-    fontSize: tokens.font.size.xs,
     fontWeight: tokens.font.weight.medium,
     color: tokens.color.text.secondary,
     backgroundColor: 'transparent',
@@ -98,10 +95,33 @@ export const tab = recipe({
         },
       },
     },
+    size: {
+      xs: {
+        gap: tokens.space['1'],
+        padding: `${tokens.space['1']} 0`,
+        fontSize: tokens.font.size.xs,
+      },
+      sm: {
+        gap: tokens.space['1'],
+        padding: `${tokens.space['2']} ${tokens.space['1']}`,
+        fontSize: tokens.font.size.sm,
+      },
+      md: {
+        gap: tokens.space['2'],
+        padding: `${tokens.space['3']} ${tokens.space['2']}`,
+        fontSize: tokens.font.size.base,
+      },
+      lg: {
+        gap: tokens.space['2'],
+        padding: `${tokens.space['4']} ${tokens.space['3']}`,
+        fontSize: tokens.font.size.lg,
+      },
+    },
   },
 
   defaultVariants: {
     variant: 'underline',
+    size: 'xs',
   },
 })
 

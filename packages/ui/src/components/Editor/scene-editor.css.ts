@@ -103,20 +103,6 @@ export const paragraphActionsGroup = style({
   marginRight: tokens.space['3'],
 })
 
-globalStyle(`${paragraphActionsMenu} .btn`, {
-  minHeight: '28px',
-  height: '28px',
-  padding: `0 ${tokens.space['2.5']}`,
-  fontSize: tokens.font.size.sm,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-})
-
-globalStyle(`${paragraphActionsMenu} .btn svg`, {
-  color: 'currentColor',
-  flexShrink: 0,
-})
 
 // Block Menu
 export const blockMenu = style({
@@ -460,4 +446,59 @@ globalStyle(`${sceneEditor} .solid-editor-mention::selection`, {
 
 globalStyle(`${sceneEditor} .solid-editor-mention *::selection`, {
   background: 'transparent',
+})
+
+// ====================================
+// Paragraph Action Button (Decoration-based)
+// ====================================
+
+// Container for the action button - positioned at end of paragraph
+export const paragraphActionButtonContainer = style({
+  position: 'absolute',
+  right: tokens.space['2'],
+  top: '50%',
+  transform: 'translateY(-50%)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  opacity: 0.6,
+  transition: `opacity ${tokens.duration.fast} ${tokens.easing.default}`,
+  selectors: {
+    '&:hover': {
+      opacity: 1,
+    },
+  },
+})
+
+// The action button itself
+export const paragraphActionButton = style({
+  minWidth: '24px',
+  width: '24px',
+  height: '24px',
+  padding: '0',
+  fontSize: tokens.font.size.base,
+  lineHeight: '1',
+})
+
+// Dropdown menu styles
+export const paragraphActionsDropdown = style({
+  minWidth: '180px',
+})
+
+export const paragraphActionsDropdownItem = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  fontSize: tokens.font.size.sm,
+  cursor: 'pointer',
+  transition: `background-color ${tokens.duration.fast} ${tokens.easing.default}`,
+  selectors: {
+    '&:hover': {
+      backgroundColor: tokens.color.surface.hover,
+    },
+    '&[data-disabled="true"]': {
+      opacity: 0.5,
+      cursor: 'not-allowed',
+    },
+  },
 })

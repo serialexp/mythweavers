@@ -2,12 +2,14 @@ import { type JSX, type ParentComponent, Show, createContext, createSignal, useC
 import * as styles from './Tabs.css'
 
 export type TabsVariant = 'underline' | 'pills'
+export type TabsSize = 'xs' | 'sm' | 'md' | 'lg'
 
 // Context for sharing state between Tabs components
 interface TabsContextValue {
   activeTab: () => string
   setActiveTab: (id: string) => void
   variant: () => TabsVariant
+  size: () => TabsSize
   toggleable: () => boolean
 }
 
@@ -23,6 +25,8 @@ const useTabsContext = () => {
 export interface TabsProps {
   /** Tab style variant */
   variant?: TabsVariant
+  /** Tab size */
+  size?: TabsSize
   /** Default active tab ID */
   defaultTab?: string
   /** Controlled active tab ID */
@@ -50,10 +54,11 @@ export const Tabs: ParentComponent<TabsProps> = (props) => {
   }
 
   const variant = () => props.variant ?? 'underline'
+  const size = () => props.size ?? 'xs'
   const toggleable = () => props.toggleable ?? false
 
   return (
-    <TabsContext.Provider value={{ activeTab, setActiveTab, variant, toggleable }}>
+    <TabsContext.Provider value={{ activeTab, setActiveTab, variant, size, toggleable }}>
       <div class={`${styles.container} ${props.class ?? ''}`} style={props.style}>
         {props.children}
       </div>
@@ -114,7 +119,7 @@ export const Tab: ParentComponent<TabProps> = (props) => {
 
   return (
     <button
-      class={styles.tab({ variant: ctx.variant() })}
+      class={styles.tab({ variant: ctx.variant(), size: ctx.size() })}
       role="tab"
       id={props.id}
       aria-selected={isSelected()}

@@ -12,8 +12,8 @@ import {
   ref as _ref,
   watch as _watch,
 } from '@histoire/vendors/vue'
-import prettierBabel from 'prettier/plugins/babel'
 import prettierEstree from 'prettier/plugins/estree'
+import prettierTypescript from 'prettier/plugins/typescript'
 import { format } from 'prettier/standalone'
 import { render } from 'solid-js/web'
 import type { SolidStorySetupHandler } from '../helpers.js'
@@ -22,8 +22,8 @@ import { MountStory as MountStorySolid, MountStoryWithContext, MountVariant as M
 async function formatCode(code: string): Promise<string> {
   try {
     let result = await format(code, {
-      parser: 'babel',
-      plugins: [prettierBabel, prettierEstree],
+      parser: 'typescript',
+      plugins: [prettierTypescript, prettierEstree],
       printWidth: 50,
       tabWidth: 2,
       useTabs: false,
@@ -114,14 +114,11 @@ export default _defineComponent({
   },
 
   setup(props) {
-    console.log('[histoire-plugin-solid] MountStory setup() called!', props)
-
     const el = _ref<HTMLDivElement>()
     let dispose: (() => void) | null = null
     let target: HTMLDivElement | null = null
 
     async function mountStory() {
-      console.log('[histoire-plugin-solid] MountStory mountStory() called')
       target = document.createElement('div')
       el.value?.appendChild(target)
 
@@ -188,7 +185,7 @@ export default _defineComponent({
 
   render() {
     return _h('div', {
-      ref: 'el',
+      ref: 'el' as any,
     })
   },
 })

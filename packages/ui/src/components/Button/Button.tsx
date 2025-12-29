@@ -3,7 +3,7 @@ import { button, pressedGhostStyle } from './Button.css'
 
 export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Button variant */
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger'
   /** Button size */
   size?: 'sm' | 'md' | 'lg'
   /** Full width button */

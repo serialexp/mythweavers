@@ -1,8 +1,9 @@
 import { type JSX, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { CommandContext, KeyBindings } from '../keymap'
 import { keydownHandler } from '../keymap'
-import { Fragment, Slice } from '../model'
-import { type EditorProps, EditorState, TextSelection, Transaction } from '../state'
+import { Fragment, type ResolvedPos, Slice } from '../model'
+import { type EditorProps, EditorState, Selection as EditorSelection, TextSelection, Transaction } from '../state'
+import { canJoin, liftTarget } from '../transform'
 import { DebugOverlay } from './DebugOverlay'
 import { createDecorationManager } from './DecorationManager'
 import { NodeView, type NodeViewMap } from './NodeView'
@@ -165,6 +166,15 @@ export function EditorView(props: EditorViewProps): JSX.Element {
 
     // Merge both sets
     return pluginDecorations.add(currentState.doc, trackedDecorations.find())
+  })
+
+  // Check for unrendered widgets after render cycle (development warning)
+  createEffect(() => {
+    const decs = decorations()
+    // Use queueMicrotask to check after the render cycle completes
+    queueMicrotask(() => {
+      decs.checkUnrenderedWidgets()
+    })
   })
 
   // Handle DOM selection changes
@@ -377,18 +387,92 @@ export function EditorView(props: EditorViewProps): JSX.Element {
 
   // Handle Backspace
   const handleBackspace = (currentState: EditorState) => {
-    const { $from, $to, empty } = currentState.selection
+    const { $from, empty } = currentState.selection
     const tr = currentState.tr()
 
     if (!empty) {
+      // Selection exists - just delete it
       tr.deleteSelection()
-    } else if ($from.pos > 0) {
-      // Delete one character before cursor
-      const before = $from.pos - 1
-      tr.delete(before, $from.pos)
+      dispatch(tr)
+      return
     }
 
-    dispatch(tr)
+    // Nothing to delete at the very start
+    if ($from.pos === 0) return
+
+    // Check if we're at the start of a textblock
+    if ($from.parentOffset === 0 && $from.parent.isTextblock) {
+      // Try to find a cut point before this block
+      const $cut = findCutBefore($from)
+
+      if ($cut) {
+        const before = $cut.nodeBefore
+        const after = $cut.nodeAfter
+
+        // Try to join with the previous block if possible
+        if (before && after && canJoin(currentState.doc, $cut.pos)) {
+          tr.join($cut.pos)
+          dispatch(tr)
+          return
+        }
+
+        // If current block is empty and there's a previous textblock, delete current block
+        if ($from.parent.content.size === 0 && before?.isTextblock) {
+          // Delete the empty paragraph
+          tr.delete($from.before($from.depth), $from.after($from.depth))
+          // Find a valid selection in the previous block
+          const $newPos = tr.doc.resolve(Math.max(0, $cut.pos - 1))
+          const sel = EditorSelection.findFrom($newPos, -1, true)
+          if (sel) tr.setSelection(sel)
+          dispatch(tr)
+          return
+        }
+      }
+
+      // Try to lift the content if we can't join
+      const range = $from.blockRange()
+      if (range) {
+        const target = liftTarget(range)
+        if (target != null) {
+          tr.lift(range, target)
+          dispatch(tr)
+          return
+        }
+      }
+
+      // Nothing we can do at the start of this block
+      return
+    }
+
+    // Not at start of textblock - safe to delete character before cursor
+    // But we need to be careful about node boundaries
+    const nodeBefore = $from.nodeBefore
+    if (nodeBefore) {
+      // There's content before in the same parent
+      if (nodeBefore.isText) {
+        // Delete one character
+        tr.delete($from.pos - 1, $from.pos)
+      } else {
+        // Delete the whole inline node (like an image or emoji)
+        tr.delete($from.pos - nodeBefore.nodeSize, $from.pos)
+      }
+      dispatch(tr)
+    }
+  }
+
+  /**
+   * Find the cut point before a position - the boundary between the current
+   * block and what's before it.
+   */
+  function findCutBefore($pos: ResolvedPos): ResolvedPos | null {
+    // Walk up the tree looking for a place where we have a sibling before us
+    for (let i = $pos.depth - 1; i >= 0; i--) {
+      if ($pos.index(i) > 0) {
+        // There's a sibling before at this depth
+        return $pos.doc.resolve($pos.before(i + 1))
+      }
+    }
+    return null
   }
 
   // Handle Delete
@@ -397,14 +481,73 @@ export function EditorView(props: EditorViewProps): JSX.Element {
     const tr = currentState.tr()
 
     if (!empty) {
+      // Selection exists - just delete it
       tr.deleteSelection()
-    } else if ($to.pos < currentState.doc.content.size) {
-      // Delete one character after cursor
-      const after = $to.pos + 1
-      tr.delete($to.pos, after)
+      dispatch(tr)
+      return
     }
 
-    dispatch(tr)
+    // Nothing to delete at the very end
+    if ($to.pos >= currentState.doc.content.size) return
+
+    // Check if we're at the end of a textblock
+    const atBlockEnd = $to.parentOffset === $to.parent.content.size && $to.parent.isTextblock
+
+    if (atBlockEnd) {
+      // Try to find a cut point after this block
+      const $cut = findCutAfter($to)
+
+      if ($cut) {
+        const before = $cut.nodeBefore
+        const after = $cut.nodeAfter
+
+        // Try to join with the next block if possible
+        if (before && after && canJoin(currentState.doc, $cut.pos)) {
+          tr.join($cut.pos)
+          dispatch(tr)
+          return
+        }
+
+        // If next block is empty, delete it
+        if (after?.isTextblock && after.content.size === 0) {
+          tr.delete($cut.pos, $cut.pos + after.nodeSize)
+          dispatch(tr)
+          return
+        }
+      }
+
+      // Nothing we can do at the end of this block
+      return
+    }
+
+    // Not at end of textblock - safe to delete character after cursor
+    const nodeAfter = $to.nodeAfter
+    if (nodeAfter) {
+      if (nodeAfter.isText) {
+        // Delete one character
+        tr.delete($to.pos, $to.pos + 1)
+      } else {
+        // Delete the whole inline node
+        tr.delete($to.pos, $to.pos + nodeAfter.nodeSize)
+      }
+      dispatch(tr)
+    }
+  }
+
+  /**
+   * Find the cut point after a position - the boundary between the current
+   * block and what's after it.
+   */
+  function findCutAfter($pos: ResolvedPos): ResolvedPos | null {
+    // Walk up the tree looking for a place where we have a sibling after us
+    for (let i = $pos.depth - 1; i >= 0; i--) {
+      const parent = $pos.node(i)
+      if ($pos.index(i) + 1 < parent.childCount) {
+        // There's a sibling after at this depth
+        return $pos.doc.resolve($pos.after(i + 1))
+      }
+    }
+    return null
   }
 
   // Handle Delete Word
@@ -523,7 +666,10 @@ export function EditorView(props: EditorViewProps): JSX.Element {
           paragraphType.create(null, content ? currentState.schema.text(content) : null),
         )
         const fragment = Fragment.from(nodes)
-        tr.replaceSelection(new Slice(fragment, 0, 0))
+        // Use openStart=1, openEnd=1 to properly split the current paragraph:
+        // - First paragraph's content joins with text before cursor
+        // - Last paragraph's content joins with text after cursor
+        tr.replaceSelection(new Slice(fragment, 1, 1))
       }
     }
 

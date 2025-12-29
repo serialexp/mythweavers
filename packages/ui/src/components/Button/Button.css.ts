@@ -169,6 +169,27 @@ export const button = recipe({
           },
         },
       },
+      outline: {
+        color: tokens.color.text.primary,
+        backgroundColor: 'transparent',
+        boxShadow: `inset 0 0 0 2px ${tokens.color.border.default}`,
+        selectors: {
+          '&::before': {
+            display: 'none',
+          },
+          '&::after': {
+            display: 'none',
+          },
+          '&:hover:not(:disabled)': {
+            backgroundColor: tokens.color.surface.hover,
+            boxShadow: `inset 0 0 0 2px ${tokens.color.border.strong}`,
+          },
+          '&:active:not(:disabled)': {
+            backgroundColor: tokens.color.surface.selected,
+            transform: 'scale(0.95)',
+          },
+        },
+      },
       danger: {
         color: tokens.color.text.inverse,
         backgroundColor: tokens.color.semantic.error,
@@ -201,6 +222,12 @@ export const button = recipe({
     },
 
     size: {
+      xs: {
+        height: '28px',
+        paddingLeft: tokens.space['2'],
+        paddingRight: tokens.space['2'],
+        fontSize: tokens.font.size.xs,
+      },
       sm: {
         height: '32px',
         paddingLeft: tokens.space['3'],
@@ -242,6 +269,14 @@ export const button = recipe({
 
   compoundVariants: [
     // Icon-only size adjustments - make buttons square
+    {
+      variants: { iconOnly: true, size: 'xs' },
+      style: {
+        width: '28px',
+        paddingLeft: 0,
+        paddingRight: 0,
+      },
+    },
     {
       variants: { iconOnly: true, size: 'sm' },
       style: {

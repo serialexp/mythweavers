@@ -57,7 +57,6 @@ export const MountVariant: ParentComponent<{
       ctx.incrementVariantIndex()
 
       if (variant) {
-        console.log('[histoire-plugin-solid] MountVariant setting configReady on variant:', variant.title)
         Object.assign(variant, {
           slots: () => ({ default: true }),
           configReady: true,
@@ -109,7 +108,6 @@ export const RenderVariant: ParentComponent<{
   // This tells Histoire that the variant is ready for the controls panel
   onMount(() => {
     if (ctx?.variant && isCurrentVariant()) {
-      console.log('[histoire-plugin-solid] Setting configReady on variant:', ctx.variant.title)
       Object.assign(ctx.variant, {
         slots: () => ({ default: true }),
         configReady: true,

@@ -22,7 +22,7 @@ export interface DropdownProps {
 
 export const Dropdown: ParentComponent<DropdownProps> = (props) => {
   const [isOpen, setIsOpen] = createSignal(false)
-  const [menuPosition, setMenuPosition] = createSignal({ top: 0, left: 0 })
+  const [menuPosition, setMenuPosition] = createSignal({ top: 0, left: 0, maxHeight: 0 })
   let containerRef: HTMLDivElement | undefined
   let triggerRef: HTMLDivElement | undefined
   let menuRef: HTMLDivElement | undefined
@@ -38,32 +38,36 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
       const rect = triggerElement?.getBoundingClientRect() ?? triggerRef.getBoundingClientRect()
       const menuWidth = menuRef?.offsetWidth ?? 180
       const menuHeight = menuRef?.offsetHeight ?? 200
+      const padding = 8 // Padding from viewport edges
 
       let left = props.alignRight ? rect.right - menuWidth : rect.left
       // Keep menu within viewport horizontally
       if (left + menuWidth > window.innerWidth) {
-        left = window.innerWidth - menuWidth - 8
+        left = window.innerWidth - menuWidth - padding
       }
-      if (left < 8) {
-        left = 8
+      if (left < padding) {
+        left = padding
       }
 
-      // Check if menu fits below, otherwise flip above
-      const spaceBelow = window.innerHeight - rect.bottom - 8
-      const spaceAbove = rect.top - 8
+      // Calculate available space above and below
+      const spaceBelow = window.innerHeight - rect.bottom - padding
+      const spaceAbove = rect.top - padding
       const fitsBelow = spaceBelow >= menuHeight
       const fitsAbove = spaceAbove >= menuHeight
 
       let top: number
+      let maxHeight: number
       if (fitsBelow || (!fitsAbove && spaceBelow >= spaceAbove)) {
         // Position below
         top = rect.bottom + 4
+        maxHeight = spaceBelow - 4 // Account for the 4px gap
       } else {
         // Position above
-        top = rect.top - menuHeight - 4
+        top = rect.top - Math.min(menuHeight, spaceAbove) - 4
+        maxHeight = spaceAbove - 4 // Account for the 4px gap
       }
 
-      setMenuPosition({ top, left })
+      setMenuPosition({ top, left, maxHeight })
     }
   }
 
@@ -114,6 +118,9 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
               position: 'fixed',
               top: `${menuPosition().top}px`,
               left: `${menuPosition().left}px`,
+              'max-height': `${menuPosition().maxHeight}px`,
+              'overflow-y': 'auto',
+              'z-index': '400', // popover level - above modals and overlays
             }
           : undefined
       }

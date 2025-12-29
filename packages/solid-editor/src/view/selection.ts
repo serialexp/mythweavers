@@ -83,6 +83,23 @@ function countContentBefore(container: globalThis.Node, target: globalThis.Node)
         return false
       }
 
+      // Widget spans don't contribute to content count - they're decorations, not content
+      if (element.hasAttribute('data-widget')) {
+        debug.push('widget')
+        // Walk into it to check for target, but don't count content
+        for (let i = 0; i < node.childNodes.length; i++) {
+          if (node.childNodes[i] === target) {
+            // Target is inside widget - return current count
+            return true
+          }
+          // Check nested children too (in case of deep widget structure)
+          if (node.childNodes[i].contains(target)) {
+            return true
+          }
+        }
+        return false
+      }
+
       // Element node - check if it has position info (inline node like mention)
       const info = getPosInfo(node)
       if (info) {
@@ -169,6 +186,10 @@ export function posFromDOM(_doc: Node, domNode: globalThis.Node, domOffset: numb
     let offset = 0
     for (let i = 0; i < domOffset && i < children.length; i++) {
       const child = children[i]
+      // Skip widget elements - they're decorations, not content
+      if (child.nodeType === 1 && (child as Element).hasAttribute('data-widget')) {
+        continue
+      }
       if (child.nodeType === 3) {
         offset += child.textContent?.length ?? 0
       } else {
@@ -253,12 +274,30 @@ export function domFromPos(container: HTMLElement, pos: number): { node: globalT
           return null // Position not in this subtree
         }
         if (pos === contentStart) {
-          // At the start of content - before first child
-          return { node: element, offset: 0 }
+          // At the start of content - before first child (skip leading widgets)
+          let firstContentIndex = 0
+          for (let i = 0; i < element.childNodes.length; i++) {
+            const child = element.childNodes[i]
+            if (child.nodeType === 1 && (child as Element).hasAttribute('data-widget')) {
+              firstContentIndex = i + 1
+            } else {
+              break
+            }
+          }
+          return { node: element, offset: firstContentIndex }
         }
         if (pos === contentEnd) {
-          // At the end of content - after last child
-          return { node: element, offset: element.childNodes.length }
+          // At the end of content - after last content child (before trailing widgets)
+          let lastContentIndex = element.childNodes.length
+          for (let i = element.childNodes.length - 1; i >= 0; i--) {
+            const child = element.childNodes[i]
+            if (child.nodeType === 1 && (child as Element).hasAttribute('data-widget')) {
+              lastContentIndex = i
+            } else {
+              break
+            }
+          }
+          return { node: element, offset: lastContentIndex }
         }
       } else {
         debug.push(`wrapper(${element.tagName})`)
@@ -270,9 +309,12 @@ export function domFromPos(container: HTMLElement, pos: number): { node: globalT
       for (let i = 0; i < element.childNodes.length; i++) {
         const child = element.childNodes[i]
 
-        // Skip cursor target spans - they don't represent model content
-        if (child.nodeType === 1 && (child as Element).hasAttribute('data-cursor-target')) {
-          continue
+        // Skip cursor target spans and widget spans - they don't represent model content
+        if (child.nodeType === 1) {
+          const childElement = child as Element
+          if (childElement.hasAttribute('data-cursor-target') || childElement.hasAttribute('data-widget')) {
+            continue
+          }
         }
 
         const result = walk(child, childPos)

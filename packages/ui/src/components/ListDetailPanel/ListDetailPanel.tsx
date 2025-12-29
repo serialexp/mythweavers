@@ -1,4 +1,4 @@
-import { type Accessor, For, type JSX, Show, createSignal } from 'solid-js'
+import { type Accessor, Index, type JSX, Show, createSignal } from 'solid-js'
 import { IconButton } from '../IconButton'
 import * as styles from './ListDetailPanel.css'
 
@@ -72,16 +72,16 @@ export function ListDetailPanel<T extends { id: string }>(props: ListDetailPanel
           <div class={styles.listHeader}>{props.listHeader}</div>
         </Show>
         <div class={styles.listContent}>
-          <For each={props.items}>
+          <Index each={props.items}>
             {(item) => (
               <button
-                class={selectedId() === item.id ? `${styles.listItem} ${styles.listItemSelected}` : styles.listItem}
-                onClick={() => select(item.id)}
+                class={selectedId() === item().id ? `${styles.listItem} ${styles.listItemSelected}` : styles.listItem}
+                onClick={() => select(item().id)}
               >
-                {props.renderListItem(item, selectedId() === item.id)}
+                {props.renderListItem(item(), selectedId() === item().id)}
               </button>
             )}
-          </For>
+          </Index>
         </div>
       </div>
 

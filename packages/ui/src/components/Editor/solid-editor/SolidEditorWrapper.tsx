@@ -5,9 +5,9 @@ import { createEffect, createMemo, createSignal } from 'solid-js'
 import { editorContainer, sceneEditor } from '../scene-editor.css'
 import {
   type ParagraphActionsConfig,
-  ParagraphActionsMenu,
   createActiveParagraphPlugin,
   createAssignIdPlugin,
+  createParagraphActionsDecorations,
   createParagraphStateNodeView,
 } from '../solid-editor-plugins'
 import { InlineMenu, type InlineMenuConfig } from './InlineMenu'
@@ -31,8 +31,8 @@ export interface SolidEditorWrapperProps {
   /** Callback when current paragraph selection changes */
   onParagraphSelect?: (paragraphId: string | null) => void
 
-  /** Callback for paragraph actions */
-  onParagraphAction?: {
+  /** Callback for paragraph actions (all methods are optional) */
+  onParagraphAction?: Partial<{
     moveUp: (paragraphId: string) => void
     moveDown: (paragraphId: string) => void
     delete: (paragraphId: string) => void
@@ -48,7 +48,7 @@ export interface SolidEditorWrapperProps {
     customRewrite: (paragraphId: string) => void
     convertPerspective: (paragraphId: string) => void
     splitScene: (paragraphId: string) => void
-  }
+  }>
 
   /** Callback to accept AI suggestion */
   onSuggestionAccept?: (paragraphId: string, content: string) => void
@@ -163,6 +163,11 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     handleStateChange(newState)
   }
 
+  // Create editor props with decorations for paragraph actions
+  const editorProps = createMemo(() => ({
+    decorations: createParagraphActionsDecorations(paragraphActionsConfig, isFocused),
+  }))
+
   return (
     <div class={`${sceneEditor} ${editorContainer}`}>
       {/* Read state() inside JSX to maintain reactivity */}
@@ -177,12 +182,11 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
           placeholder="Start writing..."
           debug={props.debug}
           onFocusChange={setIsFocused}
+          props={editorProps()}
         />
       )}
       {/* Inline formatting menu */}
       <InlineMenu state={state} dispatch={handleDispatch} config={props.inlineMenuConfig} isFocused={isFocused} />
-      {/* Paragraph actions menu */}
-      <ParagraphActionsMenu state={state} config={paragraphActionsConfig()} isFocused={isFocused} />
     </div>
   )
 }

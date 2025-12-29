@@ -1,5 +1,4 @@
-import { Node } from 'prosemirror-model'
-import { NodeSelection, Plugin, PluginKey, TextSelection } from 'prosemirror-state'
+import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
 import { getSelectedTextForTranslation, toggleTranslationMark } from '../functions/toggle-title-mark'
 import { inlineMenu as inlineMenuClass } from '../scene-editor.css'
@@ -33,7 +32,6 @@ function createInlineMenu(view: EditorView, coords: { top: number; left: number 
   menu.style.position = 'absolute'
 
   // Position menu well above the selection to avoid overlap
-  const _menuHeight = 40 // Approximate menu height
   const offset = 60 // Increased offset for better clearance
   const menuTop = Math.max(10, coords.top - offset) // Ensure it doesn't go off-screen
 
@@ -177,27 +175,6 @@ function closeMenu() {
   if (existingMenu) {
     existingMenu.remove()
   }
-}
-
-function getClosestBlock(view: EditorView): { node: Node | null; pos: number } {
-  const { state } = view
-  const { selection } = state
-  let { $from } = selection
-
-  if (selection instanceof NodeSelection) {
-    return { node: selection.node, pos: selection.from }
-  }
-
-  while ($from.depth > 0) {
-    const node = $from.node($from.depth)
-    if (node.isBlock) {
-      return { node, pos: $from.before($from.depth) }
-    }
-    $from = state.doc.resolve($from.before())
-  }
-
-  const rootBlock = $from.node(0)
-  return { node: rootBlock, pos: 0 }
 }
 
 function getSelectionBoundingBox(view: EditorView) {

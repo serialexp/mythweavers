@@ -7,7 +7,7 @@ export { DebugOverlay } from './DebugOverlay'
 export type { DebugOverlayProps } from './DebugOverlay'
 
 // Node rendering
-export { NodeView } from './NodeView'
+export { NodeView, WidgetsAt } from './NodeView'
 export type { NodeViewProps, NodeViewMap } from './NodeView'
 
 export { TextView, InlineContent } from './TextView'

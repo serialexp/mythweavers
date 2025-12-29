@@ -7,11 +7,6 @@ const slideIn = keyframes({
   '100%': { transform: 'translateX(0)', opacity: 1 },
 })
 
-const _slideOut = keyframes({
-  '0%': { transform: 'translateX(0)', opacity: 1 },
-  '100%': { transform: 'translateX(100%)', opacity: 0 },
-})
-
 export const containerBase = style({
   position: 'fixed',
   display: 'flex',

@@ -1,1 +1,1 @@
-import o from"./mount.js";import e from"./render.js";console.log("[histoire-plugin-solid] Client module loaded!");console.log("[histoire-plugin-solid] MountStory:",o);console.log("[histoire-plugin-solid] RenderStory:",e);const i=o,l=e;function s(r){return r.source??""}export{i as MountStory,l as RenderStory,s as generateSourceCode};
+import r from"./mount.js";import t from"./render.js";const u=r,c=t;function S(o){return o.source??""}export{u as MountStory,c as RenderStory,S as generateSourceCode};

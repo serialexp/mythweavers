@@ -36,7 +36,7 @@ export type NodeViewMap = {
  * Renders widget decorations at a specific position.
  * This is where SolidJS shines - we just render the JSX components directly!
  */
-function WidgetsAt(props: { decorations: DecorationSet; pos: number; side?: 'before' | 'after' }): JSX.Element {
+export function WidgetsAt(props: { decorations: DecorationSet; pos: number; side?: 'before' | 'after' }): JSX.Element {
   const widgets = () => {
     const all = props.decorations.findWidgetsAt(props.pos)
     // Filter by side if specified
@@ -52,7 +52,7 @@ function WidgetsAt(props: { decorations: DecorationSet; pos: number; side?: 'bef
   return (
     <For each={widgets()}>
       {(widget) => (
-        <span class="solid-editor-widget" data-widget-key={widget.spec.key} contentEditable={false}>
+        <span class="solid-editor-widget" data-widget-key={widget.spec.key} data-widget="" contentEditable={false}>
           {widget.widget()}
         </span>
       )}
@@ -254,9 +254,9 @@ function ParagraphView(props: NodeViewProps): JSX.Element {
 
   return (
     <p {...attrs()} ref={(el) => (elementRef = el)}>
-      {/* Widgets at start of paragraph content */}
+      {/* Widgets at start of paragraph content (position after opening tag) */}
       <Show when={props.decorations}>
-        <WidgetsAt decorations={props.decorations!} pos={props.pos} side="before" />
+        <WidgetsAt decorations={props.decorations!} pos={props.pos + 1} side="before" />
       </Show>
 
       {props.node.content.size > 0 ? (
@@ -273,9 +273,9 @@ function ParagraphView(props: NodeViewProps): JSX.Element {
         <br />
       )}
 
-      {/* Widgets at end of paragraph content */}
+      {/* Widgets at end of paragraph content (position before closing tag) */}
       <Show when={props.decorations}>
-        <WidgetsAt decorations={props.decorations!} pos={props.pos + props.node.content.size} side="after" />
+        <WidgetsAt decorations={props.decorations!} pos={props.pos + 1 + props.node.content.size} side="after" />
       </Show>
     </p>
   )

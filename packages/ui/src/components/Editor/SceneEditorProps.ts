@@ -52,17 +52,6 @@ export interface EditorTreeNode {
 }
 
 /**
- * AI generation types
- */
-export type AiHelpType =
-  | 'rewrite_spelling'
-  | 'rewrite'
-  | 'snowflake_refine_scene_style'
-  | 'snowflake_convert_perspective'
-  | 'add_sensory_details'
-  | 'generate_between'
-
-/**
  * Props for the SceneEditor component
  */
 export interface SceneEditorProps {
@@ -97,54 +86,6 @@ export interface SceneEditorProps {
   /** Callback to delete a paragraph */
   onParagraphDelete: (paragraphId: string) => void
 
-  /** Callback to move paragraph up */
-  onParagraphMoveUp: (paragraphId: string) => void
-
-  /** Callback to move paragraph down */
-  onParagraphMoveDown: (paragraphId: string) => void
-
   /** Callback to update selected paragraph */
   onSelectedParagraphChange: (paragraphId: string) => void
-
-  /** Callback when viewpoint character changes */
-  onViewpointChange?: (characterId: string | null) => void
-
-  /** Callback when active characters change */
-  onActiveCharactersChange?: (characterIds: string[]) => void
-
-  /** Callback when scene goal changes */
-  onGoalChange?: (goal: string | null) => void
-
-  /** Callback to split scene at a paragraph */
-  onSceneSplit?: (paragraphId: string) => void
-
-  /** Callback for AI help */
-  onAiHelp?: () => Promise<void>
-
-  /** Callback for AI rewrite */
-  onAiRewrite?: () => Promise<void>
-
-  /** Callback for AI translate */
-  onAiTranslate?: () => Promise<void>
-
-  /** Callback for AI generate between */
-  onAiBetween?: () => Promise<void>
-
-  /** Callback for AI assistance (legacy) */
-  onAiRequest?: (type: AiHelpType, paragraphId: string, customInstructions?: string) => Promise<string | null>
-
-  /** Callback when generate between text is saved to UI state */
-  onGenerateBetweenTextSave?: (text: string) => void
-
-  /** Previously saved generate between text (for persistence) */
-  savedGenerateBetweenText?: string
-
-  /** Optional: Custom inventory actions component */
-  InventoryActionsComponent?: () => any
-
-  /** Optional: Custom plot point actions component */
-  PlotpointActionsComponent?: (props: { onClose: () => void }) => any
-
-  /** Optional: Custom audio button component */
-  AudioButtonComponent?: (props: { text: string }) => any
 }

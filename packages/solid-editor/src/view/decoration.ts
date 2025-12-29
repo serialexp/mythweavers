@@ -269,10 +269,22 @@ export class DecorationSet {
   /** An empty decoration set. */
   static empty: DecorationSet = new DecorationSet([])
 
+  /** Track widget positions for development warnings */
+  private widgetPositions: Set<number> = new Set()
+  /** Track which positions have been queried */
+  private queriedPositions: Set<number> = new Set()
+
   private constructor(
     /** All decorations, sorted by from position */
     private readonly decorations: Decoration[],
-  ) {}
+  ) {
+    // Track widget positions for development mode warnings
+    for (const dec of decorations) {
+      if (isWidget(dec)) {
+        this.widgetPositions.add(dec.from)
+      }
+    }
+  }
 
   /**
    * Create a decoration set from a list of decorations.
@@ -319,7 +331,31 @@ export class DecorationSet {
    * Find widget decorations at a specific position.
    */
   findWidgetsAt(pos: number): WidgetDecoration[] {
+    this.queriedPositions.add(pos)
     return this.decorations.filter((d): d is WidgetDecoration => isWidget(d) && d.from === pos)
+  }
+
+  /**
+   * Check for widgets that were created but never queried (likely not rendered).
+   * Call this after rendering to detect missing WidgetsAt in custom nodeViews.
+   */
+  checkUnrenderedWidgets(): void {
+    if (this.widgetPositions.size === 0) return
+
+    const unrendered: number[] = []
+    for (const pos of this.widgetPositions) {
+      if (!this.queriedPositions.has(pos)) {
+        unrendered.push(pos)
+      }
+    }
+
+    if (unrendered.length > 0) {
+      console.warn(
+        `[DecorationSet] ${unrendered.length} widget decoration(s) at position(s) [${unrendered.join(', ')}] ` +
+          `were created but never queried by WidgetsAt. ` +
+          `If you're using custom nodeViews, make sure they render <WidgetsAt> for widget decorations.`,
+      )
+    }
   }
 
   /**

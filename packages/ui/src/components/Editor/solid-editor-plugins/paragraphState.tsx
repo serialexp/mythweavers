@@ -1,6 +1,6 @@
 import type { Paragraph } from '@mythweavers/shared'
-import { DecorationSet, InlineContent, type NodeViewProps, setPosInfo } from '@writer/solid-editor'
-import { type Accessor, type JSX, createEffect } from 'solid-js'
+import { DecorationSet, InlineContent, type NodeViewProps, WidgetsAt, setPosInfo } from '@writer/solid-editor'
+import { type Accessor, type JSX, Show, createEffect } from 'solid-js'
 
 /**
  * Creates a paragraph nodeView factory that renders paragraphs with
@@ -61,6 +61,11 @@ export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>):
         class="solid-editor-paragraph"
         ref={(el) => (elementRef = el)}
       >
+        {/* Widgets at start of paragraph content (position after opening tag) */}
+        <Show when={props.decorations}>
+          <WidgetsAt decorations={props.decorations!} pos={props.pos + 1} side="before" />
+        </Show>
+
         {props.node.content.size > 0 ? (
           <InlineContent
             node={props.node}
@@ -73,6 +78,11 @@ export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>):
         ) : (
           <br />
         )}
+
+        {/* Widgets at end of paragraph content (position before closing tag) */}
+        <Show when={props.decorations}>
+          <WidgetsAt decorations={props.decorations!} pos={props.pos + 1 + props.node.content.size} side="after" />
+        </Show>
       </p>
     ) as JSX.Element
   }

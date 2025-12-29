@@ -601,3 +601,101 @@ describe('DecorationManager', () => {
     })
   })
 })
+
+describe('collectDecorations', () => {
+  it('collects decorations from viewProps.decorations function', async () => {
+    const { collectDecorations } = await import('../src/view/propHelpers')
+
+    const d = doc(p('hello'))
+    const state = EditorState.create({ doc: d, schema })
+
+    // Create a decorations function like what we pass via props
+    const decorationsFn = (st: EditorState) => {
+      return DecorationSet.create(st.doc, [widget(3, () => null as any, { key: 'test-widget' })])
+    }
+
+    const viewProps = { decorations: decorationsFn }
+    const result = collectDecorations(state, viewProps)
+
+    expect(result.size).toBe(1)
+    expect(result.findWidgetsAt(3).length).toBe(1)
+    expect(result.findWidgetsAt(3)[0].spec.key).toBe('test-widget')
+  })
+
+  it('returns empty set when no decorations function', async () => {
+    const { collectDecorations } = await import('../src/view/propHelpers')
+
+    const d = doc(p('hello'))
+    const state = EditorState.create({ doc: d, schema })
+
+    const result = collectDecorations(state, undefined)
+    expect(result.isEmpty).toBe(true)
+  })
+})
+
+describe('Widget positions in paragraph', () => {
+  it('widget at end of paragraph content is found at correct position', () => {
+    const d = doc(p('hello'))
+
+    // Let's discover the actual positions
+    const paragraph = d.child(0)
+    console.log('doc.nodeSize:', d.nodeSize)
+    console.log('paragraph.nodeSize:', paragraph.nodeSize)
+    console.log('paragraph.content.size:', paragraph.content.size)
+
+    // In our schema: doc contains paragraphs
+    // doc.nodeSize = 2 (doc boundaries) + paragraph.nodeSize = 2 + 7 = 9
+    expect(d.nodeSize).toBe(9)
+    expect(paragraph.nodeSize).toBe(7) // 1 (open) + 5 (content) + 1 (close)
+    expect(paragraph.content.size).toBe(5) // just the text content
+
+    // The paragraph position within the doc
+    // In a doc, child nodes start at position 1 (after doc opening)
+    let paragraphPos = 0
+    d.forEach((node, offset) => {
+      if (node === paragraph) paragraphPos = offset
+    })
+    console.log('paragraphPos:', paragraphPos)
+
+    // Position for widget at end of paragraph content:
+    // contentStart = paragraphPos + 1
+    // contentEnd = paragraphPos + 1 + content.size
+    const contentEndPos = paragraphPos + 1 + paragraph.content.size
+    console.log('contentEndPos:', contentEndPos)
+
+    // Create widget at that position
+    const set = DecorationSet.create(d, [widget(contentEndPos, () => null as any, { side: 1, key: 'end-widget' })])
+
+    // Should be findable at that position
+    const widgets = set.findWidgetsAt(contentEndPos)
+    expect(widgets.length).toBe(1)
+    expect(widgets[0].spec.key).toBe('end-widget')
+  })
+
+  it('widget created at range.to - 1 matches end of content position', () => {
+    const d = doc(p('hello'))
+    const paragraph = d.child(0)
+
+    // Get the actual paragraph position
+    let paragraphPos = 0
+    d.forEach((node, offset) => {
+      if (node === paragraph) paragraphPos = offset
+    })
+
+    // This simulates what getParagraphRange returns
+    const range = { from: paragraphPos, to: paragraphPos + paragraph.nodeSize }
+    console.log('range:', range)
+
+    // Our decoration code uses range.to - 1
+    const widgetPos = range.to - 1
+
+    // The NodeView looks for widgets at: props.pos + 1 + props.node.content.size
+    const nodeViewWidgetPos = paragraphPos + 1 + paragraph.content.size
+
+    console.log('widgetPos (range.to - 1):', widgetPos)
+    console.log('nodeViewWidgetPos:', nodeViewWidgetPos)
+
+    // They should match!
+    expect(widgetPos).toBe(nodeViewWidgetPos)
+  })
+})

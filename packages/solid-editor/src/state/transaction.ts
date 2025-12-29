@@ -193,23 +193,16 @@ export class Transaction extends Transform {
     const sel = this.selection
 
     if (inheritMarks) {
-      // Get marks to apply
-      let marks: readonly Mark[] | undefined
-      if (this.storedMarks) {
-        marks = this.storedMarks
-      } else if (sel.$from.depth) {
-        // Inherit marks from the cursor position
-        marks = sel.$from.marks()
-      }
+      // Get marks to apply - match ProseMirror's logic
+      const marks =
+        this.storedMarks ||
+        (sel.empty ? sel.$from.marks() : sel.$from.marksAcross(sel.$to) || Mark.none)
 
-      // Apply marks to the node if it's a text node
-      if (marks?.length && node.isText) {
-        const schema = this.doc.type.schema
-        node = schema.text(node.text!, marks)
-      }
+      // Apply marks to the node
+      node = node.mark(marks)
     }
 
-    this.replaceWith(sel.from, sel.to, node)
+    sel.replaceWith(this, node)
     return this
   }
 

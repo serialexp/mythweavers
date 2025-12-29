@@ -59,7 +59,6 @@ export const Modal: ParentComponent<ModalProps> = (props) => {
     if (focusableElements.length === 0) return
 
     const firstElement = focusableElements[0]
-    const _lastElement = focusableElements[focusableElements.length - 1]
 
     // If focus moved outside modal, bring it back
     if (!modalRef.contains(e.target as Node)) {

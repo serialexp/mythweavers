@@ -144,6 +144,53 @@ export default (props: { Hst: any }) => {
           </ButtonGroup>
         </ThemeComparison>
       </Hst.Variant>
+
+      <Hst.Variant title="All Variants">
+        <ThemeComparison>
+          <div style={{ display: 'flex', 'flex-direction': 'column', gap: '12px', 'align-items': 'flex-start' }}>
+            <div style={{ display: 'flex', 'align-items': 'center', gap: '12px' }}>
+              <span style={{ width: '80px', 'font-size': '12px', opacity: 0.7 }}>Primary</span>
+              <ButtonGroup>
+                <Button variant="primary" size="sm">Left</Button>
+                <Button variant="primary" size="sm">Middle</Button>
+                <Button variant="primary" size="sm">Right</Button>
+              </ButtonGroup>
+            </div>
+            <div style={{ display: 'flex', 'align-items': 'center', gap: '12px' }}>
+              <span style={{ width: '80px', 'font-size': '12px', opacity: 0.7 }}>Secondary</span>
+              <ButtonGroup>
+                <Button variant="secondary" size="sm">Left</Button>
+                <Button variant="secondary" size="sm">Middle</Button>
+                <Button variant="secondary" size="sm">Right</Button>
+              </ButtonGroup>
+            </div>
+            <div style={{ display: 'flex', 'align-items': 'center', gap: '12px' }}>
+              <span style={{ width: '80px', 'font-size': '12px', opacity: 0.7 }}>Ghost</span>
+              <ButtonGroup>
+                <Button variant="ghost" size="sm">Left</Button>
+                <Button variant="ghost" size="sm">Middle</Button>
+                <Button variant="ghost" size="sm">Right</Button>
+              </ButtonGroup>
+            </div>
+            <div style={{ display: 'flex', 'align-items': 'center', gap: '12px' }}>
+              <span style={{ width: '80px', 'font-size': '12px', opacity: 0.7 }}>Outline</span>
+              <ButtonGroup>
+                <Button variant="outline" size="sm">Left</Button>
+                <Button variant="outline" size="sm">Middle</Button>
+                <Button variant="outline" size="sm">Right</Button>
+              </ButtonGroup>
+            </div>
+            <div style={{ display: 'flex', 'align-items': 'center', gap: '12px' }}>
+              <span style={{ width: '80px', 'font-size': '12px', opacity: 0.7 }}>Danger</span>
+              <ButtonGroup>
+                <Button variant="danger" size="sm">Left</Button>
+                <Button variant="danger" size="sm">Middle</Button>
+                <Button variant="danger" size="sm">Right</Button>
+              </ButtonGroup>
+            </div>
+          </div>
+        </ThemeComparison>
+      </Hst.Variant>
     </Hst.Story>
   )
 }

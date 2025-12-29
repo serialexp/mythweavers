@@ -1,7 +1,15 @@
 import type { Paragraph } from '@mythweavers/shared'
-import { EditorState, EditorView } from '@writer/solid-editor'
+import {
+  DecorationSet,
+  EditorState,
+  EditorView,
+  InlineContent,
+  type NodeViewProps,
+  setPosInfo,
+  widget,
+} from '@writer/solid-editor'
 import shortUUID from 'short-uuid'
-import { createSignal } from 'solid-js'
+import { createEffect, createSignal } from 'solid-js'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'
 import { SolidEditorWrapper, storySchema } from './solid-editor'
 import { MentionView } from './solid-editor/MentionView'
@@ -164,6 +172,143 @@ export default (props: { Hst: any }) => {
                   isProtagonistSet={false}
                   debug
                 />
+              </div>
+            )
+          })()}
+        </ThemeComparison>
+      </Hst.Variant>
+
+      <Hst.Variant title="Widget Decorations Test">
+        <ThemeComparison>
+          {(() => {
+            const [paragraphs, setParagraphs] = createSignal<Paragraph[]>([
+              {
+                id: 'test-para-1',
+                body: 'Click in this paragraph to see the action button on the right.',
+                state: 'draft',
+                comments: [],
+              },
+            ])
+
+            // Simple paragraph action handlers
+            const paragraphActions = {
+              moveUp: (id: string) => console.log('Move up:', id),
+              moveDown: (id: string) => console.log('Move down:', id),
+              delete: (id: string) => console.log('Delete:', id),
+              setState: (id: string, state: 'draft' | 'revise' | 'ai' | 'final' | 'sdt') => {
+                console.log('Set state:', id, state)
+                setParagraphs((prev) => prev.map((p) => (p.id === id ? { ...p, state } : p)))
+              },
+            }
+
+            return (
+              <div style={{ padding: '1rem' }}>
+                <p style={{ 'margin-bottom': '1rem', 'font-size': '0.875rem', color: 'var(--color-text-secondary)' }}>
+                  Focus the editor and place cursor in the paragraph. A "⋮" button should appear on the right side.
+                </p>
+                <SolidEditorWrapper
+                  paragraphs={paragraphs()}
+                  onParagraphsChange={(p) => setParagraphs(p)}
+                  onParagraphCreate={() => 'new-id'}
+                  onParagraphDelete={() => {}}
+                  onParagraphAction={paragraphActions}
+                  isProtagonistSet={true}
+                />
+              </div>
+            )
+          })()}
+        </ThemeComparison>
+      </Hst.Variant>
+
+      <Hst.Variant title="Widget Warning Test (Broken NodeView)">
+        <ThemeComparison>
+          {(() => {
+            // Deliberately broken nodeView that doesn't render WidgetsAt
+            const BrokenParagraphView = (props: NodeViewProps) => {
+              let elementRef: HTMLParagraphElement | undefined
+
+              createEffect(() => {
+                if (elementRef) {
+                  setPosInfo(elementRef, { pos: props.pos, node: props.node })
+                }
+              })
+
+              // This nodeView is MISSING <WidgetsAt> - widgets won't render!
+              return (
+                <p
+                  id={props.node.attrs.id as string}
+                  class="solid-editor-paragraph"
+                  style={{ background: '#fff3cd' }}
+                  ref={(el) => (elementRef = el)}
+                >
+                  {props.node.content.size > 0 ? (
+                    <InlineContent
+                      node={props.node}
+                      startPos={props.pos + 1}
+                      decorations={undefined}
+                      nodeViews={props.nodeViews}
+                      selection={props.selection}
+                      onSelectNode={props.onSelectNode}
+                    />
+                  ) : (
+                    <br />
+                  )}
+                </p>
+              )
+            }
+
+            // Create decorations that add a widget
+            const createTestDecorations = () => (state: EditorState) => {
+              const { selection } = state
+              if (selection.from === selection.to) {
+                // Find the paragraph and add a widget at the end
+                let widgetPos = 0
+                state.doc.descendants((node, pos) => {
+                  if (node.type.name === 'paragraph') {
+                    widgetPos = pos + node.nodeSize - 1
+                    return false
+                  }
+                  return true
+                })
+                if (widgetPos > 0) {
+                  return DecorationSet.create(state.doc, [
+                    widget(widgetPos, () => <span style={{ color: 'red' }}>[WIDGET]</span>, {
+                      side: 1,
+                      key: 'test-widget',
+                    }),
+                  ])
+                }
+              }
+              return DecorationSet.empty
+            }
+
+            const [state, setState] = createSignal(
+              EditorState.create({
+                doc: storySchema.nodes.doc.create(null, [
+                  storySchema.nodes.paragraph.create({ id: 'broken-para' }, [
+                    storySchema.text('This paragraph uses a BROKEN nodeView that does NOT render widgets.'),
+                  ]),
+                ]),
+                schema: storySchema,
+              }),
+            )
+
+            return (
+              <div style={{ padding: '1rem' }}>
+                <p style={{ 'margin-bottom': '1rem', 'font-size': '0.875rem', color: 'var(--color-text-secondary)' }}>
+                  <strong>Check the console!</strong> This uses a broken nodeView that doesn't render WidgetsAt. You
+                  should see a warning: "[DecorationSet] widget decoration(s) were created but never queried..."
+                </p>
+                <div style={{ border: '1px solid var(--color-border)', 'border-radius': '4px' }}>
+                  <EditorView
+                    state={state()}
+                    onStateChange={setState}
+                    nodeViews={{ paragraph: BrokenParagraphView }}
+                    props={{ decorations: createTestDecorations() }}
+                    editable={true}
+                    autoFocus={false}
+                  />
+                </div>
               </div>
             )
           })()}

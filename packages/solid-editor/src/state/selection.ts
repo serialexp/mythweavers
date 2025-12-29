@@ -1,5 +1,5 @@
 import { Fragment, Mark, Node, ResolvedPos, Slice } from '../model'
-import { Mapping } from '../transform'
+import { Mapping, ReplaceStep, ReplaceAroundStep } from '../transform'
 
 /**
  * Superclass for editor selections. Every selection type should
@@ -104,12 +104,15 @@ export abstract class Selection {
     for (let i = 0; i < ranges.length; i++) {
       const { $from, $to } = ranges[i]
       const mapping = tr.mapping.slice(mapFrom)
-      tr.replaceWith(mapping.map($from.pos), mapping.map($to.pos), i ? Fragment.empty : Fragment.from(node))
+      const from = mapping.map($from.pos)
+      const to = mapping.map($to.pos)
+      if (i) {
+        tr.delete(from, to)
+      } else {
+        tr.replaceWith(from, to, node)
+        selectionToInsertionEnd(tr, mapFrom, node.isInline ? -1 : 1)
+      }
     }
-
-    const head = this.$head
-    const set = Selection.findFrom(tr.doc.resolve(tr.mapping.slice(mapFrom).map(head.pos)), 1, true)
-    if (set) tr.setSelection(set)
   }
 
   /**
@@ -512,6 +515,23 @@ function findSelectionIn(
     pos += child.nodeSize * dir
   }
   return null
+}
+
+/**
+ * Move the selection to the end of the inserted content.
+ * Used after replace operations to position cursor correctly.
+ */
+function selectionToInsertionEnd(tr: Transaction, startLen: number, bias: number): void {
+  const last = tr.steps.length - 1
+  if (last < startLen) return
+  const step = tr.steps[last]
+  if (!(step instanceof ReplaceStep || step instanceof ReplaceAroundStep)) return
+  const map = tr.mapping.maps[last]
+  let end: number | undefined
+  map.forEach((_from, _to, _newFrom, newTo) => {
+    if (end == null) end = newTo
+  })
+  tr.setSelection(Selection.near(tr.doc.resolve(end!), bias))
 }
 
 // Re-export Transaction interface for external use

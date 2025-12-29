@@ -540,7 +540,6 @@ function histTransaction(history: HistoryState, state: EditorState, redo: boolea
   const pop = (redo ? history.undone : history.done).popEvent(state, preserveItems)
   if (!pop) return null
 
-  const selection = pop.selection.resolve(pop.transform.doc)
   const added = (redo ? history.done : history.undone).addTransform(
     pop.transform,
     state.selection.getBookmark(),
@@ -555,6 +554,10 @@ function histTransaction(history: HistoryState, state: EditorState, redo: boolea
   for (const step of pop.transform.steps) {
     tr.step(step)
   }
+
+  // Resolve the selection from the transaction's doc (after steps are applied)
+  // to ensure the selection references the correct document instance
+  const selection = pop.selection.resolve(tr.doc)
 
   return tr.setSelection(selection).setMeta(historyKey, {
     redo,

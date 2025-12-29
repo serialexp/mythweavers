@@ -17,18 +17,18 @@ export interface SelectProps extends Omit<JSX.SelectHTMLAttributes<HTMLSelectEle
 }
 
 export const Select = (props: SelectProps) => {
-  const [local, variants, rest] = splitProps(props, ['class', 'options', 'placeholder'], ['size'])
+  const [local, variants, rest] = splitProps(props, ['class', 'options', 'placeholder', 'value'], ['size'])
 
   return (
-    <select class={`${select(variants)} ${local.class ?? ''}`} {...rest}>
+    <select class={`${select(variants)} ${local.class ?? ''}`} value={local.value} {...rest}>
       {local.placeholder && (
-        <option value="" disabled>
+        <option value="" disabled selected={local.value === '' || local.value === undefined}>
           {local.placeholder}
         </option>
       )}
       <For each={local.options}>
         {(option) => (
-          <option value={option.value} disabled={option.disabled}>
+          <option value={option.value} disabled={option.disabled} selected={local.value === option.value}>
             {option.label}
           </option>
         )}
