@@ -1,12 +1,99 @@
 import ejs from 'ejs'
 import { enableMapSet, produce } from 'immer'
 import { calendarStore } from '../stores/calendarStore'
+import { charactersStore } from '../stores/charactersStore'
+import { contextItemsStore } from '../stores/contextItemsStore'
+import { plotPointsStore } from '../stores/plotPointsStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
-import { Message, Node } from '../types/core'
+import { Character, ContextItem, Message, Node } from '../types/core'
+import { getCharacterDisplayName } from './character'
 import { getMessagesInStoryOrder } from './nodeTraversal'
 
 // Enable support for Maps and Sets in Immer
 enableMapSet()
+
+// Initialize character data with static properties from character entities
+function initializeCharacterData(data: ScriptData) {
+  const characters = charactersStore.characters
+
+  // Guard: If characters store is empty or not initialized, skip initialization
+  if (!characters || characters.length === 0) {
+    return
+  }
+
+  // Initialize characters object if it doesn't exist
+  if (!data.characters || typeof data.characters !== 'object' || Array.isArray(data.characters)) {
+    data.characters = {}
+  }
+
+  const charactersObj = data.characters as Record<string, any>
+
+  // Initialize each character with static properties from Character entities
+  characters.forEach((character: Character) => {
+    const displayName = getCharacterDisplayName(character)
+    if (!charactersObj[displayName]) {
+      charactersObj[displayName] = {}
+    }
+
+    // Add static properties from the Character entity
+    charactersObj[displayName].name = displayName
+
+    if (character.birthdate !== undefined) {
+      charactersObj[displayName].birthdate = character.birthdate
+    }
+
+    charactersObj[displayName].isMainCharacter = character.isMainCharacter || false
+  })
+}
+
+// Initialize context item data
+function initializeContextItemData(data: ScriptData) {
+  const contextItems = contextItemsStore.contextItems
+
+  // Guard: If contextItems store is empty or not initialized, skip initialization
+  if (!contextItems || contextItems.length === 0) {
+    return
+  }
+
+  // Initialize contextItems object if it doesn't exist
+  if (!data.contextItems || typeof data.contextItems !== 'object' || Array.isArray(data.contextItems)) {
+    data.contextItems = {}
+  }
+
+  const contextItemsObj = data.contextItems as Record<string, any>
+
+  // Initialize each context item
+  contextItems.forEach((item: ContextItem) => {
+    if (!contextItemsObj[item.name]) {
+      contextItemsObj[item.name] = {}
+    }
+
+    // Add static properties from the ContextItem entity
+    contextItemsObj[item.name].name = item.name
+    contextItemsObj[item.name].type = item.type
+    contextItemsObj[item.name].isGlobal = item.isGlobal
+  })
+}
+
+// Initialize plot points with default values from definitions
+function initializePlotPointData(data: ScriptData) {
+  const definitions = plotPointsStore.definitions
+
+  // Initialize plotPoints object
+  if (!data.plotPoints || typeof data.plotPoints !== 'object' || Array.isArray(data.plotPoints)) {
+    data.plotPoints = {}
+  }
+
+  const plotPointsObj = data.plotPoints as Record<string, string | number | boolean>
+
+  // Set default values from definitions
+  definitions.forEach((def) => {
+    // Only set if not already defined (global script may have modified it)
+    if (plotPointsObj[def.key] === undefined) {
+      plotPointsObj[def.key] = def.default
+    }
+  })
+}
 
 export interface ScriptData {
   [key: string]: any
@@ -19,6 +106,7 @@ export interface ScriptFunctions {
 export interface ScriptResult {
   data: ScriptData
   functions?: ScriptFunctions
+  error?: string
 }
 
 /**
@@ -101,8 +189,9 @@ export function executeScript(
 
     return { data: newData, functions }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Error executing script:', error)
-    return { data, functions }
+    return { data, functions, error: errorMessage }
   }
 }
 
@@ -132,13 +221,21 @@ export function executeScriptsUpToMessage(
     functions = result.functions || {}
   }
 
-  // Initialize currentTime to 0 if not set by global script
-  if (data.currentTime === undefined) {
-    data = produce(data, (draft: ScriptData) => {
+  // Initialize currentTime, characters, context items, and plot points
+  // This mirrors the initialization done in scriptDataStore.evaluateAllScripts
+  data = produce({ ...data }, (draft: ScriptData) => {
+    // Initialize currentTime to 0 if not set by global script
+    if (draft.currentTime === undefined) {
       draft.currentTime = 0
       draft.currentDate = calendarStore.formatStoryTime(0) || ''
-    })
-  }
+    }
+
+    // Initialize characters, context items, and plot points from entity stores
+    // This makes character.birthdate and other entity properties available to scripts
+    initializeCharacterData(draft)
+    initializeContextItemData(draft)
+    initializePlotPointData(draft)
+  })
 
   // Get messages to process in story order based on nodes
   const messagesToProcess = getMessagesInStoryOrder(messages, nodes, targetMessageId)
@@ -152,8 +249,8 @@ export function executeScriptsUpToMessage(
   // Execute scripts for each message
   for (const message of messagesToProcess) {
     // Check if we've moved to a new node - update currentTime if needed
-    if (message.nodeId && message.nodeId !== currentNodeId) {
-      currentNodeId = message.nodeId
+    if (message.sceneId && message.sceneId !== currentNodeId) {
+      currentNodeId = message.sceneId
       const currentNode = nodes.find((n) => n.id === currentNodeId)
 
       // Handle storyTime for the new node
