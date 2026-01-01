@@ -7,7 +7,7 @@ export const container = style({
   alignItems: 'center',
   justifyContent: 'center',
   minHeight: '100vh',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  background: tokens.color.bg.base,
 })
 
 export const title = style({

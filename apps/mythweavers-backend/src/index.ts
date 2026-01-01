@@ -39,6 +39,7 @@ import myScenesRoutes from './routes/my/scenes.js'
 import myStoriesRoutes from './routes/my/stories.js'
 import myStoryCalendarRoutes from './routes/my/story-calendar.js'
 import myStoryTagsRoutes from './routes/my/story-tags.js'
+import myExportPdfRoutes from './routes/my/export-pdf.js'
 import publicStoriesRoutes from './routes/stories/public.js'
 import publicTagRoutes from './routes/tags/public.js'
 
@@ -270,6 +271,7 @@ await server.register(myPawnsRoutes, { prefix: '/my' })
 await server.register(myPathsRoutes, { prefix: '/my' })
 await server.register(myPathSegmentsRoutes, { prefix: '/my' })
 await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
+await server.register(myExportPdfRoutes, { prefix: '/my' })
 await server.register(publicStoriesRoutes, { prefix: '/stories' })
 await server.register(publicTagRoutes, { prefix: '' })
 await server.register(calendarPresetsRoutes, { prefix: '/calendars' })

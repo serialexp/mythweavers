@@ -6,6 +6,7 @@ import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { storyManagerStore } from '../stores/storyManagerStore'
+import { getMyStoriesByStoryIdPdf } from '../client/config'
 import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
 import { createSavePayload } from '../utils/savePayload'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
@@ -246,7 +247,25 @@ export const StoryManager: Component = () => {
   const handleDownloadPdf = async (story: ApiStoryMetadata) => {
     try {
       const filename = `${story.name.replace(/[^a-z0-9]/gi, '_')}.pdf`
-      await apiClient.downloadStoryAsPdf(story.id, filename)
+      const { data, error } = await getMyStoriesByStoryIdPdf({
+        path: { storyId: story.id },
+      })
+
+      if (error) {
+        throw new Error(error.error || 'Failed to generate PDF')
+      }
+
+      // Create download link from blob response
+      const blob = data
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
     } catch (error) {
       console.error('Failed to download PDF:', error)
       alert('Failed to download PDF. Make sure Typst is installed on the server.')

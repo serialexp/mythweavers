@@ -13609,6 +13609,71 @@ export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses = {
 
 export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponse = DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses[keyof DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses];
 
+export type GetMyStoriesByStoryIdPdfData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/pdf';
+};
+
+export type GetMyStoriesByStoryIdPdfErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdPdfError = GetMyStoriesByStoryIdPdfErrors[keyof GetMyStoriesByStoryIdPdfErrors];
+
+export type GetMyStoriesByStoryIdPdfResponses = {
+    /**
+     * PDF file content
+     */
+    200: Blob | File;
+};
+
+export type GetMyStoriesByStoryIdPdfResponse = GetMyStoriesByStoryIdPdfResponses[keyof GetMyStoriesByStoryIdPdfResponses];
+
 export type GetStoriesData = {
     body?: never;
     path?: never;
