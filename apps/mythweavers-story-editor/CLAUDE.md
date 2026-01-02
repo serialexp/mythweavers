@@ -98,9 +98,24 @@ const response = await fetch(`${baseUrl}/my/stories/${storyId}/messages/reorder`
 })
 ```
 
+**Regenerating the API Client:**
+
+The backend dev server is almost always running with hot reload, so you can regenerate the client anytime after making backend changes:
+
+```bash
+cd /home/bart/Projects/writer2/apps/mythweavers-story-editor
+pnpm generate:client
+```
+
+**When to regenerate:**
+- After adding new backend endpoints
+- After modifying request/response schemas (adding fields, changing types)
+- When you get TypeScript errors about missing properties on API calls
+- The backend must be running on port 3201 for this to work
+
 **When adding new backend endpoints:**
-1. Add the endpoint to the backend
-2. Regenerate the SDK: `pnpm generate:client` (requires backend running on port 3201)
+1. Add the endpoint to the backend (it hot-reloads automatically)
+2. Regenerate the SDK: `pnpm generate:client`
 3. Import and use the new generated function
 
 ## Saving Data (Important!)
