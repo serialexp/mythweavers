@@ -129,6 +129,9 @@ const updateMessageBodySchema = z.strictObject({
   sortOrder: z.number().int().min(0).optional().meta({
     description: 'Display order',
   }),
+  nodeId: z.string().optional().meta({
+    description: 'Move message to a different scene (sceneId)',
+  }),
   type: z.string().nullable().optional().meta({
     description: 'Message type: null for normal, branch for choices, event for events',
   }),
@@ -469,6 +472,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           instruction: request.body.instruction,
           script: request.body.script,
           sortOrder: request.body.sortOrder,
+          sceneId: request.body.nodeId, // nodeId on API = sceneId in database
           type: request.body.type,
           options: toJsonInput(request.body.options),
           deleted: request.body.deleted,

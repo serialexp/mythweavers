@@ -259,4 +259,63 @@ describe('Messages Batch API', () => {
     console.log(`Created 100 messages in ${duration}ms`)
     expect(duration).toBeLessThan(10000)
   })
+
+  test('should persist instructions in database', async () => {
+    // Create messages with instructions
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${storyId}/messages/batch`,
+      cookies: { sessionToken },
+      payload: {
+        messages: [
+          {
+            sceneId,
+            sortOrder: 300,
+            instruction: 'Write a dramatic opening scene',
+            paragraphs: [{ body: 'The story begins...', sortOrder: 0 }],
+          },
+          {
+            sceneId,
+            sortOrder: 301,
+            instruction: 'Continue with tension',
+            paragraphs: [{ body: 'The plot thickens...', sortOrder: 0 }],
+          },
+        ],
+      },
+    })
+
+    expect(createResponse.statusCode).toBe(201)
+    const createdIds = createResponse.json().messageIds
+
+    // Now fetch the story via the export endpoint to verify instructions persisted
+    const exportResponse = await app.inject({
+      method: 'GET',
+      url: `/my/stories/${storyId}/export`,
+      cookies: { sessionToken },
+    })
+
+    expect(exportResponse.statusCode).toBe(200)
+    const storyData = exportResponse.json()
+
+    // Find the messages we just created
+    const messages: any[] = []
+    for (const book of storyData.books) {
+      for (const arc of book.arcs) {
+        for (const chapter of arc.chapters) {
+          for (const scene of chapter.scenes) {
+            messages.push(...scene.messages)
+          }
+        }
+      }
+    }
+
+    // Verify our created messages have instructions
+    const createdMsg1 = messages.find((m) => m.id === createdIds[0])
+    const createdMsg2 = messages.find((m) => m.id === createdIds[1])
+
+    expect(createdMsg1).toBeDefined()
+    expect(createdMsg1.instruction).toBe('Write a dramatic opening scene')
+    expect(createdMsg2).toBeDefined()
+    expect(createdMsg2.instruction).toBe('Continue with tension')
+  })
 })

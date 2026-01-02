@@ -55,15 +55,15 @@ const batchMessageSchema = z.strictObject({
     description: 'Display order within the scene',
     example: 0,
   }),
-  instruction: z.string().optional().meta({
+  instruction: z.string().nullish().meta({
     description: 'Generation instruction for this message',
     example: 'Write a dramatic opening scene',
   }),
-  script: z.string().optional().meta({
+  script: z.string().nullish().meta({
     description: 'JavaScript to execute',
     example: 'console.log("scene setup")',
   }),
-  type: z.string().optional().meta({
+  type: z.string().nullish().meta({
     description: 'Message type: null for normal, branch for choices, event for events',
     example: 'branch',
   }),
