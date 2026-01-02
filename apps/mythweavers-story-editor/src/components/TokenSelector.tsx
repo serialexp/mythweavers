@@ -1,5 +1,6 @@
 import { DropdownItem, SplitButton } from '@mythweavers/ui'
-import { Component, For, createSignal } from 'solid-js'
+import { Component, For, createEffect, createSignal } from 'solid-js'
+import { settingsStore } from '../stores/settingsStore'
 
 interface TokenSelectorProps {
   onSubmit: (maxTokens: number) => void
@@ -13,25 +14,43 @@ const TOKEN_OPTIONS = [
   { value: 1024, label: '1024 tokens', description: 'Medium response' },
   { value: 2048, label: '2048 tokens', description: 'Long response' },
   { value: 4096, label: '4096 tokens', description: 'Extra long response' },
+  { value: 8192, label: '8192 tokens', description: 'Maximum response' },
 ] as const
 
 export const TokenSelector: Component<TokenSelectorProps> = (props) => {
   const [selectedTokens, setSelectedTokens] = createSignal(1024)
+
+  // Auto-update token count when thinking setting changes
+  // Double the thinking budget to allow for generation
+  createEffect(() => {
+    const thinkingBudget = settingsStore.thinkingBudget
+    if (thinkingBudget > 0) {
+      setSelectedTokens(thinkingBudget * 2)
+    }
+  })
 
   const handleSelect = (tokens: number) => {
     setSelectedTokens(tokens)
     props.onSubmit(tokens)
   }
 
-  const getButtonText = () => {
+  const getButtonLabel = () => {
     if (props.isAnalyzing) return 'Analyzing...'
     if (props.isLoading) return 'Generating...'
-    return 'Continue Story'
+
+    const responseBudget = selectedTokens() - settingsStore.thinkingBudget
+
+    return (
+      <div style={{ display: 'flex', 'flex-direction': 'column', 'align-items': 'flex-start' }}>
+        <div>Continue Story</div>
+        <div style={{ 'font-size': '0.75em', opacity: '0.7' }}>{responseBudget} tokens response</div>
+      </div>
+    )
   }
 
   return (
     <SplitButton
-      label={getButtonText()}
+      label={getButtonLabel()}
       size="sm"
       onClick={() => props.onSubmit(selectedTokens())}
       disabled={props.disabled}

@@ -14,6 +14,7 @@ import {
   BsPencil,
   BsPeople,
   BsPlusCircle,
+  BsScissors,
   BsThreeDots,
   BsTrash,
 } from 'solid-icons/bs'
@@ -37,6 +38,7 @@ import { createAnthropicClient } from '../utils/anthropicClient'
 import { CharacterUpdateModal } from './CharacterUpdateModal'
 import { ContextItemGenerateModal } from './ContextItemGenerateModal'
 import { NodeStatusMenu } from './NodeStatusMenu'
+import { SplitSceneModal } from './SplitSceneModal'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
 
@@ -44,6 +46,7 @@ interface NodeItemProps {
   treeNode: TreeNode
   level: number
   onSelectChapter?: () => void
+  onSplitScene?: (nodeId: string) => void
 }
 
 const getAllowedParentType = (type: NodeType): NodeType | null => {
@@ -1049,6 +1052,12 @@ const NodeItem: Component<NodeItemProps> = (props) => {
               >
                 Exclude All Before
               </DropdownItem>
+              <DropdownItem
+                icon={<BsScissors />}
+                onClick={() => props.onSplitScene?.(props.treeNode.id)}
+              >
+                Split into Chapters/Scenes
+              </DropdownItem>
             </Show>
             <DropdownItem
               icon={<BsPlusCircle />}
@@ -1080,7 +1089,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       <Show when={isExpanded() && hasChildren()}>
         <div class={styles.childrenContainer}>
           <For each={props.treeNode.children}>
-            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} />}
+            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} />}
           </For>
         </div>
       </Show>
@@ -1096,6 +1105,18 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   let treeContainerRef: HTMLDivElement | undefined
   const [showCharacterUpdateModal, setShowCharacterUpdateModal] = createSignal(false)
   const [showContextItemGenerateModal, setShowContextItemGenerateModal] = createSignal(false)
+  const [showSplitSceneModal, setShowSplitSceneModal] = createSignal(false)
+  const [splitTargetNodeId, setSplitTargetNodeId] = createSignal<string | null>(null)
+
+  const handleSplitScene = (nodeId: string) => {
+    setSplitTargetNodeId(nodeId)
+    setShowSplitSceneModal(true)
+  }
+
+  const handleCloseSplitSceneModal = () => {
+    setShowSplitSceneModal(false)
+    setSplitTargetNodeId(null)
+  }
 
   // Signal to hold the async token count result
   const [tokenCountResult, setTokenCountResult] = createSignal<{
@@ -1266,7 +1287,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
       <div class={styles.navigation}>
         <div class={styles.treeContainer} ref={treeContainerRef}>
           <For each={nodeStore.tree}>
-            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} />}
+            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} />}
           </For>
 
           <Show when={nodeStore.tree.length === 0}>
@@ -1335,6 +1356,12 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
       <ContextItemGenerateModal
         isOpen={showContextItemGenerateModal()}
         onClose={() => setShowContextItemGenerateModal(false)}
+      />
+
+      <SplitSceneModal
+        isOpen={showSplitSceneModal()}
+        onClose={handleCloseSplitSceneModal}
+        targetNodeId={splitTargetNodeId()}
       />
     </TreeDragDropProvider>
   )

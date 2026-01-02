@@ -55,14 +55,33 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
       const fitsBelow = spaceBelow >= menuHeight
       const fitsAbove = spaceAbove >= menuHeight
 
+      console.log('[Dropdown] Auto-position debug:', {
+        menuHeight,
+        menuWidth,
+        triggerTop: rect.top,
+        triggerBottom: rect.bottom,
+        spaceAbove,
+        spaceBelow,
+        fitsAbove,
+        fitsBelow,
+        windowHeight: window.innerHeight,
+      })
+
       let top: number
       let maxHeight: number
-      if (fitsBelow || (!fitsAbove && spaceBelow >= spaceAbove)) {
+
+      // Prefer dropping up if there's significantly more space above
+      // This handles cases where menuHeight measurement is unreliable (e.g., menu not fully rendered yet)
+      const hasMoreSpaceAbove = spaceAbove > spaceBelow * 2
+
+      if ((fitsBelow && !hasMoreSpaceAbove) || (!fitsAbove && spaceBelow >= spaceAbove)) {
         // Position below
+        console.log('[Dropdown] Positioning BELOW')
         top = rect.bottom + 4
         maxHeight = spaceBelow - 4 // Account for the 4px gap
       } else {
         // Position above
+        console.log('[Dropdown] Positioning ABOVE')
         top = rect.top - Math.min(menuHeight, spaceAbove) - 4
         maxHeight = spaceAbove - 4 // Account for the 4px gap
       }
@@ -74,7 +93,11 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
   // Close on click outside - only attach listener when open
   createEffect(() => {
     if (isOpen()) {
-      updatePosition()
+      // Use requestAnimationFrame to wait for Portal to finish rendering
+      // before measuring the menu height for auto-positioning
+      requestAnimationFrame(() => {
+        updatePosition()
+      })
 
       const handleClickOutside = (e: MouseEvent) => {
         const target = e.target as Node
