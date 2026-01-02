@@ -6755,6 +6755,10 @@ export type PatchMyMessagesByIdData = {
          */
         sortOrder?: number;
         /**
+         * Move message to a different scene (sceneId)
+         */
+        nodeId?: string;
+        /**
          * Message type: null for normal, branch for choices, event for events
          */
         type?: string | null;
@@ -6977,15 +6981,15 @@ export type PostMyStoriesByStoryIdMessagesBatchData = {
             /**
              * Generation instruction for this message
              */
-            instruction?: string;
+            instruction?: string | null;
             /**
              * JavaScript to execute
              */
-            script?: string;
+            script?: string | null;
             /**
              * Message type: null for normal, branch for choices, event for events
              */
-            type?: string;
+            type?: string | null;
             /**
              * Branch options - only for branch type messages
              */
