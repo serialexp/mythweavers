@@ -21,6 +21,12 @@ export function estimateTokensFromText(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+  cache_control?: { type: 'ephemeral'; ttl?: '5m' | '1h' }
+}
+
 /**
  * Generate a new template based on a change request using AI
  * @param currentTemplate - The current EJS template
@@ -55,6 +61,11 @@ export const generateTemplateChange = async (
       throw new Error('Anthropic API key not configured')
     }
     const client = new AnthropicClient(anthropicApiKey)
+    // Use caching-optimized structure when story content is present
+    if (storyContent) {
+      const messages = createTemplateMessagesForCaching(currentTemplate, currentResolvedState, changeRequest, storyContent)
+      return generateWithAnthropicClientCached(client, messages, model)
+    }
     return generateWithAnthropicClient(client, prompt, model)
   }
   throw new Error('Unknown provider')
@@ -100,6 +111,107 @@ IMPORTANT INSTRUCTIONS:
 6. Ensure the template is valid EJS syntax
 
 OUTPUT THE NEW TEMPLATE NOW:`
+}
+
+/**
+ * Create messages structured for Anthropic prompt caching.
+ * The story content is placed first with cache_control so it can be reused
+ * across multiple character updates.
+ */
+function createTemplateMessagesForCaching(
+  currentTemplate: string,
+  currentResolvedState: any,
+  changeRequest: string,
+  storyContent: string,
+): ChatMessage[] {
+  const stateJson = JSON.stringify(currentResolvedState, null, 2)
+
+  // System message with instructions (cacheable prefix)
+  const systemMessage: ChatMessage = {
+    role: 'system',
+    content: `You are a template editor assistant. Your task is to modify an EJS template based on a user's change request.
+
+IMPORTANT INSTRUCTIONS:
+1. Output ONLY the new template - no explanations, no markdown, just the raw template text
+2. Preserve the existing EJS syntax style (use <%= %> for output, <% %> for logic)
+3. Only use variables that exist in the available state
+4. Keep the template concise and readable
+5. If the current template doesn't use EJS tags and the change doesn't require them, keep it simple
+6. Ensure the template is valid EJS syntax`,
+    cache_control: { type: 'ephemeral', ttl: '5m' },
+  }
+
+  // Story content in first user message - this is the large, cacheable content
+  // Marked with cache_control so Anthropic will cache it for subsequent requests
+  // Using 5m TTL since batch character updates happen in quick succession
+  const storyContextMessage: ChatMessage = {
+    role: 'user',
+    content: `RELEVANT STORY CONTENT:
+${storyContent}
+
+Use this story content as context when making changes. The user's request may reference events, character developments, or details from this content.`,
+    cache_control: { type: 'ephemeral', ttl: '5m' },
+  }
+
+  // Acknowledge story content to maintain conversation flow
+  const assistantAck: ChatMessage = {
+    role: 'assistant',
+    content: 'I have read the story content and will use it as context for updating the character template. Please provide the current template, available state, and your change request.',
+  }
+
+  // Character-specific content (changes per character, not cached)
+  const characterMessage: ChatMessage = {
+    role: 'user',
+    content: `CURRENT TEMPLATE:
+${currentTemplate}
+
+AVAILABLE STATE/CONTEXT (this is what's available in the template):
+${stateJson}
+
+USER'S CHANGE REQUEST:
+${changeRequest}
+
+OUTPUT THE NEW TEMPLATE NOW:`,
+  }
+
+  return [systemMessage, storyContextMessage, assistantAck, characterMessage]
+}
+
+/**
+ * Generate with Anthropic client using cached messages structure
+ */
+async function generateWithAnthropicClientCached(
+  client: AnthropicClient,
+  messages: ChatMessage[],
+  model: string,
+): Promise<string> {
+  let result = ''
+
+  const response = await client.generate({
+    model,
+    messages,
+    stream: true,
+    options: {
+      num_ctx: 4096,
+    },
+  })
+
+  for await (const part of response) {
+    if (part.response) {
+      result += part.response
+    }
+    // Log cache statistics when available
+    if (part.done) {
+      if (part.cache_read_input_tokens) {
+        console.log(`[Template AI] Cache read: ${part.cache_read_input_tokens} tokens`)
+      }
+      if (part.cache_creation_input_tokens) {
+        console.log(`[Template AI] Cache write: ${part.cache_creation_input_tokens} tokens`)
+      }
+    }
+  }
+
+  return result.trim()
 }
 
 /**
