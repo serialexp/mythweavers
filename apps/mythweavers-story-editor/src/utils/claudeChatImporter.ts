@@ -75,64 +75,56 @@ export async function importClaudeChat(options: ImportClaudeChatOptions): Promis
   // Collect messages with scene ID
   const messagesWithScene: Message[] = []
 
-  // For server storage, use batch save endpoint for efficiency
-  if (storageMode === 'server') {
-    // Prepare messages for batch API
-    const batchMessages = messages.map((msg, index) => ({
-      id: msg.id,
+  // Always use batch save for efficiency and consistency
+  // Prepare messages for batch API
+  const batchMessages = messages.map((msg, index) => ({
+    id: msg.id,
+    sceneId: scene.id,
+    sortOrder: index,
+    instruction: msg.instruction ?? null,
+    content: msg.content,
+  }))
+
+  console.log('[claudeChatImporter] Batch messages before save:', {
+    messageCount: batchMessages.length,
+    messagesWithInstructions: batchMessages.filter(m => m.instruction).length,
+    sampleMessage: batchMessages[0] ? {
+      id: batchMessages[0].id,
+      hasInstruction: !!batchMessages[0].instruction,
+      instruction: batchMessages[0].instruction,
+    } : null,
+  })
+
+  // Save all messages in one batch call
+  await saveService.saveMessagesBatch(storyId, batchMessages)
+
+  // Add messages to local store (without triggering individual saves)
+  for (const msg of messages) {
+    const messageWithScene: Message = {
+      ...msg,
       sceneId: scene.id,
-      sortOrder: index,
-      instruction: msg.instruction,
-      content: msg.content,
-    }))
-
-    // Save all messages in one API call
-    await saveService.saveMessagesBatch(storyId, batchMessages)
-
-    // Add messages to local store (without triggering individual saves)
-    for (const msg of messages) {
-      const messageWithScene: Message = {
-        ...msg,
-        sceneId: scene.id,
-      }
-      messagesWithScene.push(messageWithScene)
-      // Use no-save version to avoid triggering saveService (already saved via batch)
-      messagesStore.appendMessageNoSave(messageWithScene)
     }
-  } else {
-    // For local storage, add messages normally
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i]
-      const messageWithScene: Message = {
-        ...msg,
-        sceneId: scene.id,
-      }
-      messagesWithScene.push(messageWithScene)
-      messagesStore.appendMessage(messageWithScene)
+    messagesWithScene.push(messageWithScene)
+    // Use no-save version to avoid triggering saveService (already saved via batch)
+    messagesStore.appendMessageNoSave(messageWithScene)
+  }
 
-      // Yield to event loop every 10 messages to keep UI responsive
-      if (i % 10 === 9) {
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      }
-    }
-
-    // For local storage with new story, save the complete story
-    if (importTarget === 'new') {
-      await storyManager.updateLocalStory(storyId, {
-        id: storyId,
-        name: storyName,
-        savedAt: new Date(),
-        messages: messagesWithScene,
-        characters: [],
-        contextItems: [],
-        nodes: [book, arc, chapter, scene],
-        input: '',
-        storySetting: '',
-        storageMode: 'local',
-        person: 'third',
-        tense: 'past',
-      })
-    }
+  // For local storage with new story, save the complete story
+  if (importTarget === 'new' && storageMode === 'local') {
+    await storyManager.updateLocalStory(storyId, {
+      id: storyId,
+      name: storyName,
+      savedAt: new Date(),
+      messages: messagesWithScene,
+      characters: [],
+      contextItems: [],
+      nodes: [book, arc, chapter, scene],
+      input: '',
+      storySetting: '',
+      storageMode: 'local',
+      person: 'third',
+      tense: 'past',
+    })
   }
 
   return { storyId }

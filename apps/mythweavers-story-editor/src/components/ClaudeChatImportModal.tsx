@@ -2,6 +2,7 @@ import { Button, Modal, Spinner } from '@mythweavers/ui'
 import { BsCloudFill, BsCloudUpload, BsFileEarmarkText, BsHddFill } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { authStore } from '../stores/authStore'
+import { currentStoryStore } from '../stores/currentStoryStore'
 import {
   type ClaudeChatExport,
   type ClaudeConversation,
@@ -39,6 +40,16 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
 
   const isAuthenticated = () => authStore.isAuthenticated && !authStore.isOfflineMode
 
+  // Determine the storage mode to use
+  const getStorageMode = () => {
+    // When importing into current story, use its storage mode
+    if (importTarget() === 'current' && currentStoryStore.storageMode) {
+      return currentStoryStore.storageMode as 'local' | 'server'
+    }
+    // Otherwise use the selected storage mode
+    return storageMode()
+  }
+
   const handleFileSelect = async (file: File) => {
     setError(null)
     try {
@@ -53,6 +64,16 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
       setError(err instanceof Error ? err.message : 'Failed to parse file')
       setConversations(null)
       setSelectedConversation(null)
+    }
+  }
+
+  const handleFileInputChange = async (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (file) {
+      await handleFileSelect(file)
+      // Clear the input value so the same file can be selected again
+      const input = e.target as HTMLInputElement
+      input.value = ''
     }
   }
 
@@ -80,12 +101,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json'
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        await handleFileSelect(file)
-      }
-    }
+    input.onchange = handleFileInputChange
     input.click()
   }
 
@@ -99,7 +115,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
     try {
       const messages = convertToStoryMessages(conversation)
       setImportingMessageCount(messages.length)
-      await props.onImport(conversation.name, messages, importTarget(), storageMode())
+      await props.onImport(conversation.name, messages, importTarget(), getStorageMode())
       handleClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import conversation')
@@ -266,10 +282,10 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
                     >
                       <>
                         <div class={styles.previewTitle}>
-                          Preview ({summary().activeMessageCount} of {summary().messageCount} messages
+                          Preview - last 3 messages ({summary().activeMessageCount} of {summary().messageCount} total
                           {summary().hasAbandonedBranches && ' - some branches excluded'})
                         </div>
-                        <For each={conversation().chat_messages.slice(0, 5)}>
+                        <For each={conversation().chat_messages.slice(-3)}>
                           {(message) => {
                             const textContent =
                               message.content.find((c) => c.type === 'text')?.text || message.text

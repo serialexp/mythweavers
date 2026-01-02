@@ -173,6 +173,14 @@ export function convertToStoryMessages(conversation: ClaudeConversation): Messag
   // Sort by created_at to ensure correct order
   activeMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
+  console.log('[convertToStoryMessages] Conversion details:', {
+    totalMessages: conversation.chat_messages.length,
+    activeBranchSize: activeBranch.size,
+    activeMessagesCount: activeMessages.length,
+    humanCount: activeMessages.filter(m => m.sender === 'human').length,
+    assistantCount: activeMessages.filter(m => m.sender === 'assistant').length,
+  })
+
   for (let i = 0; i < activeMessages.length; i++) {
     const msg = activeMessages[i]
 
@@ -184,11 +192,21 @@ export function convertToStoryMessages(conversation: ClaudeConversation): Messag
       const textContent = msg.content.find((c) => c.type === 'text')?.text || msg.text
       const thinkContent = msg.content.find((c) => c.type === 'thinking')?.thinking
 
+      // Extract instruction from human message (check both text field and content array)
+      const instruction = humanMsg
+        ? humanMsg.content.find((c) => c.type === 'text')?.text || humanMsg.text
+        : null
+
+      console.log(`[convertToStoryMessages] Assistant message ${i}:`, {
+        hasHumanPredecessor: !!humanMsg,
+        instruction: instruction ? instruction.substring(0, 50) + '...' : instruction,
+      })
+
       messages.push({
         id: generateMessageId(),
         role: 'assistant',
         content: textContent,
-        instruction: humanMsg?.text,
+        instruction,
         think: thinkContent,
         timestamp: new Date(msg.created_at),
         order: messages.length,
@@ -198,11 +216,13 @@ export function convertToStoryMessages(conversation: ClaudeConversation): Messag
       const nextMsg = activeMessages[i + 1]
       if (!nextMsg || nextMsg.sender !== 'assistant') {
         // Orphaned human message - include with empty content
+        // Extract text from content array or text field
+        const humanText = msg.content.find((c) => c.type === 'text')?.text || msg.text
         messages.push({
           id: generateMessageId(),
           role: 'assistant',
           content: '',
-          instruction: msg.text,
+          instruction: humanText,
           timestamp: new Date(msg.created_at),
           order: messages.length,
         })
