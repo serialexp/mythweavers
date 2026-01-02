@@ -182,3 +182,130 @@ export const tokenEstimateWarning = style({
 export const tokenEstimateError = style({
   color: '#ef4444', // red error color
 })
+
+export const characterGrid = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+  gap: tokens.space['2'],
+  maxHeight: '200px',
+  overflowY: 'auto',
+  padding: tokens.space['2'],
+  backgroundColor: tokens.color.bg.raised,
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+})
+
+export const characterCheckbox = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.primary,
+  cursor: 'pointer',
+  borderRadius: tokens.radius.default,
+  transition: `background-color ${tokens.duration.fast} ${tokens.easing.default}`,
+
+  ':hover': {
+    backgroundColor: tokens.color.bg.elevated,
+  },
+
+  selectors: {
+    '& input': {
+      cursor: 'pointer',
+    },
+  },
+})
+
+export const resultsContainer = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['4'],
+})
+
+export const resultCard = style({
+  padding: tokens.space['3'],
+  backgroundColor: tokens.color.bg.raised,
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  transition: `opacity ${tokens.duration.fast} ${tokens.easing.default}`,
+})
+
+export const resultCardAccepted = style({
+  opacity: 0.6,
+  borderColor: '#22c55e',
+})
+
+export const resultHeader = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  marginBottom: tokens.space['2'],
+})
+
+export const resultCharacterName = style({
+  fontWeight: tokens.font.weight.semibold,
+  color: tokens.color.text.primary,
+  flex: 1,
+})
+
+export const resultActions = style({
+  display: 'flex',
+  gap: tokens.space['1'],
+})
+
+export const acceptButton = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '28px',
+  height: '28px',
+  padding: 0,
+  backgroundColor: 'rgba(34, 197, 94, 0.15)',
+  color: '#22c55e',
+  border: 'none',
+  borderRadius: tokens.radius.default,
+  cursor: 'pointer',
+  transition: `background-color ${tokens.duration.fast} ${tokens.easing.default}`,
+
+  ':hover': {
+    backgroundColor: 'rgba(34, 197, 94, 0.3)',
+  },
+})
+
+export const rejectButton = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '28px',
+  height: '28px',
+  padding: 0,
+  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  color: '#ef4444',
+  border: 'none',
+  borderRadius: tokens.radius.default,
+  cursor: 'pointer',
+  transition: `background-color ${tokens.duration.fast} ${tokens.easing.default}`,
+
+  ':hover': {
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+  },
+})
+
+export const acceptedBadge = style({
+  fontSize: tokens.font.size.xs,
+  fontWeight: tokens.font.weight.medium,
+  color: '#22c55e',
+  padding: `${tokens.space['0.5']} ${tokens.space['2']}`,
+  backgroundColor: 'rgba(34, 197, 94, 0.15)',
+  borderRadius: tokens.radius.default,
+})
+
+export const errorBadge = style({
+  fontSize: tokens.font.size.xs,
+  fontWeight: tokens.font.weight.medium,
+  color: '#ef4444',
+  padding: `${tokens.space['0.5']} ${tokens.space['2']}`,
+  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  borderRadius: tokens.radius.default,
+})

@@ -1,6 +1,6 @@
 import { Button, Modal, Spinner } from '@mythweavers/ui'
 import * as Diff from 'diff'
-import { BsExclamationTriangle } from 'solid-icons/bs'
+import { BsCheck2, BsExclamationTriangle, BsX } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { charactersStore } from '../stores/charactersStore'
@@ -19,12 +19,21 @@ interface CharacterUpdateModalProps {
   preselectedCharacterId?: string
 }
 
+interface CharacterResult {
+  characterId: string
+  characterName: string
+  originalDescription: string
+  proposedDescription: string | null
+  error: string | null
+  accepted: boolean
+}
+
 export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props) => {
-  const [selectedCharacterId, setSelectedCharacterId] = createSignal<string>(props.preselectedCharacterId || '')
+  const [selectedCharacterIds, setSelectedCharacterIds] = createSignal<Set<string>>(new Set())
   const [instruction, setInstruction] = createSignal('')
   const [isGenerating, setIsGenerating] = createSignal(false)
-  const [error, setError] = createSignal<string | null>(null)
-  const [proposedDescription, setProposedDescription] = createSignal<string | null>(null)
+  const [currentProcessingIndex, setCurrentProcessingIndex] = createSignal(0)
+  const [results, setResults] = createSignal<CharacterResult[]>([])
   const [tokenEstimate, setTokenEstimate] = createSignal<TokenEstimateResult | null>(null)
   const [isEstimating, setIsEstimating] = createSignal(false)
   const contextMessageId = useContextMessage()
@@ -73,13 +82,6 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
     return charactersStore.characters.filter((char) => activeCharacterIds.has(char.id))
   })
 
-  // Get selected character
-  const selectedCharacter = createMemo(() => {
-    const id = selectedCharacterId()
-    if (!id) return null
-    return charactersStore.characters.find((c) => c.id === id) || null
-  })
-
   // Build combined story content from context nodes
   const getStoryContent = () => {
     const fullNodes = fullContentNodes()
@@ -107,20 +109,37 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
   }
 
   // Compute diff between current and proposed description
-  const diffResult = createMemo(() => {
-    const current = selectedCharacter()?.description || ''
-    const proposed = proposedDescription()
+  const computeDiff = (current: string, proposed: string | null) => {
     if (!proposed) return null
-
     return Diff.diffLines(current, proposed)
+  }
+
+  // Check if we have any results to show
+  const hasResults = createMemo(() => results().length > 0)
+
+  // Count pending (unaccepted, non-error) results
+  const pendingCount = createMemo(() => {
+    return results().filter((r) => !r.accepted && !r.error && r.proposedDescription).length
   })
 
-  // Estimate tokens when character or content changes
+  // Initialize selection when modal opens
   createEffect(
     on(
-      () => [selectedCharacter(), fullContentNodes(), summaryNodes(), props.isOpen] as const,
-      async ([character, _fullNodes, _summNodes, isOpen]) => {
-        if (!isOpen || !character) {
+      () => props.isOpen,
+      (isOpen) => {
+        if (isOpen && props.preselectedCharacterId) {
+          setSelectedCharacterIds(new Set([props.preselectedCharacterId]))
+        }
+      },
+    ),
+  )
+
+  // Estimate tokens when selection or content changes
+  createEffect(
+    on(
+      () => [selectedCharacterIds().size, fullContentNodes(), summaryNodes(), props.isOpen] as const,
+      async ([selectedCount, _fullNodes, _summNodes, isOpen]) => {
+        if (!isOpen || selectedCount === 0) {
           setTokenEstimate(null)
           return
         }
@@ -129,7 +148,16 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
         try {
           const messages = messagesStore.messages
           const messageId = contextMessageId()
-          const currentDescription = character.description || ''
+
+          // Get script state for first selected character (estimate is similar for all)
+          const firstCharacterId = [...selectedCharacterIds()][0]
+          const firstCharacter = charactersStore.characters.find((c) => c.id === firstCharacterId)
+          if (!firstCharacter) {
+            setTokenEstimate(null)
+            return
+          }
+
+          const currentDescription = firstCharacter.description || ''
 
           // Get script state
           let currentResolvedState = {}
@@ -148,7 +176,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
           const estimate = await estimateTemplateChangeTokens(
             currentDescription,
             currentResolvedState,
-            'placeholder instruction', // Use placeholder to estimate base cost
+            'placeholder instruction',
             storyContent,
           )
           setTokenEstimate(estimate)
@@ -162,123 +190,188 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
     ),
   )
 
-  const handleGenerate = async () => {
-    const character = selectedCharacter()
-    if (!character || !instruction().trim()) return
-
-    setIsGenerating(true)
-    setError(null)
-    setProposedDescription(null)
-
-    try {
-      const messages = messagesStore.messages
-      const messageId = contextMessageId()
-      const currentDescription = character.description || ''
-
-      // Get script state
-      let currentResolvedState = {}
-      if (messageId) {
-        const preview = getTemplatePreview(
-          currentDescription,
-          messages,
-          messageId,
-          nodeStore.nodesArray,
-          currentStoryStore.globalScript,
-        )
-        currentResolvedState = preview.data
+  const toggleCharacterSelection = (characterId: string) => {
+    setSelectedCharacterIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(characterId)) {
+        next.delete(characterId)
+      } else {
+        next.add(characterId)
       }
-
-      // Get story content
-      const storyContent = getStoryContent()
-
-      // Generate new description
-      const newDescription = await generateTemplateChange(
-        currentDescription,
-        currentResolvedState,
-        instruction(),
-        storyContent,
-      )
-
-      // Validate the new template
-      if (messageId) {
-        const validationResult = getTemplatePreview(
-          newDescription,
-          messages,
-          messageId,
-          nodeStore.nodesArray,
-          currentStoryStore.globalScript,
-        )
-
-        if (validationResult.error) {
-          setError(`Invalid template generated: ${validationResult.error}`)
-          return
-        }
-      }
-
-      setProposedDescription(newDescription)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate description')
-    } finally {
-      setIsGenerating(false)
-    }
+      return next
+    })
   }
 
-  const handleAccept = () => {
-    const character = selectedCharacter()
-    const proposed = proposedDescription()
-    if (!character || !proposed) return
+  const selectAllCharacters = () => {
+    const allIds = new Set(availableCharacters().map((c) => c.id))
+    setSelectedCharacterIds(allIds)
+  }
 
-    charactersStore.updateCharacter(character.id, { description: proposed })
-    handleClose()
+  const deselectAllCharacters = () => {
+    setSelectedCharacterIds(new Set<string>())
+  }
+
+  const handleGenerate = async () => {
+    const selectedIds = [...selectedCharacterIds()]
+    if (selectedIds.length === 0 || !instruction().trim()) return
+
+    setIsGenerating(true)
+    setResults([])
+    setCurrentProcessingIndex(0)
+
+    const messages = messagesStore.messages
+    const messageId = contextMessageId()
+    const storyContent = getStoryContent()
+
+    // Process each character sequentially to benefit from caching
+    for (let i = 0; i < selectedIds.length; i++) {
+      setCurrentProcessingIndex(i)
+      const characterId = selectedIds[i]
+      const character = charactersStore.characters.find((c) => c.id === characterId)
+
+      if (!character) continue
+
+      const characterName = getCharacterDisplayName(character)
+      const currentDescription = character.description || ''
+
+      try {
+        // Get script state
+        let currentResolvedState = {}
+        if (messageId) {
+          const preview = getTemplatePreview(
+            currentDescription,
+            messages,
+            messageId,
+            nodeStore.nodesArray,
+            currentStoryStore.globalScript,
+          )
+          currentResolvedState = preview.data
+        }
+
+        // Generate new description
+        const newDescription = await generateTemplateChange(
+          currentDescription,
+          currentResolvedState,
+          instruction(),
+          storyContent,
+        )
+
+        // Validate the new template
+        let validationError: string | null = null
+        if (messageId) {
+          const validationResult = getTemplatePreview(
+            newDescription,
+            messages,
+            messageId,
+            nodeStore.nodesArray,
+            currentStoryStore.globalScript,
+          )
+
+          if (validationResult.error) {
+            validationError = `Invalid template: ${validationResult.error}`
+          }
+        }
+
+        // Add result
+        setResults((prev) => [
+          ...prev,
+          {
+            characterId,
+            characterName,
+            originalDescription: currentDescription,
+            proposedDescription: validationError ? null : newDescription,
+            error: validationError,
+            accepted: false,
+          },
+        ])
+      } catch (err) {
+        // Add error result
+        setResults((prev) => [
+          ...prev,
+          {
+            characterId,
+            characterName,
+            originalDescription: currentDescription,
+            proposedDescription: null,
+            error: err instanceof Error ? err.message : 'Failed to generate description',
+            accepted: false,
+          },
+        ])
+      }
+    }
+
+    setIsGenerating(false)
+  }
+
+  const handleAcceptResult = (characterId: string) => {
+    const result = results().find((r) => r.characterId === characterId)
+    if (!result || !result.proposedDescription) return
+
+    charactersStore.updateCharacter(characterId, { description: result.proposedDescription })
+    setResults((prev) => prev.map((r) => (r.characterId === characterId ? { ...r, accepted: true } : r)))
+  }
+
+  const handleRejectResult = (characterId: string) => {
+    setResults((prev) => prev.filter((r) => r.characterId !== characterId))
+  }
+
+  const handleAcceptAll = () => {
+    const pendingResults = results().filter((r) => !r.accepted && !r.error && r.proposedDescription)
+    for (const result of pendingResults) {
+      charactersStore.updateCharacter(result.characterId, { description: result.proposedDescription! })
+    }
+    setResults((prev) => prev.map((r) => (r.proposedDescription && !r.error ? { ...r, accepted: true } : r)))
   }
 
   const handleClose = () => {
-    setSelectedCharacterId(props.preselectedCharacterId || '')
+    setSelectedCharacterIds(new Set<string>())
     setInstruction('')
-    setError(null)
-    setProposedDescription(null)
+    setResults([])
+    setCurrentProcessingIndex(0)
     props.onClose()
   }
 
   const handleReset = () => {
-    setProposedDescription(null)
-    setError(null)
+    setResults([])
+    setCurrentProcessingIndex(0)
   }
 
   return (
     <Modal
       open={props.isOpen}
       onClose={handleClose}
-      title="Update Character Description"
+      title="Update Character Descriptions"
       size="lg"
       footer={
         <div class={styles.actions}>
-          <Show when={!proposedDescription()}>
+          <Show when={!hasResults()}>
             <Button variant="secondary" onClick={handleClose}>
               Cancel
             </Button>
             <Button
               onClick={handleGenerate}
               disabled={
-                !selectedCharacterId() ||
+                selectedCharacterIds().size === 0 ||
                 !instruction().trim() ||
                 isGenerating() ||
                 (tokenEstimate() !== null && !tokenEstimate()!.fitsInContext)
               }
             >
-              <Show when={isGenerating()} fallback="Generate">
+              <Show when={isGenerating()} fallback={`Generate (${selectedCharacterIds().size} characters)`}>
                 <Spinner size="sm" /> Generating...
               </Show>
             </Button>
           </Show>
-          <Show when={proposedDescription()}>
+          <Show when={hasResults() && !isGenerating()}>
             <Button variant="secondary" onClick={handleReset}>
-              Try Again
+              Start Over
             </Button>
             <Button variant="secondary" onClick={handleClose}>
-              Cancel
+              Close
             </Button>
-            <Button onClick={handleAccept}>Accept Changes</Button>
+            <Show when={pendingCount() > 0}>
+              <Button onClick={handleAcceptAll}>Accept All ({pendingCount()})</Button>
+            </Show>
           </Show>
         </div>
       }
@@ -309,7 +402,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
         </Show>
 
         {/* Token Estimate Display */}
-        <Show when={tokenEstimate() && selectedCharacter()}>
+        <Show when={tokenEstimate() && selectedCharacterIds().size > 0}>
           {(() => {
             const est = tokenEstimate()!
             const statusClass = !est.fitsInContext
@@ -325,6 +418,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
                 <span>
                   {est.estimate.isExact ? '' : '~'}
                   {est.estimate.tokens.toLocaleString()} tokens ({est.percentUsed}% of context)
+                  {selectedCharacterIds().size > 1 && ' per character (cached after first)'}
                 </span>
                 <Show when={!est.fitsInContext}>
                   <span>- exceeds context limit!</span>
@@ -334,24 +428,59 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
           })()}
         </Show>
 
-        {/* Character Selection */}
-        <div class={styles.formSection}>
-          <label class={styles.label}>Character</label>
-          <select
-            class={styles.select}
-            value={selectedCharacterId()}
-            onChange={(e) => setSelectedCharacterId(e.currentTarget.value)}
-            disabled={isGenerating() || !!proposedDescription()}
-          >
-            <option value="">Select a character...</option>
-            <For each={availableCharacters()}>
-              {(character) => <option value={character.id}>{getCharacterDisplayName(character)}</option>}
-            </For>
-          </select>
-        </div>
+        {/* Character Selection - only show when not generating and no results */}
+        <Show when={!hasResults() && !isGenerating()}>
+          <div class={styles.formSection}>
+            <div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'center' }}>
+              <label class={styles.label}>Select Characters ({selectedCharacterIds().size} selected)</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={selectAllCharacters}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-accent-primary)',
+                    cursor: 'pointer',
+                    'font-size': '0.75rem',
+                    padding: '0.25rem 0.5rem',
+                  }}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={deselectAllCharacters}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-text-muted)',
+                    cursor: 'pointer',
+                    'font-size': '0.75rem',
+                    padding: '0.25rem 0.5rem',
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div class={styles.characterGrid}>
+              <For each={availableCharacters()}>
+                {(character) => (
+                  <label class={styles.characterCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={selectedCharacterIds().has(character.id)}
+                      onChange={() => toggleCharacterSelection(character.id)}
+                    />
+                    <span>{getCharacterDisplayName(character)}</span>
+                  </label>
+                )}
+              </For>
+            </div>
+          </div>
 
-        {/* Instruction Input */}
-        <Show when={!proposedDescription()}>
+          {/* Instruction Input */}
           <div class={styles.formSection}>
             <label class={styles.label}>Update Instructions</label>
             <textarea
@@ -359,61 +488,102 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
               value={instruction()}
               onInput={(e) => setInstruction(e.currentTarget.value)}
               placeholder="e.g., 'Add details about their experience in the recent battle' or 'Update their emotional state based on recent events'"
-              disabled={isGenerating()}
             />
           </div>
         </Show>
 
-        {/* Error Display */}
-        <Show when={error()}>
-          <div class={styles.noContextWarning}>
-            <BsExclamationTriangle />
-            <span>{error()}</span>
-          </div>
-        </Show>
-
-        {/* Loading State */}
+        {/* Progress Display */}
         <Show when={isGenerating()}>
           <div class={styles.loadingContainer}>
             <Spinner size="md" />
-            <span>Generating updated description...</span>
+            <span>
+              Processing character {currentProcessingIndex() + 1} of {selectedCharacterIds().size}...
+              {currentProcessingIndex() > 0 && ' (using cached context)'}
+            </span>
           </div>
         </Show>
 
-        {/* Diff Preview */}
-        <Show when={proposedDescription() && diffResult()}>
-          <div class={styles.diffContainer}>
-            {/* Current Description */}
-            <div class={styles.diffPane}>
-              <div class={styles.diffHeader}>Current Description</div>
-              <div class={styles.diffContent}>
-                <For each={diffResult()!}>
-                  {(part) => (
-                    <Show when={!part.added}>
-                      <span class={`${styles.diffLine} ${part.removed ? styles.diffLineRemoved : ''}`}>
-                        {part.value}
-                      </span>
+        {/* Results Display */}
+        <Show when={hasResults()}>
+          <div class={styles.resultsContainer}>
+            <For each={results()}>
+              {(result) => (
+                <div class={`${styles.resultCard} ${result.accepted ? styles.resultCardAccepted : ''}`}>
+                  <div class={styles.resultHeader}>
+                    <span class={styles.resultCharacterName}>{result.characterName}</span>
+                    <Show when={result.accepted}>
+                      <span class={styles.acceptedBadge}>✓ Accepted</span>
                     </Show>
-                  )}
-                </For>
-              </div>
-            </div>
+                    <Show when={result.error}>
+                      <span class={styles.errorBadge}>Error</span>
+                    </Show>
+                    <Show when={!result.accepted && !result.error && result.proposedDescription}>
+                      <div class={styles.resultActions}>
+                        <button
+                          type="button"
+                          class={styles.acceptButton}
+                          onClick={() => handleAcceptResult(result.characterId)}
+                          title="Accept changes"
+                        >
+                          <BsCheck2 />
+                        </button>
+                        <button
+                          type="button"
+                          class={styles.rejectButton}
+                          onClick={() => handleRejectResult(result.characterId)}
+                          title="Reject changes"
+                        >
+                          <BsX />
+                        </button>
+                      </div>
+                    </Show>
+                  </div>
 
-            {/* Proposed Description */}
-            <div class={styles.diffPane}>
-              <div class={styles.diffHeader}>Proposed Description</div>
-              <div class={styles.diffContent}>
-                <For each={diffResult()!}>
-                  {(part) => (
-                    <Show when={!part.removed}>
-                      <span class={`${styles.diffLine} ${part.added ? styles.diffLineAdded : ''}`}>
-                        {part.value}
-                      </span>
-                    </Show>
-                  )}
-                </For>
-              </div>
-            </div>
+                  <Show when={result.error}>
+                    <div class={styles.noContextWarning}>
+                      <BsExclamationTriangle />
+                      <span>{result.error}</span>
+                    </div>
+                  </Show>
+
+                  <Show when={result.proposedDescription && !result.error}>
+                    <div class={styles.diffContainer}>
+                      {/* Current Description */}
+                      <div class={styles.diffPane}>
+                        <div class={styles.diffHeader}>Current</div>
+                        <div class={styles.diffContent}>
+                          <For each={computeDiff(result.originalDescription, result.proposedDescription)}>
+                            {(part) => (
+                              <Show when={!part.added}>
+                                <span class={`${styles.diffLine} ${part.removed ? styles.diffLineRemoved : ''}`}>
+                                  {part.value}
+                                </span>
+                              </Show>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+
+                      {/* Proposed Description */}
+                      <div class={styles.diffPane}>
+                        <div class={styles.diffHeader}>Proposed</div>
+                        <div class={styles.diffContent}>
+                          <For each={computeDiff(result.originalDescription, result.proposedDescription)}>
+                            {(part) => (
+                              <Show when={!part.removed}>
+                                <span class={`${styles.diffLine} ${part.added ? styles.diffLineAdded : ''}`}>
+                                  {part.value}
+                                </span>
+                              </Show>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                    </div>
+                  </Show>
+                </div>
+              )}
+            </For>
           </div>
         </Show>
       </div>
