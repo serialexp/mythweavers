@@ -152,19 +152,17 @@ saveService.setCallbacks({
 
     // Import mapsStore dynamically to avoid circular dependency
     import('../stores/mapsStore').then(({ mapsStore }) => {
-      const mapId = operation.data?.mapId
-
-      if (operation.entityType === 'hyperlane' && operation.type === 'hyperlane-insert' && mapId) {
+      if (operation.type === 'hyperlane-insert') {
         // Roll back hyperlane creation
-        mapsStore.deleteHyperlane(mapId, operation.entityId)
+        mapsStore.deleteHyperlane(operation.data.mapId, operation.entityId)
         console.log(`Rolled back failed hyperlane creation: ${operation.entityId}`)
-      } else if (operation.entityType === 'landmark' && operation.type === 'landmark-insert' && mapId) {
+      } else if (operation.type === 'landmark-insert') {
         // Roll back landmark creation (junctions)
-        mapsStore.deleteLandmark(mapId, operation.entityId)
+        mapsStore.deleteLandmark(operation.data.mapId, operation.entityId)
         console.log(`Rolled back failed landmark creation: ${operation.entityId}`)
-      } else if (operation.entityType === 'fleet' && operation.type === 'fleet-insert' && mapId) {
+      } else if (operation.type === 'fleet-insert') {
         // Roll back fleet creation
-        mapsStore.deleteFleet(mapId, operation.entityId)
+        mapsStore.deleteFleet(operation.data.mapId, operation.entityId)
         console.log(`Rolled back failed fleet creation: ${operation.entityId}`)
       }
     })
