@@ -229,6 +229,9 @@ PACING AND TONE GUIDELINES:
 - Allow for natural story rhythms with quieter moments, conversations, and character development
 - Focus on authentic character actions and dialogue rather than overly dramatic internal monologues
 
+PLAYER AGENCY:
+The reader controls ONLY the main character (the POV character for this scene). You, as the author, control all other characters, NPCs, world events, and story developments. Choices should always be actions the protagonist can take - never ask what happens in the world or what other characters do. The reader decides their character's actions; you decide how the world responds.
+
 CYOA FORMAT REQUIREMENT:
 After completing this turn's story content, you MUST present 2-4 choices for the reader. Format them as:
 
@@ -238,7 +241,7 @@ After completing this turn's story content, you MUST present 2-4 choices for the
 3. [Third choice - brief action description]
 4. Something else...
 
-Make choices meaningful and distinct. They should lead to genuinely different story paths. The last option should always be "Something else..." to allow the reader to type their own action.`
+Make choices meaningful and distinct. They should lead to genuinely different story paths. Each choice must be an action the protagonist can take. The last option should always be "Something else..." to allow the reader to type their own action.`
   }
 
   // Standard narrative mode
