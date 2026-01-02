@@ -20,7 +20,14 @@ export const getApiBaseUrl = (): string => {
     return import.meta.env.VITE_UNIFIED_API_URL
   }
 
-  // Default to localhost
+  // Default to current hostname with API port
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname
+    const protocol = window.location.protocol
+    return `${protocol}//${hostname}:3201`
+  }
+
+  // Fallback for server-side rendering
   return 'http://localhost:3201'
 }
 
