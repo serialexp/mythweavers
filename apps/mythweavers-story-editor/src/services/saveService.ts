@@ -57,72 +57,319 @@ import {
 } from '../types/core'
 import { apiClient } from '../utils/apiClient'
 
-type SaveOperationType =
-  | 'message-insert'
-  | 'message-update'
-  | 'message-delete'
-  | 'message-reorder'
-  | 'paragraph-insert'
-  | 'paragraph-update'
-  | 'paragraph-delete'
-  | 'chapter-update'
-  | 'chapter-delete'
-  | 'character-insert'
-  | 'character-update'
-  | 'character-delete'
-  | 'context-insert'
-  | 'context-update'
-  | 'context-delete'
-  | 'context-states'
-  | 'map-insert'
-  | 'map-update'
-  | 'map-delete'
-  | 'landmark-insert'
-  | 'landmark-update'
-  | 'landmark-delete'
-  | 'landmark-state'
-  | 'node-insert'
-  | 'node-update'
-  | 'node-delete'
-  | 'node-bulk-update'
-  | 'node-reorder'
-  | 'fleet-insert'
-  | 'fleet-update'
-  | 'fleet-delete'
-  | 'fleet-movement-insert'
-  | 'fleet-movement-update'
-  | 'fleet-movement-delete'
-  | 'hyperlane-insert'
-  | 'hyperlane-update'
-  | 'hyperlane-delete'
-  | 'story-settings'
-  | 'full-story'
-
-interface SaveOperation {
+// Base fields shared by all save operations
+interface SaveOperationBase {
   id: string // Unique ID for this operation
-  type: SaveOperationType
-  entityType:
-    | 'message'
-    | 'paragraph'
-    | 'chapter'
-    | 'character'
-    | 'context'
-    | 'context-states'
-    | 'map'
-    | 'landmark'
-    | 'landmark-state'
-    | 'node'
-    | 'fleet'
-    | 'fleet-movement'
-    | 'hyperlane'
-    | 'story-settings'
-    | 'story'
   entityId: string // ID of the entity being saved
   storyId: string
-  data?: any // The actual data to save
   timestamp: number // When this was queued
   retryCount?: number
 }
+
+// Message operations
+interface MessageInsertOperation extends SaveOperationBase {
+  type: 'message-insert'
+  entityType: 'message'
+  data: Message & { afterMessageId?: string | null }
+}
+
+interface MessageUpdateOperation extends SaveOperationBase {
+  type: 'message-update'
+  entityType: 'message'
+  data: Partial<Message>
+}
+
+interface MessageDeleteOperation extends SaveOperationBase {
+  type: 'message-delete'
+  entityType: 'message'
+  data?: undefined
+}
+
+interface MessageReorderOperation extends SaveOperationBase {
+  type: 'message-reorder'
+  entityType: 'message'
+  data: { items: Array<{ messageId: string; sceneId: string; order: number }> }
+}
+
+interface MessageBatchOperation extends SaveOperationBase {
+  type: 'message-batch'
+  entityType: 'message'
+  data: {
+    messages: Array<{
+      id?: string
+      sceneId: string
+      sortOrder: number
+      instruction?: string
+      script?: string
+      paragraphs?: Array<{ body: string; sortOrder: number }>
+    }>
+  }
+}
+
+// Chapter operations
+interface ChapterUpdateOperation extends SaveOperationBase {
+  type: 'chapter-update'
+  entityType: 'chapter'
+  data: Partial<Chapter>
+}
+
+interface ChapterDeleteOperation extends SaveOperationBase {
+  type: 'chapter-delete'
+  entityType: 'chapter'
+  data?: undefined
+}
+
+// Character operations
+interface CharacterInsertOperation extends SaveOperationBase {
+  type: 'character-insert'
+  entityType: 'character'
+  data: Character
+}
+
+interface CharacterUpdateOperation extends SaveOperationBase {
+  type: 'character-update'
+  entityType: 'character'
+  data: Partial<Character>
+}
+
+interface CharacterDeleteOperation extends SaveOperationBase {
+  type: 'character-delete'
+  entityType: 'character'
+  data?: undefined
+}
+
+// Context operations
+interface ContextInsertOperation extends SaveOperationBase {
+  type: 'context-insert'
+  entityType: 'context'
+  data: ContextItem
+}
+
+interface ContextUpdateOperation extends SaveOperationBase {
+  type: 'context-update'
+  entityType: 'context'
+  data: Partial<ContextItem>
+}
+
+interface ContextDeleteOperation extends SaveOperationBase {
+  type: 'context-delete'
+  entityType: 'context'
+  data?: undefined
+}
+
+interface ContextStatesOperation extends SaveOperationBase {
+  type: 'context-states'
+  entityType: 'context-states'
+  data: {
+    characterStates: Array<{ characterId: string; messageId: string; isActive: boolean }>
+    contextItemStates: Array<{ contextItemId: string; messageId: string; isActive: boolean }>
+  }
+}
+
+// Map operations
+interface MapInsertOperation extends SaveOperationBase {
+  type: 'map-insert'
+  entityType: 'map'
+  data: StoryMap
+}
+
+interface MapUpdateOperation extends SaveOperationBase {
+  type: 'map-update'
+  entityType: 'map'
+  data: Partial<StoryMap>
+}
+
+interface MapDeleteOperation extends SaveOperationBase {
+  type: 'map-delete'
+  entityType: 'map'
+  data?: undefined
+}
+
+// Landmark operations
+interface LandmarkInsertOperation extends SaveOperationBase {
+  type: 'landmark-insert'
+  entityType: 'landmark'
+  data: Landmark & { mapId: string }
+}
+
+interface LandmarkUpdateOperation extends SaveOperationBase {
+  type: 'landmark-update'
+  entityType: 'landmark'
+  data: Landmark & { mapId: string }
+}
+
+interface LandmarkDeleteOperation extends SaveOperationBase {
+  type: 'landmark-delete'
+  entityType: 'landmark'
+  data: { mapId: string }
+}
+
+interface LandmarkStateOperation extends SaveOperationBase {
+  type: 'landmark-state'
+  entityType: 'landmark-state'
+  data: { mapId: string; landmarkId: string; storyTime: number; field: string; value: string | null }
+}
+
+// Node operations
+interface NodeInsertOperation extends SaveOperationBase {
+  type: 'node-insert'
+  entityType: 'node'
+  data: Node
+}
+
+interface NodeUpdateOperation extends SaveOperationBase {
+  type: 'node-update'
+  entityType: 'node'
+  data: Partial<Node>
+}
+
+interface NodeDeleteOperation extends SaveOperationBase {
+  type: 'node-delete'
+  entityType: 'node'
+  data: Node & { permanent?: boolean }
+}
+
+interface NodeBulkUpdateOperation extends SaveOperationBase {
+  type: 'node-bulk-update'
+  entityType: 'node'
+  data: Node[]
+}
+
+interface NodeReorderOperation extends SaveOperationBase {
+  type: 'node-reorder'
+  entityType: 'node'
+  data: {
+    items: Array<{
+      nodeId: string
+      nodeType: 'book' | 'arc' | 'chapter' | 'scene'
+      parentId: string | null
+      order: number
+    }>
+  }
+}
+
+// Fleet operations
+interface FleetInsertOperation extends SaveOperationBase {
+  type: 'fleet-insert'
+  entityType: 'fleet'
+  data: Fleet & { mapId: string }
+}
+
+interface FleetUpdateOperation extends SaveOperationBase {
+  type: 'fleet-update'
+  entityType: 'fleet'
+  data: Partial<Fleet> & { mapId: string }
+}
+
+interface FleetDeleteOperation extends SaveOperationBase {
+  type: 'fleet-delete'
+  entityType: 'fleet'
+  data: { mapId: string }
+}
+
+// Fleet movement operations
+interface FleetMovementInsertOperation extends SaveOperationBase {
+  type: 'fleet-movement-insert'
+  entityType: 'fleet-movement'
+  data: FleetMovement & { mapId: string; fleetId: string }
+}
+
+interface FleetMovementUpdateOperation extends SaveOperationBase {
+  type: 'fleet-movement-update'
+  entityType: 'fleet-movement'
+  data: FleetMovement & { mapId: string; fleetId: string }
+}
+
+interface FleetMovementDeleteOperation extends SaveOperationBase {
+  type: 'fleet-movement-delete'
+  entityType: 'fleet-movement'
+  data: { mapId: string; fleetId: string }
+}
+
+// Hyperlane operations
+interface HyperlaneInsertOperation extends SaveOperationBase {
+  type: 'hyperlane-insert'
+  entityType: 'hyperlane'
+  data: Hyperlane & { mapId: string }
+}
+
+interface HyperlaneUpdateOperation extends SaveOperationBase {
+  type: 'hyperlane-update'
+  entityType: 'hyperlane'
+  data: Partial<Hyperlane> & { mapId: string }
+}
+
+interface HyperlaneDeleteOperation extends SaveOperationBase {
+  type: 'hyperlane-delete'
+  entityType: 'hyperlane'
+  data: { mapId: string }
+}
+
+// Story operations
+interface StorySettingsOperation extends SaveOperationBase {
+  type: 'story-settings'
+  entityType: 'story-settings'
+  data: Partial<{
+    name: string
+    person: 'first' | 'second' | 'third'
+    tense: 'present' | 'past'
+    storySetting: string
+    format: 'narrative' | 'cyoa'
+    paragraphsPerTurn: number
+    globalScript: string
+    selectedChapterId: string | null
+    selectedNodeId: string | null
+    branchChoices: Record<string, string>
+    timelineStartTime: number
+    timelineEndTime: number
+    timelineGranularity: 'hour' | 'day'
+    provider: string
+    model: string | null
+    plotPointDefaults: unknown[]
+  }>
+}
+
+// Discriminated union of all save operations
+type SaveOperation =
+  | MessageInsertOperation
+  | MessageUpdateOperation
+  | MessageDeleteOperation
+  | MessageReorderOperation
+  | MessageBatchOperation
+  | ChapterUpdateOperation
+  | ChapterDeleteOperation
+  | CharacterInsertOperation
+  | CharacterUpdateOperation
+  | CharacterDeleteOperation
+  | ContextInsertOperation
+  | ContextUpdateOperation
+  | ContextDeleteOperation
+  | ContextStatesOperation
+  | MapInsertOperation
+  | MapUpdateOperation
+  | MapDeleteOperation
+  | LandmarkInsertOperation
+  | LandmarkUpdateOperation
+  | LandmarkDeleteOperation
+  | LandmarkStateOperation
+  | NodeInsertOperation
+  | NodeUpdateOperation
+  | NodeDeleteOperation
+  | NodeBulkUpdateOperation
+  | NodeReorderOperation
+  | FleetInsertOperation
+  | FleetUpdateOperation
+  | FleetDeleteOperation
+  | FleetMovementInsertOperation
+  | FleetMovementUpdateOperation
+  | FleetMovementDeleteOperation
+  | HyperlaneInsertOperation
+  | HyperlaneUpdateOperation
+  | HyperlaneDeleteOperation
+  | StorySettingsOperation
+
+// Helper type to extract operation type string
+type SaveOperationType = SaveOperation['type']
 
 interface SaveQueueState {
   queue: SaveOperation[]
@@ -194,11 +441,11 @@ export class SaveService {
       return
     }
 
-    const op: SaveOperation = {
+    const op = {
       ...operation,
       id: `${operation.entityType}-${operation.entityId}-${Date.now()}`,
       timestamp: Date.now(),
-    }
+    } as SaveOperation
 
     const existingIndex = this.state.queue.findIndex(
       (existing) => existing.entityType === op.entityType && existing.entityId === op.entityId,
@@ -369,16 +616,14 @@ export class SaveService {
 
   // Execute a single save operation
   private async executeSaveOperation(operation: SaveOperation): Promise<void> {
-    const { storyId, entityId, data, type } = operation
+    const { storyId, entityId } = operation
 
-    // Execute save operation
+    // Execute save operation - use operation.data directly for type narrowing
 
-    switch (type) {
+    switch (operation.type) {
       case 'message-insert': {
         // For inserts, we need to know where to insert the message
-        // The data should contain the afterMessageId and sceneId
-        const insertData = data as Message & { afterMessageId?: string | null }
-        const sceneId = insertData.sceneId
+        const sceneId = operation.data.sceneId
         if (!sceneId) {
           throw new Error('sceneId is required to insert a message')
         }
@@ -387,10 +632,10 @@ export class SaveService {
         const insertResponse = await postMyScenesBySceneIdMessages({
           path: { sceneId },
           body: {
-            id: insertData.id,
-            instruction: insertData.instruction,
-            script: insertData.script,
-            sortOrder: insertData.order,
+            id: operation.data.id,
+            instruction: operation.data.instruction,
+            script: operation.data.script,
+            sortOrder: operation.data.order,
           } as { instruction?: string; script?: string; sortOrder?: number; id?: string },
         })
         // Message inserted
@@ -399,8 +644,8 @@ export class SaveService {
 
           // If the message has content, create paragraphs for it (split on double newlines)
           const revisionId = insertResponse.data.message.currentMessageRevisionId
-          if (revisionId && insertData.content) {
-            const paragraphTexts = insertData.content
+          if (revisionId && operation.data.content) {
+            const paragraphTexts = operation.data.content
               .split(/\n\n+/)
               .map((p) => p.trim())
               .filter((p) => p.length > 0)
@@ -427,13 +672,14 @@ export class SaveService {
       case 'message-update': {
         // Update message metadata using new endpoint
         // Note: content/paragraphs are saved separately via saveParagraphs()
-        const updateData = data as Partial<Message>
+        // Map sceneId to nodeId for the backend API
         const updateResponse = await patchMyMessagesById({
           path: { id: entityId },
           body: {
-            instruction: updateData.instruction,
-            script: updateData.script,
-            sortOrder: updateData.order,
+            instruction: operation.data.instruction,
+            script: operation.data.script,
+            sortOrder: operation.data.order,
+            nodeId: operation.data.sceneId, // sceneId on frontend = nodeId on backend
           },
         })
         // Message updated
@@ -453,8 +699,7 @@ export class SaveService {
 
       case 'message-reorder': {
         // Map sceneId to nodeId for the API
-        const reorderData = data as { items: Array<{ messageId: string; sceneId: string; order: number }> }
-        const items = reorderData.items.map((item) => ({
+        const items = operation.data.items.map((item) => ({
           messageId: item.messageId,
           nodeId: item.sceneId,
           order: item.order,
@@ -469,15 +714,26 @@ export class SaveService {
         break
       }
 
+      case 'message-batch': {
+        const { postMyStoriesByStoryIdMessagesBatch } = await import('../client/config')
+        const batchResult = await postMyStoriesByStoryIdMessagesBatch({
+          path: { storyId },
+          body: { messages: operation.data.messages },
+        })
+        if (batchResult.error) {
+          throw new Error(batchResult.error.error || 'Batch save failed')
+        }
+        break
+      }
+
       case 'chapter-update': {
-        const chapterData = data as Partial<Chapter>
         await patchMyChaptersById({
           path: { id: entityId },
           body: {
-            name: chapterData.title,
-            summary: chapterData.summary,
-            sortOrder: chapterData.order,
-            nodeType: chapterData.nodeType,
+            name: operation.data.title,
+            summary: operation.data.summary,
+            sortOrder: operation.data.order,
+            nodeType: operation.data.nodeType,
           },
         })
         break
@@ -488,36 +744,34 @@ export class SaveService {
         break
 
       case 'character-insert': {
-        const characterData = data as Character
         await postMyStoriesByStoryIdCharacters({
           path: { storyId },
           body: {
-            firstName: characterData.firstName,
-            lastName: characterData.lastName || undefined,
-            middleName: characterData.middleName || undefined,
-            nickname: characterData.nickname || undefined,
-            description: characterData.description || undefined,
-            birthdate: characterData.birthdate ?? undefined,
-            isMainCharacter: characterData.isMainCharacter,
-            pictureFileId: characterData.pictureFileId || undefined,
+            firstName: operation.data.firstName,
+            lastName: operation.data.lastName || undefined,
+            middleName: operation.data.middleName || undefined,
+            nickname: operation.data.nickname || undefined,
+            description: operation.data.description || undefined,
+            birthdate: operation.data.birthdate ?? undefined,
+            isMainCharacter: operation.data.isMainCharacter,
+            pictureFileId: operation.data.pictureFileId || undefined,
           },
         })
         break
       }
 
       case 'character-update': {
-        const characterData = data as Partial<Character>
         await patchMyCharactersById({
           path: { id: entityId },
           body: {
-            firstName: characterData.firstName,
-            lastName: characterData.lastName,
-            middleName: characterData.middleName,
-            nickname: characterData.nickname,
-            description: characterData.description,
-            birthdate: characterData.birthdate ?? undefined,
-            isMainCharacter: characterData.isMainCharacter,
-            pictureFileId: characterData.pictureFileId,
+            firstName: operation.data.firstName,
+            lastName: operation.data.lastName,
+            middleName: operation.data.middleName,
+            nickname: operation.data.nickname,
+            description: operation.data.description,
+            birthdate: operation.data.birthdate ?? undefined,
+            isMainCharacter: operation.data.isMainCharacter,
+            pictureFileId: operation.data.pictureFileId,
           },
         })
         break
@@ -528,28 +782,26 @@ export class SaveService {
         break
 
       case 'context-insert': {
-        const contextData = data as ContextItem
         await postMyStoriesByStoryIdContextItems({
           path: { storyId },
           body: {
-            type: contextData.type,
-            name: contextData.name,
-            description: contextData.description,
-            isGlobal: contextData.isGlobal,
+            type: operation.data.type,
+            name: operation.data.name,
+            description: operation.data.description,
+            isGlobal: operation.data.isGlobal,
           },
         })
         break
       }
 
       case 'context-update': {
-        const contextData = data as Partial<ContextItem>
         await patchMyContextItemsById({
           path: { id: entityId },
           body: {
-            type: contextData.type,
-            name: contextData.name,
-            description: contextData.description,
-            isGlobal: contextData.isGlobal,
+            type: operation.data.type,
+            name: operation.data.name,
+            description: operation.data.description,
+            isGlobal: operation.data.isGlobal,
           },
         })
         break
@@ -560,19 +812,18 @@ export class SaveService {
         break
 
       case 'map-insert': {
-        const mapData = data as StoryMap
         let fileId: string | undefined
 
         // If map has imageData, upload it first
-        if (mapData.imageData) {
+        if (operation.data.imageData) {
           // Convert base64 to blob
-          const base64Data = mapData.imageData.split(',')[1] || mapData.imageData
-          const mimeType = mapData.imageData.match(/data:([^;]+);/)?.[1] || 'image/png'
+          const base64Data = operation.data.imageData.split(',')[1] || operation.data.imageData
+          const mimeType = operation.data.imageData.match(/data:([^;]+);/)?.[1] || 'image/png'
           const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then((r) => r.blob())
 
           // Upload file using multipart/form-data
           const formData = new FormData()
-          formData.append('file', blob, `${mapData.name || 'map'}.png`)
+          formData.append('file', blob, `${operation.data.name || 'map'}.png`)
           if (storyId) {
             formData.append('storyId', storyId)
           }
@@ -596,9 +847,9 @@ export class SaveService {
         await postMyStoriesByStoryIdMaps({
           path: { storyId },
           body: {
-            id: mapData.id,
-            name: mapData.name,
-            borderColor: mapData.borderColor,
+            id: operation.data.id,
+            name: operation.data.name,
+            borderColor: operation.data.borderColor,
             fileId,
           } as { name: string; id?: string; fileId?: string; borderColor?: string },
         })
@@ -606,12 +857,11 @@ export class SaveService {
       }
 
       case 'map-update': {
-        const mapData = data as Partial<StoryMap>
         await putMyMapsById({
           path: { id: entityId },
           body: {
-            name: mapData.name,
-            borderColor: mapData.borderColor,
+            name: operation.data.name,
+            borderColor: operation.data.borderColor,
           },
         })
         break
@@ -622,36 +872,34 @@ export class SaveService {
         break
 
       case 'landmark-insert': {
-        const landmarkData = data as Landmark
         await postMyMapsByMapIdLandmarks({
-          path: { mapId: landmarkData.mapId },
+          path: { mapId: operation.data.mapId },
           body: {
-            x: landmarkData.x,
-            y: landmarkData.y,
-            name: landmarkData.name,
-            description: landmarkData.description,
-            type: landmarkData.type,
-            color: landmarkData.color,
-            size: landmarkData.size,
-            properties: landmarkData.properties,
+            x: operation.data.x,
+            y: operation.data.y,
+            name: operation.data.name,
+            description: operation.data.description,
+            type: operation.data.type,
+            color: operation.data.color,
+            size: operation.data.size,
+            properties: operation.data.properties,
           },
         })
         break
       }
 
       case 'landmark-update': {
-        const landmarkData = data as Landmark
         await putMyLandmarksById({
           path: { id: entityId },
           body: {
-            x: landmarkData.x,
-            y: landmarkData.y,
-            name: landmarkData.name,
-            description: landmarkData.description,
-            type: landmarkData.type,
-            color: landmarkData.color,
-            size: landmarkData.size,
-            properties: landmarkData.properties,
+            x: operation.data.x,
+            y: operation.data.y,
+            name: operation.data.name,
+            description: operation.data.description,
+            type: operation.data.type,
+            color: operation.data.color,
+            size: operation.data.size,
+            properties: operation.data.properties,
           },
         })
         break
@@ -662,48 +910,47 @@ export class SaveService {
         break
 
       case 'node-insert': {
-        const nodeData = data as Node
-        if (nodeData.type === 'book') {
+        if (operation.data.type === 'book') {
           await postMyStoriesByStoryIdBooks({
             path: { storyId },
             body: {
-              id: nodeData.id, // Pass client-generated ID
-              name: nodeData.title,
-              summary: nodeData.summary || undefined,
-              sortOrder: nodeData.sortOrder || nodeData.order || 0,
+              id: operation.data.id, // Pass client-generated ID
+              name: operation.data.title,
+              summary: operation.data.summary || undefined,
+              sortOrder: operation.data.sortOrder || operation.data.order || 0,
             },
           })
-        } else if (nodeData.type === 'arc') {
+        } else if (operation.data.type === 'arc') {
           await postMyBooksByBookIdArcs({
-            path: { bookId: nodeData.parentId! },
+            path: { bookId: operation.data.parentId! },
             body: {
-              id: nodeData.id, // Pass client-generated ID
-              name: nodeData.title,
-              summary: nodeData.summary || undefined,
-              sortOrder: nodeData.sortOrder || nodeData.order || 0,
+              id: operation.data.id, // Pass client-generated ID
+              name: operation.data.title,
+              summary: operation.data.summary || undefined,
+              sortOrder: operation.data.sortOrder || operation.data.order || 0,
             },
           })
-        } else if (nodeData.type === 'chapter') {
+        } else if (operation.data.type === 'chapter') {
           await postMyArcsByArcIdChapters({
-            path: { arcId: nodeData.parentId! },
+            path: { arcId: operation.data.parentId! },
             body: {
-              id: nodeData.id, // Pass client-generated ID
-              name: nodeData.title,
-              summary: nodeData.summary || undefined,
-              sortOrder: nodeData.sortOrder || nodeData.order || 0,
-              nodeType: nodeData.nodeType || 'story',
+              id: operation.data.id, // Pass client-generated ID
+              name: operation.data.title,
+              summary: operation.data.summary || undefined,
+              sortOrder: operation.data.sortOrder || operation.data.order || 0,
+              nodeType: operation.data.nodeType || 'story',
             },
           })
-        } else if (nodeData.type === 'scene') {
+        } else if (operation.data.type === 'scene') {
           const { postMyChaptersByChapterIdScenes } = await import('../client/config')
           // Note: id is passed for client-side ID generation
           await postMyChaptersByChapterIdScenes({
-            path: { chapterId: nodeData.parentId! },
+            path: { chapterId: operation.data.parentId! },
             body: {
-              id: nodeData.id,
-              name: nodeData.title,
-              summary: nodeData.summary || undefined,
-              sortOrder: nodeData.sortOrder || nodeData.order || 0,
+              id: operation.data.id,
+              name: operation.data.title,
+              summary: operation.data.summary || undefined,
+              sortOrder: operation.data.sortOrder || operation.data.order || 0,
             } as any,
           })
         }
@@ -711,43 +958,42 @@ export class SaveService {
       }
 
       case 'node-update': {
-        const nodeData = data as Partial<Node>
-        if (nodeData.type === 'book') {
+        if (operation.data.type === 'book') {
           await patchMyBooksById({
             path: { id: entityId },
             body: {
-              name: nodeData.title,
-              summary: nodeData.summary,
-              sortOrder: nodeData.sortOrder ?? nodeData.order,
+              name: operation.data.title,
+              summary: operation.data.summary,
+              sortOrder: operation.data.sortOrder ?? operation.data.order,
             },
           })
-        } else if (nodeData.type === 'arc') {
+        } else if (operation.data.type === 'arc') {
           await patchMyArcsById({
             path: { id: entityId },
             body: {
-              name: nodeData.title,
-              summary: nodeData.summary,
-              sortOrder: nodeData.sortOrder ?? nodeData.order,
+              name: operation.data.title,
+              summary: operation.data.summary,
+              sortOrder: operation.data.sortOrder ?? operation.data.order,
             },
           })
-        } else if (nodeData.type === 'chapter') {
+        } else if (operation.data.type === 'chapter') {
           await patchMyChaptersById({
             path: { id: entityId },
             body: {
-              name: nodeData.title,
-              summary: nodeData.summary,
-              sortOrder: nodeData.sortOrder ?? nodeData.order,
-              nodeType: nodeData.nodeType,
+              name: operation.data.title,
+              summary: operation.data.summary,
+              sortOrder: operation.data.sortOrder ?? operation.data.order,
+              nodeType: operation.data.nodeType,
             },
           })
-        } else if (nodeData.type === 'scene') {
+        } else if (operation.data.type === 'scene') {
           const { patchMyScenesById } = await import('../client/config')
           await patchMyScenesById({
             path: { id: entityId },
             body: {
-              name: nodeData.title,
-              summary: nodeData.summary,
-              sortOrder: nodeData.sortOrder ?? nodeData.order,
+              name: operation.data.title,
+              summary: operation.data.summary,
+              sortOrder: operation.data.sortOrder ?? operation.data.order,
             },
           })
         }
@@ -755,15 +1001,14 @@ export class SaveService {
       }
 
       case 'node-delete': {
-        const nodeData = data as Node & { permanent?: boolean }
-        const query = nodeData.permanent ? { permanent: 'true' as const } : undefined
-        if (nodeData.type === 'book') {
+        const query = operation.data.permanent ? { permanent: 'true' as const } : undefined
+        if (operation.data.type === 'book') {
           await deleteMyBooksById({ path: { id: entityId }, query })
-        } else if (nodeData.type === 'arc') {
+        } else if (operation.data.type === 'arc') {
           await deleteMyArcsById({ path: { id: entityId }, query })
-        } else if (nodeData.type === 'chapter') {
+        } else if (operation.data.type === 'chapter') {
           await deleteMyChaptersById({ path: { id: entityId }, query })
-        } else if (nodeData.type === 'scene') {
+        } else if (operation.data.type === 'scene') {
           await deleteMyScenesById({ path: { id: entityId }, query })
         }
         break
@@ -771,8 +1016,7 @@ export class SaveService {
 
       case 'node-bulk-update': {
         // Bulk update needs to be split into individual updates
-        const nodes = data as Node[]
-        for (const node of nodes) {
+        for (const node of operation.data) {
           if (node.type === 'book') {
             await patchMyBooksById({
               path: { id: node.id },
@@ -817,12 +1061,9 @@ export class SaveService {
       }
 
       case 'node-reorder': {
-        const reorderData = data as {
-          items: Array<{ nodeId: string; nodeType: 'book' | 'arc' | 'chapter' | 'scene'; parentId: string | null; order: number }>
-        }
         const { data: reorderResponse } = await postMyStoriesByStoryIdNodesReorder({
           path: { storyId },
-          body: { items: reorderData.items },
+          body: { items: operation.data.items },
         })
         if (reorderResponse?.updatedAt) {
           this.updateLastKnownTimestamp(reorderResponse.updatedAt)
@@ -837,7 +1078,7 @@ export class SaveService {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               storyId,
-              ...data,
+              ...operation.data,
             }),
           })
           .then((res) => res.json())
@@ -846,7 +1087,7 @@ export class SaveService {
       }
 
       case 'landmark-state': {
-        const { landmarkId, storyTime, field, value } = data
+        const { landmarkId, storyTime, field, value } = operation.data
         await postMyLandmarksByLandmarkIdStates({
           path: { landmarkId },
           body: { storyTime, field, value },
@@ -856,38 +1097,36 @@ export class SaveService {
       }
 
       case 'fleet-insert': {
-        const fleetData = data as Fleet
         // Fleet → Pawn migration: hyperdriveRating → speed
         await postMyMapsByMapIdPawns({
-          path: { mapId: fleetData.mapId },
+          path: { mapId: operation.data.mapId },
           body: {
-            name: fleetData.name,
-            description: fleetData.description,
-            designation: fleetData.designation,
-            speed: fleetData.hyperdriveRating, // Map hyperdriveRating to speed
-            defaultX: fleetData.defaultX,
-            defaultY: fleetData.defaultY,
-            color: fleetData.color,
-            size: fleetData.size,
+            name: operation.data.name,
+            description: operation.data.description,
+            designation: operation.data.designation,
+            speed: operation.data.hyperdriveRating, // Map hyperdriveRating to speed
+            defaultX: operation.data.defaultX,
+            defaultY: operation.data.defaultY,
+            color: operation.data.color,
+            size: operation.data.size,
           },
         })
         break
       }
 
       case 'fleet-update': {
-        const fleetData = data as Partial<Fleet>
         // Fleet → Pawn migration: hyperdriveRating → speed
         await putMyPawnsById({
           path: { id: entityId },
           body: {
-            name: fleetData.name,
-            description: fleetData.description,
-            designation: fleetData.designation,
-            speed: fleetData.hyperdriveRating, // Map hyperdriveRating to speed
-            defaultX: fleetData.defaultX,
-            defaultY: fleetData.defaultY,
-            color: fleetData.color,
-            size: fleetData.size,
+            name: operation.data.name,
+            description: operation.data.description,
+            designation: operation.data.designation,
+            speed: operation.data.hyperdriveRating, // Map hyperdriveRating to speed
+            defaultX: operation.data.defaultX,
+            defaultY: operation.data.defaultY,
+            color: operation.data.color,
+            size: operation.data.size,
           },
         })
         break
@@ -900,9 +1139,9 @@ export class SaveService {
       case 'fleet-movement-insert': {
         const movementCreateResponse = await apiClient.createFleetMovement(
           storyId,
-          data.mapId,
-          data.fleetId,
-          data as FleetMovement,
+          operation.data.mapId,
+          operation.data.fleetId,
+          operation.data,
         )
         this.updateLastKnownTimestamp(movementCreateResponse.updatedAt)
         break
@@ -911,28 +1150,32 @@ export class SaveService {
       case 'fleet-movement-update': {
         const movementUpdateResponse = await apiClient.updateFleetMovement(
           storyId,
-          data.mapId,
-          data.fleetId,
+          operation.data.mapId,
+          operation.data.fleetId,
           entityId,
-          data as FleetMovement,
+          operation.data,
         )
         this.updateLastKnownTimestamp(movementUpdateResponse.updatedAt)
         break
       }
 
       case 'fleet-movement-delete': {
-        const movementDeleteResponse = await apiClient.deleteFleetMovement(storyId, data.mapId, data.fleetId, entityId)
+        const movementDeleteResponse = await apiClient.deleteFleetMovement(
+          storyId,
+          operation.data.mapId,
+          operation.data.fleetId,
+          entityId,
+        )
         this.updateLastKnownTimestamp(movementDeleteResponse.updatedAt)
         break
       }
 
       case 'hyperlane-insert': {
-        const hyperlaneData = data as Hyperlane
         // Hyperlane → Path migration
         await postMyMapsByMapIdPaths({
-          path: { mapId: hyperlaneData.mapId },
+          path: { mapId: operation.data.mapId },
           body: {
-            speedMultiplier: hyperlaneData.speedMultiplier,
+            speedMultiplier: operation.data.speedMultiplier,
           },
         })
         // TODO: PathSegments need to be created separately - segments not yet migrated
@@ -940,12 +1183,11 @@ export class SaveService {
       }
 
       case 'hyperlane-update': {
-        const hyperlaneData = data as Partial<Hyperlane>
         // Hyperlane → Path migration
         await putMyPathsById({
           path: { id: entityId },
           body: {
-            speedMultiplier: hyperlaneData.speedMultiplier,
+            speedMultiplier: operation.data.speedMultiplier,
           },
         })
         break
@@ -956,7 +1198,7 @@ export class SaveService {
         break
 
       case 'story-settings': {
-        console.log('[SaveService] Saving story settings:', data)
+        console.log('[SaveService] Saving story settings:', operation.data)
         // Map frontend values to backend enum values
         const perspectiveMap: Record<string, 'FIRST' | 'SECOND' | 'THIRD'> = {
           first: 'FIRST',
@@ -969,23 +1211,24 @@ export class SaveService {
         }
         // Build the body, including plotPointDefaults which may not be in generated types yet
         const updateBody: Record<string, unknown> = {
-          name: data.name,
-          genre: data.storySetting, // storySetting is the genre (fantasy, sci-fi, etc.)
-          defaultPerspective: data.person ? perspectiveMap[data.person] : undefined,
-          defaultTense: data.tense ? tenseMap[data.tense] : undefined,
-          paragraphsPerTurn: data.paragraphsPerTurn,
-          timelineStartTime: data.timelineStartTime,
-          timelineEndTime: data.timelineEndTime,
-          timelineGranularity: data.timelineGranularity,
-          provider: data.provider,
-          model: data.model,
-          globalScript: data.globalScript,
-          selectedNodeId: data.selectedNodeId,
-          branchChoices: data.branchChoices,
+          name: operation.data.name,
+          genre: operation.data.storySetting, // storySetting is the genre (fantasy, sci-fi, etc.)
+          defaultPerspective: operation.data.person ? perspectiveMap[operation.data.person] : undefined,
+          defaultTense: operation.data.tense ? tenseMap[operation.data.tense] : undefined,
+          format: operation.data.format, // format is stored as-is (narrative or cyoa)
+          paragraphsPerTurn: operation.data.paragraphsPerTurn,
+          timelineStartTime: operation.data.timelineStartTime,
+          timelineEndTime: operation.data.timelineEndTime,
+          timelineGranularity: operation.data.timelineGranularity,
+          provider: operation.data.provider,
+          model: operation.data.model,
+          globalScript: operation.data.globalScript,
+          selectedNodeId: operation.data.selectedNodeId,
+          branchChoices: operation.data.branchChoices,
         }
         // Add plotPointDefaults if present (type will be updated when API client is regenerated)
-        if (data.plotPointDefaults !== undefined) {
-          updateBody.plotPointDefaults = data.plotPointDefaults
+        if (operation.data.plotPointDefaults !== undefined) {
+          updateBody.plotPointDefaults = operation.data.plotPointDefaults
         }
         const settingsResponse = await patchMyStoriesById({
           path: { id: storyId },
@@ -1001,8 +1244,11 @@ export class SaveService {
         break
       }
 
-      default:
-        console.warn('Unknown operation type:', type)
+      default: {
+        // Exhaustive check - this should never be reached
+        const _exhaustive: never = operation
+        console.warn('Unknown operation type:', _exhaustive)
+      }
     }
   }
 
@@ -1733,10 +1979,10 @@ export class SaveService {
   /**
    * Batch create messages with their paragraphs in a single API call.
    * This is much more efficient than creating messages one by one.
+   * Uses the save queue to ensure proper ordering with other operations.
    *
    * @param storyId - The story ID
    * @param messages - Array of messages to create with their content
-   * @returns Promise with the created message IDs
    */
   async saveMessagesBatch(
     storyId: string,
@@ -1748,22 +1994,7 @@ export class SaveService {
       script?: string
       content?: string // Will be split into paragraphs
     }>,
-  ): Promise<{ created: number; messageIds: string[] }> {
-    // Check if this is a local story - if so, skip (handled elsewhere)
-    if (currentStoryStore.storageMode === 'local') {
-      console.log('[SaveService] Local storage mode, batch save not applicable')
-      return { created: 0, messageIds: [] }
-    }
-
-    // Don't batch save during a full save
-    if (this.state.isFullSaveInProgress) {
-      console.log('[SaveService] Full save in progress, skipping batch save')
-      return { created: 0, messageIds: [] }
-    }
-
-    // Import the batch endpoint
-    const { postMyStoriesByStoryIdMessagesBatch } = await import('../client/config')
-
+  ): Promise<void> {
     // Transform messages to API format, splitting content into paragraphs
     const batchMessages = messages.map((msg) => {
       // Split content into paragraphs (double newline separation)
@@ -1782,30 +2013,29 @@ export class SaveService {
         id: msg.id,
         sceneId: msg.sceneId,
         sortOrder: msg.sortOrder,
-        instruction: msg.instruction,
-        script: msg.script,
+        instruction: msg.instruction ?? null,
+        script: msg.script ?? null,
         paragraphs,
       }
     })
 
-    console.log(`[SaveService] Batch creating ${batchMessages.length} messages`)
-
-    const result = await postMyStoriesByStoryIdMessagesBatch({
-      path: { storyId },
-      body: { messages: batchMessages },
+    console.log('[saveService.saveMessagesBatch] Queuing batch save:', {
+      messageCount: batchMessages.length,
+      messagesWithInstructions: batchMessages.filter(m => m.instruction).length,
+      sampleMessage: batchMessages[0] ? {
+        hasInstruction: !!batchMessages[0].instruction,
+        instruction: batchMessages[0].instruction,
+      } : null,
     })
 
-    if (result.error) {
-      console.error('[SaveService] Batch save failed:', result.error)
-      throw new Error(result.error.error || 'Batch save failed')
-    }
-
-    console.log(`[SaveService] Batch created ${result.data?.created} messages`)
-
-    return {
-      created: result.data?.created ?? 0,
-      messageIds: result.data?.messageIds ?? [],
-    }
+    // Queue the batch operation - it will be processed in order after any pending operations
+    await this.queueSave({
+      type: 'message-batch',
+      entityType: 'message',
+      entityId: `batch-${Date.now()}`,
+      storyId,
+      data: { messages: batchMessages },
+    })
   }
 
   // Get current save status
@@ -1817,6 +2047,7 @@ export class SaveService {
       isFullSaveInProgress: this.state.isFullSaveInProgress,
     }
   }
+
 }
 
 // Create singleton instance
