@@ -1,4 +1,4 @@
-import { keyframes, style } from '@vanilla-extract/css'
+import { style } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
 
 // Main app layout
@@ -27,35 +27,6 @@ export const desktopNavigation = style({
   overflow: 'hidden',
 })
 
-const slideInFromLeft = keyframes({
-  from: { transform: 'translateX(-100%)' },
-  to: { transform: 'translateX(0)' },
-})
-
-export const mobileNavigation = style({
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '85vw',
-  maxWidth: '400px',
-  height: '100vh',
-  background: tokens.color.bg.raised,
-  zIndex: 900,
-  boxShadow: '4px 0 20px rgba(0, 0, 0, 0.3)',
-  overflow: 'hidden',
-  animation: `${slideInFromLeft} 0.2s ease-out`,
-})
-
-export const mobileNavBackdrop = style({
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  background: 'rgba(0, 0, 0, 0.5)',
-  zIndex: 899,
-})
-
 export const desktopEpisodeViewer = style({
   width: '400px',
   flexShrink: 0,
@@ -70,8 +41,6 @@ export const chatContainer = style({
   flexDirection: 'column',
   overflow: 'hidden',
   background: tokens.color.bg.base,
-  maxWidth: '60rem',
-  margin: '0 auto',
 })
 
 // Loading states

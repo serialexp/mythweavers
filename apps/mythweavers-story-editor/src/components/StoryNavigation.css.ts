@@ -237,10 +237,15 @@ export const footer = style({
   background: tokens.color.bg.elevated,
 })
 
-export const footerButtons = style({
+export const footerButtonsGrid = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['2'],
+})
+
+export const footerRow = style({
   display: 'flex',
   gap: tokens.space['2'],
-  flexWrap: 'wrap',
 })
 
 export const tokenEstimate = style({
@@ -325,4 +330,47 @@ export const dragPreview = style({
 
 export const childrenContainer = style({
   marginLeft: tokens.space['1'],
+})
+
+// Preset buttons container
+export const presetButtons = style({
+  display: 'flex',
+  gap: tokens.space['1'],
+  marginLeft: 'auto',
+})
+
+// Individual preset button
+export const presetButton = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: tokens.space['1'],
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  background: tokens.color.bg.raised,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.default,
+  cursor: 'pointer',
+  color: tokens.color.text.secondary,
+  fontSize: tokens.font.size.sm,
+  transition: 'all 0.2s',
+  minWidth: '48px',
+
+  ':hover': {
+    background: tokens.color.surface.hover,
+    borderColor: tokens.color.accent.primary,
+    color: tokens.color.text.primary,
+  },
+})
+
+// Preset button when it has stored settings
+export const presetButtonStored = style({
+  background: 'rgba(34, 197, 94, 0.15)',
+  borderColor: '#22c55e',
+  color: '#22c55e',
+
+  ':hover': {
+    background: 'rgba(34, 197, 94, 0.25)',
+    borderColor: '#22c55e',
+    color: '#22c55e',
+  },
 })

@@ -1,4 +1,5 @@
 import {
+  BsArrowCounterclockwise,
   BsArrowDown,
   BsArrowUp,
   BsBook,
@@ -15,6 +16,7 @@ import {
   BsPeople,
   BsPlusCircle,
   BsScissors,
+  BsSave,
   BsThreeDots,
   BsTrash,
 } from 'solid-icons/bs'
@@ -24,6 +26,7 @@ import { Dropdown, DropdownItem } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { useOllama } from '../hooks/useOllama'
 import { copyPreviewStore } from '../stores/copyPreviewStore'
+import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { navigationStore } from '../stores/navigationStore'
@@ -1101,12 +1104,102 @@ interface StoryNavigationProps {
   onSelectChapter?: () => void
 }
 
+// Type for storing includeInFull presets
+interface IncludePreset {
+  settings: Record<string, number> // nodeId -> includeInFull value
+}
+
 export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   let treeContainerRef: HTMLDivElement | undefined
   const [showCharacterUpdateModal, setShowCharacterUpdateModal] = createSignal(false)
   const [showContextItemGenerateModal, setShowContextItemGenerateModal] = createSignal(false)
   const [showSplitSceneModal, setShowSplitSceneModal] = createSignal(false)
   const [splitTargetNodeId, setSplitTargetNodeId] = createSignal<string | null>(null)
+
+  // LocalStorage key for presets (per-story)
+  const getPresetsKey = () => `story-presets-${currentStoryStore.id}`
+
+  // Load presets from localStorage
+  const loadPresetsFromStorage = (): (IncludePreset | null)[] => {
+    try {
+      const stored = localStorage.getItem(getPresetsKey())
+      if (stored) {
+        return JSON.parse(stored)
+      }
+    } catch (e) {
+      console.error('Failed to load presets from localStorage:', e)
+    }
+    return [null, null, null]
+  }
+
+  // Save presets to localStorage
+  const savePresetsToStorage = (presetsData: (IncludePreset | null)[]) => {
+    try {
+      localStorage.setItem(getPresetsKey(), JSON.stringify(presetsData))
+    } catch (e) {
+      console.error('Failed to save presets to localStorage:', e)
+    }
+  }
+
+  // Preset state for includeInFull settings (3 slots)
+  const [presets, setPresets] = createSignal<(IncludePreset | null)[]>(loadPresetsFromStorage())
+
+  // Reload presets when story changes
+  createEffect(() => {
+    // Track story ID to reload presets when it changes
+    const storyId = currentStoryStore.id
+    if (storyId) {
+      setPresets(loadPresetsFromStorage())
+    }
+  })
+
+  // Save current includeInFull settings to a preset slot
+  const savePreset = (slotIndex: number) => {
+    const settings: Record<string, number> = {}
+    for (const node of nodeStore.nodesArray) {
+      if (node.type === 'scene' && node.includeInFull !== undefined) {
+        settings[node.id] = node.includeInFull
+      }
+    }
+    setPresets((prev) => {
+      const next = [...prev]
+      next[slotIndex] = { settings }
+      savePresetsToStorage(next)
+      return next
+    })
+  }
+
+  // Restore includeInFull settings from a preset slot
+  const restorePreset = (slotIndex: number) => {
+    const preset = presets()[slotIndex]
+    if (!preset) return
+
+    // Apply stored settings to nodes
+    for (const [nodeId, includeValue] of Object.entries(preset.settings)) {
+      const node = nodeStore.nodes[nodeId]
+      if (node && node.type === 'scene') {
+        nodeStore.updateNode(nodeId, { includeInFull: includeValue })
+      }
+    }
+
+    // Clear the preset after restoring
+    setPresets((prev) => {
+      const next = [...prev]
+      next[slotIndex] = null
+      savePresetsToStorage(next)
+      return next
+    })
+  }
+
+  // Toggle preset: save if empty, restore if stored
+  const togglePreset = (slotIndex: number) => {
+    const preset = presets()[slotIndex]
+    if (preset) {
+      restorePreset(slotIndex)
+    } else {
+      savePreset(slotIndex)
+    }
+  }
 
   const handleSplitScene = (nodeId: string) => {
     setSplitTargetNodeId(nodeId)
@@ -1330,19 +1423,42 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
               })()}
             </Show>
 
-            <div class={styles.footerButtons}>
-              <button class={styles.addButton} onClick={handleCopyTreeMarkdown}>
-                <BsDiagram3 /> Copy Tree as Markdown
-              </button>
-              <button class={styles.addButton} onClick={() => setShowCharacterUpdateModal(true)}>
-                <BsPeople /> Update Character
-              </button>
-              <button class={styles.addButton} onClick={() => setShowContextItemGenerateModal(true)}>
-                <BsFileText /> Generate Context
-              </button>
-              <button class={styles.addButton} onClick={handleAddBook}>
-                <BsPlusCircle /> Add Book
-              </button>
+            <div class={styles.footerButtonsGrid}>
+              <div class={styles.footerRow}>
+                <button class={styles.addButton} onClick={handleCopyTreeMarkdown} title="Copy Tree as Markdown">
+                  <BsDiagram3 /> Copy Tree
+                </button>
+                <button class={styles.addButton} onClick={() => setShowCharacterUpdateModal(true)} title="Update Character">
+                  <BsPeople /> Update Char
+                </button>
+                <button class={styles.addButton} onClick={() => setShowContextItemGenerateModal(true)} title="Generate Context Item">
+                  <BsFileText /> Gen Context
+                </button>
+              </div>
+              <div class={styles.footerRow}>
+                <button class={styles.addButton} onClick={handleAddBook}>
+                  <BsPlusCircle /> Add Book
+                </button>
+
+                {/* Preset buttons for includeInFull settings */}
+                <div class={styles.presetButtons}>
+                  <For each={[0, 1, 2]}>
+                    {(slotIndex) => {
+                      const hasPreset = () => presets()[slotIndex] !== null
+                      return (
+                        <button
+                          class={`${styles.presetButton} ${hasPreset() ? styles.presetButtonStored : ''}`}
+                          onClick={() => togglePreset(slotIndex)}
+                          title={hasPreset() ? `Restore preset ${slotIndex + 1}` : `Save current context to preset ${slotIndex + 1}`}
+                        >
+                          {hasPreset() ? <BsArrowCounterclockwise /> : <BsSave />}
+                          <span>{slotIndex + 1}</span>
+                        </button>
+                      )
+                    }}
+                  </For>
+                </div>
+              </div>
             </div>
           </div>
         </Show>

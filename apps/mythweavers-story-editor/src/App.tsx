@@ -38,7 +38,6 @@ import { globalOperationStore } from './stores/globalOperationStore'
 import { headerStore } from './stores/headerStore'
 import { mapsStore } from './stores/mapsStore'
 import { messagesStore } from './stores/messagesStore'
-import { navigationStore } from './stores/navigationStore'
 import { plotPointsStore } from './stores/plotPointsStore'
 import { modelsStore } from './stores/modelsStore'
 import { nodeStore } from './stores/nodeStore'
@@ -47,7 +46,8 @@ import { serverStore } from './stores/serverStore'
 import { settingsStore } from './stores/settingsStore'
 import { ApiStory } from './types/api'
 import { Chapter, Character, ContextItem, Message, Node } from './types/core'
-import { importClaudeChat } from './utils/claudeChatImporter'
+import type { BranchConversionResult } from './utils/claudeChatImport'
+import { importClaudeChat, importClaudeChatWithBranches } from './utils/claudeChatImporter'
 import { migrateChaptersToScenes, needsSceneMigration } from './utils/scenesMigration'
 import { storyManager } from './utils/storyManager'
 
@@ -858,6 +858,26 @@ const App: Component = () => {
     }
   }
 
+  const handleImportClaudeChatWithBranches = async (
+    conversationName: string,
+    branchData: BranchConversionResult,
+    importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => {
+    const { storyId } = await importClaudeChatWithBranches({
+      conversationName,
+      segments: branchData.segments,
+      branchChoices: branchData.branchChoices,
+      importTarget,
+      storageMode,
+    })
+
+    // Navigate to the story if we created a new one
+    if (importTarget === 'new') {
+      window.location.href = `/story/${storyId}`
+    }
+  }
+
   const handleLoadStory = (
     messages: Message[],
     characters: Character[],
@@ -1222,6 +1242,7 @@ const App: Component = () => {
                           onExportStory={handleExportStory}
                           onImportStory={handleImportStory}
                           onImportClaudeChat={handleImportClaudeChat}
+                          onImportClaudeChatWithBranches={handleImportClaudeChatWithBranches}
                           serverAvailable={serverStore.isAvailable}
                           isGenerating={isGenerating() || ollamaExternallyBusy()}
                           contextSize={effectiveContextSize()}
@@ -1236,21 +1257,6 @@ const App: Component = () => {
                             </div>
                           </Show>
 
-                          {/* Mobile: Overlay sidebar - controlled independently by navigationStore */}
-                          <Show when={isMobile() && navigationStore.showNavigation}>
-                            <div
-                              class={styles.mobileNavBackdrop}
-                              onClick={() => navigationStore.setShowNavigation(false)}
-                            />
-                            <div class={styles.mobileNavigation}>
-                              <StoryNavigation
-                                onSelectChapter={() => {
-                                  // Auto-close sidebar on mobile when selecting a scene
-                                  navigationStore.setShowNavigation(false)
-                                }}
-                              />
-                            </div>
-                          </Show>
                           <main class={styles.chatContainer}>
                             <Show
                               when={(() => {
