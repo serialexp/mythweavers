@@ -1,4 +1,4 @@
-import { style } from '@vanilla-extract/css'
+import { globalStyle, style } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
 
 export const modalContent = style({
@@ -42,6 +42,19 @@ export const noContextWarning = style({
   backgroundColor: tokens.color.bg.raised,
   borderRadius: tokens.radius.default,
   border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+})
+
+export const validationWarning = style({
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: tokens.space['2'],
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  fontSize: tokens.font.size.xs,
+  color: '#f59e0b', // amber warning color
+  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.default} solid rgba(245, 158, 11, 0.3)`,
+  marginBottom: tokens.space['2'],
 })
 
 export const formSection = style({
@@ -209,12 +222,10 @@ export const characterCheckbox = style({
   ':hover': {
     backgroundColor: tokens.color.bg.elevated,
   },
+})
 
-  selectors: {
-    '& input': {
-      cursor: 'pointer',
-    },
-  },
+globalStyle(`${characterCheckbox} input`, {
+  cursor: 'pointer',
 })
 
 export const resultsContainer = style({
@@ -308,4 +319,103 @@ export const errorBadge = style({
   padding: `${tokens.space['0.5']} ${tokens.space['2']}`,
   backgroundColor: 'rgba(239, 68, 68, 0.15)',
   borderRadius: tokens.radius.default,
+})
+
+// Proposal sections for plot points and state changes
+export const proposalSection = style({
+  marginTop: tokens.space['3'],
+  padding: tokens.space['3'],
+  backgroundColor: tokens.color.bg.elevated,
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+})
+
+export const proposalHeader = style({
+  fontSize: tokens.font.size.sm,
+  fontWeight: tokens.font.weight.semibold,
+  color: tokens.color.text.primary,
+  marginBottom: tokens.space['2'],
+})
+
+export const proposalList = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['2'],
+})
+
+export const proposalItem = style({
+  padding: tokens.space['2'],
+  backgroundColor: tokens.color.bg.base,
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.subtle}`,
+})
+
+export const proposalItemWarning = style({
+  borderColor: '#f59e0b',
+  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+})
+
+export const proposalItemHeader = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  marginBottom: tokens.space['1'],
+})
+
+export const proposalKey = style({
+  fontSize: tokens.font.size.sm,
+  fontWeight: tokens.font.weight.medium,
+  color: tokens.color.text.primary,
+  backgroundColor: tokens.color.bg.raised,
+  padding: `${tokens.space['0.5']} ${tokens.space['1']}`,
+  borderRadius: tokens.radius.sm,
+})
+
+export const proposalBadgeNew = style({
+  fontSize: tokens.font.size.xs,
+  fontWeight: tokens.font.weight.medium,
+  color: '#3b82f6',
+  padding: `${tokens.space['0.5']} ${tokens.space['1']}`,
+  backgroundColor: 'rgba(59, 130, 246, 0.15)',
+  borderRadius: tokens.radius.default,
+})
+
+export const proposalBadgeExtend = style({
+  fontSize: tokens.font.size.xs,
+  fontWeight: tokens.font.weight.medium,
+  color: '#8b5cf6',
+  padding: `${tokens.space['0.5']} ${tokens.space['1']}`,
+  backgroundColor: 'rgba(139, 92, 246, 0.15)',
+  borderRadius: tokens.radius.default,
+})
+
+export const proposalOptions = style({
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.secondary,
+})
+
+export const proposalDefault = style({
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+})
+
+export const proposalValue = style({
+  fontSize: tokens.font.size.sm,
+  color: '#22c55e',
+  fontWeight: tokens.font.weight.medium,
+})
+
+export const proposalMessageRef = style({
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+  marginTop: tokens.space['1'],
+  fontStyle: 'italic',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+})
+
+export const proposalWarning = style({
+  color: '#f59e0b',
+  fontStyle: 'normal',
 })

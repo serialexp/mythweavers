@@ -7,10 +7,17 @@ import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { plotPointsStore } from '../stores/plotPointsStore'
 import { getCharacterDisplayName } from '../utils/character'
-import { buildNodeMarkdown } from '../utils/nodeContentExport'
+import { buildMarkedNodesMarkdown, getMarkedNodesContent } from '../utils/nodeContentExport'
 import { getTemplatePreview } from '../utils/scriptEngine'
-import { estimateTemplateChangeTokens, generateTemplateChange, type TokenEstimateResult } from '../utils/templateAI'
+import {
+  estimateTemplateChangeTokens,
+  generateTemplateWithPlotPoints,
+  type PlotPointProposal,
+  type StateProposal,
+  type TokenEstimateResult,
+} from '../utils/templateAI'
 import * as styles from './CharacterUpdateModal.css'
 
 interface CharacterUpdateModalProps {
@@ -24,6 +31,9 @@ interface CharacterResult {
   characterName: string
   originalDescription: string
   proposedDescription: string | null
+  proposedPlotPoints: PlotPointProposal[]
+  proposedStateChanges: StateProposal[]
+  validationWarning?: string | null
   error: string | null
   accepted: boolean
 }
@@ -38,36 +48,27 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
   const [isEstimating, setIsEstimating] = createSignal(false)
   const contextMessageId = useContextMessage()
 
-  // Get nodes marked for full content (includeInFull === 2)
-  const fullContentNodes = createMemo(() => {
-    return nodeStore.nodesArray
-      .filter((node) => node.includeInFull === 2)
-      .sort((a, b) => a.order - b.order)
-  })
+  // Get marked nodes content using shared utility
+  const markedNodes = createMemo(() => getMarkedNodesContent())
 
-  // Get nodes marked for summary (includeInFull === 1)
-  const summaryNodes = createMemo(() => {
-    return nodeStore.nodesArray
-      .filter((node) => node.includeInFull === 1 && node.summary)
-      .sort((a, b) => a.order - b.order)
-  })
-
-  // Check if we have any context nodes
-  const hasContextNodes = createMemo(() => fullContentNodes().length > 0 || summaryNodes().length > 0)
+  // Derived memos for UI display
+  const fullContentNodes = createMemo(() => markedNodes().filter((n) => n.isFullContent))
+  const summaryNodes = createMemo(() => markedNodes().filter((n) => !n.isFullContent))
+  const hasContextNodes = createMemo(() => markedNodes().length > 0)
 
   // Get characters that are active in any of the context nodes
   const availableCharacters = createMemo(() => {
-    const fullNodes = fullContentNodes()
-    const summNodes = summaryNodes()
-    if (fullNodes.length === 0 && summNodes.length === 0) {
+    const nodes = markedNodes()
+    if (nodes.length === 0) {
       // Fallback to all characters if no context nodes
       return charactersStore.characters
     }
 
     // Collect all active character IDs from context nodes
     const activeCharacterIds = new Set<string>()
-    for (const node of [...fullNodes, ...summNodes]) {
-      if (node.activeCharacterIds) {
+    for (const markedNode of nodes) {
+      const node = nodeStore.nodes[markedNode.nodeId]
+      if (node?.activeCharacterIds) {
         for (const id of node.activeCharacterIds) {
           activeCharacterIds.add(id)
         }
@@ -82,30 +83,10 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
     return charactersStore.characters.filter((char) => activeCharacterIds.has(char.id))
   })
 
-  // Build combined story content from context nodes
+  // Build combined story content from context nodes using shared utility
   const getStoryContent = () => {
-    const fullNodes = fullContentNodes()
-    const summNodes = summaryNodes()
-    if (fullNodes.length === 0 && summNodes.length === 0) return undefined
-
-    const sections: string[] = []
-
-    // Add full content sections
-    for (const node of fullNodes) {
-      const markdown = buildNodeMarkdown(node.id)
-      if (markdown) {
-        sections.push(`## ${node.title}\n\n${markdown}`)
-      }
-    }
-
-    // Add summary sections
-    for (const node of summNodes) {
-      if (node.summary) {
-        sections.push(`## ${node.title} (Summary)\n\n${node.summary}`)
-      }
-    }
-
-    return sections.length > 0 ? sections.join('\n\n---\n\n') : undefined
+    const content = buildMarkedNodesMarkdown()
+    return content || undefined
   }
 
   // Compute diff between current and proposed description
@@ -236,7 +217,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
 
       try {
         // Get script state
-        let currentResolvedState = {}
+        let currentResolvedState: Record<string, unknown> = {}
         if (messageId) {
           const preview = getTemplatePreview(
             currentDescription,
@@ -248,19 +229,21 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
           currentResolvedState = preview.data
         }
 
-        // Generate new description
-        const newDescription = await generateTemplateChange(
+        // Generate new description with plot point proposals
+        const response = await generateTemplateWithPlotPoints(
           currentDescription,
           currentResolvedState,
           instruction(),
-          storyContent,
+          storyContent!,
+          plotPointsStore.definitions,
         )
 
-        // Validate the new template
-        let validationError: string | null = null
+        // Validate the new template (as a warning, not a blocking error)
+        // Template may reference new plot points that will be created when accepted
+        let validationWarning: string | null = null
         if (messageId) {
           const validationResult = getTemplatePreview(
-            newDescription,
+            response.template,
             messages,
             messageId,
             nodeStore.nodesArray,
@@ -268,19 +251,23 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
           )
 
           if (validationResult.error) {
-            validationError = `Invalid template: ${validationResult.error}`
+            // Only warn - the template may reference plot points that will be created on accept
+            validationWarning = validationResult.error
           }
         }
 
-        // Add result
+        // Add result - always include the proposed description
         setResults((prev) => [
           ...prev,
           {
             characterId,
             characterName,
             originalDescription: currentDescription,
-            proposedDescription: validationError ? null : newDescription,
-            error: validationError,
+            proposedDescription: response.template,
+            proposedPlotPoints: response.plotPoints,
+            proposedStateChanges: response.stateChanges,
+            validationWarning,
+            error: null,
             accepted: false,
           },
         ])
@@ -293,6 +280,8 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
             characterName,
             originalDescription: currentDescription,
             proposedDescription: null,
+            proposedPlotPoints: [],
+            proposedStateChanges: [],
             error: err instanceof Error ? err.message : 'Failed to generate description',
             accepted: false,
           },
@@ -303,10 +292,59 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
     setIsGenerating(false)
   }
 
+  /**
+   * Apply plot point proposals: create new plot points or extend existing enums
+   */
+  const applyPlotPointProposals = (proposals: PlotPointProposal[]) => {
+    for (const proposal of proposals) {
+      if (proposal.isNew) {
+        // Create new plot point
+        plotPointsStore.addDefinition({
+          key: proposal.key,
+          type: 'enum',
+          default: proposal.default || proposal.options[0],
+          options: proposal.options,
+        })
+      } else {
+        // Extend existing enum with new options
+        const existing = plotPointsStore.definitions.find((d) => d.key === proposal.key)
+        if (existing && existing.type === 'enum' && existing.options) {
+          const newOptions = [...existing.options]
+          for (const opt of proposal.options) {
+            if (!newOptions.includes(opt)) {
+              newOptions.push(opt)
+            }
+          }
+          plotPointsStore.updateDefinition(proposal.key, { options: newOptions })
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply state change proposals: set plot point values at specific messages
+   */
+  const applyStateChangeProposals = (stateChanges: StateProposal[]) => {
+    for (const sc of stateChanges) {
+      // Validate message exists
+      const messageExists = messagesStore.messages.some((m) => m.id === sc.messageId)
+      if (messageExists) {
+        plotPointsStore.setStateAtMessage(sc.messageId, sc.key, sc.value)
+      } else {
+        console.warn(`[CharacterUpdateModal] Skipping state change: message ${sc.messageId} not found`)
+      }
+    }
+  }
+
   const handleAcceptResult = (characterId: string) => {
     const result = results().find((r) => r.characterId === characterId)
     if (!result || !result.proposedDescription) return
 
+    // Apply plot point proposals first (so template can reference them)
+    applyPlotPointProposals(result.proposedPlotPoints)
+    applyStateChangeProposals(result.proposedStateChanges)
+
+    // Update character description
     charactersStore.updateCharacter(characterId, { description: result.proposedDescription })
     setResults((prev) => prev.map((r) => (r.characterId === characterId ? { ...r, accepted: true } : r)))
   }
@@ -317,9 +355,36 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
 
   const handleAcceptAll = () => {
     const pendingResults = results().filter((r) => !r.accepted && !r.error && r.proposedDescription)
+
+    // Collect all plot point proposals (dedup by key for new ones)
+    const seenNewKeys = new Set<string>()
+    const allPlotPointProposals: PlotPointProposal[] = []
+    const allStateChanges: StateProposal[] = []
+
+    for (const result of pendingResults) {
+      for (const pp of result.proposedPlotPoints) {
+        if (pp.isNew) {
+          if (!seenNewKeys.has(pp.key)) {
+            seenNewKeys.add(pp.key)
+            allPlotPointProposals.push(pp)
+          }
+        } else {
+          // Extensions can be duplicated (will merge options)
+          allPlotPointProposals.push(pp)
+        }
+      }
+      allStateChanges.push(...result.proposedStateChanges)
+    }
+
+    // Apply all plot point proposals
+    applyPlotPointProposals(allPlotPointProposals)
+    applyStateChangeProposals(allStateChanges)
+
+    // Update all character descriptions
     for (const result of pendingResults) {
       charactersStore.updateCharacter(result.characterId, { description: result.proposedDescription! })
     }
+
     setResults((prev) => prev.map((r) => (r.proposedDescription && !r.error ? { ...r, accepted: true } : r)))
   }
 
@@ -546,6 +611,13 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
                     </div>
                   </Show>
 
+                  <Show when={result.validationWarning && !result.error}>
+                    <div class={styles.validationWarning}>
+                      <BsExclamationTriangle />
+                      <span>Template validation warning (may resolve after plot points are created): {result.validationWarning}</span>
+                    </div>
+                  </Show>
+
                   <Show when={result.proposedDescription && !result.error}>
                     <div class={styles.diffContainer}>
                       {/* Current Description */}
@@ -580,6 +652,65 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
                         </div>
                       </div>
                     </div>
+
+                    {/* Proposed Plot Points */}
+                    <Show when={result.proposedPlotPoints.length > 0}>
+                      <div class={styles.proposalSection}>
+                        <div class={styles.proposalHeader}>Proposed Plot Points</div>
+                        <div class={styles.proposalList}>
+                          <For each={result.proposedPlotPoints}>
+                            {(pp) => (
+                              <div class={styles.proposalItem}>
+                                <div class={styles.proposalItemHeader}>
+                                  <code class={styles.proposalKey}>{pp.key}</code>
+                                  <span class={pp.isNew ? styles.proposalBadgeNew : styles.proposalBadgeExtend}>
+                                    {pp.isNew ? 'new' : 'extend'}
+                                  </span>
+                                </div>
+                                <div class={styles.proposalOptions}>
+                                  Options: {pp.options.join(', ')}
+                                </div>
+                                <Show when={pp.isNew && pp.default}>
+                                  <div class={styles.proposalDefault}>
+                                    Default: <code>{pp.default}</code>
+                                  </div>
+                                </Show>
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                    </Show>
+
+                    {/* Proposed State Changes */}
+                    <Show when={result.proposedStateChanges.length > 0}>
+                      <div class={styles.proposalSection}>
+                        <div class={styles.proposalHeader}>Proposed State Changes</div>
+                        <div class={styles.proposalList}>
+                          <For each={result.proposedStateChanges}>
+                            {(sc) => {
+                              // Find the message to show context
+                              const message = messagesStore.messages.find((m) => m.id === sc.messageId)
+                              const messagePreview = message?.content?.slice(0, 100) || 'Unknown message'
+                              const isValidMessage = !!message
+                              return (
+                                <div class={`${styles.proposalItem} ${!isValidMessage ? styles.proposalItemWarning : ''}`}>
+                                  <div class={styles.proposalItemHeader}>
+                                    <code class={styles.proposalKey}>{sc.key}</code>
+                                    <span class={styles.proposalValue}>= {sc.value}</span>
+                                  </div>
+                                  <div class={styles.proposalMessageRef}>
+                                    <Show when={isValidMessage} fallback={<span class={styles.proposalWarning}>⚠ Message not found: {sc.messageId}</span>}>
+                                      <span>@ "{messagePreview.trim()}{message?.content && message.content.length > 100 ? '...' : ''}"</span>
+                                    </Show>
+                                  </div>
+                                </div>
+                              )
+                            }}
+                          </For>
+                        </div>
+                      </div>
+                    </Show>
                   </Show>
                 </div>
               )}

@@ -187,3 +187,82 @@ export const noScenes = style({
   color: tokens.color.text.muted,
   fontSize: '0.875rem',
 })
+
+// Preview/confirmation styles
+export const previewContainer = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+  height: '60vh',
+  minHeight: '400px',
+})
+
+export const diffContainer = style({
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: tokens.space['4'],
+  flex: 1,
+  overflow: 'hidden',
+
+  '@media': {
+    '(max-width: 768px)': {
+      gridTemplateColumns: '1fr',
+    },
+  },
+})
+
+export const diffPane = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['1'],
+  overflow: 'hidden',
+})
+
+export const diffHeader = style({
+  fontSize: tokens.font.size.sm,
+  fontWeight: tokens.font.weight.semibold,
+  color: tokens.color.text.secondary,
+  paddingBottom: tokens.space['1'],
+  borderBottom: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  flexShrink: 0,
+})
+
+export const diffContent = style({
+  fontFamily: 'inherit',
+  fontSize: tokens.font.size.sm,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  padding: tokens.space['3'],
+  backgroundColor: tokens.color.bg.raised,
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  flex: 1,
+  overflowY: 'auto',
+  lineHeight: 1.6,
+})
+
+export const diffLine = style({
+  display: 'block',
+  padding: `${tokens.space['0.5']} 0`,
+})
+
+export const diffLineAdded = style({
+  backgroundColor: 'rgba(34, 197, 94, 0.15)',
+  color: '#22c55e',
+})
+
+export const diffLineRemoved = style({
+  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  color: '#ef4444',
+  textDecoration: 'line-through',
+})
+
+export const loadingContainer = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: tokens.space['8'],
+  gap: tokens.space['2'],
+  color: tokens.color.text.secondary,
+  flex: 1,
+})
