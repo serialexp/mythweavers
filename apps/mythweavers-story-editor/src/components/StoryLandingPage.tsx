@@ -30,7 +30,8 @@ import { mapsStore } from '../stores/mapsStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
-import { importClaudeChat } from '../utils/claudeChatImporter'
+import type { BranchConversionResult } from '../utils/claudeChatImport'
+import { importClaudeChat, importClaudeChatWithBranches } from '../utils/claudeChatImporter'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
 import { StoryMetadata, storyManager } from '../utils/storyManager'
 import type { Message } from '../types/core'
@@ -68,7 +69,6 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         updatedAt: undefined,
         messageCount: story.messageCount,
         characterCount: story.characterCount,
-        chapterCount: story.chapterCount || 0,
         storySetting: story.storySetting,
         type: (story.storageMode || 'local') as 'local' | 'server',
         isCurrentStory: false, // No current story on landing page
@@ -87,7 +87,6 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         updatedAt: story.updatedAt,
         messageCount: story.messageCount,
         characterCount: story.characterCount,
-        chapterCount: story.chapterCount || 0,
         storySetting: story.storySetting,
         type: 'server' as const,
         isCurrentStory: false,
@@ -268,6 +267,25 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     const { storyId } = await importClaudeChat({
       conversationName,
       messages,
+      importTarget: 'new',
+      storageMode,
+    })
+
+    setShowClaudeChatImport(false)
+    navigate(`/story/${storyId}`)
+  }
+
+  const handleImportClaudeChatWithBranches = async (
+    conversationName: string,
+    branchData: BranchConversionResult,
+    _importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => {
+    // Always create a new story from the landing page (no current story exists)
+    const { storyId } = await importClaudeChatWithBranches({
+      conversationName,
+      segments: branchData.segments,
+      branchChoices: branchData.branchChoices,
       importTarget: 'new',
       storageMode,
     })
@@ -475,6 +493,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         serverAvailable={serverAvailable()}
         onClose={() => setShowClaudeChatImport(false)}
         onImport={handleImportClaudeChat}
+        onImportWithBranches={handleImportClaudeChatWithBranches}
       />
     </div>
   )

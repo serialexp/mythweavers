@@ -17,6 +17,14 @@ export function getCharacterShortName(character: Character): string {
 }
 
 /**
+ * Get the initial letter(s) for an avatar placeholder
+ */
+export function getAvatarInitial(name: string): string {
+  const trimmed = name.trim()
+  return trimmed ? trimmed.charAt(0).toUpperCase() : '?'
+}
+
+/**
  * Parse a single name string into firstName/lastName components
  * Useful when saving from a single input field
  */

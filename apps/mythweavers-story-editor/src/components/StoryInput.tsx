@@ -20,7 +20,7 @@ interface StoryInputProps {
   onShowContextPreview: () => void
 }
 
-const PARAGRAPH_OPTIONS = [1, 2, 3, 4, 5, 6, 0] as const
+const PARAGRAPH_OPTIONS = [3, 6, 9, 12, 15, 18, 0] as const
 const THINKING_OPTIONS = [
   { value: 0, label: 'Off' },
   { value: 1024, label: 'Low' },
@@ -124,7 +124,7 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
                         currentStoryStore.setParagraphsPerTurn(count)
                         setParagraphsExpanded(false)
                       }}
-                      title={count === 0 ? 'No paragraph limit' : `Generate ${count} paragraph${count !== 1 ? 's' : ''}`}
+                      title={count === 0 ? 'No paragraph limit' : `Generate ${count} paragraphs`}
                     >
                       {count === 0 ? '∞' : count}
                     </ToggleButton>

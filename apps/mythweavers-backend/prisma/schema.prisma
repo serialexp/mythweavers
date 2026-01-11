@@ -85,6 +85,8 @@ model User {
   paragraphComments ParagraphComment[]
   files             File[]
   sessions          Session[]
+  accessTokens      AccessToken[]
+  adventures        Adventure[]
   storyReadStatuses StoryReadStatus[]
 
   @@index([email])
@@ -103,6 +105,45 @@ model Session {
   @@index([token])
   @@index([userId])
   @@index([expiresAt])
+}
+
+model AccessToken {
+  id        String    @id @default(cuid())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique // mw_xxxxxxxxxxxx
+  name      String             // "Claude Artifact" or user-defined
+  lastUsed  DateTime?
+  expiresAt DateTime?          // null = never expires
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+model DeviceCode {
+  id         String   @id @default(cuid())
+  deviceCode String   @unique // Random string for polling
+  userCode   String   @unique // Human-friendly ABCD-1234
+  userId     Int?             // Set when user approves
+  expiresAt  DateTime         // Short-lived: 15 minutes
+  approved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([deviceCode])
+  @@index([userCode])
+}
+
+model Adventure {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   @default("Untitled Adventure")
+  data      Json     // Full artifact state as JSON blob
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model BookShelfStory {
@@ -311,7 +352,7 @@ model Scene {
 
   // Scene state (from Story Project Node model)
   status                String?      // Scene status: draft, needs_work, review, done
-  includeInFull         Int          @default(1) // 0=not included, 1=summary only, 2=full content
+  includeInFull         Int          @default(2) // 0=not included, 1=summary only, 2=full content
   deleted               Boolean      @default(false)
   deletedAt             DateTime?
 
@@ -416,8 +457,9 @@ model ParagraphRevision {
   contentSchema       String?              @db.Text // Store original content schema as JSON
   version             Int                  @default(1)
   state               ParagraphState?      // AI, DRAFT, REVISE, FINAL, SDT
-  plotPointActions    Json?
-  inventoryActions    Json?
+  script              String?              @db.Text // JavaScript to execute for this paragraph
+  plotPointActions    Json?                // @deprecated Use script instead
+  inventoryActions    Json?                // @deprecated Use script instead
 
   createdAt           DateTime             @default(now())
 

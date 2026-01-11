@@ -7,7 +7,7 @@
       script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;
       worker-src 'self' blob:;
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://api.mythweavers.io;
+      img-src 'self' data: blob: http: https://api.mythweavers.io;
       font-src 'self';
       connect-src 'self'
         https://api.mythweavers.io
@@ -15,12 +15,9 @@
         https://api.anthropic.com
         https://api.openai.com
         https://openrouter.ai
-        http://localhost:*
-        http://127.0.0.1:*
-        ws://localhost:*
-        ws://127.0.0.1:*
-        wss://localhost:*
-        wss://127.0.0.1:*;
+        http:
+        ws:
+        wss:;
     " />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

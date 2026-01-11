@@ -69,7 +69,6 @@ export const storyManager = {
         savedAt: new Date(),
         messageCount: messages.length,
         characterCount: characters.length,
-        chapterCount: 0, // New stories start with no chapters
         storySetting,
         storageMode,
       }
@@ -104,7 +103,6 @@ export const storyManager = {
           savedAt: storyData.savedAt,
           messageCount: storyData.messages.length,
           characterCount: storyData.characters ? storyData.characters.length : 0,
-          chapterCount: storyData.chapters ? storyData.chapters.length : 0,
           storySetting: storyData.storySetting,
           storageMode: storyData.storageMode || 'local',
         }
@@ -118,7 +116,6 @@ export const storyManager = {
           savedAt: storyData.savedAt,
           messageCount: storyData.messages.length,
           characterCount: storyData.characters ? storyData.characters.length : 0,
-          chapterCount: storyData.chapters ? storyData.chapters.length : 0,
           storySetting: storyData.storySetting,
           storageMode: storyData.storageMode || 'local',
         }
@@ -143,7 +140,6 @@ export const storyManager = {
         errorType: isError(error) ? error.constructor.name : 'Unknown',
         isDOMException: error instanceof DOMException,
         storyId: id,
-        hasChapters: storyData.chapters ? storyData.chapters.length : 0,
       })
       return false
     }
@@ -271,7 +267,6 @@ export const storyManager = {
         })),
         characters: apiStory.characters,
         contextItems: apiStory.contextItems,
-        chapters: apiStory.chapters,
         input: apiStory.input,
         storySetting: apiStory.storySetting,
         person: apiStory.person || 'third',

@@ -74,6 +74,7 @@ export const previewContent = style({
   color: tokens.color.text.primary,
   lineHeight: tokens.font.lineHeight.normal,
   minHeight: '1.5em',
+  whiteSpace: 'pre-line',
 })
 
 export const emptyPlaceholder = style({

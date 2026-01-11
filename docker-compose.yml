@@ -1,0 +1,153 @@
+services:
+  # Caddy reverse proxy with automatic HTTPS
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    container_name: mythweavers-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CADDY_INGRESS_NETWORKS=mythweavers
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - caddy_data:/data
+    networks:
+      - mythweavers
+    restart: unless-stopped
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: mythweavers-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mythweavers}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-mythweavers}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mythweavers
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mythweavers}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: mythweavers-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - mythweavers
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    image: ${REGISTRY:-serialexp}/mythweavers-backend:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/mythweavers-backend/Dockerfile
+    container_name: mythweavers-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3201
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mythweavers}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mythweavers}
+      - REDIS_URL=redis://redis:6379
+      - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET is required}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      # Optional: Cloudflare R2 storage (falls back to local uploads/ if not set)
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_PUBLIC_BUCKET=${R2_PUBLIC_BUCKET:-}
+      - R2_PRIVATE_BUCKET=${R2_PRIVATE_BUCKET:-}
+      - R2_PUBLIC_BUCKET_URL=${R2_PUBLIC_BUCKET_URL:-}
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - mythweavers
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    labels:
+      caddy: ${BACKEND_DOMAIN:-api.mythweavers.localhost}
+      caddy.reverse_proxy: "{{upstreams 3201}}"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3201/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Story Editor (Writer Frontend)
+  story-editor:
+    image: ${REGISTRY:-serialexp}/mythweavers-story-editor:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/mythweavers-story-editor/Dockerfile
+    container_name: mythweavers-story-editor
+    environment:
+      - BACKEND_URL=${BACKEND_URL:-https://${BACKEND_DOMAIN:-api.mythweavers.localhost}}
+    networks:
+      - mythweavers
+    depends_on:
+      - backend
+    restart: unless-stopped
+    labels:
+      caddy: ${EDITOR_DOMAIN:-editor.mythweavers.localhost}
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Reading Frontend (Astro SSR)
+  reader:
+    image: ${REGISTRY:-serialexp}/mythweavers-reader:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/mythweavers-reading-frontend-astro/Dockerfile
+    container_name: mythweavers-reader
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3202
+      - API_URL=http://backend:3201
+    networks:
+      - mythweavers
+    depends_on:
+      - backend
+    restart: unless-stopped
+    labels:
+      caddy: ${READER_DOMAIN:-reader.mythweavers.localhost}
+      caddy.reverse_proxy: "{{upstreams 3202}}"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3202"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  mythweavers:
+    name: mythweavers
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  uploads_data:

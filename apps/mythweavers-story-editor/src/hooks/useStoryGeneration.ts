@@ -10,6 +10,7 @@ import { generateNextStoryBeatInstructions } from '../utils/autoGeneration'
 import { getCharacterDisplayName } from '../utils/character'
 import { generateContextMessages } from '../utils/contextGeneration'
 import { getTemplatedCharacterContext, getTemplatedContextItems } from '../utils/contextTemplating'
+import { MissingSummariesError } from '../utils/errors'
 import { generateMessageId } from '../utils/id'
 import { saveMessageVersion } from '../utils/messageVersions'
 import { analyzeStoryBeat, extractKnownEntities } from '../utils/smartContext'
@@ -20,6 +21,7 @@ interface UseStoryGenerationProps {
     assistantMessageId: string,
     shouldSummarize: boolean,
     maxTokens?: number,
+    isRegeneration?: boolean,
   ) => Promise<void>
   generateSummaries: (
     messageId: string,
@@ -35,13 +37,14 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
   // Flag to prevent multiple simultaneous regenerations
   let regenerateInProgress = false
 
-  // Helper function to get the chapter node from a message ID
-  const getChapterNodeForMessage = (messageId: string): Node | undefined => {
+  // Helper function to get the scene/chapter node from a message ID
+  // Returns the node that the message belongs to (typically a scene node)
+  const getSceneNodeForMessage = (messageId: string): Node | undefined => {
     const message = messagesStore.messages.find((m) => m.id === messageId)
     if (!message || !message.sceneId) return undefined
 
     const node = nodeStore.nodesArray.find((n) => n.id === message.sceneId)
-    if (!node || node.type !== 'chapter') return undefined
+    if (!node) return undefined
 
     return node
   }
@@ -60,7 +63,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       forceMissingSummaries,
     })
     // Generate templated context based on the target message
-    const chapterNode = getChapterNodeForMessage(targetMessageId)
+    const chapterNode = getSceneNodeForMessage(targetMessageId)
     const characterContext = getTemplatedCharacterContext(
       charactersStore.characters,
       messages,
@@ -122,7 +125,6 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         // Pass nodes for context generation
         // Each node has a summary field that should be used
         nodes: nodeStore.nodesArray,
-        chapters: [], // No longer using chapters
         branchChoices: currentStoryStore.branchChoices,
         targetMessageId,
         model: settingsStore.model,
@@ -193,7 +195,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         order: 0, // Will be set properly by insertMessage/addMessage
         isQuery: true,
         model: settingsStore.model,
-        sceneId: selectedNodeId || selectedChapterId || messagesStore.getCurrentChapterId() || undefined,
+        sceneId: selectedNodeId || messagesStore.getCurrentNodeId() || undefined,
       }
 
       // Insert query at the end of selected node
@@ -203,20 +205,10 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           messagesStore.insertMessage(insertAfterId, assistantMessage)
         } else {
           // Fallback: add to end if we can't find the node
-          // Could not find insertion point for node
-          messagesStore.appendMessage(assistantMessage)
-        }
-      } else if (selectedChapterId) {
-        // Fall back to old chapter system if no node selected
-        const insertAfterId = messagesStore.getInsertAfterIdForChapter(selectedChapterId)
-        if (insertAfterId) {
-          messagesStore.insertMessage(insertAfterId, assistantMessage)
-        } else {
-          // Could not find insertion point for chapter
           messagesStore.appendMessage(assistantMessage)
         }
       } else {
-        // No node or chapter selected, add to end
+        // No node selected, add to end
         messagesStore.appendMessage(assistantMessage)
       }
 
@@ -235,7 +227,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         }
 
         // Use messages up to insertion point for script execution
-        const chapterNode = getChapterNodeForMessage(assistantMessageId)
+        const chapterNode = getSceneNodeForMessage(assistantMessageId)
         const characterContext = getTemplatedCharacterContext(
           charactersStore.characters,
           messagesForContext,
@@ -258,8 +250,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           contextType: 'query',
           characterContext: characterContext + contextItemsContext,
           model: settingsStore.model,
-          nodes: nodeStore.nodesArray, // Use nodes instead of chapters
-          chapters: [], // No longer using chapters
+          nodes: nodeStore.nodesArray,
           branchChoices: currentStoryStore.branchChoices,
           targetMessageId: assistantMessageId,
           includeQueryHistory: true,
@@ -277,7 +268,6 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     } else {
       const assistantMessageId = generateMessageId()
       const selectedNodeId = nodeStore.selectedNodeId
-      const selectedChapterId = nodeStore.selectedNodeId // Using node ID as chapter ID
       const assistantMessage: Message = {
         id: assistantMessageId,
         role: 'assistant',
@@ -287,7 +277,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         order: 0, // Will be set properly by insertMessage/addMessage
         isQuery: false,
         model: settingsStore.model,
-        sceneId: selectedNodeId || selectedChapterId || messagesStore.getCurrentChapterId() || undefined,
+        sceneId: selectedNodeId || messagesStore.getCurrentNodeId() || undefined,
       }
       // If a node is selected, insert at the end of that node
       if (selectedNodeId) {
@@ -296,28 +286,18 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           messagesStore.insertMessage(insertAfterId, assistantMessage)
         } else {
           // Fallback: add to end if we can't find the node
-          // Could not find insertion point for node
-          messagesStore.appendMessage(assistantMessage)
-        }
-      } else if (selectedChapterId) {
-        // Fall back to old chapter system if no node selected
-        const insertAfterId = messagesStore.getInsertAfterIdForChapter(selectedChapterId)
-        if (insertAfterId) {
-          messagesStore.insertMessage(insertAfterId, assistantMessage)
-        } else {
-          // Could not find insertion point for chapter
           messagesStore.appendMessage(assistantMessage)
         }
       } else {
-        // No node or chapter selected, add to end
+        // No node selected, add to end
         messagesStore.appendMessage(assistantMessage)
       }
 
       try {
         // Get messages up to where we just inserted the new message
         let messagesForContext: Message[]
-        if (selectedChapterId) {
-          // We just inserted at the end of the selected chapter
+        if (selectedNodeId) {
+          // We just inserted at the end of the selected node
           const insertedMessageIndex = messagesStore.messages.findIndex((m) => m.id === assistantMessageId)
           if (insertedMessageIndex !== -1) {
             messagesForContext = messagesStore.messages.slice(0, insertedMessageIndex + 1).filter((m) => !m.isQuery)
@@ -326,7 +306,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
             messagesForContext = messagesStore.visibleMessages.filter((m) => !m.isQuery)
           }
         } else {
-          // No chapter selected, message was added at the end
+          // No node selected, message was added at the end
           messagesForContext = messagesStore.visibleMessages.filter((m) => !m.isQuery)
         }
 
@@ -342,11 +322,11 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           name: error.name,
         })
 
-        // Handle missing chapter summaries with a confirmation dialog
-        if (error.message?.includes('previous chapters need summaries')) {
-          console.warn('[handleSubmit] Missing chapter summaries detected')
+        // Handle missing chapter/scene summaries with a confirmation dialog
+        if (error instanceof MissingSummariesError) {
+          console.warn('[handleSubmit] Missing scene summaries detected:', error.missingNodeTitles)
           const proceed = confirm(
-            `${error.message}\n\nDo you want to continue anyway? The story might lack important context from previous chapters.`,
+            `${error.message}\n\nDo you want to continue anyway? The story might lack important context from previous scenes.`,
           )
 
           if (proceed) {
@@ -447,7 +427,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     await saveMessageVersion(messageId, message.content, message.instruction, message.model, 'regeneration')
 
     messagesStore.setIsLoading(true)
-    messagesStore.updateMessage(messageId, { content: '' })
+    messagesStore.updateMessage(messageId, { content: '', paragraphs: [] })
 
     try {
       // Find the index of the message being regenerated
@@ -464,14 +444,14 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       )
 
       // Regenerate the response for this specific message
-      await props.generateResponse(messages, messageId, !message.isQuery, maxTokens)
+      await props.generateResponse(messages, messageId, !message.isQuery, maxTokens, true)
     } catch (error: any) {
       console.error('Regeneration failed:', error)
 
-      // Handle missing chapter summaries with a confirmation dialog
-      if (error.message?.includes('previous chapters need summaries')) {
+      // Handle missing chapter/scene summaries with a confirmation dialog
+      if (error instanceof MissingSummariesError) {
         const proceed = confirm(
-          `${error.message}\n\nDo you want to continue anyway? The story might lack important context from previous chapters.`,
+          `${error.message}\n\nDo you want to continue anyway? The story might lack important context from previous scenes.`,
         )
 
         if (proceed) {
@@ -490,7 +470,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
             )
 
             // Regenerate the response for this specific message
-            await props.generateResponse(messages, messageId, !message.isQuery, maxTokens)
+            await props.generateResponse(messages, messageId, !message.isQuery, maxTokens, true)
           } catch (retryError) {
             console.error('Regeneration failed on retry:', retryError)
             const { errorStore } = await import('../stores/errorStore')
@@ -513,7 +493,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     if (!message || !message.isQuery) return
 
     messagesStore.setIsLoading(true)
-    messagesStore.updateMessage(messageId, { content: '' })
+    messagesStore.updateMessage(messageId, { content: '', paragraphs: [] })
 
     try {
       // Find the index of the query being regenerated
@@ -525,7 +505,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       const allMessages = messagesUpToTarget
       // But for character/context templating, we only use story messages
       const storyMessages = allMessages.filter((m) => !m.isQuery && m.role === 'assistant')
-      const chapterNode = getChapterNodeForMessage(messageId)
+      const chapterNode = getSceneNodeForMessage(messageId)
       const characterContext = getTemplatedCharacterContext(
         charactersStore.characters,
         storyMessages,
@@ -548,15 +528,14 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         contextType: 'query',
         characterContext: characterContext + contextItemsContext,
         model: settingsStore.model,
-        nodes: nodeStore.nodesArray, // Use nodes instead of chapters
-        chapters: [], // No longer using chapters
+        nodes: nodeStore.nodesArray,
         branchChoices: currentStoryStore.branchChoices,
         targetMessageId: messageId,
         includeQueryHistory: true,
         maxQueryHistory: 5,
       })
 
-      await props.generateResponse(queryMessages, messageId, false, maxTokens)
+      await props.generateResponse(queryMessages, messageId, false, maxTokens, true)
     } catch (error) {
       console.error('Query regeneration failed:', error)
       const { errorStore } = await import('../stores/errorStore')

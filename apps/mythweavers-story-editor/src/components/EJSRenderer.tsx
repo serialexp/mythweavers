@@ -2,6 +2,7 @@ import { Alert, Button, Card, CardBody } from '@mythweavers/ui'
 import { BsExclamationTriangle, BsEye, BsEyeSlash } from 'solid-icons/bs'
 import { Component, Show, createMemo, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
+import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -28,6 +29,13 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
   })
 
   const evaluationResult = createMemo(() => {
+    // Track character data changes (especially birthdates) to re-evaluate when they change
+    // This is needed because character data is used in script context
+    charactersStore.characters.forEach((c) => {
+      c.birthdate
+      c.isMainCharacter
+    })
+
     if (!props.template) {
       return {
         result: '',

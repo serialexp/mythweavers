@@ -52,3 +52,11 @@ export const infoMessageText = style({
   lineHeight: tokens.font.lineHeight.normal,
   color: tokens.color.text.secondary,
 })
+
+// Wrapper for messages - centers content with max-width
+export const messageWrapper = style({
+  position: 'relative',
+  padding: '0 1rem',
+  maxWidth: '60rem',
+  margin: '0 auto',
+})

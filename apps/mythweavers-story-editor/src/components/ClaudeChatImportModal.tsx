@@ -4,11 +4,13 @@ import { Component, For, Show, createSignal } from 'solid-js'
 import { authStore } from '../stores/authStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import {
+  type BranchConversionResult,
   type ClaudeChatExport,
   type ClaudeConversation,
   ORGANIZATIONS_API_URL,
   buildConversationApiUrl,
   convertToStoryMessages,
+  convertToStoryMessagesWithBranches,
   getConversationSummary,
   parseClaudeChatExport,
 } from '../utils/claudeChatImport'
@@ -25,6 +27,12 @@ interface ClaudeChatImportModalProps {
     importTarget: 'new' | 'current',
     storageMode: 'local' | 'server',
   ) => Promise<void>
+  onImportWithBranches: (
+    conversationName: string,
+    branchData: BranchConversionResult,
+    importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => Promise<void>
 }
 
 export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (props) => {
@@ -32,6 +40,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
   const [selectedConversation, setSelectedConversation] = createSignal<ClaudeConversation | null>(null)
   const [importTarget, setImportTarget] = createSignal<'new' | 'current'>('new')
   const [storageMode, setStorageMode] = createSignal<'local' | 'server'>('local')
+  const [includeBranches, setIncludeBranches] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [isImporting, setIsImporting] = createSignal(false)
   const [isDragOver, setIsDragOver] = createSignal(false)
@@ -113,9 +122,18 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
     setError(null)
 
     try {
-      const messages = convertToStoryMessages(conversation)
-      setImportingMessageCount(messages.length)
-      await props.onImport(conversation.name, messages, importTarget(), getStorageMode())
+      if (includeBranches()) {
+        // Import with all branches preserved
+        const branchData = convertToStoryMessagesWithBranches(conversation)
+        const totalMessages = branchData.segments.reduce((sum, seg) => sum + seg.messages.length, 0)
+        setImportingMessageCount(totalMessages)
+        await props.onImportWithBranches(conversation.name, branchData, importTarget(), getStorageMode())
+      } else {
+        // Standard import - only active branch
+        const messages = convertToStoryMessages(conversation)
+        setImportingMessageCount(messages.length)
+        await props.onImport(conversation.name, messages, importTarget(), getStorageMode())
+      }
       handleClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import conversation')
@@ -130,6 +148,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
     setSelectedConversation(null)
     setError(null)
     setIsImporting(false)
+    setIncludeBranches(false)
     setOrgId('')
     props.onClose()
   }
@@ -377,6 +396,26 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
                       <span>Server Storage</span>
                     </label>
                   </Show>
+                </div>
+              </Show>
+
+              {/* Branch import option - only show when conversation has abandoned branches */}
+              <Show when={getConversationSummary(selectedConversation()!).hasAbandonedBranches}>
+                <div class={styles.importOptions}>
+                  <div style={{ 'font-size': '0.875rem', 'font-weight': '500', 'margin-bottom': '0.5rem' }}>
+                    Branch Options
+                  </div>
+                  <label class={styles.importOption}>
+                    <input
+                      type="checkbox"
+                      checked={includeBranches()}
+                      onChange={(e) => setIncludeBranches(e.currentTarget.checked)}
+                    />
+                    <span>Include all branches</span>
+                  </label>
+                  <div style={{ 'font-size': '0.75rem', color: 'var(--text-muted)', 'margin-top': '0.25rem' }}>
+                    Creates separate scenes for each branch with navigation between them
+                  </div>
                 </div>
               </Show>
             </Show>

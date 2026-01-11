@@ -3,10 +3,61 @@ import { authConfig } from './config.js'
 import { prisma } from './prisma.js'
 
 /**
- * Authentication helper that extracts user from session cookie
+ * Check for Bearer token (AccessToken) authentication
+ * Returns user object if valid token found, null otherwise
+ */
+async function getUserFromAccessToken(request: FastifyRequest) {
+  const authHeader = request.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null
+  }
+
+  const token = authHeader.slice(7) // Remove 'Bearer ' prefix
+  if (!token) {
+    return null
+  }
+
+  const accessToken = await prisma.accessToken.findUnique({
+    where: { token },
+    include: { user: true },
+  })
+
+  if (!accessToken) {
+    return null
+  }
+
+  // Check if token has expired (null expiresAt = never expires)
+  if (accessToken.expiresAt && accessToken.expiresAt < new Date()) {
+    // Delete expired token
+    await prisma.accessToken.delete({
+      where: { id: accessToken.id },
+    })
+    return null
+  }
+
+  // Update lastUsed timestamp (fire and forget, don't block request)
+  prisma.accessToken.update({
+    where: { id: accessToken.id },
+    data: { lastUsed: new Date() },
+  }).catch(() => {
+    // Ignore errors updating lastUsed
+  })
+
+  return accessToken.user
+}
+
+/**
+ * Authentication helper that checks Bearer token first, then session cookie
  * Returns user object if authenticated, null otherwise
  */
 export async function getUserFromSession(request: FastifyRequest) {
+  // Check Bearer token first (for API/artifact access)
+  const tokenUser = await getUserFromAccessToken(request)
+  if (tokenUser) {
+    return tokenUser
+  }
+
+  // Fall back to session cookie
   const token = request.cookies.sessionToken
 
   if (!token) {

@@ -186,7 +186,16 @@ export function EditorView(props: EditorViewProps): JSX.Element {
 
     // Check if selection is within our editor
     const range = domSelection.getRangeAt(0)
-    if (!containerRef.contains(range.commonAncestorContainer)) return
+    const ancestor = range.commonAncestorContainer
+    // Guard against invalid selection during DOM mutations - the ancestor may not
+    // be a valid Node if SolidJS is in the middle of a reactive DOM update
+    if (!ancestor || !(ancestor instanceof Node)) return
+    try {
+      if (!containerRef.contains(ancestor)) return
+    } catch {
+      // Selection may reference removed DOM nodes during reactive updates
+      return
+    }
 
     const currentState = state()
     const selection = selectionFromDOM(currentState.doc, domSelection)

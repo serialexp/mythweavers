@@ -292,7 +292,7 @@ export const mapsStore = {
 
   // Load basic map metadata from export data (server stories only)
   loadFromExport: async (
-    maps: Array<{ id: string; name: string; fileId: string | null; borderColor: string; landmarkCount?: number }>,
+    maps: Array<{ id: string; name: string; fileId: string | null; borderColor: string; propertySchema?: any; landmarkCount?: number }>,
   ) => {
     // Load only basic metadata - detailed data (landmarks, fleets, etc) will be lazy-loaded when map is opened
     const basicMaps: StoryMap[] = maps.map((map) => ({
@@ -300,6 +300,7 @@ export const mapsStore = {
       name: map.name,
       imageData: '', // Will be loaded lazily
       borderColor: map.borderColor,
+      propertySchema: map.propertySchema,
       landmarkCount: map.landmarkCount,
       landmarks: [], // Will be loaded lazily
       fleets: [], // Will be loaded lazily

@@ -37,7 +37,8 @@ import { navigationStore } from '../stores/navigationStore'
 import { searchModalStore } from '../stores/searchModalStore'
 import { settingsStore } from '../stores/settingsStore'
 import { viewModeStore } from '../stores/viewModeStore'
-import { Chapter, Character, Message } from '../types/core'
+import { Character, Message } from '../types/core'
+import type { BranchConversionResult } from '../utils/claudeChatImport'
 import { CalendarManagement } from './CalendarManagement'
 import { Characters, type CharactersRef } from './Characters'
 import { ContextItems, type ContextItemsRef } from './ContextItems'
@@ -59,7 +60,6 @@ interface StoryHeaderProps {
     characters: Character[],
     input: string,
     storySetting: string,
-    chapters?: Chapter[],
   ) => void
   onBulkSummarize: () => void
   onBulkAnalysis: () => void
@@ -72,6 +72,12 @@ interface StoryHeaderProps {
   onImportClaudeChat: (
     conversationName: string,
     messages: Message[],
+    importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => Promise<void>
+  onImportClaudeChatWithBranches: (
+    conversationName: string,
+    branchData: BranchConversionResult,
     importTarget: 'new' | 'current',
     storageMode: 'local' | 'server',
   ) => Promise<void>
@@ -425,6 +431,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           onExportStory={props.onExportStory}
           onImportStory={props.onImportStory}
           onImportClaudeChat={props.onImportClaudeChat}
+          onImportClaudeChatWithBranches={props.onImportClaudeChatWithBranches}
           serverAvailable={props.serverAvailable}
           isLoading={messagesStore.isLoading}
           isGenerating={props.isGenerating}

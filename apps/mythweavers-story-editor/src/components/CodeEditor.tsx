@@ -1,4 +1,11 @@
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
+import {
+  type Completion,
+  type CompletionContext,
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
@@ -16,12 +23,25 @@ import {
 import { Component, createEffect, onCleanup, onMount } from 'solid-js'
 import * as styles from './CodeEditor.css'
 
+export interface CodeEditorCompletion {
+  /** The text to insert */
+  label: string
+  /** Optional description shown in autocomplete menu */
+  detail?: string
+  /** Optional longer description */
+  info?: string
+  /** Type of completion (function, variable, etc) */
+  type?: 'function' | 'variable' | 'property' | 'keyword'
+}
+
 interface CodeEditorProps {
   value: string
   onChange: (value: string) => void
   error?: string | null
   readOnly?: boolean
   height?: string
+  /** Custom completions to show in autocomplete */
+  completions?: CodeEditorCompletion[]
 }
 
 export const CodeEditor: Component<CodeEditorProps> = (props) => {
@@ -29,9 +49,38 @@ export const CodeEditor: Component<CodeEditorProps> = (props) => {
   let view: EditorView | undefined
   const readOnlyCompartment = new Compartment()
 
+  // Create custom completion source from props
+  const createCustomCompletions = (completions: CodeEditorCompletion[]) => {
+    return (context: CompletionContext) => {
+      // Get the word before cursor
+      const word = context.matchBefore(/[\w.]*/)
+      if (!word || (word.from === word.to && !context.explicit)) return null
+
+      const options: Completion[] = completions.map((c) => ({
+        label: c.label,
+        detail: c.detail,
+        info: c.info,
+        type: c.type || 'function',
+      }))
+
+      return {
+        from: word.from,
+        options,
+        validFor: /^[\w.]*$/,
+      }
+    }
+  }
+
   onMount(() => {
     // Detect if user prefers dark mode for CodeMirror syntax theme
     const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+
+    // Build autocompletion config with custom completions if provided
+    const autocompletionConfig = props.completions?.length
+      ? autocompletion({
+          override: [createCustomCompletions(props.completions)],
+        })
+      : autocompletion()
 
     // Create a basic setup similar to the official one but more minimal
     const basicExtensions = [
@@ -42,7 +91,7 @@ export const CodeEditor: Component<CodeEditorProps> = (props) => {
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       bracketMatching(),
       closeBrackets(),
-      autocompletion(),
+      autocompletionConfig,
       rectangularSelection(),
       highlightActiveLine(),
       highlightSpecialChars(),

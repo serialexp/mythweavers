@@ -133,7 +133,7 @@ export interface PlotPointState {
   value: string // Stored as string, parsed based on definition type
 }
 
-export type ChapterStatus = 'draft' | 'needs_work' | 'review' | 'done'
+export type NodeStatus = 'draft' | 'needs_work' | 'review' | 'done'
 export type NodeType = 'book' | 'arc' | 'chapter' | 'scene'
 export type NodeContentType = 'story' | 'non-story' | 'context' // API classification for content type
 
@@ -146,13 +146,12 @@ export interface Node {
   title: string
   summary?: string
   order: number
-  sortOrder?: number // Alias for order (API uses sortOrder)
   expanded?: boolean
   isSummarizing?: boolean
 
   // Chapter-specific fields (organizational level)
   includeInFull?: number // 0=not included, 1=summary only, 2=full content
-  status?: ChapterStatus // Track the status of the chapter
+  status?: NodeStatus // Track the status of the node
 
   // Scene-specific fields (POV/context boundary)
   goal?: string // Scene goal: what we're trying to accomplish (used in generation context)
@@ -172,21 +171,6 @@ export interface Node {
   isOpen?: boolean // Whether the node is expanded in the tree view
   wordCount?: number // Calculated word count for display
   messageWordCounts?: Record<string, number>
-}
-
-export interface Chapter {
-  id: string
-  storyId: string
-  title: string
-  summary?: string
-  order: number
-  expanded?: boolean
-  isSummarizing?: boolean
-  includeInFull?: number // 0=not included, 1=summary only, 2=full content
-  status?: ChapterStatus // Track the status of the chapter
-  nodeType?: NodeContentType // API field: indicates if content is story, non-story, or context
-  createdAt: Date
-  updatedAt: Date
 }
 
 // Property schema for dynamic landmark properties

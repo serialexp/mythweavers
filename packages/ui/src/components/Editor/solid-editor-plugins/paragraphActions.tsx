@@ -23,6 +23,7 @@ export interface ParagraphActionsConfig {
   onSetState?: (paragraphId: string, state: ParagraphState) => void
   onToggleInventory?: (paragraphId: string) => void
   onTogglePlotpoint?: (paragraphId: string) => void
+  onEditScript?: (paragraphId: string) => void
   onCustomRewrite?: (paragraphId: string) => void
   onConvertPerspective?: (paragraphId: string) => void
   onSplitScene?: (paragraphId: string) => void
@@ -183,6 +184,7 @@ export function ParagraphActionsMenu(props: ParagraphActionsProps): JSX.Element 
       c.onSetState ||
       c.onToggleInventory ||
       c.onTogglePlotpoint ||
+      c.onEditScript ||
       c.onCustomRewrite ||
       c.onConvertPerspective ||
       c.onSplitScene
@@ -264,9 +266,16 @@ export function ParagraphActionsMenu(props: ParagraphActionsProps): JSX.Element 
             </Show>
           </div>
 
-          {/* Context group */}
-          <Show when={config().onToggleInventory || config().onTogglePlotpoint}>
+          {/* Context/Script group */}
+          <Show when={config().onToggleInventory || config().onTogglePlotpoint || config().onEditScript}>
             <div class={paragraphActionsGroup}>
+              <Show when={config().onEditScript}>
+                <ActionButton
+                  icon="{ }"
+                  title="Edit paragraph script"
+                  onClick={() => config().onEditScript!(currentParagraphId()!)}
+                />
+              </Show>
               <Show when={config().onToggleInventory}>
                 <ActionButton
                   icon="📦"

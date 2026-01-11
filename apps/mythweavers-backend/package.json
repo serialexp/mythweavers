@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
+    "dev": "bun --env-file=../../.env.local --watch src/index.ts",
     "build": "tsc",
     "start": "bun src/index.ts",
     "test": "bun test --env-file=.env.test",
@@ -15,7 +15,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "migrate:writer": "tsx scripts/migrate/from-writer.ts",
-    "migrate:story": "tsx --env-file-if-exists=.env scripts/migrate/from-story.ts"
+    "migrate:story": "tsx --env-file-if-exists=.env --env-file-if-exists=../../.env.local scripts/migrate/from-story.ts"
   },
   "keywords": [
     "writer",
@@ -31,6 +31,7 @@
     "@aws-sdk/lib-storage": "^3.956.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^10.0.1",
+    "@fastify/formbody": "^8.0.2",
     "@fastify/multipart": "^9.3.0",
     "@fastify/static": "^8.3.0",
     "@fastify/swagger": "^9.3.0",

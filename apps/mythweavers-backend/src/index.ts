@@ -1,6 +1,7 @@
 import path from 'node:path'
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
+import formbody from '@fastify/formbody'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import swagger from '@fastify/swagger'
@@ -15,6 +16,9 @@ import {
 import { z } from 'zod'
 import authRoutes from './routes/auth/index.js'
 import calendarPresetsRoutes from './routes/calendars/presets.js'
+import devicePageRoutes from './routes/device/index.js'
+import oauthRoutes from './routes/oauth/index.js'
+import myAdventuresRoutes from './routes/my/adventures.js'
 import myArcsRoutes from './routes/my/arcs.js'
 import myBooksRoutes from './routes/my/books.js'
 import myCalendarsRoutes from './routes/my/calendars.js'
@@ -89,6 +93,9 @@ await server.register(cookie, {
   secret: process.env.COOKIE_SECRET || 'changeme-in-production',
   parseOptions: {},
 })
+
+// Form body support (for device authorization page)
+await server.register(formbody)
 
 // Multipart support (for file uploads)
 await server.register(multipart, {
@@ -247,6 +254,9 @@ server.get(
 
 // Register routes
 await server.register(authRoutes, { prefix: '/auth' })
+await server.register(oauthRoutes, { prefix: '/oauth' })
+await server.register(devicePageRoutes, { prefix: '/device' })
+await server.register(myAdventuresRoutes, { prefix: '/my' })
 await server.register(myStoriesRoutes, { prefix: '/my/stories' })
 await server.register(myBooksRoutes, { prefix: '/my' })
 await server.register(myArcsRoutes, { prefix: '/my' })

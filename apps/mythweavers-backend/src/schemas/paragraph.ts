@@ -18,14 +18,28 @@ export const inventoryActionSchema = z.strictObject({
     description: 'Type of inventory action',
     example: 'add',
   }),
+  character_name: z.string().meta({
+    description: 'Display name of the character receiving/losing the item',
+    example: 'Luke Skywalker',
+  }),
   item_name: z.string().meta({
     description: 'Name of the item',
-    example: 'Magic Sword',
+    example: 'Lightsaber',
   }),
   item_amount: z.number().int().meta({
     description: 'Amount of the item',
     example: 1,
   }),
+  item_description: z.string().optional().meta({
+    description: 'Optional description of the item (used when adding)',
+    example: 'Blue kyber crystal blade',
+  }),
+})
+
+// Paragraph script schema
+export const paragraphScriptSchema = z.string().optional().meta({
+  description: 'JavaScript function to execute for this paragraph. Receives (data, functions) parameters.',
+  example: '(data, { addItem }) => { addItem(data, "Luke", { name: "lightsaber", amount: 1 }) }',
 })
 
 // Character significant action schema

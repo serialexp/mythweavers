@@ -7,12 +7,6 @@
   margin: 0 auto;
 }
 
-/* Message wrapper for insert button */
-.message-wrapper {
-  position: relative;
-  padding: 0 1rem;
-}
-
 .header {
   background: var(--bg-primary);
   padding: 0.75rem;

@@ -1,8 +1,8 @@
 import {
+  BsArrowRepeat,
   BsCheckCircle,
   BsChevronLeft,
   BsChevronRight,
-  BsChevronUp,
   BsCircle,
   BsClipboard,
   BsClock,
@@ -22,13 +22,15 @@ import { calendarStore } from '../stores/calendarStore'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { copyPreviewStore } from '../stores/copyPreviewStore'
+import { massRewriteDialogStore } from '../stores/massRewriteDialogStore'
+import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { Node as StoryNode } from '../types/core'
-import { getCharacterDisplayName } from '../utils/character'
+import { getAvatarInitial, getCharacterDisplayName } from '../utils/character'
 import { buildNodeMarkdown, buildPrecedingContextMarkdown } from '../utils/nodeContentExport'
-import { getChaptersInStoryOrder } from '../utils/nodeTraversal'
+import { getScenesInStoryOrder } from '../utils/nodeTraversal'
+import { CharacterSelect } from './CharacterSelect'
 import { ChapterContextManager } from './ChapterContextManager'
-import { CharacterUpdateModal } from './CharacterUpdateModal'
 import * as styles from './NodeHeader.css'
 import { NodeStatusMenu } from './NodeStatusMenu'
 import { StoryTimePicker } from './StoryTimePicker'
@@ -52,11 +54,9 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
   const [isStatusMenuOpen, setIsStatusMenuOpen] = createSignal(false)
   const [isEditingTime, setIsEditingTime] = createSignal(false)
   const [isContextManagerOpen, setIsContextManagerOpen] = createSignal(false)
-  const [isSelectingViewpoint, setIsSelectingViewpoint] = createSignal(false)
   const [isSelectingStorylines, setIsSelectingStorylines] = createSignal(false)
   const [isEditingGoal, setIsEditingGoal] = createSignal(false)
   const [editGoal, setEditGoal] = createSignal(props.node.goal || '')
-  const [showCharacterUpdateModal, setShowCharacterUpdateModal] = createSignal(false)
 
   const { generateNodeSummary } = useOllama()
 
@@ -77,40 +77,40 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
     }
   })
 
-  const chaptersInOrder = createMemo(() => getChaptersInStoryOrder(nodeStore.nodesArray))
-  const currentChapterIndex = createMemo(() => chaptersInOrder().findIndex((chapter) => chapter.id === props.node.id))
-  const previousChapter = createMemo(() => {
-    const chapters = chaptersInOrder()
-    const index = currentChapterIndex()
+  const scenesInOrder = createMemo(() => getScenesInStoryOrder(nodeStore.nodesArray))
+  const currentSceneIndex = createMemo(() => scenesInOrder().findIndex((scene) => scene.id === props.node.id))
+  const previousScene = createMemo(() => {
+    const scenes = scenesInOrder()
+    const index = currentSceneIndex()
     if (index > 0) {
-      return chapters[index - 1]
+      return scenes[index - 1]
     }
     return null
   })
-  const nextChapter = createMemo(() => {
-    const chapters = chaptersInOrder()
-    const index = currentChapterIndex()
-    if (index >= 0 && index < chapters.length - 1) {
-      return chapters[index + 1]
+  const nextScene = createMemo(() => {
+    const scenes = scenesInOrder()
+    const index = currentSceneIndex()
+    if (index >= 0 && index < scenes.length - 1) {
+      return scenes[index + 1]
     }
     return null
   })
 
-  const getPreviousChapterTitle = () => {
-    const chapter = previousChapter()
-    return chapter ? `Go to previous chapter: ${chapter.title}` : 'Previous chapter unavailable'
+  const getPreviousSceneTitle = () => {
+    const scene = previousScene()
+    return scene ? `Go to previous scene: ${scene.title}` : 'Previous scene unavailable'
   }
 
-  const getNextChapterTitle = () => {
-    const chapter = nextChapter()
-    return chapter ? `Go to next chapter: ${chapter.title}` : 'Next chapter unavailable'
+  const getNextSceneTitle = () => {
+    const scene = nextScene()
+    return scene ? `Go to next scene: ${scene.title}` : 'Next scene unavailable'
   }
 
   // Handle click outside to close dropdown
   onMount(() => {
     const handleClickOutside = (e: MouseEvent) => {
       // Don't close if we're editing the time or selecting viewpoint/storylines
-      if (isEditingTime() || isSelectingViewpoint() || isSelectingStorylines()) return
+      if (isEditingTime() || isSelectingStorylines()) return
 
       if (
         dropdownRef &&
@@ -333,6 +333,23 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
     await copyPreviewStore.requestCopy(summary)
   }
 
+  const handleMassRewrite = (e: MouseEvent) => {
+    e.stopPropagation()
+    // Get all assistant messages in this node
+    const nodeMessageIds = messagesStore.messages
+      .filter((m) => m.sceneId === props.node.id && m.role === 'assistant' && !m.isQuery)
+      .sort((a, b) => a.order - b.order)
+      .map((m) => m.id)
+
+    if (nodeMessageIds.length === 0) {
+      alert('No messages to rewrite in this node.')
+      return
+    }
+
+    massRewriteDialogStore.show(props.node.id, nodeMessageIds)
+    setShowDropdown(false)
+  }
+
   const handleEditTime = (e: MouseEvent) => {
     e.stopPropagation()
     setIsEditingTime(true)
@@ -355,15 +372,8 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
     setShowDropdown(false)
   }
 
-  const handleSelectViewpoint = (e: MouseEvent) => {
-    e.stopPropagation()
-    setIsSelectingViewpoint(true)
-  }
-
   const handleSetViewpointCharacter = (characterId: string | null) => {
     nodeStore.updateNode(props.node.id, { viewpointCharacterId: characterId || undefined })
-    setIsSelectingViewpoint(false)
-    setShowDropdown(false)
   }
 
   const handleToggleStoryline = (storylineId: string) => {
@@ -391,12 +401,6 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
     nodeStore.updateNode(props.node.id, {
       activeContextItemIds: [...nonPlotIds, ...newPlotIds],
     })
-  }
-
-  const handleScrollToTop = () => {
-    if (headerRef) {
-      headerRef.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
   }
 
   const handleNavigateToChapter = (chapterId: string | undefined) => {
@@ -535,7 +539,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
             </Show>
             <Show when={props.node.storyTime !== undefined && props.node.storyTime !== null}>
               <span class={styles.metaItem} title={calendarStore.formatStoryTime(props.node.storyTime!)}>
-                <BsClock style={{ 'font-size': '0.9em', 'vertical-align': 'middle' }} />
+                <BsClock />
                 {calendarStore.formatStoryTime(props.node.storyTime!)}
               </span>
             </Show>
@@ -560,11 +564,29 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
               <Show when={activeCharacters().length > 0}>
                 <div class={styles.activeContextSection}>
                   <span class={styles.contextLabel}>Characters:</span>
-                  <span class={styles.contextList}>
-                    {activeCharacters()
-                      .map((char) => getCharacterDisplayName(char))
-                      .join(', ')}
-                  </span>
+                  <div class={styles.characterAvatarList}>
+                    <For each={activeCharacters()}>
+                      {(char) => (
+                        <div class={styles.characterAvatarItem}>
+                          <Show
+                            when={char.profileImageData}
+                            fallback={
+                              <div class={styles.characterAvatarPlaceholder}>
+                                {getAvatarInitial(getCharacterDisplayName(char))}
+                              </div>
+                            }
+                          >
+                            <img
+                              src={char.profileImageData!}
+                              alt={getCharacterDisplayName(char)}
+                              class={styles.characterAvatar}
+                            />
+                          </Show>
+                          <span class={styles.characterName}>{getCharacterDisplayName(char)}</span>
+                        </div>
+                      )}
+                    </For>
+                  </div>
                 </div>
               </Show>
               <Show when={activeContextItems().length > 0}>
@@ -594,20 +616,20 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
         <div class={styles.nodeActions}>
           <button
             class={styles.actionButton}
-            onClick={() => handleNavigateToChapter(previousChapter()?.id)}
-            disabled={!previousChapter()}
-            title={getPreviousChapterTitle()}
-            aria-label="Previous chapter"
+            onClick={() => handleNavigateToChapter(previousScene()?.id)}
+            disabled={!previousScene()}
+            title={getPreviousSceneTitle()}
+            aria-label="Previous scene"
           >
             <BsChevronLeft />
           </button>
 
           <button
             class={styles.actionButton}
-            onClick={() => handleNavigateToChapter(nextChapter()?.id)}
-            disabled={!nextChapter()}
-            title={getNextChapterTitle()}
-            aria-label="Next chapter"
+            onClick={() => handleNavigateToChapter(nextScene()?.id)}
+            disabled={!nextScene()}
+            title={getNextSceneTitle()}
+            aria-label="Next scene"
           >
             <BsChevronRight />
           </button>
@@ -622,10 +644,6 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
             title="More actions"
           >
             <BsThreeDotsVertical />
-          </button>
-
-          <button class={styles.actionButton} onClick={handleScrollToTop} title="Scroll to top">
-            <BsChevronUp />
           </button>
         </div>
 
@@ -660,52 +678,17 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
               </Show>
 
               <Show when={props.node.type === 'scene'}>
-                <button
-                  class={styles.dropdownButton}
-                  onClick={() => {
-                    setShowCharacterUpdateModal(true)
-                    setShowDropdown(false)
-                  }}
-                >
-                  <BsPeople /> Update Character Description
-                </button>
-              </Show>
-
-              <Show when={props.node.type === 'scene' && !isSelectingViewpoint()}>
-                <button class={styles.dropdownButton} onClick={handleSelectViewpoint}>
-                  <BsPeople />
-                  {viewpointCharacter()
-                    ? `Viewpoint: ${getCharacterDisplayName(viewpointCharacter()!)}${hasExplicitViewpoint() ? '' : ' (default)'}`
-                    : 'Set Viewpoint Character'}
-                </button>
-              </Show>
-
-              <Show when={isSelectingViewpoint()}>
-                <div class={styles.viewpointSelector}>
-                  <div class={styles.viewpointHeader}>Select Viewpoint Character:</div>
-                  <Show when={protagonist()}>
-                    <button class={styles.viewpointOption} onClick={() => handleSetViewpointCharacter(null)}>
-                      {getCharacterDisplayName(protagonist()!)} (Protagonist - Default)
-                    </button>
-                  </Show>
-                  <For each={activeCharacters()}>
-                    {(char) => (
-                      <Show when={char.id !== protagonist()?.id}>
-                        <button class={styles.viewpointOption} onClick={() => handleSetViewpointCharacter(char.id)}>
-                          {getCharacterDisplayName(char)}
-                        </button>
-                      </Show>
-                    )}
-                  </For>
-                  <button
-                    class={`${styles.dropdownButton} ${styles.viewpointCancel}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setIsSelectingViewpoint(false)
-                    }}
-                  >
-                    Cancel
-                  </button>
+                <div class={styles.viewpointRow}>
+                  <span class={styles.viewpointLabel}>Viewpoint:</span>
+                  <CharacterSelect
+                    value={props.node.viewpointCharacterId || null}
+                    onChange={handleSetViewpointCharacter}
+                    characters={activeCharacters().length > 0 ? activeCharacters() : undefined}
+                    placeholder={protagonist() ? `${getCharacterDisplayName(protagonist()!)} (default)` : 'Select viewpoint...'}
+                    allowNone={!!props.node.viewpointCharacterId}
+                    noneLabel={protagonist() ? `${getCharacterDisplayName(protagonist()!)} (default)` : 'None'}
+                    size="sm"
+                  />
                 </div>
               </Show>
 
@@ -770,6 +753,12 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 </button>
               </Show>
 
+              <Show when={props.node.type === 'scene' || props.node.type === 'chapter'}>
+                <button class={styles.dropdownButton} onClick={handleMassRewrite}>
+                  <BsArrowRepeat /> Mass Rewrite
+                </button>
+              </Show>
+
               <button class={styles.dropdownButton} onClick={handleCopyNode} disabled>
                 <BsClipboard />
                 Copy Node (TODO)
@@ -822,7 +811,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
         modal
         open={isEditingTime()}
         currentTime={props.node.storyTime ?? null}
-        previousChapterTime={previousChapter()?.storyTime ?? null}
+        previousChapterTime={previousScene()?.storyTime ?? null}
         onSave={handleSaveTime}
         onCancel={handleCancelTimeEdit}
       />
@@ -876,11 +865,6 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
           chapterNode={props.node}
         />
       </Show>
-
-      <CharacterUpdateModal
-        isOpen={showCharacterUpdateModal()}
-        onClose={() => setShowCharacterUpdateModal(false)}
-      />
     </>
   )
 }

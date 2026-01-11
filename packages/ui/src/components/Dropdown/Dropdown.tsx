@@ -143,7 +143,7 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
               left: `${menuPosition().left}px`,
               'max-height': `${menuPosition().maxHeight}px`,
               'overflow-y': 'auto',
-              'z-index': '400', // popover level - above modals and overlays
+              'z-index': '1000', // above mobile navigation (900) and other overlays
             }
           : undefined
       }
@@ -167,9 +167,37 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
       ? `${styles.containerPortal} ${props.class ?? ''}`
       : `${styles.container} ${props.class ?? ''}`
 
+  // Track if touch started to prevent double-firing from touch + synthesized click
+  let touchStarted = false
+
+  const handleTouchStart = () => {
+    touchStarted = true
+  }
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    e.preventDefault() // Prevent synthesized click event
+    e.stopPropagation()
+    toggle()
+    // Reset after a short delay
+    setTimeout(() => { touchStarted = false }, 300)
+  }
+
+  const handleClick = (e: MouseEvent) => {
+    // Ignore if this click was triggered by a touch (already handled)
+    if (touchStarted) return
+    e.stopPropagation()
+    toggle()
+  }
+
   return (
     <div ref={containerRef} class={containerClass()}>
-      <div ref={triggerRef} onClick={(e) => { e.stopPropagation(); toggle() }} style={props.portal ? { display: 'contents' } : undefined}>
+      <div
+        ref={triggerRef}
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={props.portal ? { display: 'contents' } : undefined}
+      >
         {props.trigger}
       </div>
       <Show when={isOpen()}>

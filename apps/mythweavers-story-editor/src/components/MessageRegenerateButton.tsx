@@ -1,7 +1,8 @@
 import { Button, ButtonGroup, Dropdown, DropdownItem } from '@mythweavers/ui'
 import { BsChevronDown } from 'solid-icons/bs'
-import { Component, For, createSignal } from 'solid-js'
+import { Component, For } from 'solid-js'
 import { JSX } from 'solid-js'
+import { settingsStore } from '../stores/settingsStore'
 import * as styles from './MessageStyles.css'
 
 interface MessageRegenerateButtonProps {
@@ -11,19 +12,18 @@ interface MessageRegenerateButtonProps {
   icon: JSX.Element
 }
 
+const TOKEN_OPTIONS = [
+  { value: 512, label: '512', description: 'Short' },
+  { value: 1024, label: '1024', description: 'Medium' },
+  { value: 2048, label: '2048', description: 'Long' },
+  { value: 4096, label: '4096', description: 'Extra long' },
+  { value: 8192, label: '8192', description: 'Very long' },
+]
+
 export const MessageRegenerateButton: Component<MessageRegenerateButtonProps> = (props) => {
-  const [selectedTokens, setSelectedTokens] = createSignal(4096)
-
-  const tokenOptions = [
-    { value: 512, label: '512', description: 'Short' },
-    { value: 1024, label: '1024', description: 'Medium' },
-    { value: 2048, label: '2048', description: 'Long' },
-    { value: 4096, label: '4096', description: 'Extra long' },
-    { value: 8192, label: '8192', description: 'Very long' },
-  ]
-
   const handleSelect = (tokens: number) => {
-    setSelectedTokens(tokens)
+    if (tokens <= settingsStore.thinkingBudget) return
+    settingsStore.setMaxTokens(tokens)
     props.onRegenerate(tokens)
   }
 
@@ -32,12 +32,12 @@ export const MessageRegenerateButton: Component<MessageRegenerateButtonProps> = 
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => props.onRegenerate(selectedTokens())}
+        onClick={() => props.onRegenerate(settingsStore.maxTokens)}
         disabled={props.disabled}
-        title={`${props.title} (${selectedTokens()} tokens)`}
+        title={`${props.title} (${settingsStore.maxTokens} tokens)`}
       >
         {props.icon}
-        <span class={styles.regenerateTokenBadge}>{selectedTokens()}</span>
+        <span class={styles.regenerateTokenBadge}>{settingsStore.maxTokens}</span>
       </Button>
       <Dropdown
         alignRight
@@ -54,15 +54,19 @@ export const MessageRegenerateButton: Component<MessageRegenerateButtonProps> = 
           </Button>
         }
       >
-        <For each={tokenOptions}>
-          {(option) => (
-            <DropdownItem
-              active={selectedTokens() === option.value}
-              onClick={() => handleSelect(option.value)}
-            >
-              {option.label} - {option.description}
-            </DropdownItem>
-          )}
+        <For each={TOKEN_OPTIONS}>
+          {(option) => {
+            const disabled = () => option.value <= settingsStore.thinkingBudget
+            return (
+              <DropdownItem
+                active={settingsStore.maxTokens === option.value}
+                onClick={() => handleSelect(option.value)}
+                disabled={disabled()}
+              >
+                {option.label} - {option.description}
+              </DropdownItem>
+            )
+          }}
         </For>
       </Dropdown>
     </ButtonGroup>

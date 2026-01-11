@@ -5,6 +5,12 @@ export const storageContainer = style({
   display: 'flex',
   flexDirection: 'row',
   gap: '0.75rem',
+
+  '@media': {
+    '(max-width: 600px)': {
+      flexDirection: 'column',
+    },
+  },
 })
 
 export const storageOption = style({

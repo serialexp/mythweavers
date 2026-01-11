@@ -319,6 +319,8 @@ export const nodeStore = {
       order: siblings.length,
       expanded: true,
       isOpen: true,
+      // Only scenes have content, so default to 2 (full content) for scenes, 0 for others
+      includeInFull: type === 'scene' ? 2 : 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -361,6 +363,8 @@ export const nodeStore = {
       order: beforeNode.order, // Take the position of the node we're inserting before
       expanded: true,
       isOpen: true,
+      // Only scenes have content, so default to 2 (full content) for scenes, 0 for others
+      includeInFull: type === 'scene' ? 2 : 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     }

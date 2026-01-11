@@ -11,11 +11,6 @@ export const sceneEditor = style({
 })
 
 export const editorContainer = style({
-  minHeight: '200px',
-  padding: tokens.space['4'],
-  border: `1px solid ${tokens.color.border.default}`,
-  borderRadius: tokens.radius.lg,
-  backgroundColor: tokens.color.bg.raised,
   fontFamily: 'inherit',
   lineHeight: tokens.font.lineHeight.relaxed,
 })
@@ -30,8 +25,7 @@ globalStyle(`${sceneEditor} .ProseMirror`, {
 // Paragraph base styles
 globalStyle(`${sceneEditor} .ProseMirror p`, {
   margin: 0,
-  padding: `${tokens.space['2']} 0`,
-  paddingLeft: tokens.space['2'],
+  padding: `${tokens.space['2']} ${tokens.space['4']}`,
   minHeight: '1.6em',
   position: 'relative',
   borderLeft: '3px solid transparent',
@@ -79,6 +73,37 @@ globalStyle(`${sceneEditor} .ProseMirror p[data-state="final"]`, {
 
 globalStyle(`${sceneEditor} .ProseMirror p[data-state="sdt"]`, {
   borderLeftColor: tokens.color.semantic.info,
+})
+
+// Script indicator - show { } after paragraph content
+globalStyle(`${sceneEditor} .ProseMirror p[data-has-script]::after`, {
+  content: '"{ }"',
+  display: 'inline-block',
+  marginLeft: tokens.space['2'],
+  fontSize: tokens.font.size.xs,
+  opacity: 0.6,
+  verticalAlign: 'middle',
+  color: tokens.color.accent.primary,
+  fontFamily: tokens.font.family.mono,
+  fontWeight: tokens.font.weight.bold,
+})
+
+// Inventory indicator - show + after paragraph content
+globalStyle(`${sceneEditor} .ProseMirror p[data-has-inventory]::after`, {
+  content: '"+"',
+  display: 'inline-block',
+  marginLeft: tokens.space['2'],
+  fontSize: tokens.font.size.xs,
+  opacity: 0.6,
+  verticalAlign: 'middle',
+  color: tokens.color.semantic.success,
+  fontFamily: tokens.font.family.mono,
+  fontWeight: tokens.font.weight.bold,
+})
+
+// When both script and inventory exist, show combined indicator
+globalStyle(`${sceneEditor} .ProseMirror p[data-has-script][data-has-inventory]::after`, {
+  content: '"{ } +"',
 })
 
 // Paragraph Actions Menu
@@ -340,8 +365,7 @@ globalStyle(`${sceneEditor} .solid-editor`, {
 // Solid-editor paragraph styles
 globalStyle(`${sceneEditor} .solid-editor p, ${sceneEditor} .solid-editor .solid-editor-paragraph`, {
   margin: 0,
-  padding: `${tokens.space['2']} 0`,
-  paddingLeft: tokens.space['2'],
+  padding: `${tokens.space['2']} ${tokens.space['4']}`,
   minHeight: '1.6em',
   position: 'relative',
   borderLeft: '3px solid transparent',
@@ -401,6 +425,67 @@ globalStyle(
   },
 )
 
+// Solid-editor script indicator - show { } after paragraph content
+globalStyle(
+  `${sceneEditor} .solid-editor p[data-has-script]::after, ${sceneEditor} .solid-editor .solid-editor-paragraph[data-has-script]::after`,
+  {
+    content: '"{ }"',
+    display: 'inline-block',
+    marginLeft: tokens.space['2'],
+    fontSize: tokens.font.size.xs,
+    opacity: 0.6,
+    verticalAlign: 'middle',
+    color: tokens.color.accent.primary,
+    fontFamily: tokens.font.family.mono,
+    fontWeight: tokens.font.weight.bold,
+  },
+)
+
+// ====================================
+// Inventory Action Badges
+// ====================================
+
+// Container for inventory badges - displayed inline after paragraph content
+export const inventoryBadgesContainer = style({
+  display: 'inline-flex',
+  flexWrap: 'wrap',
+  gap: tokens.space['1'],
+  marginLeft: tokens.space['2'],
+  verticalAlign: 'middle',
+  cursor: 'pointer',
+  userSelect: 'none',
+})
+
+// Individual inventory badge
+export const inventoryBadge = style({
+  display: 'inline-block',
+  padding: `${tokens.space['0.5']} ${tokens.space['1.5']}`,
+  fontSize: tokens.font.size.xs,
+  fontFamily: tokens.font.family.mono,
+  fontWeight: tokens.font.weight.medium,
+  borderRadius: tokens.radius.sm,
+  whiteSpace: 'nowrap',
+  transition: `opacity ${tokens.duration.fast} ${tokens.easing.default}`,
+  opacity: 0.8,
+  selectors: {
+    '&:hover': {
+      opacity: 1,
+    },
+  },
+})
+
+// Add item badge (green)
+export const inventoryBadgeAdd = style({
+  backgroundColor: tokens.color.semantic.successSubtle,
+  color: tokens.color.semantic.success,
+})
+
+// Remove item badge (red/warning)
+export const inventoryBadgeRemove = style({
+  backgroundColor: tokens.color.semantic.errorSubtle,
+  color: tokens.color.semantic.error,
+})
+
 // Solid-editor focus styles
 globalStyle(`${sceneEditor} .solid-editor:focus`, {
   boxShadow: `0 0 0 2px color-mix(in srgb, ${tokens.color.accent.primary} 15%, transparent)`,
@@ -410,9 +495,9 @@ globalStyle(`${sceneEditor} .solid-editor:focus`, {
 globalStyle(`${sceneEditor} .solid-editor-placeholder`, {
   color: tokens.color.text.muted,
   fontStyle: 'italic',
-  // Match paragraph padding: borderLeft (3px) + paddingLeft (space['2'])
-  paddingLeft: `calc(3px + ${tokens.space['2']})`,
-  paddingTop: tokens.space['2'],
+  // Match paragraph padding: borderLeft (3px) + horizontal padding (space['4'])
+  padding: `${tokens.space['2']} ${tokens.space['4']}`,
+  paddingLeft: `calc(3px + ${tokens.space['4']})`,
 })
 
 // Solid-editor mark styles
@@ -462,11 +547,26 @@ export const paragraphActionButtonContainer = style({
   alignItems: 'center',
   opacity: 0.6,
   transition: `opacity ${tokens.duration.fast} ${tokens.easing.default}`,
+  // Prevent cursor and selection inside the widget
+  userSelect: 'none',
+  caretColor: 'transparent',
+  // Ensure rounded corners match the button inside
+  borderRadius: tokens.radius.default,
+  overflow: 'hidden',
   selectors: {
     '&:hover': {
       opacity: 1,
     },
   },
+})
+
+// Prevent selection highlight inside paragraph action widgets
+globalStyle(`${paragraphActionButtonContainer} *`, {
+  userSelect: 'none',
+})
+
+globalStyle(`${paragraphActionButtonContainer}::selection, ${paragraphActionButtonContainer} *::selection`, {
+  background: 'transparent',
 })
 
 // The action button itself
@@ -477,6 +577,7 @@ export const paragraphActionButton = style({
   padding: '0',
   fontSize: tokens.font.size.base,
   lineHeight: '1',
+  borderRadius: tokens.radius.default,
 })
 
 // Dropdown menu styles

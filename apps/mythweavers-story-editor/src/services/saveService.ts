@@ -25,7 +25,8 @@ import {
   postMyMapsByMapIdLandmarks,
   postMyMapsByMapIdPaths,
   postMyMapsByMapIdPawns,
-  postMyMessageRevisionsByRevisionIdParagraphs,
+  postMyMessageRevisionsByRevisionIdParagraphsBatch,
+  postMyMessagesByIdRegenerate,
   postMyScenesBySceneIdMessages,
   postMyStoriesByStoryIdBooks,
   postMyStoriesByStoryIdCharacters,
@@ -40,11 +41,11 @@ import {
   postMyLandmarksByLandmarkIdStates,
   postMyMessagesByMessageIdPlotPointStates,
   deleteMyMessagesByMessageIdPlotPointStatesByKey,
+  getApiBaseUrl,
 } from '../client/config'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { VersionConflictError } from '../types/api'
 import {
-  Chapter,
   Character,
   ContextItem,
   Fleet,
@@ -56,6 +57,18 @@ import {
   StoryMap,
 } from '../types/core'
 import { apiClient } from '../utils/apiClient'
+
+// Convert base64 data URI to Blob without using fetch (CSP-compliant)
+function base64ToBlob(dataUri: string): Blob {
+  const mimeType = dataUri.match(/data:([^;]+);/)?.[1] || 'image/jpeg'
+  const base64Data = dataUri.split(',')[1] || dataUri
+  const binaryString = atob(base64Data)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: mimeType })
+}
 
 // Base fields shared by all save operations
 interface SaveOperationBase {
@@ -99,24 +112,19 @@ interface MessageBatchOperation extends SaveOperationBase {
       id?: string
       sceneId: string
       sortOrder: number
-      instruction?: string
-      script?: string
+      instruction?: string | null
+      script?: string | null
+      type?: 'chapter' | 'event' | 'branch' | null
+      options?: Array<{
+        id: string
+        label: string
+        targetNodeId: string
+        targetMessageId: string
+        description?: string
+      }>
       paragraphs?: Array<{ body: string; sortOrder: number }>
     }>
   }
-}
-
-// Chapter operations
-interface ChapterUpdateOperation extends SaveOperationBase {
-  type: 'chapter-update'
-  entityType: 'chapter'
-  data: Partial<Chapter>
-}
-
-interface ChapterDeleteOperation extends SaveOperationBase {
-  type: 'chapter-delete'
-  entityType: 'chapter'
-  data?: undefined
 }
 
 // Character operations
@@ -336,8 +344,6 @@ type SaveOperation =
   | MessageDeleteOperation
   | MessageReorderOperation
   | MessageBatchOperation
-  | ChapterUpdateOperation
-  | ChapterDeleteOperation
   | CharacterInsertOperation
   | CharacterUpdateOperation
   | CharacterDeleteOperation
@@ -393,6 +399,7 @@ export class SaveService {
   private onConflict?: (serverUpdatedAt: string, clientUpdatedAt: string) => void
   private onError?: (error: Error) => void
   private onOperationFailed?: (operation: SaveOperation, error: Error) => void
+  private onMessageCreated?: (messageId: string, data: { currentMessageRevisionId: string }) => void
 
   // Set callbacks for UI updates
   setCallbacks(callbacks: {
@@ -401,12 +408,14 @@ export class SaveService {
     onConflict?: (serverUpdatedAt: string, clientUpdatedAt: string) => void
     onError?: (error: Error) => void
     onOperationFailed?: (operation: SaveOperation, error: Error) => void
+    onMessageCreated?: (messageId: string, data: { currentMessageRevisionId: string }) => void
   }) {
     this.onSaveStatusChange = callbacks.onSaveStatusChange
     this.onQueueLengthChange = callbacks.onQueueLengthChange
     this.onConflict = callbacks.onConflict
     this.onError = callbacks.onError
     this.onOperationFailed = callbacks.onOperationFailed
+    this.onMessageCreated = callbacks.onMessageCreated
   }
 
   private onQueueLengthChange?: (length: number) => void
@@ -642,28 +651,35 @@ export class SaveService {
         if (insertResponse.data?.message) {
           this.updateLastKnownTimestamp(insertResponse.data.message.updatedAt)
 
-          // If the message has content, create paragraphs for it (split on double newlines)
+          // Update the frontend message with the currentMessageRevisionId from backend
           const revisionId = insertResponse.data.message.currentMessageRevisionId
+          if (revisionId) {
+            this.onMessageCreated?.(operation.data.id, { currentMessageRevisionId: revisionId })
+          }
+
+          // If the message has content, create paragraphs for it (split on double newlines)
           if (revisionId && operation.data.content) {
             const paragraphTexts = operation.data.content
               .split(/\n\n+/)
               .map((p) => p.trim())
               .filter((p) => p.length > 0)
 
-            // Create all paragraphs in parallel
-            const paragraphPromises = paragraphTexts.map((text, index) =>
-              postMyMessageRevisionsByRevisionIdParagraphs({
-                path: { revisionId },
-                body: {
-                  body: text,
-                  sortOrder: index,
-                } as any,
-              }).catch((err) => {
-                console.error(`[SaveService] Failed to create paragraph ${index}:`, err)
-              }),
-            )
-
-            await Promise.all(paragraphPromises)
+            // Create all paragraphs using bulk endpoint
+            if (paragraphTexts.length > 0) {
+              try {
+                await postMyMessageRevisionsByRevisionIdParagraphsBatch({
+                  path: { revisionId },
+                  body: {
+                    paragraphs: paragraphTexts.map((text, index) => ({
+                      body: text,
+                      sortOrder: index,
+                    })),
+                  },
+                })
+              } catch (err) {
+                console.error('[SaveService] Failed to create paragraphs:', err)
+              }
+            }
           }
         }
         break
@@ -680,6 +696,8 @@ export class SaveService {
             script: operation.data.script,
             sortOrder: operation.data.order,
             nodeId: operation.data.sceneId, // sceneId on frontend = nodeId on backend
+            type: operation.data.type,
+            options: operation.data.options,
           },
         })
         // Message updated
@@ -726,24 +744,34 @@ export class SaveService {
         break
       }
 
-      case 'chapter-update': {
-        await patchMyChaptersById({
-          path: { id: entityId },
-          body: {
-            name: operation.data.title,
-            summary: operation.data.summary,
-            sortOrder: operation.data.order,
-            nodeType: operation.data.nodeType,
-          },
-        })
-        break
-      }
-
-      case 'chapter-delete':
-        await deleteMyChaptersById({ path: { id: entityId } })
-        break
-
       case 'character-insert': {
+        let pictureFileId = operation.data.pictureFileId
+
+        // Upload profile image if present as base64 data URI
+        const imageData = operation.data.profileImageData
+        if (imageData && imageData.startsWith('data:')) {
+          const blob = base64ToBlob(imageData)
+
+          const formData = new FormData()
+          formData.append('file', blob, 'character-avatar.jpg')
+          if (storyId) {
+            formData.append('storyId', storyId)
+          }
+
+          const response = await fetch(`${getApiBaseUrl()}/my/files`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          })
+
+          if (response.ok) {
+            const result = await response.json()
+            pictureFileId = result.file?.id
+          } else {
+            console.error('Failed to upload character image:', await response.text())
+          }
+        }
+
         await postMyStoriesByStoryIdCharacters({
           path: { storyId },
           body: {
@@ -754,13 +782,43 @@ export class SaveService {
             description: operation.data.description || undefined,
             birthdate: operation.data.birthdate ?? undefined,
             isMainCharacter: operation.data.isMainCharacter,
-            pictureFileId: operation.data.pictureFileId || undefined,
+            pictureFileId: pictureFileId || undefined,
           },
         })
         break
       }
 
       case 'character-update': {
+        let pictureFileId = operation.data.pictureFileId
+
+        // Upload profile image if present as base64 data URI
+        // profileImageData being a base64 data URI indicates a new image was selected
+        // (null means clear the image, undefined means no change)
+        // Note: profileImageData might be a URL when loaded from server - only process if it's base64
+        const imageData = operation.data.profileImageData
+        if (imageData && imageData.startsWith('data:')) {
+          const blob = base64ToBlob(imageData)
+
+          const formData = new FormData()
+          formData.append('file', blob, 'character-avatar.jpg')
+          if (storyId) {
+            formData.append('storyId', storyId)
+          }
+
+          const response = await fetch(`${getApiBaseUrl()}/my/files`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          })
+
+          if (response.ok) {
+            const result = await response.json()
+            pictureFileId = result.file?.id
+          } else {
+            console.error('Failed to upload character image:', await response.text())
+          }
+        }
+
         await patchMyCharactersById({
           path: { id: entityId },
           body: {
@@ -771,7 +829,7 @@ export class SaveService {
             description: operation.data.description,
             birthdate: operation.data.birthdate ?? undefined,
             isMainCharacter: operation.data.isMainCharacter,
-            pictureFileId: operation.data.pictureFileId,
+            pictureFileId: pictureFileId,
           },
         })
         break
@@ -862,6 +920,7 @@ export class SaveService {
           body: {
             name: operation.data.name,
             borderColor: operation.data.borderColor,
+            propertySchema: operation.data.propertySchema,
           },
         })
         break
@@ -917,7 +976,7 @@ export class SaveService {
               id: operation.data.id, // Pass client-generated ID
               name: operation.data.title,
               summary: operation.data.summary || undefined,
-              sortOrder: operation.data.sortOrder || operation.data.order || 0,
+              sortOrder: operation.data.order ?? 0,
             },
           })
         } else if (operation.data.type === 'arc') {
@@ -927,7 +986,7 @@ export class SaveService {
               id: operation.data.id, // Pass client-generated ID
               name: operation.data.title,
               summary: operation.data.summary || undefined,
-              sortOrder: operation.data.sortOrder || operation.data.order || 0,
+              sortOrder: operation.data.order ?? 0,
             },
           })
         } else if (operation.data.type === 'chapter') {
@@ -937,7 +996,7 @@ export class SaveService {
               id: operation.data.id, // Pass client-generated ID
               name: operation.data.title,
               summary: operation.data.summary || undefined,
-              sortOrder: operation.data.sortOrder || operation.data.order || 0,
+              sortOrder: operation.data.order ?? 0,
               nodeType: operation.data.nodeType || 'story',
             },
           })
@@ -950,7 +1009,7 @@ export class SaveService {
               id: operation.data.id,
               name: operation.data.title,
               summary: operation.data.summary || undefined,
-              sortOrder: operation.data.sortOrder || operation.data.order || 0,
+              sortOrder: operation.data.order ?? 0,
             } as any,
           })
         }
@@ -964,7 +1023,7 @@ export class SaveService {
             body: {
               name: operation.data.title,
               summary: operation.data.summary,
-              sortOrder: operation.data.sortOrder ?? operation.data.order,
+              sortOrder: operation.data.order,
             },
           })
         } else if (operation.data.type === 'arc') {
@@ -973,7 +1032,7 @@ export class SaveService {
             body: {
               name: operation.data.title,
               summary: operation.data.summary,
-              sortOrder: operation.data.sortOrder ?? operation.data.order,
+              sortOrder: operation.data.order,
             },
           })
         } else if (operation.data.type === 'chapter') {
@@ -982,8 +1041,9 @@ export class SaveService {
             body: {
               name: operation.data.title,
               summary: operation.data.summary,
-              sortOrder: operation.data.sortOrder ?? operation.data.order,
+              sortOrder: operation.data.order,
               nodeType: operation.data.nodeType,
+              status: operation.data.status,
             },
           })
         } else if (operation.data.type === 'scene') {
@@ -993,7 +1053,14 @@ export class SaveService {
             body: {
               name: operation.data.title,
               summary: operation.data.summary,
-              sortOrder: operation.data.sortOrder ?? operation.data.order,
+              sortOrder: operation.data.order,
+              includeInFull: operation.data.includeInFull,
+              // Scene-specific fields for context/characters
+              activeCharacterIds: operation.data.activeCharacterIds,
+              activeContextItemIds: operation.data.activeContextItemIds,
+              viewpointCharacterId: operation.data.viewpointCharacterId,
+              goal: operation.data.goal,
+              storyTime: operation.data.storyTime,
             },
           })
         }
@@ -1023,7 +1090,7 @@ export class SaveService {
               body: {
                 name: node.title,
                 summary: node.summary,
-                sortOrder: node.sortOrder ?? node.order,
+                sortOrder: node.order,
               },
             })
           } else if (node.type === 'arc') {
@@ -1032,7 +1099,7 @@ export class SaveService {
               body: {
                 name: node.title,
                 summary: node.summary,
-                sortOrder: node.sortOrder ?? node.order,
+                sortOrder: node.order,
               },
             })
           } else if (node.type === 'chapter') {
@@ -1041,8 +1108,9 @@ export class SaveService {
               body: {
                 name: node.title,
                 summary: node.summary,
-                sortOrder: node.sortOrder ?? node.order,
+                sortOrder: node.order,
                 nodeType: node.nodeType,
+                status: node.status,
               },
             })
           } else if (node.type === 'scene') {
@@ -1052,7 +1120,14 @@ export class SaveService {
               body: {
                 name: node.title,
                 summary: node.summary,
-                sortOrder: node.sortOrder ?? node.order,
+                sortOrder: node.order,
+                includeInFull: node.includeInFull,
+                // Scene-specific fields for context/characters
+                activeCharacterIds: node.activeCharacterIds,
+                activeContextItemIds: node.activeContextItemIds,
+                viewpointCharacterId: node.viewpointCharacterId,
+                goal: node.goal,
+                storyTime: node.storyTime,
               },
             })
           }
@@ -1325,31 +1400,6 @@ export class SaveService {
       // Using immediate save
       this.queueSave(saveOp)
     }
-  }
-
-  saveChapter(storyId: string, chapterId: string, updates: Partial<Chapter>, debounce = false) {
-    const saveOp = {
-      type: 'chapter-update' as SaveOperationType,
-      entityType: 'chapter' as const,
-      entityId: chapterId,
-      storyId,
-      data: updates,
-    }
-
-    if (debounce) {
-      this.debouncedQueueSave(saveOp, 500)
-    } else {
-      this.queueSave(saveOp)
-    }
-  }
-
-  deleteChapter(storyId: string, chapterId: string) {
-    this.queueSave({
-      type: 'chapter-delete',
-      entityType: 'chapter',
-      entityId: chapterId,
-      storyId,
-    })
   }
 
   createCharacter(storyId: string, character: Character) {
@@ -1811,6 +1861,14 @@ export class SaveService {
     originalParagraphs: Paragraph[],
     newParagraphs: Paragraph[],
   ): Promise<{ created: number; updated: number; deleted: number }> {
+    // Convert frontend state to API state format
+    const toApiState = (
+      state: Paragraph['state'] | undefined,
+    ): 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT' | undefined => {
+      if (!state) return undefined
+      return state.toUpperCase() as 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT'
+    }
+
     const originalMap = new Map(originalParagraphs.map((p) => [p.id, p]))
     const newMap = new Map(newParagraphs.map((p) => [p.id, p]))
 
@@ -1847,34 +1905,45 @@ export class SaveService {
       `[SaveService.saveParagraphs] Changes: ${toCreate.length} create, ${toUpdate.length} update, ${toDelete.length} delete`,
     )
 
-    // Execute all operations in parallel for better performance
-    const createPromises = toCreate.map((para) =>
-      postMyMessageRevisionsByRevisionIdParagraphs({
-        path: { revisionId: messageRevisionId },
-        body: {
-          id: para.id,
-          body: para.body,
-          contentSchema: para.contentSchema,
-          state: para.state?.toUpperCase() as any,
-          sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
-        } as any,
-      })
-        .then(() => ({ success: true, id: para.id }))
-        .catch((error) => {
-          console.error(`[SaveService.saveParagraphs] Failed to create paragraph ${para.id}:`, error)
-          return { success: false, id: para.id, error }
+    // Use bulk endpoint for creates (single API call instead of N calls)
+    let createdCount = 0
+    let createError: Error | null = null
+    if (toCreate.length > 0) {
+      try {
+        const bulkCreateResult = await postMyMessageRevisionsByRevisionIdParagraphsBatch({
+          path: { revisionId: messageRevisionId },
+          body: {
+            paragraphs: toCreate.map((para) => ({
+              id: para.id,
+              body: para.body,
+              contentSchema: para.contentSchema ?? undefined,
+              state: toApiState(para.state),
+              sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
+            })),
+          },
         })
-    )
+        if (bulkCreateResult.data) {
+          createdCount = bulkCreateResult.data.created
+        } else if (bulkCreateResult.error) {
+          console.error('[SaveService.saveParagraphs] Bulk create failed:', bulkCreateResult.error)
+          createError = new Error(bulkCreateResult.error.error || 'Bulk create failed')
+        }
+      } catch (error) {
+        console.error('[SaveService.saveParagraphs] Bulk create error:', error)
+        createError = error as Error
+      }
+    }
 
+    // Updates and deletes still run in parallel (they are individual operations)
     const updatePromises = toUpdate.map((para) =>
       patchMyParagraphsById({
         path: { id: para.id },
         body: {
           body: para.body,
           contentSchema: para.contentSchema,
-          state: para.state?.toUpperCase() as any,
+          state: toApiState(para.state),
           sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
-        } as any,
+        },
       })
         .then(() => ({ success: true, id: para.id }))
         .catch((error) => {
@@ -1894,18 +1963,16 @@ export class SaveService {
         })
     )
 
-    // Run all operations in parallel
-    const [createResults, updateResults, deleteResults] = await Promise.all([
-      Promise.all(createPromises),
+    // Run update and delete operations in parallel
+    const [updateResults, deleteResults] = await Promise.all([
       Promise.all(updatePromises),
       Promise.all(deletePromises),
     ])
 
-    const createdCount = createResults.filter((r) => r.success).length
     const updatedCount = updateResults.filter((r) => r.success).length
     const deletedCount = deleteResults.filter((r) => r.success).length
     const errorCount =
-      createResults.filter((r) => !r.success).length +
+      (createError ? toCreate.length : 0) +
       updateResults.filter((r) => !r.success).length +
       deleteResults.filter((r) => !r.success).length
 
@@ -1922,6 +1989,85 @@ export class SaveService {
       updated: updatedCount,
       deleted: deletedCount,
     }
+  }
+
+  /**
+   * Update the body of specific paragraphs (for find/replace operations).
+   * This preserves paragraph structure and only updates the text content.
+   *
+   * @param paragraphs - Paragraphs with updated body text
+   */
+  async updateParagraphBodies(paragraphs: Array<{ id: string; body: string }>): Promise<void> {
+    const updatePromises = paragraphs.map((p) =>
+      patchMyParagraphsById({
+        path: { id: p.id },
+        body: { body: p.body },
+      }).catch((err) => {
+        console.error(`[SaveService.updateParagraphBodies] Failed to update paragraph ${p.id}:`, err)
+      }),
+    )
+    await Promise.all(updatePromises)
+  }
+
+  /**
+   * Create a new message revision with new content.
+   * This is the proper way to replace content (regeneration, AI rewrite, etc.)
+   * - it creates a new revision rather than mutating the existing one.
+   *
+   * @param messageId - The message ID
+   * @param newContent - New content string (will be split on double newlines)
+   * @param metadata - Optional metadata for the revision (model, tokens, etc.)
+   * @returns The new revision ID and updates to apply to local message state
+   */
+  async createMessageRevision(
+    messageId: string,
+    newContent: string,
+    metadata?: {
+      model?: string
+      tokensPerSecond?: number
+      totalTokens?: number
+      promptTokens?: number
+      cacheCreationTokens?: number
+      cacheReadTokens?: number
+      think?: string
+      showThink?: boolean
+    },
+  ): Promise<{ revisionId: string }> {
+    // Create new revision via regenerate endpoint
+    const { data, error } = await postMyMessagesByIdRegenerate({
+      path: { id: messageId },
+      body: metadata || {},
+    })
+
+    if (error || !data) {
+      throw new Error(`Failed to create message revision: ${error}`)
+    }
+
+    const revisionId = data.revision.id
+
+    // Split content and create paragraphs on the new revision using bulk endpoint
+    const paragraphTexts = newContent
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0)
+
+    if (paragraphTexts.length > 0) {
+      try {
+        await postMyMessageRevisionsByRevisionIdParagraphsBatch({
+          path: { revisionId },
+          body: {
+            paragraphs: paragraphTexts.map((text, index) => ({
+              body: text,
+              sortOrder: index,
+            })),
+          },
+        })
+      } catch (err) {
+        console.error('[SaveService.createMessageRevision] Failed to create paragraphs:', err)
+      }
+    }
+
+    return { revisionId }
   }
 
   // ============================================================================
@@ -1972,6 +2118,48 @@ export class SaveService {
     }
   }
 
+  /**
+   * Save a paragraph script
+   * This calls the API directly (not queued) for immediate feedback
+   */
+  async saveParagraphScript(_storyId: string, paragraphId: string, script: string | null) {
+    try {
+      await patchMyParagraphsById({
+        path: { id: paragraphId },
+        body: { script: script ?? undefined },
+      })
+      console.log('[SaveService] Saved paragraph script:', paragraphId)
+    } catch (error) {
+      console.error('[SaveService] Failed to save paragraph script:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Save paragraph script and inventory actions together
+   * This calls the API directly (not queued) for immediate feedback
+   */
+  async saveParagraphScriptAndInventory(
+    _storyId: string,
+    paragraphId: string,
+    script: string | null,
+    inventoryActions: any[] | null,
+  ) {
+    try {
+      await patchMyParagraphsById({
+        path: { id: paragraphId },
+        body: {
+          script: script ?? undefined,
+          inventoryActions: inventoryActions ?? undefined,
+        },
+      })
+      console.log('[SaveService] Saved paragraph script and inventory:', paragraphId)
+    } catch (error) {
+      console.error('[SaveService] Failed to save paragraph script/inventory:', error)
+      throw error
+    }
+  }
+
   // ============================================================================
   // BATCH MESSAGE OPERATIONS
   // ============================================================================
@@ -1993,6 +2181,14 @@ export class SaveService {
       instruction?: string
       script?: string
       content?: string // Will be split into paragraphs
+      type?: 'chapter' | 'event' | 'branch' | null
+      options?: Array<{
+        id: string
+        label: string
+        targetNodeId: string
+        targetMessageId: string
+        description?: string
+      }>
     }>,
   ): Promise<void> {
     // Transform messages to API format, splitting content into paragraphs
@@ -2015,6 +2211,8 @@ export class SaveService {
         sortOrder: msg.sortOrder,
         instruction: msg.instruction ?? null,
         script: msg.script ?? null,
+        type: msg.type ?? null,
+        options: msg.options,
         paragraphs,
       }
     })

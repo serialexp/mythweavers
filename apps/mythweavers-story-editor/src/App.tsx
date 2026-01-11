@@ -14,6 +14,7 @@ import { LoginForm } from './components/LoginForm'
 // SceneEditorWrapper import removed - component used via lazy loading or routes
 import { MessageList } from './components/MessageList'
 import { MessageRewriterDialog } from './components/MessageRewriterDialog'
+import { MassRewriteDialog } from './components/MassRewriteDialog'
 import { SingleRewriteDialog } from './components/SingleRewriteDialog'
 import { PendingEntitiesModal } from './components/PendingEntitiesModal'
 import { ResetPassword } from './components/ResetPassword'
@@ -45,10 +46,9 @@ import { rewriteDialogStore } from './stores/rewriteDialogStore'
 import { serverStore } from './stores/serverStore'
 import { settingsStore } from './stores/settingsStore'
 import { ApiStory } from './types/api'
-import { Chapter, Character, ContextItem, Message, Node } from './types/core'
+import { Character, ContextItem, Message, Node } from './types/core'
 import type { BranchConversionResult } from './utils/claudeChatImport'
 import { importClaudeChat, importClaudeChatWithBranches } from './utils/claudeChatImporter'
-import { migrateChaptersToScenes, needsSceneMigration } from './utils/scenesMigration'
 import { storyManager } from './utils/storyManager'
 
 // Component to redirect to login
@@ -262,8 +262,7 @@ const App: Component = () => {
           type: 'book',
           title: book.name,
           summary: book.summary,
-          sortOrder: book.sortOrder,
-          order: bookIndex,
+          order: book.sortOrder ?? bookIndex,
           expanded: true,
           isOpen: true,
           createdAt: book.createdAt,
@@ -279,8 +278,7 @@ const App: Component = () => {
             type: 'arc',
             title: arc.name,
             summary: arc.summary,
-            sortOrder: arc.sortOrder,
-            order: arcIndex,
+            order: arc.sortOrder ?? arcIndex,
             expanded: true,
             isOpen: true,
             createdAt: arc.createdAt,
@@ -296,8 +294,7 @@ const App: Component = () => {
               type: 'chapter',
               title: chapter.name,
               summary: chapter.summary,
-              sortOrder: chapter.sortOrder,
-              order: chapterIndex,
+              order: chapter.sortOrder ?? chapterIndex,
               nodeType: chapter.nodeType || 'story',
               status: chapter.status,
               expanded: true,
@@ -316,8 +313,7 @@ const App: Component = () => {
                 type: 'scene',
                 title: scene.name || `Scene ${sceneIndex + 1}`,
                 summary: scene.summary,
-                sortOrder: scene.sortOrder,
-                order: sceneIndex,
+                order: scene.sortOrder ?? sceneIndex,
                 // Scene-specific fields
                 goal: scene.goal,
                 activeCharacterIds: scene.activeCharacterIds,
@@ -402,8 +398,6 @@ const App: Component = () => {
         transformedCharacters,
         '', // input - not stored in new schema
         '', // storySetting - not stored in new schema
-        [], // chapters - converted to nodes
-        null, // selectedChapterId
         contextItems || [],
         nodes,
         story.selectedNodeId || null, // Restore last selected node
@@ -543,39 +537,14 @@ const App: Component = () => {
       plotPointsStore.setDefinitions((story as any).plotPointDefaults || [])
       plotPointsStore.setStates([]) // Local stories don't have API-stored states
 
-      // Run scene migration if needed (local stories)
-      let nodesToLoad = story.nodes || []
-      let messagesToLoad = story.messages || []
-
-      if (nodesToLoad.length > 0) {
-        const chapters = nodesToLoad.filter((n) => n.type === 'chapter')
-        const scenes = nodesToLoad.filter((n) => n.type === 'scene')
-
-        if (needsSceneMigration(chapters, scenes, messagesToLoad)) {
-          console.log('[loadStoryById] Running scene migration for local story')
-          const migrationResult = await migrateChaptersToScenes(chapters, scenes, messagesToLoad)
-          console.log('[loadStoryById] Migration result:', migrationResult)
-
-          // Reload nodes to include newly created scenes
-          // The migration saves scenes via saveService, so we need to reload from storage
-          const updatedStory = await storyManager.loadStory(storyId)
-          if (updatedStory) {
-            nodesToLoad = updatedStory.nodes || []
-            messagesToLoad = updatedStory.messages || []
-          }
-        }
-      }
-
       // Load the story data
       handleLoadStory(
-        messagesToLoad,
+        story.messages || [],
         story.characters,
         story.input,
         story.storySetting,
-        story.chapters,
-        story.selectedChapterId,
         story.contextItems,
-        nodesToLoad,
+        story.nodes || [],
         story.selectedNodeId,
       )
       // Set branch choices after data is loaded (now with loop detection)
@@ -883,10 +852,8 @@ const App: Component = () => {
     characters: Character[],
     input: string,
     storySetting: string,
-    chapters?: Chapter[],
-    selectedChapterId?: string | null,
     contextItems?: ContextItem[],
-    nodes?: any[],
+    nodes?: Node[],
     selectedNodeId?: string | null,
   ) => {
     console.log('[handleLoadStory] Called with:', {
@@ -901,41 +868,16 @@ const App: Component = () => {
     charactersStore.setCharacters([])
     contextItemsStore.setContextItems([])
 
-    // Loading story data
-
-    // Debug: Check if messages have order field
-    // Checking message order
-
-    // Check if any messages are missing order field
-    const messagesWithoutOrder = messages.filter((m) => m.order === undefined || m.order === null)
-    if (messagesWithoutOrder.length > 0) {
-      // Found messages without order field
-    }
-
     // Ensure timestamps are Date objects and fix missing order fields
     let messagesWithDates = messages.map((msg, index) => ({
       ...msg,
       timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
-      order: msg.order !== undefined && msg.order !== null ? msg.order : index, // Use index as fallback
+      order: msg.order !== undefined && msg.order !== null ? msg.order : index,
     }))
 
-    // Handle chapters - but only if we're not using the new node system
-    // The node system will handle chapter organization
-    if (!nodes || nodes.length === 0) {
-      if (chapters && chapters.length > 0) {
-        // Use the proper loadChapters method which handles Date conversion and logging
-        // Chapters are now handled through the node system
-      } else {
-        // Don't reconstruct chapters - the node system will handle this
-        // chaptersStore.reconstructChapterAssociations(messagesWithDates)
-      }
-    }
-
-    // Load nodes first, as we might need to update messages with node IDs
+    // Load nodes and select the appropriate one
     if (nodes && nodes.length > 0) {
       nodeStore.setNodes(nodes)
-
-      // Messages should already have sceneId set from the backend
 
       // Select the saved node or auto-select first scene if none selected
       if (selectedNodeId) {
@@ -946,55 +888,8 @@ const App: Component = () => {
           nodeStore.selectNode(sceneNodes[0].id)
         }
       }
-    } else if (chapters && chapters.length > 0) {
-      // Migrate from old chapter system to nodes
-      // Migrating chapters to node structure
-      const bookNode = nodeStore.addNode(null, 'book', 'Book 1')
-      const arcNode = nodeStore.addNode(bookNode.id, 'arc', 'Arc 1')
-
-      // Create nodes for existing chapters, keeping their original IDs
-      const chapterIdMap = new Map<string, string>() // old ID -> new node ID
-
-      chapters.forEach((chapter, index) => {
-        // Create a node with the chapter's data
-        const newNode: Node = {
-          id: chapter.id, // Keep the same ID for compatibility
-          storyId: '',
-          parentId: arcNode.id,
-          type: 'chapter',
-          title: chapter.title,
-          summary: chapter.summary,
-          status: chapter.status,
-          includeInFull: chapter.includeInFull,
-          order: index,
-          expanded: chapter.expanded !== false,
-          isOpen: true,
-          createdAt: chapter.createdAt,
-          updatedAt: chapter.updatedAt,
-        }
-
-        // Add directly to store without generating new ID
-        nodeStore.setNodes([...nodeStore.nodesArray, newNode])
-        chapterIdMap.set(chapter.id, chapter.id)
-
-        // Update messages that belong to this chapter to use sceneId
-        messagesWithDates = messagesWithDates.map((msg) => {
-          if ((msg as any).chapterId === chapter.id) {
-            return { ...msg, sceneId: chapter.id }
-          }
-          return msg
-        })
-      })
-
-      // Select the first or previously selected chapter
-      if (selectedChapterId && chapters.find((c) => c.id === selectedChapterId)) {
-        nodeStore.selectNode(selectedChapterId)
-      } else if (chapters.length > 0) {
-        nodeStore.selectNode(chapters[0].id)
-      }
     } else {
-      // Create default structure for stories without any chapters
-      // Creating default structure
+      // Create default structure for stories without nodes
       const bookNode = nodeStore.addNode(null, 'book', 'Book 1')
       const arcNode = nodeStore.addNode(bookNode.id, 'arc', 'Arc 1')
       const chapterNode = nodeStore.addNode(arcNode.id, 'chapter', 'Chapter 1')
@@ -1005,16 +900,14 @@ const App: Component = () => {
 
       // If we have messages, assign them all to the default scene
       if (messagesWithDates.length > 0) {
-        // Assigning messages to default scene
         messagesWithDates = messagesWithDates.map((msg) => ({
           ...msg,
-          chapterId: chapterNode.id, // Keep for backwards compatibility
-          nodeId: sceneNode.id,
+          sceneId: sceneNode.id,
         }))
       }
     }
 
-    // Now set messages with updated node IDs
+    // Set messages and other data
     messagesStore.setMessages(messagesWithDates)
     charactersStore.setCharacters(characters)
     messagesStore.setInput(input)
@@ -1024,8 +917,6 @@ const App: Component = () => {
     if (contextItems) {
       contextItemsStore.setContextItems(contextItems)
     }
-
-    // Story loaded successfully
   }
 
   return (
@@ -1309,6 +1200,8 @@ const App: Component = () => {
                         <MessageRewriterDialog />
 
                         <SingleRewriteDialog />
+
+                        <MassRewriteDialog />
 
                         <CopyTokenModal />
 

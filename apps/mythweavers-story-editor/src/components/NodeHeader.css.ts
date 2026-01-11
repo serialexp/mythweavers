@@ -71,6 +71,9 @@ export const nodeMetadata = style({
 })
 
 export const metaItem = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
   whiteSpace: 'nowrap',
 })
 
@@ -217,6 +220,19 @@ export const viewpointCancel = style({
   fontSize: '0.875rem',
 })
 
+export const viewpointRow = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  padding: `${tokens.space['2']} ${tokens.space['4']}`,
+})
+
+export const viewpointLabel = style({
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.secondary,
+  whiteSpace: 'nowrap',
+})
+
 export const summarySection = style({
   padding: `0 ${tokens.space['4']}`,
   marginTop: `calc(-1 * ${tokens.space['1']})`,
@@ -289,4 +305,48 @@ export const goalInput = style({
 export const spinner = style({
   display: 'inline-block',
   animation: `${spin} 1s linear infinite`,
+})
+
+export const characterAvatarList = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['3'],
+  flexWrap: 'wrap',
+})
+
+export const characterAvatarItem = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
+  cursor: 'default',
+})
+
+export const characterAvatar = style({
+  width: '20px',
+  height: '20px',
+  borderRadius: tokens.radius.full,
+  objectFit: 'cover',
+  flexShrink: 0,
+  border: `1px solid ${tokens.color.border.default}`,
+})
+
+export const characterAvatarPlaceholder = style({
+  width: '20px',
+  height: '20px',
+  borderRadius: tokens.radius.full,
+  backgroundColor: tokens.color.bg.base,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '10px',
+  fontWeight: 600,
+  color: tokens.color.text.muted,
+  flexShrink: 0,
+  border: `1px solid ${tokens.color.border.default}`,
+})
+
+export const characterName = style({
+  fontSize: '0.875rem',
+  color: tokens.color.text.primary,
+  whiteSpace: 'nowrap',
 })

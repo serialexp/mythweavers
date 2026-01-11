@@ -357,36 +357,6 @@ class ApiClient {
     return response.json()
   }
 
-  // Single chapter operations for granular saves
-  async updateChapter(storyId: string, chapterId: string, chapterData: any): Promise<any> {
-    const response = await this.fetch(`/stories/${storyId}/chapters/${chapterId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(chapterData),
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Failed to update chapter' }))
-      throw new Error(errorData.error || `Failed to update chapter: ${response.status} ${response.statusText}`)
-    }
-    return response.json()
-  }
-
-  async deleteChapter(storyId: string, chapterId: string): Promise<any> {
-    const response = await this.fetch(`/stories/${storyId}/chapters/${chapterId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Failed to delete chapter' }))
-      throw new Error(errorData.error || `Failed to delete chapter: ${response.status} ${response.statusText}`)
-    }
-    return response.json()
-  }
-
   // Map operations
   async getMaps(storyId: string): Promise<any[]> {
     const response = await this.fetch(`/stories/${storyId}/maps`)

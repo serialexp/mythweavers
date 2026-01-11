@@ -30,6 +30,7 @@ const [settingsState, setSettingsState] = createStore({
   showEventMessages: localStorage.getItem('story-show-event-messages') !== 'false', // Default to true
   thinkingBudget: Number.parseInt(localStorage.getItem('story-thinking-budget') || '0'), // 0 = no budget
   refineClichés: localStorage.getItem('story-refine-cliches') === 'true',
+  maxTokens: Number.parseInt(localStorage.getItem('story-max-tokens') || '4096'),
 })
 
 // Auto-save effects
@@ -96,6 +97,10 @@ createEffect(() => {
   localStorage.setItem('story-refine-cliches', settingsState.refineClichés.toString())
 })
 
+createEffect(() => {
+  localStorage.setItem('story-max-tokens', settingsState.maxTokens.toString())
+})
+
 export const settingsStore = {
   // Getters
   get model() {
@@ -146,6 +151,9 @@ export const settingsStore = {
   get refineClichés() {
     return settingsState.refineClichés
   },
+  get maxTokens() {
+    return settingsState.maxTokens
+  },
 
   // Actions
   setModel: (model: string) => {
@@ -187,6 +195,7 @@ export const settingsStore = {
   toggleEventMessages: () => setSettingsState('showEventMessages', !settingsState.showEventMessages),
   setThinkingBudget: (budget: number) => setSettingsState('thinkingBudget', budget),
   setRefineClichés: (enabled: boolean) => setSettingsState('refineClichés', enabled),
+  setMaxTokens: (tokens: number) => setSettingsState('maxTokens', tokens),
 
   // Sync provider and model from story (called when loading a story)
   syncFromStory: (provider?: string, model?: string | null) => {

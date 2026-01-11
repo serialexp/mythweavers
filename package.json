@@ -41,7 +41,13 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "check": "biome check --write --unsafe ."
+    "check": "biome check --write --unsafe .",
+    "db:migrate": "cd apps/mythweavers-backend && bun --env-file=../../.env.local prisma migrate dev",
+    "db:studio": "cd apps/mythweavers-backend && bun --env-file=../../.env.local prisma studio",
+    "docker:build": "depot bake -f docker-bake.hcl",
+    "docker:build:backend": "depot bake -f docker-bake.hcl backend",
+    "docker:build:editor": "depot bake -f docker-bake.hcl story-editor",
+    "docker:build:reader": "depot bake -f docker-bake.hcl reader"
   },
   "keywords": [],
   "author": "",

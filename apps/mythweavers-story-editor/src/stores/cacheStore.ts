@@ -8,6 +8,13 @@ interface CacheEntry {
   messageCount: number
 }
 
+export interface CachedPrefix {
+  hash: string
+  cachedAt: number // timestamp in ms
+  ttlMs: number // TTL in ms
+  label?: string // optional label for debugging (e.g., "story-context", "chapter-summaries")
+}
+
 const [cacheState, setCacheState] = createStore({
   activeCaches: [] as CacheEntry[],
   keepAliveInterval: null as NodeJS.Timeout | null,
@@ -24,6 +31,8 @@ const [cacheState, setCacheState] = createStore({
   totalCost: 0, // Total actual cost
   totalNormalCost: 0, // What it would have cost without caching
   isCacheRefreshing: false,
+  // Cache prediction tracking - multiple prefixes can be cached
+  cachedPrefixes: [] as CachedPrefix[],
 })
 
 // Cache now lasts for 1 hour with TTL
@@ -195,5 +204,46 @@ export const cacheStore = {
   // Initialize the keep-alive timer (to be called from within a component)
   initializeKeepAlive: () => {
     // This will be called from App.tsx inside a createEffect
+  },
+
+  // Cache prefix tracking for prediction
+  get cachedPrefixes() {
+    return cacheState.cachedPrefixes
+  },
+
+  // Record a cached prefix (add or update)
+  recordCachedPrefix: (hash: string, ttlMs: number, label?: string) => {
+    const now = Date.now()
+    setCacheState('cachedPrefixes', (prefixes) => {
+      // Remove existing entry with same hash if present
+      const filtered = prefixes.filter((p) => p.hash !== hash)
+      return [...filtered, { hash, cachedAt: now, ttlMs, label }]
+    })
+  },
+
+  // Check if a hash is cached and return remaining time in ms (0 if expired/not found)
+  getCacheRemainingMs: (hash: string): number => {
+    const prefix = cacheState.cachedPrefixes.find((p) => p.hash === hash)
+    if (!prefix) return 0
+    const expiresAt = prefix.cachedAt + prefix.ttlMs
+    const remaining = expiresAt - Date.now()
+    return remaining > 0 ? remaining : 0
+  },
+
+  // Get all valid (non-expired) cached prefixes
+  getValidCachedPrefixes: (): CachedPrefix[] => {
+    const now = Date.now()
+    return cacheState.cachedPrefixes.filter((p) => p.cachedAt + p.ttlMs > now)
+  },
+
+  // Remove expired prefixes from the store
+  cleanupExpiredPrefixes: () => {
+    const now = Date.now()
+    setCacheState('cachedPrefixes', (prefixes) => prefixes.filter((p) => p.cachedAt + p.ttlMs > now))
+  },
+
+  // Clear all cached prefixes
+  clearCachedPrefixes: () => {
+    setCacheState('cachedPrefixes', [])
   },
 }

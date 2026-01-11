@@ -165,8 +165,30 @@ export const getMessagesInContext = (
   return messagesInContext
 }
 
-export const getStoryPrompt = (
+/**
+ * Get the minimal system message - just the role description and genre.
+ * Detailed instructions are now in getStoryInstructions() and placed near the user message.
+ */
+export const getMinimalSystemPrompt = (
   storySetting: string,
+  storyFormat?: 'narrative' | 'cyoa',
+) => {
+  const selectedSetting = STORY_SETTINGS.find((s) => s.value === storySetting)
+  const settingText = selectedSetting?.value
+    ? ` This is a ${selectedSetting.label.toLowerCase()} story.`
+    : ''
+
+  if (storyFormat === 'cyoa') {
+    return `You are a creative story writer creating an interactive "Choose Your Own Adventure" narrative.${settingText}`
+  }
+
+  return `You are a creative story writer helping to create an engaging narrative.${settingText}`
+}
+
+/**
+ * Get the detailed writing instructions - placed near the end of context for better LLM attention.
+ */
+export const getStoryInstructions = (
   person?: string,
   tense?: string,
   protagonistName?: string,
@@ -174,12 +196,8 @@ export const getStoryPrompt = (
   viewpointCharacterName?: string,
   chapterGoal?: string,
   storyFormat?: 'narrative' | 'cyoa',
+  paragraphsPerTurn?: number,
 ) => {
-  const selectedSetting = STORY_SETTINGS.find((s) => s.value === storySetting)
-  const settingText = selectedSetting?.value
-    ? `This is a ${selectedSetting.label.toLowerCase()} story. Write in the appropriate tone, style, and atmosphere for this genre. `
-    : ''
-
   // Build narrative style instruction
   const personText = person === 'first' ? 'first person' : person === 'second' ? 'second person' : 'third person'
   const tenseText = tense === 'present' ? 'present tense' : 'past tense'
@@ -200,20 +218,27 @@ export const getStoryPrompt = (
     }
   }
 
-  const styleText = `Write in ${personText} ${tenseText}${perspectiveText}. `
+  const styleText = `Write in ${personText} ${tenseText}${perspectiveText}.`
 
   // Build chapter goal text if provided
   const goalText = chapterGoal
-    ? `\n\nCHAPTER GOAL: ${chapterGoal}\nKeep this goal in mind as you continue the story, but don't feel obligated to fully accomplish it in a single turn. Progress naturally toward this goal through character actions and developments. `
+    ? `\n\nCHAPTER GOAL: ${chapterGoal}\nKeep this goal in mind as you continue the story, but don't feel obligated to fully accomplish it in a single turn. Progress naturally toward this goal through character actions and developments.`
     : ''
 
   const taskText = isNewStory
-    ? `Create a story based on the user's direction. `
-    : `Continue the story based on the user's direction, maintaining consistency with previous events and character development. `
+    ? `Create a story based on the user's direction.`
+    : `Continue the story based on the user's direction, maintaining consistency with previous events and character development.`
 
   // CYOA-specific instructions
   if (storyFormat === 'cyoa') {
-    return `You are a creative story writer creating an interactive "Choose Your Own Adventure" narrative. ${settingText}${styleText}${taskText}${goalText}Write in a natural, flowing style that draws the reader in. Focus on "show, don't tell" and include vivid descriptions, dialogue, and character thoughts where appropriate.
+    const paragraphGuidance =
+      paragraphsPerTurn && paragraphsPerTurn > 0
+        ? `\n\n- Write no more than ${paragraphsPerTurn} paragraph${paragraphsPerTurn !== 1 ? 's' : ''} before presenting the choices`
+        : ''
+    return `WRITING INSTRUCTIONS:
+${styleText} ${taskText}${goalText}
+
+Write in a natural, flowing style that draws the reader in. Focus on "show, don't tell" and include vivid descriptions, dialogue, and character thoughts where appropriate.
 
 IMPORTANT:
 - Write a single story section that responds to the reader's choice
@@ -232,6 +257,13 @@ PACING AND TONE GUIDELINES:
 PLAYER AGENCY:
 The reader controls ONLY the main character (the POV character for this scene). You, as the author, control all other characters, NPCs, world events, and story developments. Choices should always be actions the protagonist can take - never ask what happens in the world or what other characters do. The reader decides their character's actions; you decide how the world responds.
 
+INTERPRETING PLAYER INPUT:
+- Player input describes their intent or general action, NOT literal dialogue or exact wording
+- Write the scene showing the character performing this action naturally with appropriate dialogue and description
+- EXCEPTION: Text in "quotes" should be used literally as the character's exact words
+- Example: "I ask about the artifact" → Write a natural scene where the character inquires about the artifact
+- Example: "I say 'Give me the artifact or else'" → Use that exact dialogue in the scene
+
 CYOA FORMAT REQUIREMENT:
 After completing this turn's story content, you MUST present 2-4 choices for the reader. Format them as:
 
@@ -241,11 +273,14 @@ After completing this turn's story content, you MUST present 2-4 choices for the
 3. [Third choice - brief action description]
 4. Something else...
 
-Make choices meaningful and distinct. They should lead to genuinely different story paths. Each choice must be an action the protagonist can take. The last option should always be "Something else..." to allow the reader to type their own action.`
+Make choices meaningful and distinct. They should lead to genuinely different story paths. Each choice must be an action the protagonist can take. The last option should always be "Something else..." to allow the reader to type their own action.${paragraphGuidance}`
   }
 
   // Standard narrative mode
-  return `You are a creative story writer helping to create an engaging narrative. ${settingText}${styleText}${taskText}${goalText}Write in a natural, flowing style that draws the reader in. Focus on "show, don't tell" and include vivid descriptions, dialogue, and character thoughts where appropriate.
+  return `WRITING INSTRUCTIONS:
+${styleText} ${taskText}${goalText}
+
+Write in a natural, flowing style that draws the reader in. Focus on "show, don't tell" and include vivid descriptions, dialogue, and character thoughts where appropriate.
 
 IMPORTANT:
 - Write ONLY a single story continuation turn
@@ -265,6 +300,26 @@ PACING AND TONE GUIDELINES:
 - Allow for natural story rhythms with quieter moments, conversations, and character development
 - Sometimes the most engaging turns simply advance the story naturally without forced drama
 - Focus on authentic character actions and dialogue rather than overly dramatic internal monologues`
+}
+
+/**
+ * @deprecated Use getMinimalSystemPrompt and getStoryInstructions separately for better LLM attention.
+ * This function is kept for backward compatibility with existing code.
+ */
+export const getStoryPrompt = (
+  storySetting: string,
+  person?: string,
+  tense?: string,
+  protagonistName?: string,
+  isNewStory?: boolean,
+  viewpointCharacterName?: string,
+  chapterGoal?: string,
+  storyFormat?: 'narrative' | 'cyoa',
+) => {
+  // For backward compatibility, combine the minimal system prompt with instructions
+  const minimal = getMinimalSystemPrompt(storySetting, storyFormat)
+  const instructions = getStoryInstructions(person, tense, protagonistName, isNewStory, viewpointCharacterName, chapterGoal, storyFormat)
+  return `${minimal}\n\n${instructions}`
 }
 
 export interface ChatMessage {

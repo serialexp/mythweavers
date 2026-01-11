@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Chapter, Message } from '../types/core'
+import type { Message } from '../types/core'
 import { type ContextGenerationOptions, generateContextMessages } from './contextGeneration'
 
 // Mock dependencies
@@ -31,16 +31,6 @@ describe('generateContextMessages', () => {
     timestamp: new Date('2024-01-01'),
     order: 0,
     isQuery: false,
-    ...overrides,
-  })
-
-  const createChapter = (overrides: Partial<Chapter>): Chapter => ({
-    id: 'ch-1',
-    storyId: 'story-1',
-    title: 'Chapter 1',
-    order: 1,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
     ...overrides,
   })
 
@@ -191,105 +181,8 @@ describe('generateContextMessages', () => {
     })
   })
 
-  describe('Chapter Support', () => {
-    it('should respect chapter boundaries', async () => {
-      const chapters: Chapter[] = [
-        createChapter({ id: 'ch-1', title: 'Chapter 1', summary: 'Chapter 1 summary' }),
-        createChapter({ id: 'ch-2', title: 'Chapter 2', summary: 'Chapter 2 summary' }),
-        createChapter({ id: 'ch-3', title: 'Chapter 3', summary: 'Chapter 3 summary' }),
-      ]
-
-      const messages: Message[] = [
-        createMessage({ type: 'chapter', sceneId: 'ch-1', content: 'Chapter 1' }),
-        createMessage({ id: 'msg-1', sceneId: 'ch-1', content: 'Ch1 Message 1' }),
-        createMessage({ id: 'msg-2', sceneId: 'ch-1', content: 'Ch1 Message 2' }),
-        createMessage({ type: 'chapter', sceneId: 'ch-2', content: 'Chapter 2' }),
-        createMessage({ id: 'msg-3', sceneId: 'ch-2', content: 'Ch2 Message 1' }),
-        createMessage({ id: 'msg-4', sceneId: 'ch-2', content: 'Ch2 Message 2' }),
-        createMessage({ type: 'chapter', sceneId: 'ch-3', content: 'Chapter 3' }),
-        createMessage({ id: 'msg-5', sceneId: 'ch-3', content: 'Ch3 Message 1' }),
-        createMessage({ id: 'msg-6', sceneId: 'ch-3', content: 'Ch3 Message 2' }),
-      ]
-
-      const options: ContextGenerationOptions = {
-        inputText: 'Continue',
-        messages,
-        contextType: 'story',
-        chapters,
-        targetMessageId: 'msg-5', // Message in chapter 3
-      }
-
-      const result = await generateContextMessages(options)
-
-      // Should include chapter summaries for ch-1 and ch-2
-      expect(result[1].content).toBe('[Chapter: Chapter 1]\nChapter 1 summary')
-      expect(result[2].content).toBe('[Chapter: Chapter 2]\nChapter 2 summary')
-
-      // Should only include messages from chapter 3
-      expect(result[3].content).toBe('Ch3 Message 1')
-      expect(result[4].content).toBe('Ch3 Message 2')
-
-      // Should NOT include messages from other chapters
-      expect(result.find((m) => m.content.includes('Ch1 Message'))).toBeUndefined()
-      expect(result.find((m) => m.content.includes('Ch2 Message'))).toBeUndefined()
-    })
-
-    it('should throw error if previous chapters lack summaries', async () => {
-      const chapters: Chapter[] = [
-        createChapter({ id: 'ch-1', title: 'Chapter 1' }), // No summary
-        createChapter({ id: 'ch-2', title: 'Chapter 2', summary: 'Chapter 2 summary' }),
-      ]
-
-      const messages: Message[] = [
-        createMessage({ type: 'chapter', sceneId: 'ch-1' }),
-        createMessage({ sceneId: 'ch-1', content: 'Ch1 content' }),
-        createMessage({ type: 'chapter', sceneId: 'ch-2' }),
-        createMessage({ id: 'target', sceneId: 'ch-2', content: 'Ch2 content' }),
-      ]
-
-      const options: ContextGenerationOptions = {
-        inputText: 'Continue',
-        messages,
-        contextType: 'story',
-        chapters,
-        targetMessageId: 'target',
-      }
-
-      await expect(generateContextMessages(options)).rejects.toThrow(
-        'Cannot generate story continuation. The following previous chapters need summaries first: Chapter 1',
-      )
-    })
-
-    it('should handle chapters in correct story order', async () => {
-      const chapters: Chapter[] = [
-        createChapter({ id: 'ch-3', title: 'Chapter 3', summary: 'Ch3 summary', order: 3 }),
-        createChapter({ id: 'ch-1', title: 'Chapter 1', summary: 'Ch1 summary', order: 1 }),
-        createChapter({ id: 'ch-2', title: 'Chapter 2', summary: 'Ch2 summary', order: 2 }),
-      ]
-
-      // Messages define the actual story order
-      const messages: Message[] = [
-        createMessage({ type: 'chapter', sceneId: 'ch-1' }),
-        createMessage({ type: 'chapter', sceneId: 'ch-2' }),
-        createMessage({ type: 'chapter', sceneId: 'ch-3' }),
-        createMessage({ id: 'target', sceneId: 'ch-3' }),
-      ]
-
-      const options: ContextGenerationOptions = {
-        inputText: 'Continue',
-        messages,
-        contextType: 'story',
-        chapters,
-        targetMessageId: 'target',
-      }
-
-      const result = await generateContextMessages(options)
-
-      // Should include summaries in story order, not chapter.order
-      expect(result[1].content).toBe('[Chapter: Chapter 1]\nCh1 summary')
-      expect(result[2].content).toBe('[Chapter: Chapter 2]\nCh2 summary')
-    })
-  })
+  // Note: Chapter-based context generation has been removed.
+  // Context is now built using nodes (scenes) which are tested separately.
 
   describe('Query Context', () => {
     it('should generate query context with different system prompt', async () => {

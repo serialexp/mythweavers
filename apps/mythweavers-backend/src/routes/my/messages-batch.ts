@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import type { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { createParagraphsBulk } from '../../lib/paragraphHelpers.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
 
@@ -211,38 +212,9 @@ const messagesBatchRoutes: FastifyPluginAsyncZod = async (fastify) => {
             data: { currentMessageRevisionId: revision.id },
           })
 
-          // Create paragraphs if provided
+          // Create paragraphs if provided (using shared helper)
           if (messageData.paragraphs && messageData.paragraphs.length > 0) {
-            for (let i = 0; i < messageData.paragraphs.length; i++) {
-              const paraData = messageData.paragraphs[i]
-              const sortOrder = paraData.sortOrder ?? i
-
-              // Create paragraph with initial revision
-              const paragraph = await tx.paragraph.create({
-                data: {
-                  id: paraData.id,
-                  messageRevisionId: revision.id,
-                  sortOrder,
-                  paragraphRevisions: {
-                    create: {
-                      version: 1,
-                      body: paraData.body,
-                      contentSchema: paraData.contentSchema || null,
-                      state: paraData.state || null,
-                    },
-                  },
-                },
-                include: {
-                  paragraphRevisions: true,
-                },
-              })
-
-              // Update paragraph with currentParagraphRevisionId
-              await tx.paragraph.update({
-                where: { id: paragraph.id },
-                data: { currentParagraphRevisionId: paragraph.paragraphRevisions[0].id },
-              })
-            }
+            await createParagraphsBulk(tx, revision.id, messageData.paragraphs)
           }
 
           createdMessageIds.push(message.id)

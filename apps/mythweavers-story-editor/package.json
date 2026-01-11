@@ -40,6 +40,7 @@
     "@codemirror/theme-one-dark": "^6.1.3",
     "@codemirror/view": "^6.38.6",
     "@hello-pangea/dnd": "^18.0.1",
+    "@mythweavers/image-cropper": "workspace:^",
     "@mythweavers/shared": "workspace:^",
     "@mythweavers/ui": "workspace:^",
     "@paralleldrive/cuid2": "^2.2.2",

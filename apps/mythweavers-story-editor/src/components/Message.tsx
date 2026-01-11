@@ -1,4 +1,3 @@
-import { paragraphsToText } from '@mythweavers/shared'
 import { Button } from '@mythweavers/ui'
 import {
   BsArrowDownCircle,
@@ -19,7 +18,6 @@ import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup
 import * as styles from './Message.css'
 import { useOllama } from '../hooks/useOllama'
 import { useStoryGeneration } from '../hooks/useStoryGeneration'
-import { saveService } from '../services/saveService'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -57,10 +55,18 @@ export const Message: Component<MessageProps> = (props) => {
       generateResponse,
       generateSummaries,
     })
-  const [isEditing, setIsEditing] = createSignal(false)
-  const [editContent, setEditContent] = createSignal('')
-  const [editParagraphs, setEditParagraphs] = createSignal<any[]>([]) // Track edited paragraphs from SceneEditor
   const [isEditingInstruction, setIsEditingInstruction] = createSignal(false)
+
+  // Determine if this message should use the always-on editor (story content)
+  // Story content = assistant message, not a query, not an event, not a branch
+  const isStoryContent = createMemo(() => {
+    return (
+      props.message.role === 'assistant' &&
+      !props.message.isQuery &&
+      props.message.type !== 'event' &&
+      props.message.type !== 'branch'
+    )
+  })
   const [editInstruction, setEditInstruction] = createSignal('')
   const [showAnalysisDebug, setShowAnalysisDebug] = createSignal(false)
   const [showScriptModal, setShowScriptModal] = createSignal(false)
@@ -338,76 +344,10 @@ export const Message: Component<MessageProps> = (props) => {
     messagesStore.updateMessage(props.message.id, { showThink: !props.message.showThink })
   }
 
-  const startEditingContent = () => {
-    // Save this message as the last edited message
-    localStorage.setItem('lastEditedMessageId', props.message.id)
-    localStorage.setItem('lastEditedMessageTime', Date.now().toString())
-    setEditContent(props.message.content)
-    console.log(
-      '[Message.startEditingContent] Loading paragraphs from message:',
-      props.message.paragraphs?.length || 0,
-      props.message.paragraphs,
-    )
-    setEditParagraphs(props.message.paragraphs || []) // Initialize with current paragraphs
-    setIsEditing(true)
-  }
-
-  const saveEdit = async () => {
-    console.log('[Message.saveEdit] editParagraphs count:', editParagraphs().length)
-    // If we have edited paragraphs (from SceneEditor), save them
-    if (editParagraphs().length > 0) {
-      const revisionId = props.message.currentMessageRevisionId
-      if (!revisionId) {
-        console.error('[Message.saveEdit] No currentMessageRevisionId - cannot save paragraphs')
-        return
-      }
-
-      // Generate flattened content for backward compatibility
-      const flattenedContent = paragraphsToText(editParagraphs())
-
-      console.log('[Message.saveEdit] Saving paragraphs to backend:', editParagraphs())
-
-      // Save paragraphs to backend with diffing
-      try {
-        const result = await saveService.saveParagraphs(revisionId, props.message.paragraphs || [], editParagraphs())
-        console.log(
-          `[Message.saveEdit] Saved paragraphs: ${result.created} created, ${result.updated} updated, ${result.deleted} deleted`,
-        )
-      } catch (error) {
-        console.error('[Message.saveEdit] Failed to save paragraphs:', error)
-      }
-
-      // Update local state
-      console.log('[Message.saveEdit] Updating local state with paragraphs')
-      messagesStore.updateMessage(props.message.id, {
-        content: flattenedContent,
-        paragraphs: editParagraphs(),
-      })
-      console.log('[Message.saveEdit] Local state updated')
-    } else {
-      // Traditional content editing (no paragraphs)
-      const content = editContent()
-        .replace(/\r\n/g, '\n') // Normalize Windows line breaks
-        .replace(/\n{3,}/g, '\n\n') // Replace 3+ newlines with just 2
-        .trim()
-
-      if (content && content !== props.message.content) {
-        messagesStore.updateMessage(props.message.id, { content })
-      }
-    }
-    setIsEditing(false)
-  }
-
-  const cancelEdit = () => {
-    setIsEditing(false)
-    setEditContent('')
-  }
+  // TODO: Add save mechanism for always-edit mode
+  // The editor now always displays content - need to implement auto-save or explicit save
 
   const startEditingInstruction = () => {
-    // Save this message as the last edited message (instruction edit)
-    localStorage.setItem('lastEditedMessageId', `${props.message.id}-instruction`)
-    localStorage.setItem('lastEditedMessageTime', Date.now().toString())
-
     // Check if there's a draft to restore
     const draftData = localStorage.getItem(getDraftKey())
     if (draftData) {
@@ -652,6 +592,7 @@ export const Message: Component<MessageProps> = (props) => {
     return messages[messages.length - 1]?.id === props.message.id
   }
 
+
   // Helper to compute message container classes
   const getMessageClasses = (isInstruction = false): string => {
     return cn(
@@ -686,7 +627,6 @@ export const Message: Component<MessageProps> = (props) => {
         when={
           props.message.role === 'assistant' &&
           props.message.instruction &&
-          !isEditing() &&
           props.message.type !== 'event'
         }
       >
@@ -846,13 +786,8 @@ export const Message: Component<MessageProps> = (props) => {
       </Show>
       <div ref={messageRef} data-message-id={props.message.id} class={getMessageClasses()}>
         <div class={styles.content}>
-          <Show when={isEditing()}>
-            <SceneEditorWrapper
-              messageId={props.message.id}
-              onParagraphsUpdate={(paragraphs) => setEditParagraphs(paragraphs)}
-            />
-          </Show>
-          <Show when={!isEditing()}>
+          {/* Story content */}
+          <Show when={isStoryContent()}>
             <Show when={canRegenerateThisAssistant()}>
               <div style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
                 <em>Response cleared - click to regenerate</em>
@@ -870,6 +805,7 @@ export const Message: Component<MessageProps> = (props) => {
               </div>
             </Show>
             <Show when={!canRegenerateThisAssistant()}>
+              {/* Collapsed: show summary */}
               <Show when={shouldShowSummary() && !isExpanded()}>
                 <div class={styles.summary}>
                   <div class={styles.summaryHeader}>
@@ -905,20 +841,12 @@ export const Message: Component<MessageProps> = (props) => {
                   <BsChevronDown /> Show full content
                 </Button>
               </Show>
+              {/* Expanded: show editor instead of plain text */}
               <Show when={!shouldShowSummary() || isExpanded()}>
-                <Show
-                  when={props.message.type === 'branch'}
-                  fallback={
-                    <>
-                      <Show when={props.message.type === 'event'}>
-                        <span class={styles.eventIcon}>📌 </span>
-                      </Show>
-                      {props.message.content}
-                    </>
-                  }
-                >
-                  <BranchMessage message={props.message} />
-                </Show>
+                <SceneEditorWrapper
+                  messageId={props.message.id}
+                  editable={!props.isGenerating}
+                />
                 <Show when={shouldShowSummary() && isExpanded()}>
                   <Button
                     variant="ghost"
@@ -930,37 +858,55 @@ export const Message: Component<MessageProps> = (props) => {
                     <BsChevronUp /> Show summary
                   </Button>
                 </Show>
-                <Show when={props.message.think}>
-                  <Show when={!props.message.showThink}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      class={styles.thinkToggle}
-                      onClick={toggleThink}
-                      title="Show AI thinking"
-                    >
-                      <BsLightbulb /> Show thinking
-                    </Button>
-                  </Show>
-                  <Show when={props.message.showThink}>
-                    <div class={styles.thinkSection}>
-                      <div class={styles.thinkTitle}>
-                        <BsLightbulb /> AI Thinking:
-                      </div>
-                      {props.message.think}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      class={styles.thinkToggle}
-                      onClick={toggleThink}
-                      title="Hide AI thinking"
-                    >
-                      <BsChevronUp /> Hide thinking
-                    </Button>
-                  </Show>
-                </Show>
               </Show>
+            </Show>
+            {/* Think section for story content */}
+            <Show when={props.message.think}>
+              <Show when={!props.message.showThink}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class={styles.thinkToggle}
+                  onClick={toggleThink}
+                  title="Show AI thinking"
+                >
+                  <BsLightbulb /> Show thinking
+                </Button>
+              </Show>
+              <Show when={props.message.showThink}>
+                <div class={styles.thinkSection}>
+                  <div class={styles.thinkTitle}>
+                    <BsLightbulb /> AI Thinking:
+                  </div>
+                  {props.message.think}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class={styles.thinkToggle}
+                  onClick={toggleThink}
+                  title="Hide AI thinking"
+                >
+                  <BsChevronUp /> Hide thinking
+                </Button>
+              </Show>
+            </Show>
+          </Show>
+
+          {/* Non-story content (events, branches, queries): Use plain text rendering */}
+          <Show when={!isStoryContent()}>
+            <Show
+              when={props.message.type === 'branch'}
+              fallback={
+                <>
+                  <Show when={props.message.type === 'event'}>
+                    <span class={styles.eventIcon}>📌 </span>
+                  </Show>
+                  {props.message.content}
+                </>
+              }
+            >
+              <BranchMessage message={props.message} />
             </Show>
           </Show>
         </div>
@@ -1113,37 +1059,7 @@ export const Message: Component<MessageProps> = (props) => {
                 icon={<BsArrowRepeat />}
               />
             </Show>
-            <Show when={isEditing()}>
-              <Button
-                variant="primary"
-                size="sm"
-                iconOnly
-                onClick={saveEdit}
-                title="Save changes"
-              >
-                <BsCheck />
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                iconOnly
-                onClick={cancelEdit}
-                title="Cancel editing"
-              >
-                <BsX />
-              </Button>
-            </Show>
-            <Show when={props.message.role === 'assistant' && !props.message.isQuery && !isEditing()}>
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={startEditingContent}
-                title="Edit story content"
-              >
-                <BsPencil />
-              </Button>
-            </Show>
+            {/* Edit button removed - editor is now always visible for story content */}
             <Show when={uiStore.isTargeting() && props.message.type !== 'branch'}>
               <Button
                 variant="secondary"
@@ -1154,7 +1070,7 @@ export const Message: Component<MessageProps> = (props) => {
                 <ImTarget size={16} /> Set as Target
               </Button>
             </Show>
-            <Show when={props.message.role === 'assistant' && !isEditing()}>
+            <Show when={props.message.role === 'assistant'}>
               <Show when={props.message.script || props.message.type === 'event'}>
                 <Button
                   variant="ghost"
@@ -1198,26 +1114,24 @@ export const Message: Component<MessageProps> = (props) => {
                 />
               </Show>
             </Show>
-            <Show when={!isEditing()}>
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => setShowVersionHistory(true)}
-                title="View version history"
-              >
-                <BsClockHistory />
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                iconOnly
-                onClick={() => messagesStore.deleteMessage(props.message.id)}
-                title="Delete this message"
-              >
-                <BsX />
-              </Button>
-            </Show>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={() => setShowVersionHistory(true)}
+              title="View version history"
+            >
+              <BsClockHistory />
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              iconOnly
+              onClick={() => messagesStore.deleteMessage(props.message.id)}
+              title="Delete this message"
+            >
+              <BsX />
+            </Button>
           </div>
         </div>
       </div>

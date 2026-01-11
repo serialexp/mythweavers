@@ -18,7 +18,18 @@ export const codeBlock = style({
   fontSize: '13px',
   lineHeight: 1.5,
   color: tokens.color.text.secondary,
-  maxHeight: '300px',
-  overflowY: 'auto',
   margin: 0,
+})
+
+export const expandButton = style({
+  background: 'transparent',
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: '4px',
+  padding: '4px 8px',
+  fontSize: '12px',
+  color: tokens.color.text.secondary,
+  cursor: 'pointer',
+  ':hover': {
+    backgroundColor: tokens.color.surface.hover,
+  },
 })

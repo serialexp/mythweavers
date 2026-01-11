@@ -1,5 +1,5 @@
 import { Badge, Modal, Stack } from '@mythweavers/ui'
-import { Component, For, Show } from 'solid-js'
+import { Component, For, Show, createSignal } from 'solid-js'
 import * as styles from './ContextPreviewModal.css'
 
 interface ContextMessage {
@@ -22,12 +22,32 @@ interface ContextPreviewModalProps {
   onClose: () => void
 }
 
-export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) => {
-  console.log('[ContextPreviewModal] Rendering, show:', props.show, 'has data:', !!props.data)
+const TRUNCATE_LENGTH = 200
 
-  // Log when modal visibility changes
-  if (props.show && props.data) {
-    console.log('[ContextPreviewModal] Modal is visible with', props.data.messages.length, 'messages')
+export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) => {
+  const [expandedMessages, setExpandedMessages] = createSignal<Set<number>>(new Set())
+
+  const toggleExpand = (index: number) => {
+    setExpandedMessages((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }
+
+  const isExpanded = (index: number) => expandedMessages().has(index)
+
+  const truncateContent = (content: string, index: number) => {
+    if (isExpanded(index) || content.length <= TRUNCATE_LENGTH) {
+      return content.length > 50000
+        ? `${content.substring(0, 50000)}\n\n[Content truncated - too large to display]`
+        : content
+    }
+    return `${content.substring(0, TRUNCATE_LENGTH)}...`
   }
 
   return (
@@ -45,17 +65,18 @@ export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) 
                 <h3 class={styles.messageTitle}>
                   {msg.role === 'system' ? 'System' : msg.role === 'user' ? 'User' : 'Assistant'} Message {index() + 1}
                 </h3>
-                <Show when={msg.cache_control}>
-                  <span title={`Cache TTL: ${msg.cache_control?.ttl || '5m'}`}>
-                    <Badge variant="success">Cached</Badge>
-                  </span>
-                </Show>
+                <Stack direction="horizontal" gap="sm" align="center">
+                  <Show when={msg.cache_control}>
+                    <Badge variant="success">Cached ({msg.cache_control?.ttl || '5m'})</Badge>
+                  </Show>
+                  <Show when={msg.content.length > TRUNCATE_LENGTH}>
+                    <button class={styles.expandButton} onClick={() => toggleExpand(index())}>
+                      {isExpanded(index()) ? 'Collapse' : 'Expand'}
+                    </button>
+                  </Show>
+                </Stack>
               </Stack>
-              <pre class={styles.codeBlock}>
-                {msg.content.length > 50000
-                  ? `${msg.content.substring(0, 50000)}\n\n[Content truncated - too large to display]`
-                  : msg.content}
-              </pre>
+              <pre class={styles.codeBlock}>{truncateContent(msg.content, index())}</pre>
             </div>
           )}
         </For>

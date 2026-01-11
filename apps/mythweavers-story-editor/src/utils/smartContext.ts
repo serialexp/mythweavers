@@ -1,4 +1,4 @@
-import { Chapter, Character, ContextItem, Message, SceneAnalysis } from '../types/core'
+import { Character, ContextItem, Message, SceneAnalysis } from '../types/core'
 import { getCharacterDisplayName } from './character'
 import { generateMessageId } from './id'
 
@@ -325,10 +325,9 @@ export const buildSmartContext = async (
   messages: Message[],
   characters: Character[],
   contextItems: ContextItem[],
-  chapters: Chapter[],
   generateFn: (prompt: string) => Promise<string>,
-  targetMessageId?: string,
-  forceMissingSummaries = false,
+  _targetMessageId?: string,
+  _forceMissingSummaries = false,
 ): Promise<Message[]> => {
   const storyMessages = messages.filter((msg) => !msg.isQuery && msg.role === 'assistant' && msg.type !== 'chapter')
 
@@ -336,100 +335,7 @@ export const buildSmartContext = async (
     return []
   }
 
-  // Check if we have chapters
-  if (chapters.length > 0) {
-    // Determine current chapter ID
-    let currentChapterId: string | undefined
-
-    if (targetMessageId) {
-      // If we have a target message ID, use its chapter
-      const targetMessage = messages.find((msg) => msg.id === targetMessageId)
-      currentChapterId = targetMessage?.sceneId
-    } else {
-      // Otherwise use the most recent message
-      const recentMessages = storyMessages.slice(-1)
-      if (recentMessages.length === 0) return []
-      currentChapterId = recentMessages[0].sceneId
-    }
-
-    // If no current chapter, return empty (hard break)
-    if (!currentChapterId) {
-      return []
-    }
-
-    // Get all messages from the current chapter
-    const currentChapterMessages = storyMessages.filter((msg) => msg.sceneId === currentChapterId)
-
-    // Create synthetic messages for chapter summaries
-    const chapterSummaryMessages: Message[] = []
-
-    // Get the actual chapter order from the messages array
-    const chapterOrder: string[] = []
-
-    // Extract chapter order from messages with chapterId
-    // (Chapter markers no longer exist - chapters are managed through nodes)
-    const seenChapters = new Set<string>()
-    for (const msg of messages) {
-      if (msg.sceneId && !seenChapters.has(msg.sceneId)) {
-        chapterOrder.push(msg.sceneId)
-        seenChapters.add(msg.sceneId)
-      }
-    }
-
-    // Find the index of the current chapter in the actual story order
-    const currentChapterIndex = chapterOrder.indexOf(currentChapterId)
-    let previousChapters: Chapter[] = []
-
-    if (currentChapterIndex === -1) {
-      console.warn(`Current chapter ${currentChapterId} not found in chapter markers`)
-      // Fall back to including no chapter summaries if we can't find the current chapter
-    } else {
-      // Get only the chapters that come before the current one in story order
-      const previousChapterIds = chapterOrder.slice(0, currentChapterIndex)
-      previousChapters = chapters.filter((ch) => previousChapterIds.includes(ch.id))
-    }
-
-    // Only check chapters that have actual content
-    const chaptersWithContent = previousChapters.filter((chapter) => {
-      // Count messages in this chapter (excluding chapter markers and queries)
-      const chapterMessages = messages.filter(
-        (msg) => msg.sceneId === chapter.id && msg.type !== 'chapter' && !msg.isQuery,
-      )
-      return chapterMessages.length > 0
-    })
-
-    const chaptersWithoutSummaries = chaptersWithContent.filter((ch) => !ch.summary)
-
-    if (chaptersWithoutSummaries.length > 0 && !forceMissingSummaries) {
-      const missingChapterTitles = chaptersWithoutSummaries.map((ch) => ch.title).join(', ')
-      throw new Error(
-        `Cannot generate story continuation. The following previous scenes need summaries first: ${missingChapterTitles}`,
-      )
-    }
-
-    // Add summaries from previous scenes IN STORY ORDER
-    // We need to iterate through previousChapterIds to maintain the correct order
-    for (const chapterId of chapterOrder.slice(0, currentChapterIndex)) {
-      const chapter = previousChapters.find((ch) => ch.id === chapterId)
-      if (chapter?.summary) {
-        // Create a synthetic message for the scene summary
-        const summaryMessage: Message = {
-          id: `scene-summary-${chapter.id}`,
-          role: 'assistant',
-          content: `[Scene: ${chapter.title}]\n${chapter.summary}`,
-          timestamp: new Date(chapter.createdAt),
-          order: 0, // Order doesn't matter for synthetic messages
-          isCompacted: true, // Treat as compacted so it won't be further summarized
-        }
-        chapterSummaryMessages.push(summaryMessage)
-      }
-    }
-
-    // Return scene summaries followed by current scene messages
-    return [...chapterSummaryMessages, ...currentChapterMessages]
-  }
-
-  // Fallback to original logic if no chapters
+  // Use all story messages for smart context analysis
   const recentBeats = storyMessages
 
   try {

@@ -2,10 +2,11 @@ import type { Prisma } from '@prisma/client'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { createParagraphsBulk } from '../../lib/paragraphHelpers.js'
 import { prisma } from '../../lib/prisma.js'
 import { transformDates } from '../../lib/transform-dates.js'
 import { errorSchema, successSchema } from '../../schemas/common.js'
-import { inventoryActionSchema, plotPointActionSchema } from '../../schemas/paragraph.js'
+import { inventoryActionSchema, paragraphScriptSchema, plotPointActionSchema } from '../../schemas/paragraph.js'
 
 // ============================================================================
 // SCHEMAS
@@ -50,9 +51,10 @@ const createParagraphBodySchema = z.strictObject({
     .array(inventoryActionSchema)
     .optional()
     .meta({
-      description: 'Array of inventory actions',
+      description: 'Array of inventory actions (deprecated, use script instead)',
       example: [{ type: 'add', item_name: 'Magic Sword', item_amount: 1 }],
     }),
+  script: paragraphScriptSchema,
   sortOrder: z.number().int().min(0).optional().meta({
     description: 'Display order (auto-increments if not provided)',
     example: 0,
@@ -61,8 +63,8 @@ const createParagraphBodySchema = z.strictObject({
 
 // Update paragraph body (creates new ParagraphRevision)
 const updateParagraphBodySchema = z.strictObject({
-  body: z.string().min(1).optional().meta({
-    description: 'Paragraph content text (creates new revision)',
+  body: z.string().optional().meta({
+    description: 'Paragraph content text (creates new revision). Empty string allowed as prelude to deletion.',
     example: 'The hero awakened to find the world completely transformed.',
   }),
   contentSchema: z.string().nullable().optional().meta({
@@ -73,11 +75,12 @@ const updateParagraphBodySchema = z.strictObject({
     description: 'Paragraph state',
   }),
   plotPointActions: z.array(plotPointActionSchema).optional().meta({
-    description: 'Array of plot point actions',
+    description: 'Array of plot point actions (deprecated, use script instead)',
   }),
   inventoryActions: z.array(inventoryActionSchema).optional().meta({
-    description: 'Array of inventory actions',
+    description: 'Array of inventory actions (deprecated, use script instead)',
   }),
+  script: paragraphScriptSchema,
   sortOrder: z.number().int().min(0).optional().meta({
     description: 'Display order',
   }),
@@ -188,6 +191,7 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
               contentSchema: request.body.contentSchema || null,
               version: 1,
               state: request.body.state || null,
+              script: request.body.script || null,
               plotPointActions: (request.body.plotPointActions || null) as Prisma.InputJsonValue,
               inventoryActions: (request.body.inventoryActions || null) as Prisma.InputJsonValue,
             },
@@ -428,8 +432,8 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(404).send({ error: 'Paragraph not found' })
       }
 
-      // If body or contentSchema is being updated, create new ParagraphRevision
-      if (request.body.body !== undefined || request.body.contentSchema !== undefined) {
+      // If body, contentSchema, or script is being updated, create new ParagraphRevision
+      if (request.body.body !== undefined || request.body.contentSchema !== undefined || request.body.script !== undefined) {
         const nextVersion = paragraph.paragraphRevisions.length > 0 ? paragraph.paragraphRevisions[0].version + 1 : 1
 
         const currentRevision = paragraph.paragraphRevisions[0]
@@ -443,6 +447,7 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 ? request.body.contentSchema
                 : (currentRevision?.contentSchema ?? null),
             state: request.body.state ?? currentRevision?.state ?? null,
+            script: request.body.script !== undefined ? (request.body.script ?? null) : (currentRevision?.script ?? null),
             plotPointActions: (request.body.plotPointActions ??
               currentRevision?.plotPointActions ??
               null) as Prisma.InputJsonValue,
@@ -546,6 +551,90 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
       })
 
       return { success: true as const }
+    },
+  )
+
+  // Bulk create paragraphs in a message revision
+  fastify.post(
+    '/message-revisions/:revisionId/paragraphs/batch',
+    {
+      preHandler: requireAuth,
+      schema: {
+        description: 'Create multiple paragraphs in a message revision in a single transaction',
+        tags: ['paragraphs'],
+        params: z.strictObject({
+          revisionId: z.string().meta({
+            description: 'MessageRevision ID',
+            example: 'clx1234567890',
+          }),
+        }),
+        body: z.strictObject({
+          paragraphs: z.array(createParagraphBodySchema).meta({
+            description: 'Array of paragraphs to create',
+          }),
+        }),
+        response: {
+          201: z.strictObject({
+            success: z.literal(true),
+            created: z.number().int().meta({ description: 'Number of paragraphs created' }),
+            paragraphIds: z.array(z.string()).meta({ description: 'IDs of created paragraphs' }),
+          }),
+          400: errorSchema,
+          401: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { revisionId } = request.params
+      const userId = request.user!.id
+
+      // Verify message revision exists and user owns it
+      const messageRevision = await prisma.messageRevision.findUnique({
+        where: { id: revisionId },
+        include: {
+          message: {
+            include: {
+              scene: {
+                include: {
+                  chapter: {
+                    include: {
+                      arc: {
+                        include: {
+                          book: {
+                            include: {
+                              story: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      if (!messageRevision) {
+        return reply.code(404).send({ error: 'Message revision not found' })
+      }
+
+      if (messageRevision.message.scene.chapter.arc.book.story.ownerId !== userId) {
+        return reply.code(404).send({ error: 'Message revision not found' })
+      }
+
+      // Create all paragraphs in a transaction using shared helper
+      const paragraphIds = await prisma.$transaction(async (tx) => {
+        return createParagraphsBulk(tx, revisionId, request.body.paragraphs)
+      })
+
+      return reply.code(201).send({
+        success: true as const,
+        created: paragraphIds.length,
+        paragraphIds,
+      })
     },
   )
 }

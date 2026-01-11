@@ -143,6 +143,13 @@ saveService.setCallbacks({
     setMessagesState('lastSaveError', error.message)
     errorStore.addError(error.message)
   },
+  onMessageCreated: (messageId, data) => {
+    // Update the message with currentMessageRevisionId returned from backend
+    const index = messagesState.messages.findIndex((msg) => msg.id === messageId)
+    if (index !== -1) {
+      setMessagesState('messages', index, 'currentMessageRevisionId', data.currentMessageRevisionId)
+    }
+  },
   onOperationFailed: (operation, error) => {
     // Handle rollback of failed operations
     console.log(
@@ -308,21 +315,6 @@ const reloadDataForStory = async (storyId: string) => {
         // Filtered out compacted messages
       }
 
-      // Loaded story from storage
-
-      // Verify chapter associations
-      const chapterIds = new Set(story.chapters?.map((ch) => ch.id) || [])
-      let orphanedMessages = 0
-      messages.forEach((msg) => {
-        if (msg.sceneId && !chapterIds.has(msg.sceneId)) {
-          // Message has invalid chapterId
-          orphanedMessages++
-        }
-      })
-      if (orphanedMessages > 0) {
-        // Found messages with invalid chapter associations
-      }
-
       batch(() => {
         setMessagesState('messages', messages)
         // Only set input from story if we don't have saved input in localStorage
@@ -424,47 +416,6 @@ export const messagesStore = {
     return getStoryStats(messagesState.messages, charsPerToken, model, provider as any)
   },
 
-  // Helper to get the chapter ID for a position
-  getChapterIdForPosition: (afterMessageId: string | null): string | undefined => {
-    const messages = messagesState.messages
-
-    if (afterMessageId === null) {
-      // Inserting at beginning - no chapter
-      return undefined
-    }
-
-    const index = messages.findIndex((msg) => msg.id === afterMessageId)
-    if (index === -1) return undefined
-
-    // Look backwards from this position to find the most recent chapter marker
-    for (let i = index; i >= 0; i--) {
-      const msg = messages[i]
-      if (msg.type === 'chapter' && msg.sceneId) {
-        return msg.sceneId
-      }
-    }
-
-    return undefined
-  },
-
-  getCurrentChapterId: () => {
-    // Chapters are now nodes - use getCurrentNodeId instead
-    // This function is kept for backward compatibility
-    const selectedNodeId = nodeStore.selectedNodeId
-    if (selectedNodeId) {
-      return selectedNodeId
-    }
-
-    // Otherwise, look at the last message's chapterId or nodeId
-    const messages = messagesState.messages
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1]
-      return lastMessage.sceneId
-    }
-
-    return undefined
-  },
-
   getCurrentNodeId: () => {
     // Import here to avoid circular dependency
     const { nodeStore } = require('./nodeStore')
@@ -508,36 +459,6 @@ export const messagesStore = {
     return null
   },
 
-  // Get the message ID to insert after for a specific chapter
-  getInsertAfterIdForChapter: (chapterId: string): string | null => {
-    const messages = messagesState.messages
-    let lastMessageIdInChapter: string | null = null
-
-    // Find the last message that belongs to this chapter
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i]
-      if (msg.sceneId === chapterId || (msg.type === 'chapter' && msg.sceneId === chapterId)) {
-        lastMessageIdInChapter = msg.id
-        break
-      }
-    }
-
-    // If we found a message in the chapter, return it
-    if (lastMessageIdInChapter) {
-      return lastMessageIdInChapter
-    }
-
-    // If no messages in chapter yet, find the chapter marker
-    const chapterMarkerIndex = messages.findIndex((msg) => msg.type === 'chapter' && msg.sceneId === chapterId)
-
-    if (chapterMarkerIndex !== -1) {
-      return messages[chapterMarkerIndex].id
-    }
-
-    // Chapter not found
-    return null
-  },
-
   // Actions
   setMessages: (messages: Message[]) => {
     setMessagesState('messages', messages)
@@ -556,6 +477,49 @@ export const messagesStore = {
         messageWordCounts: nodeMessages[nodeId],
         wordCount: Object.values(nodeMessages[nodeId]).reduce((acc, val) => acc + val, 0),
       })
+    }
+  },
+
+  // Recalculate word counts for specific nodes (or all if no nodeIds provided)
+  // Call this after adding/moving messages to ensure UI shows correct word counts
+  recalculateNodeWordCounts: (nodeIds?: string[]) => {
+    const messages = messagesState.messages
+
+    // Build word count map for requested nodes
+    const nodeMessages: Record<string, Record<string, number>> = {}
+
+    messages.forEach((msg) => {
+      if (msg.sceneId) {
+        // If nodeIds specified, only process those nodes
+        if (nodeIds && !nodeIds.includes(msg.sceneId)) return
+
+        if (!nodeMessages[msg.sceneId]) {
+          nodeMessages[msg.sceneId] = {}
+        }
+        nodeMessages[msg.sceneId][msg.id] = msg.content.split(/\s+/).filter((w) => w.length > 0).length
+      }
+    })
+
+    // Update each node's word count
+    for (const nodeId in nodeMessages) {
+      nodeStore.updateNodeNoSave(nodeId, {
+        messageWordCounts: nodeMessages[nodeId],
+        wordCount: Object.values(nodeMessages[nodeId]).reduce((acc, val) => acc + val, 0),
+      })
+    }
+
+    // If specific nodeIds were requested, also handle nodes that now have 0 messages
+    // (e.g., when all messages were moved away from a node)
+    if (nodeIds) {
+      for (const nodeId of nodeIds) {
+        if (!nodeMessages[nodeId]) {
+          // No messages for this node - set word count to 0
+          nodeStore.updateNodeNoSave(nodeId, {
+            messageWordCounts: {},
+            wordCount: 0,
+          })
+        }
+      }
     }
   },
 
@@ -626,6 +590,10 @@ export const messagesStore = {
     // Use immediate save for new messages (not during generation)
     // Don't await to avoid blocking
     triggerMessageSave(message.id, messageWithOrder, 'insert', false)
+    // Recalculate word count for the target node
+    if (message.sceneId) {
+      messagesStore.recalculateNodeWordCounts([message.sceneId])
+    }
   },
 
   // Version for WebSocket updates that doesn't trigger save
@@ -752,6 +720,8 @@ export const messagesStore = {
   updateMessageNoSave: (id: string, updates: Partial<Message>) => {
     const index = messagesState.messages.findIndex((msg) => msg.id === id)
     if (index !== -1) {
+      const oldMessage = messagesState.messages[index]
+      const oldSceneId = oldMessage.sceneId
       let mergedUpdates = updates
       // Only auto-split content into paragraphs if paragraphs weren't explicitly provided
       // TODO: This creates string[] but Message.paragraphs expects Paragraph[]
@@ -766,6 +736,20 @@ export const messagesStore = {
         ...prev,
         ...mergedUpdates,
       }))
+
+      // Recalculate word counts if sceneId or content changed
+      const nodesToUpdate: string[] = []
+      if (updates.sceneId !== undefined && updates.sceneId !== oldSceneId) {
+        // Message moved to different scene - update both old and new scene
+        if (oldSceneId) nodesToUpdate.push(oldSceneId)
+        if (updates.sceneId) nodesToUpdate.push(updates.sceneId)
+      } else if (updates.content !== undefined && oldSceneId) {
+        // Content changed - update current scene
+        nodesToUpdate.push(oldSceneId)
+      }
+      if (nodesToUpdate.length > 0) {
+        messagesStore.recalculateNodeWordCounts(nodesToUpdate)
+      }
     } else {
       // Message not found
     }
@@ -1094,12 +1078,24 @@ export const messagesStore = {
 
     const updates: Partial<Message> = {}
     let hasChanges = false
+    const updatedParagraphIds: string[] = []
 
     // Replace in each requested section
     for (const section of sections) {
       if (section === 'content' && message.content && message.content.includes(searchText)) {
         updates.content = message.content.replace(searchText, replaceText)
         hasChanges = true
+
+        // Also update within paragraphs
+        if (message.paragraphs) {
+          updates.paragraphs = message.paragraphs.map((p) => {
+            if (p.body.includes(searchText)) {
+              updatedParagraphIds.push(p.id)
+              return { ...p, body: p.body.replace(searchText, replaceText) }
+            }
+            return p
+          })
+        }
       }
       if (section === 'instruction' && message.instruction && message.instruction.includes(searchText)) {
         updates.instruction = message.instruction.replace(searchText, replaceText)
@@ -1113,6 +1109,14 @@ export const messagesStore = {
 
     if (hasChanges) {
       messagesStore.updateMessage(messageId, updates)
+
+      // Save updated paragraphs to backend
+      if (updatedParagraphIds.length > 0 && updates.paragraphs) {
+        const paragraphsToSave = updates.paragraphs.filter((p) => updatedParagraphIds.includes(p.id))
+        saveService
+          .updateParagraphBodies(paragraphsToSave)
+          .catch((err) => console.error('[messagesStore.replaceInMessage] Failed to save paragraphs:', err))
+      }
     }
 
     return hasChanges
@@ -1130,6 +1134,7 @@ export const messagesStore = {
 
     const updates: Partial<Message> = {}
     let replacementCount = 0
+    const updatedParagraphIds: string[] = []
 
     // Replace in each requested section
     for (const section of sections) {
@@ -1140,6 +1145,17 @@ export const messagesStore = {
         if (matches > 0) {
           updates.content = message.content.split(searchText).join(replaceText)
           replacementCount += matches
+
+          // Also update within paragraphs
+          if (message.paragraphs) {
+            updates.paragraphs = message.paragraphs.map((p) => {
+              if (p.body.includes(searchText)) {
+                updatedParagraphIds.push(p.id)
+                return { ...p, body: p.body.split(searchText).join(replaceText) }
+              }
+              return p
+            })
+          }
         }
       }
       if (section === 'instruction' && message.instruction) {
@@ -1163,6 +1179,14 @@ export const messagesStore = {
 
     if (replacementCount > 0) {
       messagesStore.updateMessage(messageId, updates)
+
+      // Save updated paragraphs to backend
+      if (updatedParagraphIds.length > 0 && updates.paragraphs) {
+        const paragraphsToSave = updates.paragraphs.filter((p) => updatedParagraphIds.includes(p.id))
+        saveService
+          .updateParagraphBodies(paragraphsToSave)
+          .catch((err) => console.error('[messagesStore.replaceAllInMessage] Failed to save paragraphs:', err))
+      }
     }
 
     return replacementCount
@@ -1279,42 +1303,42 @@ export const messagesStore = {
     }
   },
 
-  // Move all messages from one chapter before/after another chapter
-  async moveChapterUp(chapterId: string) {
+  // Move all messages from one scene before/after another scene
+  async moveSceneUp(sceneId: string) {
     const messages = [...messagesState.messages]
 
-    // Find all messages for this chapter (including the chapter marker)
-    const chapterMessages = messages.filter(
-      (msg) => (msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId,
+    // Find all messages for this scene (including scene markers)
+    const sceneMessages = messages.filter(
+      (msg) => (msg.type === 'chapter' && msg.sceneId === sceneId) || msg.sceneId === sceneId,
     )
 
-    if (chapterMessages.length === 0) return
+    if (sceneMessages.length === 0) return
 
-    // Find the chapter marker for this chapter
-    const chapterMarker = chapterMessages.find((msg) => msg.type === 'chapter')
-    if (!chapterMarker) return
+    // Find the scene marker
+    const sceneMarker = sceneMessages.find((msg) => msg.type === 'chapter')
+    if (!sceneMarker) return
 
-    // Find the previous chapter marker
-    const chapterMarkerIndex = messages.indexOf(chapterMarker)
-    let previousChapterMarkerIndex = -1
+    // Find the previous scene marker
+    const sceneMarkerIndex = messages.indexOf(sceneMarker)
+    let previousSceneMarkerIndex = -1
 
-    // Search backwards for the previous chapter marker
-    for (let i = chapterMarkerIndex - 1; i >= 0; i--) {
+    // Search backwards for the previous scene marker
+    for (let i = sceneMarkerIndex - 1; i >= 0; i--) {
       if (messages[i].type === 'chapter') {
-        previousChapterMarkerIndex = i
+        previousSceneMarkerIndex = i
         break
       }
     }
 
-    if (previousChapterMarkerIndex === -1) return // Can't move up if no previous chapter
+    if (previousSceneMarkerIndex === -1) return // Can't move up if no previous scene
 
-    // Remove all chapter messages from their current positions
+    // Remove all scene messages from their current positions
     const remainingMessages = messages.filter(
-      (msg) => !((msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId),
+      (msg) => !((msg.type === 'chapter' && msg.sceneId === sceneId) || msg.sceneId === sceneId),
     )
 
-    // Insert chapter messages before the previous chapter
-    remainingMessages.splice(previousChapterMarkerIndex, 0, ...chapterMessages)
+    // Insert scene messages before the previous scene
+    remainingMessages.splice(previousSceneMarkerIndex, 0, ...sceneMessages)
 
     // Update the messages with new order values
     const reorderedMessages = remainingMessages.map((msg, index) => ({
@@ -1336,52 +1360,52 @@ export const messagesStore = {
     }
   },
 
-  async moveChapterDown(chapterId: string) {
+  async moveSceneDown(sceneId: string) {
     const messages = [...messagesState.messages]
 
-    // Find all messages for this chapter (including the chapter marker)
-    const chapterMessages = messages.filter(
-      (msg) => (msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId,
+    // Find all messages for this scene (including scene markers)
+    const sceneMessages = messages.filter(
+      (msg) => (msg.type === 'chapter' && msg.sceneId === sceneId) || msg.sceneId === sceneId,
     )
 
-    if (chapterMessages.length === 0) return
+    if (sceneMessages.length === 0) return
 
-    // Find the chapter marker for this chapter
-    const chapterMarker = chapterMessages.find((msg) => msg.type === 'chapter')
-    if (!chapterMarker) return
+    // Find the scene marker
+    const sceneMarker = sceneMessages.find((msg) => msg.type === 'chapter')
+    if (!sceneMarker) return
 
-    // Find the next chapter marker
-    const chapterMarkerIndex = messages.indexOf(chapterMarker)
-    let nextChapterMarkerIndex = -1
-    let nextChapterId = null
+    // Find the next scene marker
+    const sceneMarkerIndex = messages.indexOf(sceneMarker)
+    let nextSceneMarkerIndex = -1
+    let nextSceneId = null
 
-    // Search forwards for the next chapter marker
-    for (let i = chapterMarkerIndex + 1; i < messages.length; i++) {
+    // Search forwards for the next scene marker
+    for (let i = sceneMarkerIndex + 1; i < messages.length; i++) {
       if (messages[i].type === 'chapter') {
-        nextChapterMarkerIndex = i
-        nextChapterId = messages[i].sceneId
+        nextSceneMarkerIndex = i
+        nextSceneId = messages[i].sceneId
         break
       }
     }
 
-    if (nextChapterMarkerIndex === -1) return // Can't move down if no next chapter
+    if (nextSceneMarkerIndex === -1) return // Can't move down if no next scene
 
-    // Find all messages for the next chapter
-    const nextChapterMessages = messages.filter(
-      (msg) => (msg.type === 'chapter' && msg.sceneId === nextChapterId) || msg.sceneId === nextChapterId,
+    // Find all messages for the next scene
+    const nextSceneMessages = messages.filter(
+      (msg) => (msg.type === 'chapter' && msg.sceneId === nextSceneId) || msg.sceneId === nextSceneId,
     )
 
-    // Remove all chapter messages from their current positions
+    // Remove all scene messages from their current positions
     const remainingMessages = messages.filter(
-      (msg) => !((msg.type === 'chapter' && msg.sceneId === chapterId) || msg.sceneId === chapterId),
+      (msg) => !((msg.type === 'chapter' && msg.sceneId === sceneId) || msg.sceneId === sceneId),
     )
 
-    // Find where the next chapter ends in the remaining messages
-    const lastNextChapterMessage = nextChapterMessages[nextChapterMessages.length - 1]
-    const insertIndex = remainingMessages.indexOf(lastNextChapterMessage) + 1
+    // Find where the next scene ends in the remaining messages
+    const lastNextSceneMessage = nextSceneMessages[nextSceneMessages.length - 1]
+    const insertIndex = remainingMessages.indexOf(lastNextSceneMessage) + 1
 
-    // Insert chapter messages after the next chapter
-    remainingMessages.splice(insertIndex, 0, ...chapterMessages)
+    // Insert scene messages after the next scene
+    remainingMessages.splice(insertIndex, 0, ...sceneMessages)
 
     // Update the messages with new order values
     const reorderedMessages = remainingMessages.map((msg, index) => ({

@@ -10,8 +10,6 @@ vi.mock('../utils/apiClient', () => ({
     updateMessage: vi.fn(),
     deleteMessage: vi.fn(),
     reorderMessages: vi.fn(),
-    updateChapter: vi.fn(),
-    deleteChapter: vi.fn(),
     updateCharacter: vi.fn(),
     deleteCharacter: vi.fn(),
     updateContextItem: vi.fn(),

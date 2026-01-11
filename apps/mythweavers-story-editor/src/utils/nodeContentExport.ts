@@ -5,7 +5,7 @@ import { messagesStore } from '../stores/messagesStore'
 import { TreeNode, nodeStore } from '../stores/nodeStore'
 import { Message, Node } from '../types/core'
 import { getCharacterDisplayName } from './character'
-import { calculateActivePath } from './nodeTraversal'
+import { calculateActivePath, getScenesInStoryOrder } from './nodeTraversal'
 
 function isDescendantOf(node: Node, ancestorId: string, nodesById: Record<string, Node>): boolean {
   let currentParentId: string | null | undefined = node.parentId
@@ -57,14 +57,19 @@ export function getChapterIdsForNode(nodeId: string): string[] {
   return getSceneIdsForNode(nodeId)
 }
 
-export function getNodeMessageContents(nodeId: string): string[] {
+export interface MessageWithId {
+  id: string
+  content: string
+}
+
+export function getNodeMessageContents(nodeId: string): MessageWithId[] {
   const sceneIds = getSceneIdsForNode(nodeId)
   if (sceneIds.length === 0) {
     return []
   }
 
   const sceneIdSet = new Set(sceneIds)
-  const sceneMessageMap = new Map<string, string[]>()
+  const sceneMessageMap = new Map<string, MessageWithId[]>()
 
   sceneIds.forEach((id) => {
     sceneMessageMap.set(id, [])
@@ -86,11 +91,11 @@ export function getNodeMessageContents(nodeId: string): string[] {
 
     const bucket = sceneMessageMap.get(owningSceneId)
     if (bucket) {
-      bucket.push(trimmedContent)
+      bucket.push({ id: message.id, content: trimmedContent })
     }
   }
 
-  const orderedContents: string[] = []
+  const orderedContents: MessageWithId[] = []
   sceneIds.forEach((id) => {
     const bucket = sceneMessageMap.get(id)
     if (bucket && bucket.length > 0) {
@@ -101,12 +106,95 @@ export function getNodeMessageContents(nodeId: string): string[] {
   return orderedContents
 }
 
-export function buildNodeMarkdown(nodeId: string): string {
-  const contents = getNodeMessageContents(nodeId)
-  if (contents.length === 0) {
+export interface BuildNodeMarkdownOptions {
+  includeMessageIds?: boolean
+}
+
+export function buildNodeMarkdown(nodeId: string, options: BuildNodeMarkdownOptions = {}): string {
+  const { includeMessageIds = false } = options
+  const messages = getNodeMessageContents(nodeId)
+  if (messages.length === 0) {
     return ''
   }
-  return contents.join('\n\n')
+  if (includeMessageIds) {
+    return messages.map((msg) => `[MSG:${msg.id}]\n${msg.content}`).join('\n\n')
+  }
+  return messages.map((msg) => msg.content).join('\n\n')
+}
+
+/**
+ * Represents content from a node marked for context inclusion.
+ */
+export interface MarkedNodeContent {
+  nodeId: string
+  title: string
+  content: string // Full message content or summary
+  isFullContent: boolean // true if includeInFull === 2, false if === 1 (summary)
+}
+
+export interface GetMarkedNodesContentOptions {
+  includeMessageIds?: boolean
+}
+
+/**
+ * Get content from nodes marked for context inclusion.
+ * Returns nodes sorted by story order (using proper tree traversal).
+ *
+ * - includeInFull === 2 → full content (uses buildNodeMarkdown)
+ * - includeInFull === 1 → summary only (uses node.summary)
+ * - includeInFull === 0 or undefined → skipped
+ */
+export function getMarkedNodesContent(options: GetMarkedNodesContentOptions = {}): MarkedNodeContent[] {
+  const { includeMessageIds = false } = options
+  const nodesArray = nodeStore.nodesArray
+  const result: MarkedNodeContent[] = []
+
+  // Get scenes in proper story order (using tree traversal, not just order field)
+  const scenesInOrder = getScenesInStoryOrder(nodesArray)
+
+  // Filter to marked scenes while preserving story order
+  const markedNodes = scenesInOrder.filter(
+    (node) => node.includeInFull === 1 || node.includeInFull === 2
+  )
+
+  for (const node of markedNodes) {
+    if (node.includeInFull === 2) {
+      // Full content
+      const content = buildNodeMarkdown(node.id, { includeMessageIds })
+      if (content) {
+        result.push({
+          nodeId: node.id,
+          title: node.title,
+          content,
+          isFullContent: true,
+        })
+      }
+    } else if (node.includeInFull === 1 && node.summary) {
+      // Summary only (summaries don't have message IDs)
+      result.push({
+        nodeId: node.id,
+        title: node.title,
+        content: node.summary,
+        isFullContent: false,
+      })
+    }
+  }
+
+  return result
+}
+
+/**
+ * Build markdown string from marked nodes.
+ * Uses [Scene: Title] format matching story generation for caching consistency.
+ * Includes message IDs for AI to reference specific messages.
+ */
+export function buildMarkedNodesMarkdown(): string {
+  // Include message IDs for AI context (allows AI to reference specific messages)
+  const nodes = getMarkedNodesContent({ includeMessageIds: true })
+  if (nodes.length === 0) {
+    return ''
+  }
+  return nodes.map((n) => `[Scene: ${n.title}]\n${n.content}`).join('\n\n')
 }
 
 export interface TreeMarkdownOptions {
@@ -136,8 +224,8 @@ export function buildTreeMarkdown(options: TreeMarkdownOptions = {}): string {
     if (contentWordCountCache.has(nodeId)) {
       return contentWordCountCache.get(nodeId)!
     }
-    const contents = getNodeMessageContents(nodeId)
-    if (contents.length === 0) {
+    const messages = getNodeMessageContents(nodeId)
+    if (messages.length === 0) {
       const node = nodes[nodeId]
       if (node?.wordCount !== undefined) {
         contentWordCountCache.set(nodeId, node.wordCount)
@@ -146,7 +234,7 @@ export function buildTreeMarkdown(options: TreeMarkdownOptions = {}): string {
       contentWordCountCache.set(nodeId, 0)
       return 0
     }
-    const total = contents.reduce((acc, content) => acc + countWords(content), 0)
+    const total = messages.reduce((acc, msg) => acc + countWords(msg.content), 0)
     contentWordCountCache.set(nodeId, total)
     return total
   }
@@ -282,9 +370,10 @@ export function buildPrecedingContextMarkdown(nodeId: string, options: Preceding
       if (summary) {
         sectionBody = summary
       } else {
-        const messageContents = getNodeMessageContents(scene.id)
-        if (messageContents.length > 0) {
-          const joined = messageContents.join('\n\n').trim()
+        const messages = getNodeMessageContents(scene.id)
+        if (messages.length > 0) {
+          // For summary mode, just use content without message IDs
+          const joined = messages.map((m) => m.content).join('\n\n').trim()
           if (joined) {
             const paragraphs = joined
               .split(/\n{2,}/)
@@ -296,9 +385,10 @@ export function buildPrecedingContextMarkdown(nodeId: string, options: Preceding
         }
       }
     } else {
-      const messageContents = getNodeMessageContents(scene.id)
-      if (messageContents.length > 0) {
-        sectionBody = messageContents.join('\n\n').trim()
+      const messages = getNodeMessageContents(scene.id)
+      if (messages.length > 0) {
+        // For full mode, include message IDs
+        sectionBody = messages.map((msg) => `[MSG:${msg.id}]\n${msg.content}`).join('\n\n').trim()
       } else if (summary) {
         sectionBody = summary
       }

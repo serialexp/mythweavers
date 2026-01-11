@@ -69,7 +69,7 @@ export function ScriptModeView(props: ScriptModeViewProps) {
       <For each={scriptMessages()}>
         {(message) => (
           <>
-            <div class="message-wrapper">
+            <div class={viewStyles.messageWrapper}>
               <Message
                 message={message}
                 storyTurnNumber={messagesStore.getStoryTurnNumbers().get(message.id) || 0}

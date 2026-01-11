@@ -1,7 +1,10 @@
-import { Component, For, Show, createEffect, createMemo, onCleanup, onMount } from 'solid-js'
+import { IconButton } from '@mythweavers/ui'
+import { BsChevronUp } from 'solid-icons/bs'
+import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
 import MessageListItems from './MessageListItems'
 import * as styles from './MessageList.css'
+import * as viewStyles from './ViewStyles.css'
 
 interface MessageListProps {
   isLoading: boolean
@@ -23,6 +26,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
   let previousMessageCount = displayMessages().length
   let scrollPositionBeforeUpdate: number | null = null
   let hasRestoredInitialScroll = false
+  const [showScrollToTop, setShowScrollToTop] = createSignal(false)
 
   // Chapter handlers removed - chapters are now nodes
   /*
@@ -235,6 +239,11 @@ export const MessageList: Component<MessageListProps> = (props) => {
     // Always save the current scroll position
     saveScrollPosition()
 
+    // Update scroll to top button visibility
+    if (messagesRef) {
+      setShowScrollToTop(messagesRef.scrollTop > 100)
+    }
+
     // If generating and user scrolls away from bottom, mark as manually scrolled
     if (messagesRef && isCurrentlyGenerating()) {
       const isNearBottom = messagesRef.scrollHeight - messagesRef.scrollTop - messagesRef.clientHeight < 100
@@ -244,55 +253,64 @@ export const MessageList: Component<MessageListProps> = (props) => {
     }
   }
 
+  const handleScrollToTop = () => {
+    if (messagesRef) {
+      messagesRef.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
   // Unified scroll restoration effect - runs after messages are loaded
   createEffect(() => {
     // Only run once when messages are loaded and DOM is ready
     if (!hasRestoredInitialScroll && displayMessages().length > 0 && messagesRef) {
-      // Use double requestAnimationFrame to ensure DOM is fully rendered
+      // Wait for content to stabilize before restoring scroll position
+      // The editor content loads asynchronously, so we need to wait for
+      // scrollHeight to stop changing before we can accurately restore position
+      let lastHeight = 0
+      let stableCount = 0
+      const STABILITY_THRESHOLD = 3 // Number of consecutive stable checks required
+      const CHECK_INTERVAL = 50 // ms between checks
+      const MAX_WAIT_TIME = 2000 // Maximum time to wait for stability
+
+      const startTime = Date.now()
+
+      const checkAndRestore = () => {
+        if (!messagesRef || hasRestoredInitialScroll) return
+
+        const currentHeight = messagesRef.scrollHeight
+
+        if (currentHeight === lastHeight) {
+          stableCount++
+        } else {
+          stableCount = 0
+          lastHeight = currentHeight
+        }
+
+        // Content is stable or we've waited too long
+        if (stableCount >= STABILITY_THRESHOLD || Date.now() - startTime > MAX_WAIT_TIME) {
+          performScrollRestoration()
+        } else {
+          // Keep checking
+          setTimeout(checkAndRestore, CHECK_INTERVAL)
+        }
+      }
+
+      const performScrollRestoration = () => {
+        if (!messagesRef || hasRestoredInitialScroll) return
+
+        // Restore saved scroll position
+        const savedScrollTop = localStorage.getItem('messagesScrollTop')
+        if (savedScrollTop) {
+          messagesRef.scrollTop = Number.parseInt(savedScrollTop, 10)
+        }
+
+        hasRestoredInitialScroll = true
+      }
+
+      // Start checking after initial render
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!messagesRef || hasRestoredInitialScroll) return
-
-          // Priority 1: Check for last edited message
-          const lastEditedMessageId = localStorage.getItem('lastEditedMessageId')
-          const lastEditedTime = localStorage.getItem('lastEditedMessageTime')
-
-          if (lastEditedMessageId && lastEditedTime) {
-            const timeSinceEdit = Date.now() - Number.parseInt(lastEditedTime, 10)
-            const twentyFourHours = 24 * 60 * 60 * 1000
-
-            if (timeSinceEdit < twentyFourHours) {
-              // Try to find the message element
-              const messageElement = messagesRef.querySelector(`[data-message-id="${lastEditedMessageId}"]`)
-
-              if (messageElement) {
-                // Scroll to the edited message
-                messageElement.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'center',
-                })
-
-                // Keep the scroll information for subsequent reloads
-                // It will be naturally overwritten when user edits a different message
-                hasRestoredInitialScroll = true
-                return
-              }
-            } else {
-              // Only clear if too old (>24 hours)
-              localStorage.removeItem('lastEditedMessageId')
-              localStorage.removeItem('lastEditedMessageTime')
-            }
-          }
-
-          // Priority 2: Fall back to saved scroll position
-          const savedScrollTop = localStorage.getItem('messagesScrollTop')
-          if (savedScrollTop) {
-            messagesRef.scrollTop = Number.parseInt(savedScrollTop, 10)
-            // Don't clear this - it's updated continuously
-          }
-
-          hasRestoredInitialScroll = true
-        })
+        lastHeight = messagesRef?.scrollHeight || 0
+        checkAndRestore()
       })
     }
   })
@@ -352,11 +370,24 @@ export const MessageList: Component<MessageListProps> = (props) => {
         </Show>
         <MessageListItems
           isGenerating={props.isGenerating}
-          // Chapter handlers removed - chapters are now managed through nodes
         />
         <Show when={props.isLoading}>
-          <div class={styles.loadingMessage}>
-            <div class={styles.loadingMessageContent}>Thinking...</div>
+          <div class={viewStyles.messageWrapper}>
+            <div class={styles.loadingMessage}>
+              <div class={styles.loadingMessageContent}>Thinking...</div>
+            </div>
+          </div>
+        </Show>
+        <Show when={showScrollToTop()}>
+          <div class={styles.scrollToTopContainer}>
+            <IconButton
+              variant="secondary"
+              size="md"
+              onClick={handleScrollToTop}
+              aria-label="Scroll to top"
+            >
+              <BsChevronUp />
+            </IconButton>
           </div>
         </Show>
       </div>

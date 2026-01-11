@@ -2,7 +2,7 @@ import { randomBytes, scrypt } from 'node:crypto'
 import { promisify } from 'node:util'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
-import { authConfig } from '../../lib/config.js'
+import { authConfig, getCookieOptions } from '../../lib/config.js'
 import { prisma } from '../../lib/prisma.js'
 
 const scryptAsync = promisify(scrypt)
@@ -121,13 +121,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         })
 
         // Set cookie
-        reply.setCookie('sessionToken', sessionToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: authConfig.sessionDuration / 1000,
-          path: '/',
-        })
+        reply.setCookie('sessionToken', sessionToken, getCookieOptions())
 
         return {
           success: true as const,
@@ -205,13 +199,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         })
 
         // Set cookie
-        reply.setCookie('sessionToken', sessionToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: authConfig.sessionDuration / 1000,
-          path: '/',
-        })
+        reply.setCookie('sessionToken', sessionToken, getCookieOptions())
 
         fastify.log.info({ userId: user.id, username: user.username }, 'User logged in')
 
@@ -253,9 +241,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
           })
         }
 
-        reply.clearCookie('sessionToken', {
-          path: '/',
-        })
+        reply.clearCookie('sessionToken', getCookieOptions())
 
         return { success: true as const }
       } catch (error) {
@@ -313,13 +299,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const timeRemaining = authConfig.sessionDuration - sessionAge
 
         if (timeRemaining < authConfig.cookieRefreshThreshold) {
-          reply.setCookie('sessionToken', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: authConfig.sessionDuration / 1000,
-            path: '/',
-          })
+          reply.setCookie('sessionToken', token, getCookieOptions())
         }
 
         return {

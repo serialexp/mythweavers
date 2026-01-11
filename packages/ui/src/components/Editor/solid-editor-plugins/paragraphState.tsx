@@ -1,6 +1,7 @@
-import type { Paragraph } from '@mythweavers/shared'
+import type { Paragraph, ParagraphInventoryAction } from '@mythweavers/shared'
 import { DecorationSet, InlineContent, type NodeViewProps, WidgetsAt, setPosInfo } from '@writer/solid-editor'
-import { type Accessor, type JSX, Show, createEffect } from 'solid-js'
+import { type Accessor, For, type JSX, Show, createEffect } from 'solid-js'
+import { inventoryBadge, inventoryBadgeAdd, inventoryBadgeRemove, inventoryBadgesContainer } from '../scene-editor.css'
 
 /**
  * Creates a paragraph nodeView factory that renders paragraphs with
@@ -26,12 +27,35 @@ export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>):
     const extra = () => props.node.attrs.extra as string | null
     const extraLoading = () => props.node.attrs.extraLoading as string | null
 
-    // Find paragraph state from external data
-    const paragraphState = () => {
+    // Find paragraph data from external data
+    const paragraphData = () => {
       const id = paragraphId()
-      if (!id) return 'draft'
-      const paragraph = paragraphs().find((p) => p.id === id)
-      return paragraph?.state || 'draft'
+      if (!id) return null
+      return paragraphs().find((p) => p.id === id) || null
+    }
+
+    // Get paragraph state
+    const paragraphState = () => paragraphData()?.state || 'draft'
+
+    // Check if paragraph has script or inventory actions
+    const hasScript = () => {
+      const data = paragraphData()
+      return !!(data?.script && data.script.trim())
+    }
+
+    const hasInventory = () => {
+      const data = paragraphData()
+      return !!(data?.inventoryActions && data.inventoryActions.length > 0)
+    }
+
+    // Get inventory actions for display
+    const inventoryActions = () => paragraphData()?.inventoryActions || []
+
+    // Format an inventory action for display
+    const formatInventoryAction = (action: ParagraphInventoryAction) => {
+      const sign = action.type === 'add' ? '+' : '-'
+      const amount = action.item_amount > 1 ? ` ×${action.item_amount}` : ''
+      return `${sign}${action.item_name}${amount}`
     }
 
     // Get inline decorations for this paragraph's content
@@ -56,6 +80,8 @@ export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>):
       <p
         id={paragraphId() || undefined}
         data-state={paragraphState()}
+        data-has-script={hasScript() || undefined}
+        data-has-inventory={hasInventory() || undefined}
         data-extra={extra() || undefined}
         data-extra-loading={extraLoading() || undefined}
         class="solid-editor-paragraph"
@@ -82,6 +108,26 @@ export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>):
         {/* Widgets at end of paragraph content (position before closing tag) */}
         <Show when={props.decorations}>
           <WidgetsAt decorations={props.decorations!} pos={props.pos + 1 + props.node.content.size} side="after" />
+        </Show>
+
+        {/* Inventory action badges - clickable to open inventory modal */}
+        <Show when={inventoryActions().length > 0}>
+          <span
+            class={inventoryBadgesContainer}
+            contentEditable={false}
+            data-paragraph-action="edit-inventory"
+            data-paragraph-id={paragraphId()}
+          >
+            <For each={inventoryActions()}>
+              {(action) => (
+                <span
+                  class={`${inventoryBadge} ${action.type === 'add' ? inventoryBadgeAdd : inventoryBadgeRemove}`}
+                >
+                  {formatInventoryAction(action)}
+                </span>
+              )}
+            </For>
+          </span>
         </Show>
       </p>
     ) as JSX.Element

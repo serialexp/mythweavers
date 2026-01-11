@@ -25,6 +25,7 @@ import { VsCode } from 'solid-icons/vs'
 import { Dropdown, DropdownItem } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { useOllama } from '../hooks/useOllama'
+import { cacheStore } from '../stores/cacheStore'
 import { copyPreviewStore } from '../stores/copyPreviewStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
@@ -36,6 +37,7 @@ import { settingsStore } from '../stores/settingsStore'
 import { statsStore } from '../stores/statsStore'
 import { Node, NodeType } from '../types/core'
 import { buildNodeMarkdown, buildPrecedingContextMarkdown, buildTreeMarkdown } from '../utils/nodeContentExport'
+import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 import { estimateTokensFromText } from '../utils/templateAI'
 import { createAnthropicClient } from '../utils/anthropicClient'
 import { CharacterUpdateModal } from './CharacterUpdateModal'
@@ -1247,9 +1249,19 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
     }
   })
 
-  // Effect that watches the fingerprint and triggers token counting
+  // Effect that watches the fingerprint and triggers token counting (debounced)
+  // We debounce to avoid constant recalculation during streaming
+  let tokenCountTimeout: ReturnType<typeof setTimeout> | null = null
+
   createEffect(() => {
     const fp = contextFingerprint()
+
+    // Clear any pending timeout when fingerprint changes
+    if (tokenCountTimeout) {
+      clearTimeout(tokenCountTimeout)
+      tokenCountTimeout = null
+    }
+
     if (!fp) {
       setTokenCountResult(null)
       return
@@ -1257,41 +1269,51 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
 
     const { provider, model, fullContentNodes, summaryNodes } = fp
 
-    // Build content for token counting
-    let totalContent = ''
-    for (const node of fullContentNodes) {
-      const markdown = buildNodeMarkdown(node.id)
-      if (markdown) {
-        totalContent += `## ${node.title}\n\n${markdown}\n\n`
+    // Debounce token counting by 2 seconds to avoid constant updates during streaming
+    tokenCountTimeout = setTimeout(() => {
+      // Build content for token counting
+      let totalContent = ''
+      for (const node of fullContentNodes) {
+        const markdown = buildNodeMarkdown(node.id)
+        if (markdown) {
+          totalContent += `## ${node.title}\n\n${markdown}\n\n`
+        }
       }
-    }
-    for (const node of summaryNodes) {
-      if (node.summary) {
-        totalContent += `## ${node.title} (Summary)\n\n${node.summary}\n\n`
+      for (const node of summaryNodes) {
+        if (node.summary) {
+          totalContent += `## ${node.title} (Summary)\n\n${node.summary}\n\n`
+        }
       }
-    }
 
-    // For Anthropic, use the API; otherwise use heuristic
-    if (provider === 'anthropic' && model && settingsStore.anthropicApiKey) {
-      // Set loading state
-      setTokenCountResult({ tokens: 0, isExact: false, isLoading: true })
+      // For Anthropic, use the API; otherwise use heuristic
+      if (provider === 'anthropic' && model && settingsStore.anthropicApiKey) {
+        // Set loading state
+        setTokenCountResult({ tokens: 0, isExact: false, isLoading: true })
 
-      const client = createAnthropicClient()
-      client
-        .countTokens([{ role: 'user', content: totalContent }], model)
-        .then((tokens) => {
-          setTokenCountResult({ tokens, isExact: true, isLoading: false })
-        })
-        .catch((err) => {
-          console.error('Failed to count tokens via Anthropic API:', err)
-          // Fall back to heuristic on error
-          const tokens = estimateTokensFromText(totalContent)
-          setTokenCountResult({ tokens, isExact: false, isLoading: false })
-        })
-    } else {
-      // Use heuristic for non-Anthropic providers
-      const tokens = estimateTokensFromText(totalContent)
-      setTokenCountResult({ tokens, isExact: false, isLoading: false })
+        const client = createAnthropicClient()
+        client
+          .countTokens([{ role: 'user', content: totalContent }], model)
+          .then((tokens) => {
+            setTokenCountResult({ tokens, isExact: true, isLoading: false })
+          })
+          .catch((err) => {
+            console.error('Failed to count tokens via Anthropic API:', err)
+            // Fall back to heuristic on error
+            const tokens = estimateTokensFromText(totalContent)
+            setTokenCountResult({ tokens, isExact: false, isLoading: false })
+          })
+      } else {
+        // Use heuristic for non-Anthropic providers
+        const tokens = estimateTokensFromText(totalContent)
+        setTokenCountResult({ tokens, isExact: false, isLoading: false })
+      }
+    }, 2000)
+  })
+
+  // Clean up timeout on unmount
+  onCleanup(() => {
+    if (tokenCountTimeout) {
+      clearTimeout(tokenCountTimeout)
     }
   })
 
@@ -1327,6 +1349,22 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
       fitsInContext: tokens <= availableForContent,
       fullContentCount: fullContentNodes.length,
       summaryCount: summaryNodes.length,
+    }
+  })
+
+  // Cache status memo - checks if current context is cached
+  const cacheStatus = createMemo(() => {
+    const fingerprint = getContextNodesFingerprint(nodeStore.nodesArray)
+    if (!fingerprint) return null
+
+    const remainingMs = cacheStore.getCacheRemainingMs(fingerprint)
+    if (remainingMs <= 0) return null
+
+    // Convert to minutes
+    const remainingMinutes = Math.ceil(remainingMs / 60000)
+    return {
+      remainingMinutes,
+      fingerprint,
     }
   })
 
@@ -1414,6 +1452,12 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
                       {est.fullContentCount > 0 && `${est.fullContentCount} full`}
                       {est.fullContentCount > 0 && est.summaryCount > 0 && ', '}
                       {est.summaryCount > 0 && `${est.summaryCount} summary`}
+                      <Show when={cacheStatus()}>
+                        {' · '}
+                        <span class={styles.cacheIndicator} title="Context is cached">
+                          cached ({cacheStatus()!.remainingMinutes}m)
+                        </span>
+                      </Show>
                     </span>
                     <Show when={!est.fitsInContext}>
                       <span class={styles.tokenEstimateError}>exceeds limit!</span>

@@ -104,3 +104,12 @@ export const deleteOrphanedButton = style({
     color: tokens.color.text.inverse,
   },
 })
+
+export const scrollToTopContainer = style({
+  position: 'sticky',
+  bottom: tokens.space['4'],
+  zIndex: 10,
+  marginTop: 'auto',
+  alignSelf: 'flex-end',
+  marginRight: tokens.space['4'],
+})

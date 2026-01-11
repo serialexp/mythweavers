@@ -1,10 +1,11 @@
+import type { ParagraphInventoryAction } from '@mythweavers/shared'
 import { produce } from 'immer'
 import { batch, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Character, ContextItem } from '../types/core'
 import { getCharacterDisplayName } from '../utils/character'
 import { getMessagesInStoryOrder } from '../utils/nodeTraversal'
-import { executeScript } from '../utils/scriptEngine'
+import { builtInFunctions, executeScript } from '../utils/scriptEngine'
 import { calendarStore } from './calendarStore'
 import { charactersStore } from './charactersStore'
 import { contextItemsStore } from './contextItemsStore'
@@ -36,13 +37,24 @@ interface NodeChangeSummary {
 
 interface ScriptError {
   messageId: string
+  paragraphId?: string // Optional: for paragraph-level script errors
   nodeId: string
   error: string
+}
+
+interface ParagraphScriptState {
+  paragraphId: string
+  messageId: string
+  before: ScriptDataObject
+  after: ScriptDataObject
+  error?: string
 }
 
 interface ScriptDataStore {
   // Map from message ID to the data state before and after that message's script
   dataStates: Record<string, ScriptDataState>
+  // Map from paragraph ID to the data state before and after that paragraph's script
+  paragraphStates: Record<string, ParagraphScriptState>
   // Map from node ID to cumulative changes in that node
   nodeChanges: Record<string, NodeChangeSummary>
   // Track script execution errors by node ID
@@ -53,6 +65,7 @@ interface ScriptDataStore {
 
 const [store, setStore] = createStore<ScriptDataStore>({
   dataStates: {},
+  paragraphStates: {},
   nodeChanges: {},
   scriptErrors: {},
   isDirty: true,
@@ -192,6 +205,26 @@ function applyPlotPointOverrides(data: ScriptDataObject, messageId: string) {
   })
 }
 
+// Apply inventory actions for a paragraph
+// Uses the built-in inventory functions from scriptEngine
+function applyInventoryActions(data: ScriptDataObject, actions: ParagraphInventoryAction[]) {
+  if (!actions || actions.length === 0) return
+
+  for (const action of actions) {
+    if (action.type === 'add') {
+      // Use the built-in addItem function
+      ;(builtInFunctions.addItem as any)(data, action.character_name, {
+        name: action.item_name,
+        amount: action.item_amount,
+        description: action.item_description,
+      })
+    } else if (action.type === 'remove') {
+      // Use the built-in removeItem function
+      ;(builtInFunctions.removeItem as any)(data, action.character_name, action.item_name, action.item_amount)
+    }
+  }
+}
+
 // Function to evaluate all scripts in sequence
 const evaluateAllScripts = () => {
   const messages = messagesStore.messages
@@ -201,6 +234,7 @@ const evaluateAllScripts = () => {
   let currentData: ScriptDataObject = {}
   let functions: Record<string, (...args: unknown[]) => unknown> = {}
   const newDataStates: Record<string, ScriptDataState> = {}
+  const newParagraphStates: Record<string, ParagraphScriptState> = {}
   const newNodeChanges: Record<string, NodeChangeSummary> = {}
   const newScriptErrors: Record<string, ScriptError[]> = {}
 
@@ -246,6 +280,12 @@ const evaluateAllScripts = () => {
       initializeContextItemData(draft)
       initializePlotPointData(draft)
     })
+
+    // Store this as the global state so getCumulativeDataAtMessage can find it
+    newDataStates.__global__ = {
+      before: {},
+      after: JSON.parse(JSON.stringify(currentData)),
+    }
   }
 
   // Get the last message to process all messages in story order
@@ -343,6 +383,66 @@ const evaluateAllScripts = () => {
       })
     }
 
+    // Process paragraph inventory actions and scripts FIRST (in sortOrder), before message script
+    if (message.paragraphs && message.paragraphs.length > 0 && message.role === 'assistant' && !message.isQuery) {
+      // Sort paragraphs by sortOrder (they may already be sorted, but ensure it)
+      const sortedParagraphs = [...message.paragraphs].sort((a, b) => {
+        // Get sortOrder - paragraphs from API should have this via the Paragraph interface
+        const orderA = (a as any).sortOrder ?? 0
+        const orderB = (b as any).sortOrder ?? 0
+        return orderA - orderB
+      })
+
+      for (const paragraph of sortedParagraphs) {
+        const hasInventoryActions = paragraph.inventoryActions && paragraph.inventoryActions.length > 0
+        const hasScript = !!paragraph.script
+
+        // Skip if neither inventory actions nor script
+        if (!hasInventoryActions && !hasScript) continue
+
+        const beforeData = JSON.parse(JSON.stringify(currentData))
+
+        // 1. Apply inventory actions FIRST (if any)
+        if (hasInventoryActions) {
+          currentData = produce({ ...currentData }, (draft: any) => {
+            applyInventoryActions(draft, paragraph.inventoryActions!)
+          })
+        }
+
+        // 2. Execute paragraph script AFTER inventory actions (if any)
+        let scriptError: string | undefined
+        if (hasScript) {
+          const result = executeScript(paragraph.script!, currentData, functions, false)
+          currentData = result.data
+          scriptError = result.error
+        }
+
+        // Store paragraph state (for both inventory actions and scripts)
+        newParagraphStates[paragraph.id] = {
+          paragraphId: paragraph.id,
+          messageId: message.id,
+          before: beforeData,
+          after: JSON.parse(JSON.stringify(currentData)),
+          error: scriptError,
+        }
+
+        // Track paragraph script errors
+        const errorNodeId = message.sceneId
+        if (scriptError && errorNodeId) {
+          if (!newScriptErrors[errorNodeId]) {
+            newScriptErrors[errorNodeId] = []
+          }
+          newScriptErrors[errorNodeId].push({
+            messageId: message.id,
+            paragraphId: paragraph.id,
+            nodeId: errorNodeId,
+            error: scriptError,
+          })
+        }
+      }
+    }
+
+    // Process message script AFTER paragraph scripts
     if (message.script && message.role === 'assistant' && !message.isQuery) {
       // Deep copy the current state as "before"
       const beforeData = JSON.parse(JSON.stringify(currentData))
@@ -400,6 +500,7 @@ const evaluateAllScripts = () => {
 
   batch(() => {
     setStore('dataStates', newDataStates)
+    setStore('paragraphStates', newParagraphStates)
     setStore('nodeChanges', newNodeChanges)
     setStore('scriptErrors', newScriptErrors)
     setStore('isDirty', false)
@@ -420,6 +521,24 @@ createEffect(() => {
     messagesStore.messages
       .filter((m) => m.role === 'assistant' && !m.isQuery)
       .map((m) => ({ id: m.id, script: m.script }))
+  )
+
+  // Track paragraph script changes
+  JSON.stringify(
+    messagesStore.messages
+      .filter((m) => m.role === 'assistant' && !m.isQuery && m.paragraphs)
+      .flatMap((m) =>
+        (m.paragraphs || []).map((p) => ({ paragraphId: p.id, messageId: m.id, script: p.script })),
+      ),
+  )
+
+  // Track paragraph inventory action changes
+  JSON.stringify(
+    messagesStore.messages
+      .filter((m) => m.role === 'assistant' && !m.isQuery && m.paragraphs)
+      .flatMap((m) =>
+        (m.paragraphs || []).map((p) => ({ paragraphId: p.id, inventoryActions: p.inventoryActions })),
+      ),
   )
 
   // Track node changes (for proper story order and storyTime changes)
@@ -476,6 +595,10 @@ export const scriptDataStore = {
     return store.dataStates
   },
 
+  get paragraphStates() {
+    return store.paragraphStates
+  },
+
   get nodeChanges() {
     return store.nodeChanges
   },
@@ -490,6 +613,10 @@ export const scriptDataStore = {
 
   getDataStateForMessage(messageId: string): ScriptDataState | undefined {
     return store.dataStates[messageId]
+  },
+
+  getDataStateForParagraph(paragraphId: string): ParagraphScriptState | undefined {
+    return store.paragraphStates[paragraphId]
   },
 
   getNodeChanges(nodeId: string): NodeChangeSummary | undefined {

@@ -191,6 +191,7 @@ export const detailAvatarPlaceholder = style({
 export const characterDescription = style({
   lineHeight: tokens.font.lineHeight.relaxed,
   color: tokens.color.text.primary,
+  whiteSpace: 'pre-line',
 })
 
 export const characterBirthdate = style({

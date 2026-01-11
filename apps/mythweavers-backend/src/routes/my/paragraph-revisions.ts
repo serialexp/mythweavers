@@ -29,7 +29,7 @@ const paragraphRevisionSchema = z.strictObject({
     .nullable()
     .meta({
       description: 'Array of inventory actions',
-      example: [{ type: 'add', item_name: 'Magic Sword', item_amount: 1 }],
+      example: [{ type: 'add', character_name: 'Hero', item_name: 'Magic Sword', item_amount: 1 }],
     }),
   createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
 })
@@ -43,7 +43,13 @@ type ParagraphState = 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT' | null
 
 // Types for expected array schemas
 type PlotPointAction = { plot_point_id: string; action: 'introduce' | 'mentioned' | 'partially resolved' | 'resolved' }
-type InventoryAction = { type: 'add' | 'remove'; item_name: string; item_amount: number }
+type InventoryAction = {
+  type: 'add' | 'remove'
+  character_name: string
+  item_name: string
+  item_amount: number
+  item_description?: string
+}
 
 // Helper to transform paragraph revision with properly typed fields
 function transformParagraphRevision<

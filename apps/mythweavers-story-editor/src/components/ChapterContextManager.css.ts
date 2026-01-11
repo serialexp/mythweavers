@@ -17,11 +17,9 @@ export const sectionHeader = style({
 })
 
 export const listContainer = style({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.25rem',
-  maxHeight: '200px',
-  overflowY: 'auto',
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
+  gap: '0.5rem',
 })
 
 export const itemText = style({
@@ -44,10 +42,26 @@ export const globalNote = style({
   fontStyle: 'italic',
 })
 
-export const footer = style({
+export const avatar = style({
+  width: '48px',
+  height: '48px',
+  borderRadius: tokens.radius.full,
+  objectFit: 'cover',
+  flexShrink: 0,
+  border: `1px solid ${tokens.color.border.default}`,
+})
+
+export const avatarPlaceholder = style({
+  width: '48px',
+  height: '48px',
+  borderRadius: tokens.radius.full,
+  backgroundColor: tokens.color.bg.elevated,
   display: 'flex',
-  gap: '0.5rem',
-  justifyContent: 'flex-end',
-  padding: '1rem',
-  borderTop: `1px solid ${tokens.color.border.default}`,
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '18px',
+  fontWeight: 600,
+  color: tokens.color.text.muted,
+  flexShrink: 0,
+  border: `1px solid ${tokens.color.border.default}`,
 })

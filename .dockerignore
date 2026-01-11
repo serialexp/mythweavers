@@ -1,5 +1,59 @@
+# Dependencies
 node_modules
 **/node_modules
+
+# Build outputs (we build fresh in Docker)
+**/dist
+**/.next
+**/.astro
+
+# Cache directories
 **/cache
+**/.cache
+
+# Git
+.git
+.gitignore
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+
+# Environment files (handled separately)
+.env
+.env.*
+!.env.example
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/coverage
+**/.nyc_output
+
+# Documentation
+*.md
+!CLAUDE.md
+
+# Legacy and dev files
 audio
 standalone
+**/*.log
+**/logs
+
+# Tauri (desktop app - not needed for web deployment)
+apps/mythweavers-story-editor/src-tauri
+
+# Histoire (component library dev tool)
+**/.histoire
+
+# TypeScript build info
+**/*.tsbuildinfo
+
+# Local development
+**/uploads
+**/data/*.db

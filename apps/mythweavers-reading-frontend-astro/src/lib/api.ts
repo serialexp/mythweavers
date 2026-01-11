@@ -3,17 +3,24 @@
  */
 
 // API base URL configuration
+// Use dynamic access to prevent Vite from inlining at build time
+const getServerEnv = (key: string) => {
+  // This pattern prevents Vite from replacing at build time
+  const env = globalThis.process?.env
+  return env?.[key]
+}
+
 const getApiUrl = () => {
-  // Server-side: use env variable
+  // Server-side: use runtime env variable
   if (typeof window === 'undefined') {
-    return import.meta.env.API_URL || 'http://localhost:3201'
+    return getServerEnv('API_URL') || 'http://localhost:3201'
   }
   // Client-side: check if on localhost
   if (window.location.host.includes('localhost')) {
     return 'http://localhost:3201'
   }
   // Production
-  return import.meta.env.PUBLIC_API_URL || 'https://api.mythweavers.com'
+  return import.meta.env.PUBLIC_API_URL || 'https://api.mythweavers.io'
 }
 
 // Type definitions

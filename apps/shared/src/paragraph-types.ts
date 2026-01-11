@@ -32,8 +32,10 @@ export interface ParagraphPlotPointAction {
  */
 export interface ParagraphInventoryAction {
   type: 'add' | 'remove'
+  character_name: string
   item_name: string
   item_amount: number
+  item_description?: string
 }
 
 // ============================================================================
@@ -68,11 +70,14 @@ export interface Paragraph {
   /** Comments on this paragraph */
   comments: ParagraphComment[]
 
-  /** Plot point actions triggered by this paragraph */
+  /** Plot point actions triggered by this paragraph @deprecated Use script instead */
   plotPointActions?: ParagraphPlotPointAction[]
 
-  /** Inventory changes triggered by this paragraph */
+  /** Inventory changes triggered by this paragraph @deprecated Use script instead */
   inventoryActions?: ParagraphInventoryAction[]
+
+  /** JavaScript to execute for this paragraph. Receives (data, functions) parameters. */
+  script?: string | null
 
   // ---- Editor-specific fields (not persisted to backend) ----
 

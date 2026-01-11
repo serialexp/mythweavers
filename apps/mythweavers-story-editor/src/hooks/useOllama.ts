@@ -25,6 +25,7 @@ import {
   getSummarizationPrompt,
 } from '../utils/storyUtils'
 import { refineClichés } from '../utils/clicheRefinement'
+import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 
 export const useOllama = () => {
   let currentAbortController: AbortController | null = null
@@ -445,6 +446,7 @@ Title:`
     assistantMessageId: string,
     shouldSummarize = false,
     maxTokens?: number,
+    isRegeneration = false,
   ) => {
     const client = getClient()
     let accumulatedContent = ''
@@ -595,7 +597,6 @@ Title:`
           }
 
           // Update token statistics
-          // Update token statistics
           cacheStore.updateTokenStats({
             inputTokens: regularInputTokens,
             outputTokens,
@@ -604,6 +605,17 @@ Title:`
             inputBasePrice,
             outputBasePrice,
           })
+
+          // Record cached prefix for cache prediction
+          // When cache is written or read, record the current context fingerprint
+          if (cacheWriteTokens > 0 || cacheReadTokens > 0) {
+            const contextFingerprint = getContextNodesFingerprint(nodeStore.nodesArray)
+            if (contextFingerprint) {
+              // 1 hour TTL for Anthropic cache
+              const ttlMs = 60 * 60 * 1000
+              cacheStore.recordCachedPrefix(contextFingerprint, ttlMs, 'context-nodes')
+            }
+          }
 
           // Convert to standardized token usage
           const tokenUsage = convertToTokenUsage(usage)
@@ -777,8 +789,59 @@ Title:`
             checkForAutoGeneration()
           }
 
-          // Message updates during generation already trigger saves via messagesStore.updateMessage
-          // The final state is automatically saved with debouncing
+          // Save content: for regeneration, create a new revision; for initial generation, save to existing revision
+          const finalMessage = messagesStore.messages.find((msg) => msg.id === assistantMessageId)
+          if (cleanedContent.trim()) {
+            const { saveService } = await import('../services/saveService')
+            try {
+              if (isRegeneration) {
+                // Regeneration: create a new revision with the content
+                const { revisionId } = await saveService.createMessageRevision(
+                  assistantMessageId,
+                  cleanedContent,
+                  {
+                    model: finalMessage?.model,
+                    tokensPerSecond: finalMessage?.tokensPerSecond,
+                    totalTokens: finalMessage?.totalTokens,
+                    promptTokens: finalMessage?.promptTokens,
+                    cacheCreationTokens: finalMessage?.cacheCreationTokens,
+                    cacheReadTokens: finalMessage?.cacheReadTokens,
+                    think: finalMessage?.think,
+                    showThink: finalMessage?.showThink,
+                  },
+                )
+                // Update local state with new revision ID
+                messagesStore.updateMessageNoSave(assistantMessageId, { currentMessageRevisionId: revisionId })
+              } else {
+                // Initial generation: save paragraphs to existing revision (v1)
+                const revisionId = finalMessage?.currentMessageRevisionId
+                if (revisionId) {
+                  // Parse content into paragraphs
+                  const paragraphs = cleanedContent
+                    .split(/\n\n+/)
+                    .map((p) => p.trim())
+                    .filter((p) => p.length > 0)
+                    .map((body, i) => ({
+                      id: `${assistantMessageId}-p${i}`,
+                      body,
+                      state: 'ai' as const,
+                      comments: [],
+                    })) as import('@mythweavers/shared').Paragraph[]
+
+                  // Save paragraphs to the existing revision
+                  await saveService.saveParagraphs(revisionId, [], paragraphs)
+
+                  // Update local message with content and paragraphs
+                  messagesStore.updateMessageNoSave(assistantMessageId, {
+                    content: cleanedContent,
+                    paragraphs,
+                  })
+                }
+              }
+            } catch (error) {
+              console.error('Failed to save generated content:', error)
+            }
+          }
         }
       }
     } catch (error) {
@@ -969,7 +1032,10 @@ Title:`
 
 Title: ${title}${protagonistNote}${viewpointNote}
 
-${content}`
+${content}
+
+---
+Now write the summary of the above content. Remember: capture key events, character developments, and plot points. Be concise and objective. Output ONLY the summary text itself - no headers like "Summary:" or "Chapter Summary:", no preamble, no meta-commentary. Start directly with the summary content.`
 
       const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 

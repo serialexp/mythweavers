@@ -1,7 +1,7 @@
 // API-related types
 
 import { CalendarConfig } from '@mythweavers/shared'
-import { Chapter, Character, ContextItem, Fleet, Hyperlane, HyperlaneSegment, Landmark, Message } from './core'
+import { Character, ContextItem, Fleet, Hyperlane, HyperlaneSegment, Landmark, Message } from './core'
 
 // ============================================================================
 // API to Local Type Mappers
@@ -208,14 +208,12 @@ export interface ApiStory {
   messages: Message[]
   characters: Character[]
   contextItems: ContextItem[]
-  chapters?: Chapter[]
-  nodes?: any[] // New hierarchical structure
+  nodes?: any[] // Hierarchical structure
   calendars?: Calendar[]
   defaultCalendarId?: string | null
   person?: 'first' | 'second' | 'third'
   tense?: 'present' | 'past'
   globalScript?: string
-  selectedChapterId?: string | null
   selectedNodeId?: string | null
   branchChoices?: Record<string, string> // branchMessageId -> selectedOptionId
   timelineStartTime?: number | null
@@ -233,7 +231,6 @@ export interface ApiStoryMetadata {
   storySetting: string
   messageCount: number
   characterCount: number
-  chapterCount?: number
   fingerprint?: string // Hash of message content for change detection
 }
 
@@ -256,22 +253,3 @@ export class VersionConflictError extends Error {
   }
 }
 
-// Chapter-related API types
-export interface CreateChapterRequest {
-  storyId: string
-  title: string
-  afterMessageId?: string // Insert chapter after this message
-}
-
-export interface UpdateChapterRequest {
-  title?: string
-  summary?: string
-}
-
-export interface GenerateChapterSummaryRequest {
-  chapterId: string
-}
-
-export interface GenerateChapterSummaryResponse {
-  summary: string
-}

@@ -22,6 +22,7 @@ import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { settingsStore } from '../stores/settingsStore'
 import type { Message, Model } from '../types/core'
+import type { BranchConversionResult } from '../utils/claudeChatImport'
 import { ClaudeChatImportModal } from './ClaudeChatImportModal'
 import { DeletedNodesModal } from './DeletedNodesModal'
 import { DeletedTurnsModal } from './DeletedTurnsModal'
@@ -65,6 +66,12 @@ interface SettingsProps {
   onImportClaudeChat: (
     conversationName: string,
     messages: Message[],
+    importTarget: 'new' | 'current',
+    storageMode: 'local' | 'server',
+  ) => Promise<void>
+  onImportClaudeChatWithBranches: (
+    conversationName: string,
+    branchData: BranchConversionResult,
     importTarget: 'new' | 'current',
     storageMode: 'local' | 'server',
   ) => Promise<void>
@@ -677,6 +684,7 @@ export const Settings: Component<SettingsProps> = (props) => {
         serverAvailable={props.serverAvailable}
         onClose={() => setShowClaudeChatImportModal(false)}
         onImport={props.onImportClaudeChat}
+        onImportWithBranches={props.onImportClaudeChatWithBranches}
       />
     </>
   )

@@ -85,11 +85,13 @@ export function SceneEditor(props: SceneEditorProps) {
     setState: (id: string, state: any) => {
       props.onParagraphUpdate(id, { state })
     },
+    editScript: props.onParagraphEditScript,
   }
 
   return (
     <SolidEditorWrapper
       paragraphs={props.scene.paragraphs}
+      editable={props.editable ?? true}
       onParagraphsChange={handleParagraphsChange}
       onParagraphCreate={props.onParagraphCreate}
       onParagraphDelete={props.onParagraphDelete}
@@ -101,6 +103,7 @@ export function SceneEditor(props: SceneEditorProps) {
       onSuggestionAccept={handleSuggestionAccept}
       onSuggestionReject={handleSuggestionReject}
       isProtagonistSet={!!props.scene.protagonistId}
+      onBlur={props.onBlur}
     />
   )
 }

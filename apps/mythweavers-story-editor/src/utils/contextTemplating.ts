@@ -5,31 +5,35 @@ import { calculateAge, formatAge } from './coruscantCalendar'
 import { ScriptData, evaluateTemplate, executeScriptsUpToMessage } from './scriptEngine'
 
 /**
- * Filter characters to only those active in the given chapter node
+ * Filter characters to only those active in the given scene/chapter node.
+ * Active characters are typically set on scene nodes (where content lives).
  */
-function filterActiveCharacters(characters: Character[], chapterNode: Node | undefined): Character[] {
-  if (!chapterNode || chapterNode.type !== 'chapter') {
+function filterActiveCharacters(characters: Character[], node: Node | undefined): Character[] {
+  if (!node) {
     return []
   }
 
-  if (!chapterNode.activeCharacterIds || chapterNode.activeCharacterIds.length === 0) {
+  // Scene nodes (and chapter nodes for legacy) can have activeCharacterIds
+  if (!node.activeCharacterIds || node.activeCharacterIds.length === 0) {
     return []
   }
 
-  const activeIds = new Set(chapterNode.activeCharacterIds)
+  const activeIds = new Set(node.activeCharacterIds)
   return characters.filter((char) => activeIds.has(char.id))
 }
 
 /**
- * Filter context items to only those active in the given chapter node or marked as global
+ * Filter context items to only those active in the given scene/chapter node or marked as global.
+ * Active context items are typically set on scene nodes (where content lives).
  */
-function filterActiveContextItems(contextItems: ContextItem[], chapterNode: Node | undefined): ContextItem[] {
-  if (!chapterNode || chapterNode.type !== 'chapter') {
-    // Still include global items even if no chapter is selected
+function filterActiveContextItems(contextItems: ContextItem[], node: Node | undefined): ContextItem[] {
+  if (!node) {
+    // Still include global items even if no node is selected
     return contextItems.filter((item) => item.isGlobal)
   }
 
-  const activeIds = new Set(chapterNode.activeContextItemIds || [])
+  // Scene nodes (and chapter nodes for legacy) can have activeContextItemIds
+  const activeIds = new Set(node.activeContextItemIds || [])
   return contextItems.filter((item) => item.isGlobal || activeIds.has(item.id))
 }
 
@@ -133,7 +137,7 @@ export function evaluateContextItemTemplates(
 }
 
 /**
- * Generate character context with evaluated templates
+ * Generate character context with evaluated templates in XML format
  * @param forceRefresh - If true, forces re-execution of scripts instead of using cache
  */
 export function getTemplatedCharacterContext(
@@ -160,13 +164,15 @@ export function getTemplatedCharacterContext(
     forceRefresh,
   )
 
-  const characterList = evaluatedCharacters
-    .map(
-      (char) => `${getCharacterDisplayName(char)}${char.isMainCharacter ? ' (protagonist)' : ''}: ${char.description}`,
-    )
+  const characterElements = evaluatedCharacters
+    .map((char) => {
+      const name = getCharacterDisplayName(char)
+      const role = char.isMainCharacter ? ' role="protagonist"' : ''
+      return `  <character name="${name}"${role}>\n${char.description}\n  </character>`
+    })
     .join('\n')
 
-  return `Known characters in this story:\n${characterList}\n\n`
+  return `<characters>\n${characterElements}\n</characters>\n`
 }
 
 /**
@@ -191,7 +197,7 @@ export function getTemplatedActiveCharacters(
 }
 
 /**
- * Generate context items with evaluated templates
+ * Generate context items with evaluated templates in XML format
  * @param forceRefresh - If true, forces re-execution of scripts instead of using cache
  */
 export function getTemplatedContextItems(
@@ -216,7 +222,9 @@ export function getTemplatedContextItems(
     forceRefresh,
   )
 
-  const contextList = evaluatedItems.map((item) => `${item.name}: ${item.description}`).join('\n')
+  const contextElements = evaluatedItems
+    .map((item) => `  <context-item name="${item.name}">\n${item.description}\n  </context-item>`)
+    .join('\n')
 
-  return `World/Setting Context:\n${contextList}\n\n`
+  return `<world>\n${contextElements}\n</world>`
 }

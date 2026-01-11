@@ -1,5 +1,12 @@
-import type { Message } from '../types/core'
+import type { BranchOption, Message } from '../types/core'
 import { generateMessageId } from './id'
+
+// Tree node for building the full conversation tree
+export interface MessageTreeNode {
+  message: ClaudeChatMessage
+  children: MessageTreeNode[]
+  isOnActiveBranch: boolean
+}
 
 // Claude chat API response types (from browser network tab)
 export interface ClaudeChatContentItem {
@@ -195,7 +202,7 @@ export function convertToStoryMessages(conversation: ClaudeConversation): Messag
       // Extract instruction from human message (check both text field and content array)
       const instruction = humanMsg
         ? humanMsg.content.find((c) => c.type === 'text')?.text || humanMsg.text
-        : null
+        : undefined
 
       console.log(`[convertToStoryMessages] Assistant message ${i}:`, {
         hasHumanPredecessor: !!humanMsg,
@@ -267,4 +274,249 @@ export function getConversationSummary(conversation: ClaudeConversation) {
     needsApiFetch: false,
     chatUrl,
   }
+}
+
+/**
+ * Build a full tree structure from a Claude conversation.
+ * Returns root nodes (messages with no parent or root parent).
+ */
+export function buildMessageTree(conversation: ClaudeConversation): MessageTreeNode[] {
+  const activeBranch = getActiveBranchUuids(conversation)
+  const rootUuid = '00000000-0000-4000-8000-000000000000'
+
+  // Build parent -> children map
+  const childrenByParent = new Map<string, ClaudeChatMessage[]>()
+  for (const msg of conversation.chat_messages) {
+    const parentUuid = msg.parent_message_uuid || rootUuid
+    if (!childrenByParent.has(parentUuid)) {
+      childrenByParent.set(parentUuid, [])
+    }
+    childrenByParent.get(parentUuid)!.push(msg)
+  }
+
+  // Sort children by created_at
+  for (const children of childrenByParent.values()) {
+    children.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  }
+
+  // Recursively build tree
+  function buildNode(msg: ClaudeChatMessage): MessageTreeNode {
+    const children = childrenByParent.get(msg.uuid) || []
+    return {
+      message: msg,
+      children: children.map(buildNode),
+      isOnActiveBranch: activeBranch.has(msg.uuid),
+    }
+  }
+
+  // Get root nodes (children of the root UUID)
+  const rootMessages = childrenByParent.get(rootUuid) || []
+  return rootMessages.map(buildNode)
+}
+
+/**
+ * Generate a label for a branch option based on its first message content.
+ * Uses first 30 chars of the first message, or full content if branches have identical prefixes.
+ */
+function generateBranchLabel(
+  branchNode: MessageTreeNode,
+  allBranchNodes: MessageTreeNode[],
+  branchIndex: number,
+): string {
+  // Get first message text (likely a human message after a fork)
+  const msg = branchNode.message
+  const textContent = msg.content.find((c) => c.type === 'text')?.text || msg.text || ''
+  const first30 = textContent.slice(0, 30).trim()
+
+  // Check if any other branch has the same first 30 chars
+  const hasDuplicate = allBranchNodes.some((other, idx) => {
+    if (idx === branchIndex) return false
+    const otherText = other.message.content.find((c) => c.type === 'text')?.text || other.message.text || ''
+    return otherText.slice(0, 30).trim() === first30
+  })
+
+  if (hasDuplicate) {
+    // Use full content (truncated at 100 chars for sanity)
+    const full = textContent.slice(0, 100).trim()
+    return full.length < textContent.length ? `${full}...` : full
+  }
+
+  return first30.length < textContent.length ? `${first30}...` : first30
+}
+
+/**
+ * A "scene segment" represents a linear chain of messages that will become a scene.
+ */
+export interface SceneSegment {
+  id: string
+  messages: Message[]
+  branchMessage?: {
+    id: string
+    content: string
+    options: BranchOption[]
+  }
+  parentSegmentId?: string
+  branchOptionId?: string // Which option in parent's branch message leads here
+}
+
+/**
+ * Result of converting a conversation with all branches preserved.
+ */
+export interface BranchConversionResult {
+  segments: SceneSegment[]
+  branchChoices: Record<string, string> // branchMessageId -> active optionId
+}
+
+/**
+ * Convert a Claude conversation to story messages, preserving ALL branches.
+ * Creates separate "segments" for each branch path, with branch messages at fork points.
+ */
+export function convertToStoryMessagesWithBranches(
+  conversation: ClaudeConversation,
+): BranchConversionResult {
+  if (!conversationHasBranchInfo(conversation)) {
+    throw new Error('Conversation lacks branch info - cannot convert with branches')
+  }
+
+  const tree = buildMessageTree(conversation)
+  const segments: SceneSegment[] = []
+  const branchChoices: Record<string, string> = {}
+
+  // Helper to convert a Claude message to our Message format
+  function convertMessage(
+    claudeMsg: ClaudeChatMessage,
+    humanMsg: ClaudeChatMessage | null,
+    order: number,
+  ): Message {
+    const textContent = claudeMsg.content.find((c) => c.type === 'text')?.text || claudeMsg.text
+    const thinkContent = claudeMsg.content.find((c) => c.type === 'thinking')?.thinking
+    const instruction = humanMsg
+      ? humanMsg.content.find((c) => c.type === 'text')?.text || humanMsg.text
+      : undefined
+
+    return {
+      id: generateMessageId(),
+      role: 'assistant',
+      content: textContent,
+      instruction,
+      think: thinkContent,
+      timestamp: new Date(claudeMsg.created_at),
+      order,
+    }
+  }
+
+  // Process a linear chain of nodes, stopping at fork points.
+  // Returns the last node processed (might have children that are forks).
+  function processLinearChain(
+    nodes: MessageTreeNode[],
+    segmentId: string,
+    parentSegmentId?: string,
+    branchOptionId?: string,
+  ): void {
+    const messages: Message[] = []
+    let currentNodes = nodes
+    let lastNodeWithFork: MessageTreeNode | null = null
+
+    // Process nodes linearly until we hit a fork
+    while (currentNodes.length > 0) {
+      if (currentNodes.length > 1) {
+        // Fork point - stop here and create branch message
+        lastNodeWithFork = { message: currentNodes[0].message, children: currentNodes, isOnActiveBranch: false }
+        break
+      }
+
+      const node = currentNodes[0]
+      const msg = node.message
+
+      if (msg.sender === 'assistant') {
+        // Standalone assistant message without human context
+        messages.push(convertMessage(msg, null, messages.length))
+      } else if (msg.sender === 'human') {
+        // Check if next is assistant - if so, pair them
+        if (node.children.length === 1 && node.children[0].message.sender === 'assistant') {
+          const assistantNode = node.children[0]
+          messages.push(convertMessage(assistantNode.message, msg, messages.length))
+          currentNodes = assistantNode.children
+          continue
+        } else if (node.children.length > 1) {
+          // Fork after human message - create orphaned human, then handle fork
+          messages.push({
+            id: generateMessageId(),
+            role: 'assistant',
+            content: '',
+            instruction: msg.content.find((c) => c.type === 'text')?.text || msg.text,
+            timestamp: new Date(msg.created_at),
+            order: messages.length,
+          })
+          lastNodeWithFork = node
+          break
+        } else {
+          // Orphaned human message
+          messages.push({
+            id: generateMessageId(),
+            role: 'assistant',
+            content: '',
+            instruction: msg.content.find((c) => c.type === 'text')?.text || msg.text,
+            timestamp: new Date(msg.created_at),
+            order: messages.length,
+          })
+        }
+      }
+
+      currentNodes = node.children
+    }
+
+    // Create the segment
+    const segment: SceneSegment = {
+      id: segmentId,
+      messages,
+      parentSegmentId,
+      branchOptionId,
+    }
+
+    // If we stopped at a fork, create branch message and recurse
+    if (lastNodeWithFork && lastNodeWithFork.children.length > 1) {
+      const branchMessageId = generateMessageId()
+      const options: BranchOption[] = []
+
+      // Create options for each branch
+      for (let i = 0; i < lastNodeWithFork.children.length; i++) {
+        const childNode = lastNodeWithFork.children[i]
+        const optionId = generateMessageId()
+        const childSegmentId = generateMessageId()
+
+        const label = generateBranchLabel(childNode, lastNodeWithFork.children, i)
+
+        options.push({
+          id: optionId,
+          label,
+          targetNodeId: '', // Will be filled by importer with actual scene ID
+          targetMessageId: '', // Will be filled by importer
+        })
+
+        // Track active branch choice
+        if (childNode.isOnActiveBranch) {
+          branchChoices[branchMessageId] = optionId
+        }
+
+        // Recursively process this branch
+        processLinearChain([childNode], childSegmentId, segmentId, optionId)
+      }
+
+      segment.branchMessage = {
+        id: branchMessageId,
+        content: 'Choose a version:',
+        options,
+      }
+    }
+
+    segments.push(segment)
+  }
+
+  // Start processing from root
+  if (tree.length > 0) {
+    processLinearChain(tree, generateMessageId())
+  }
+
+  return { segments, branchChoices }
 }

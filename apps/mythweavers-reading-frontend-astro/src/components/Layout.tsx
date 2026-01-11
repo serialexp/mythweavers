@@ -3,6 +3,14 @@ import type { ParentComponent } from 'solid-js'
 import * as styles from './Layout.css'
 import UserStatus, { type UserSession } from './UserStatus'
 
+// Editor URL - uses localhost in dev, production URL otherwise
+const getEditorUrl = () => {
+  if (typeof window !== 'undefined' && window.location.host.includes('localhost')) {
+    return 'http://localhost:3203'
+  }
+  return import.meta.env.PUBLIC_EDITOR_URL || 'https://write.mythweavers.io'
+}
+
 // Inner layout that uses theme context
 const LayoutInner: ParentComponent<{ user?: UserSession | null }> = (props) => {
   const { resolvedTheme, setTheme } = useTheme()
@@ -35,7 +43,7 @@ const LayoutInner: ParentComponent<{ user?: UserSession | null }> = (props) => {
           </NavBarNav>
 
           <NavBarActions>
-            <LinkButton href="http://localhost:3203" variant="primary" size="sm">
+            <LinkButton href={getEditorUrl()} variant="primary" size="sm">
               Start Writing
             </LinkButton>
             <UserStatus user={props.user} />

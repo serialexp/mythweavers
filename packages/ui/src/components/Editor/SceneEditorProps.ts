@@ -67,6 +67,9 @@ export interface SceneEditorProps {
   /** Available locations (for context) */
   locations: Record<string, EditorLocation>
 
+  /** Whether the editor is editable (default: true) */
+  editable?: boolean
+
   /** Tree context (book → arc → chapter) for the current scene */
   treeContext?: {
     book?: EditorTreeNode
@@ -88,4 +91,10 @@ export interface SceneEditorProps {
 
   /** Callback to update selected paragraph */
   onSelectedParagraphChange: (paragraphId: string) => void
+
+  /** Callback when user wants to edit a paragraph's script */
+  onParagraphEditScript?: (paragraphId: string) => void
+
+  /** Callback when editor loses focus */
+  onBlur?: () => void
 }

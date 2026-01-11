@@ -1,16 +1,15 @@
 import { style, keyframes } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
 
-// Pulse animation for processing states
-const pulse = keyframes({
-  '0%, 100%': { opacity: 0.7 },
-  '50%': { opacity: 0.4 },
+// Spin animation for processing border gradient
+const spinGradient = keyframes({
+  '0%': { transform: 'translate(-50%, -50%) rotate(0deg)' },
+  '100%': { transform: 'translate(-50%, -50%) rotate(360deg)' },
 })
 
 // Base message container
 export const message = style({
   position: 'relative',
-  padding: tokens.space['4'],
   backgroundColor: tokens.color.bg.raised,
   borderRadius: tokens.radius.lg,
   whiteSpace: 'pre-wrap',
@@ -21,33 +20,107 @@ export const message = style({
 
 // Message role variants
 export const messageAssistant = style({
-  borderLeft: `3px solid ${tokens.color.accent.primary}`,
+  // Subdued brown border for story content - lets paragraph status borders stand out
+  borderLeft: `3px solid ${tokens.color.border.strong}`,
+  // Small top padding so rounded border corner is visible
+  paddingTop: tokens.space['2'],
 })
 
 export const messageInstruction = style({
-  borderLeft: `3px solid ${tokens.color.semantic.warning}`,
+  // Gold border for instructions - distinct from paragraph draft state (orange)
+  borderLeft: `3px solid ${tokens.color.accent.primary}`,
   backgroundColor: tokens.color.bg.elevated,
+  // Instructions keep normal padding since they don't have paragraph state borders
+  padding: tokens.space['4'],
 })
 
 export const messageQuery = style({
   borderLeft: '3px solid #9333ea',
   backgroundColor: 'rgba(147, 51, 234, 0.08)',
+  padding: tokens.space['4'],
 })
 
-// Message state variants
+// Message state variants with spinning gradient border
+// Use max(width%, height-estimate) to ensure the spinning square covers tall messages
+// vmax ensures it's at least as large as the larger viewport dimension
 export const messageSummarizing = style({
-  borderLeftColor: tokens.color.semantic.info,
-  animation: `${pulse} 1.5s ease-in-out infinite`,
+  overflow: 'hidden',
+  isolation: 'isolate',
+
+  // Spinning gradient layer
+  '::before': {
+    content: '""',
+    position: 'absolute',
+    aspectRatio: '1',
+    // Use 300% width + vmax to handle both wide and tall messages
+    width: 'max(300%, 150vmax)',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    background: `conic-gradient(
+      from 0deg,
+      ${tokens.color.semantic.info},
+      ${tokens.color.border.default},
+      ${tokens.color.accent.primary},
+      ${tokens.color.border.default},
+      ${tokens.color.semantic.info}
+    )`,
+    animation: `${spinGradient} 8s linear infinite`,
+    zIndex: -2,
+  },
+
+  // Inner background that covers the gradient except at edges
+  '::after': {
+    content: '""',
+    position: 'absolute',
+    inset: '2px',
+    borderRadius: `calc(${tokens.radius.lg} - 2px)`,
+    backgroundColor: tokens.color.bg.raised,
+    zIndex: -1,
+  },
 })
 
 export const messageAnalyzing = style({
-  borderLeftColor: tokens.color.semantic.success,
-  animation: `${pulse} 1.5s ease-in-out infinite`,
+  overflow: 'hidden',
+  isolation: 'isolate',
+
+  // Spinning gradient layer
+  '::before': {
+    content: '""',
+    position: 'absolute',
+    aspectRatio: '1',
+    // Use 300% width + vmax to handle both wide and tall messages
+    width: 'max(300%, 150vmax)',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    background: `conic-gradient(
+      from 0deg,
+      ${tokens.color.semantic.success},
+      ${tokens.color.border.default},
+      ${tokens.color.accent.primary},
+      ${tokens.color.border.default},
+      ${tokens.color.semantic.success}
+    )`,
+    animation: `${spinGradient} 8s linear infinite`,
+    zIndex: -2,
+  },
+
+  // Inner background that covers the gradient except at edges
+  '::after': {
+    content: '""',
+    position: 'absolute',
+    inset: '2px',
+    borderRadius: `calc(${tokens.radius.lg} - 2px)`,
+    backgroundColor: tokens.color.bg.raised,
+    zIndex: -1,
+  },
 })
 
 export const messageEvent = style({
   borderLeft: `3px solid ${tokens.color.semantic.success}`,
   backgroundColor: 'rgba(34, 197, 94, 0.08)',
+  padding: tokens.space['4'],
 })
 
 export const messageCut = style({
@@ -68,6 +141,8 @@ export const content = style({
   overflowWrap: 'break-word',
   lineHeight: tokens.font.lineHeight.normal,
   color: tokens.color.text.primary,
+  // Negative margin to overlay paragraph state borders with message border
+  marginLeft: '-3px',
 })
 
 export const contentEditable = style({
@@ -85,6 +160,7 @@ export const actions = style({
   justifyContent: 'space-between',
   alignItems: 'center',
   marginTop: tokens.space['2'],
+  padding: tokens.space['4'],
   paddingTop: tokens.space['2'],
   borderTop: `1px solid ${tokens.color.border.default}`,
 })
@@ -192,6 +268,7 @@ export const thinkTitle = style({
 })
 
 export const thinkToggle = style({
+  display: 'block',
   marginTop: tokens.space['2'],
   color: tokens.color.semantic.warning,
 })

@@ -12,7 +12,6 @@ export interface StoryListItem {
   updatedAt?: string
   messageCount: number
   characterCount: number
-  chapterCount: number
   storySetting?: string
   type: 'local' | 'server'
   isCurrentStory: boolean
@@ -250,9 +249,6 @@ export const StoryList: Component<StoryListProps> = (props) => {
               <div class={styles.metaRow}>
                 <span>{story.messageCount} messages</span>
                 <span>{story.characterCount} characters</span>
-                <Show when={story.chapterCount > 0}>
-                  <span>{story.chapterCount} chapters</span>
-                </Show>
                 <span class={styles.metaDate}>{formatDate(story.savedAt)}</span>
               </div>
             </CardBody>

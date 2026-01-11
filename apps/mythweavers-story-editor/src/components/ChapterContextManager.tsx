@@ -1,5 +1,5 @@
-// ABOUTME: Component for managing which characters and context items are active in a chapter
-// ABOUTME: Allows selecting/deselecting entities and copying from previous chapter
+// ABOUTME: Component for managing which characters and context items are active in a scene
+// ABOUTME: Allows selecting/deselecting entities and copying from previous scene
 
 import { Badge, Button, Modal, Stack } from '@mythweavers/ui'
 import { BsCheck, BsFiles } from 'solid-icons/bs'
@@ -8,8 +8,13 @@ import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { nodeStore } from '../stores/nodeStore'
 import { Node } from '../types/core'
-import { getCharacterDisplayName } from '../utils/character'
+import { getAvatarInitial, getCharacterDisplayName } from '../utils/character'
+import { getScenesInStoryOrder } from '../utils/nodeTraversal'
 import * as styles from './ChapterContextManager.css'
+
+const getTypeBadgeVariant = (type: string): 'info' | 'success' | 'warning' => {
+  return type === 'theme' ? 'info' : type === 'location' ? 'success' : 'warning'
+}
 
 interface ChapterContextManagerProps {
   isOpen: boolean
@@ -47,15 +52,15 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
     })
   }
 
-  const copyFromPreviousChapter = () => {
-    // Find the previous chapter in story order
-    const allChapters = nodeStore.nodesArray.filter((n) => n.type === 'chapter').sort((a, b) => a.order - b.order)
-    const currentIndex = allChapters.findIndex((ch) => ch.id === props.chapterNode.id)
+  const copyFromPreviousScene = () => {
+    // Find the previous scene in story order
+    const allScenes = getScenesInStoryOrder(nodeStore.nodesArray)
+    const currentIndex = allScenes.findIndex((s) => s.id === props.chapterNode.id)
 
     if (currentIndex > 0) {
-      const previousChapter = allChapters[currentIndex - 1]
-      setSelectedCharacterIds(previousChapter.activeCharacterIds || [])
-      setSelectedContextItemIds(previousChapter.activeContextItemIds || [])
+      const previousScene = allScenes[currentIndex - 1]
+      setSelectedCharacterIds(previousScene.activeCharacterIds || [])
+      setSelectedContextItemIds(previousScene.activeContextItemIds || [])
     }
   }
 
@@ -74,12 +79,23 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
     props.onClose()
   }
 
-  // Check if there's a previous chapter
-  const hasPreviousChapter = () => {
-    const allChapters = nodeStore.nodesArray.filter((n) => n.type === 'chapter').sort((a, b) => a.order - b.order)
-    const currentIndex = allChapters.findIndex((ch) => ch.id === props.chapterNode.id)
+  // Check if there's a previous scene
+  const hasPreviousScene = () => {
+    const allScenes = getScenesInStoryOrder(nodeStore.nodesArray)
+    const currentIndex = allScenes.findIndex((s) => s.id === props.chapterNode.id)
     return currentIndex > 0
   }
+
+  const footerContent = (
+    <>
+      <Button variant="secondary" onClick={props.onClose}>
+        Cancel
+      </Button>
+      <Button variant="primary" onClick={handleSave}>
+        <BsCheck /> Save
+      </Button>
+    </>
+  )
 
   return (
     <Modal
@@ -87,11 +103,12 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
       onClose={props.onClose}
       title={`Active Characters & Context - ${props.chapterNode.title}`}
       size="md"
+      footer={footerContent}
     >
       <Stack gap="md" style={{ padding: '1rem' }}>
-        <Show when={hasPreviousChapter()}>
-          <Button variant="secondary" onClick={copyFromPreviousChapter}>
-            <BsFiles /> Copy from Previous Chapter
+        <Show when={hasPreviousScene()}>
+          <Button variant="secondary" onClick={copyFromPreviousScene}>
+            <BsFiles /> Copy from Previous Scene
           </Button>
         </Show>
 
@@ -106,6 +123,20 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
                     checked={selectedCharacterIds().includes(character.id)}
                     onChange={() => toggleCharacter(character.id)}
                   />
+                  <Show
+                    when={character.profileImageData}
+                    fallback={
+                      <div class={styles.avatarPlaceholder}>
+                        {getAvatarInitial(getCharacterDisplayName(character))}
+                      </div>
+                    }
+                  >
+                    <img
+                      src={character.profileImageData!}
+                      alt={getCharacterDisplayName(character)}
+                      class={styles.avatar}
+                    />
+                  </Show>
                   <span class={styles.itemText}>
                     {getCharacterDisplayName(character)}
                     <Show when={character.isMainCharacter}>
@@ -136,7 +167,7 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
                   />
                   <span class={styles.itemText}>
                     {item.name}
-                    <Badge variant="secondary" size="sm">
+                    <Badge variant={getTypeBadgeVariant(item.type)} size="sm">
                       {item.type}
                     </Badge>
                   </span>
@@ -156,15 +187,6 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
           </Show>
         </div>
       </Stack>
-
-      <div class={styles.footer}>
-        <Button variant="secondary" onClick={props.onClose}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={handleSave}>
-          <BsCheck /> Save
-        </Button>
-      </div>
     </Modal>
   )
 }

@@ -110,6 +110,109 @@ export interface ScriptResult {
 }
 
 /**
+ * Inventory item structure
+ */
+export interface InventoryItem {
+  name: string
+  amount: number
+  description?: string
+}
+
+/**
+ * Built-in inventory helper functions
+ * These are always available in scripts and work with the Immer draft
+ * Note: Using 'any' cast because ScriptFunctions has generic signature but these have typed params
+ */
+export const builtInFunctions: ScriptFunctions = {
+  /**
+   * Add an item to a character's inventory
+   * @param data - The script data object (Immer draft)
+   * @param characterName - Display name of the character
+   * @param item - Item to add { name, amount?, description? }
+   */
+  addItem: ((data: ScriptData, characterName: string, item: { name: string; amount?: number; description?: string }) => {
+    if (!data.characters?.[characterName]) {
+      console.warn(`[addItem] Character "${characterName}" not found`)
+      return
+    }
+    if (!data.characters[characterName].inventory) {
+      data.characters[characterName].inventory = []
+    }
+    const inv = data.characters[characterName].inventory as InventoryItem[]
+    const existing = inv.find((i) => i.name === item.name)
+    if (existing) {
+      existing.amount = (existing.amount || 1) + (item.amount || 1)
+      if (item.description) existing.description = item.description
+    } else {
+      inv.push({
+        name: item.name,
+        amount: item.amount || 1,
+        description: item.description || '',
+      })
+    }
+  }) as (...args: unknown[]) => unknown,
+
+  /**
+   * Remove an item from a character's inventory
+   * @param data - The script data object (Immer draft)
+   * @param characterName - Display name of the character
+   * @param itemName - Name of the item to remove
+   * @param amount - Amount to remove (default: 1)
+   * @returns true if item was found and removed, false otherwise
+   */
+  removeItem: ((data: ScriptData, characterName: string, itemName: string, amount: number = 1): boolean => {
+    const inv = data.characters?.[characterName]?.inventory as InventoryItem[] | undefined
+    if (!inv) return false
+    const item = inv.find((i) => i.name === itemName)
+    if (item) {
+      item.amount = (item.amount || 1) - amount
+      if (item.amount <= 0) {
+        const index = inv.indexOf(item)
+        inv.splice(index, 1)
+      }
+      return true
+    }
+    return false
+  }) as (...args: unknown[]) => unknown,
+
+  /**
+   * Check if a character has an item in their inventory
+   * @param data - The script data object
+   * @param characterName - Display name of the character
+   * @param itemName - Name of the item to check
+   * @param minAmount - Minimum amount required (default: 1)
+   * @returns true if character has at least minAmount of the item
+   */
+  hasItem: ((data: ScriptData, characterName: string, itemName: string, minAmount: number = 1): boolean => {
+    const inv = data.characters?.[characterName]?.inventory as InventoryItem[] | undefined
+    const item = inv?.find((i) => i.name === itemName)
+    return (item?.amount || 0) >= minAmount
+  }) as (...args: unknown[]) => unknown,
+
+  /**
+   * Get an item from a character's inventory
+   * @param data - The script data object
+   * @param characterName - Display name of the character
+   * @param itemName - Name of the item to get
+   * @returns The item object or null if not found
+   */
+  getItem: ((data: ScriptData, characterName: string, itemName: string): InventoryItem | null => {
+    const inv = data.characters?.[characterName]?.inventory as InventoryItem[] | undefined
+    return inv?.find((i) => i.name === itemName) || null
+  }) as (...args: unknown[]) => unknown,
+
+  /**
+   * List all items in a character's inventory
+   * @param data - The script data object
+   * @param characterName - Display name of the character
+   * @returns Array of inventory items or empty array
+   */
+  listInventory: ((data: ScriptData, characterName: string): InventoryItem[] => {
+    return (data.characters?.[characterName]?.inventory as InventoryItem[]) || []
+  }) as (...args: unknown[]) => unknown,
+}
+
+/**
  * Execute a script function with the given data object and functions
  * Scripts can now return either:
  * 1. Just the modified data object (backward compatible)
@@ -121,9 +224,12 @@ export interface ScriptResult {
 export function executeScript(
   script: string,
   data: ScriptData,
-  functions: ScriptFunctions = {},
+  userFunctions: ScriptFunctions = {},
   allowFunctionReturn = false,
 ): ScriptResult {
+  // Merge built-in functions with user-provided functions (user can override)
+  let functions = { ...builtInFunctions, ...userFunctions }
+
   try {
     // Wrap the script in a function if it's not already
     const scriptFunction = eval(`(${script})`)
@@ -206,7 +312,7 @@ export function executeScript(
  */
 export function executeScriptsUpToMessage(
   messages: Message[],
-  targetMessageId: string,
+  targetMessageId: string | null,
   nodes: Node[],
   globalScript?: string,
 ): ScriptData {
@@ -236,6 +342,11 @@ export function executeScriptsUpToMessage(
     initializeContextItemData(draft)
     initializePlotPointData(draft)
   })
+
+  // If no target message, just return initialized state with global script applied
+  if (!targetMessageId) {
+    return data
+  }
 
   // Get messages to process in story order based on nodes
   const messagesToProcess = getMessagesInStoryOrder(messages, nodes, targetMessageId)

@@ -358,6 +358,44 @@ export function domFromPos(container: HTMLElement, pos: number): { node: globalT
 }
 
 /**
+ * Check if a DOM position is inside a widget element.
+ * If so, return an adjusted position before the widget.
+ */
+function adjustPositionOutsideWidget(
+  domNode: globalThis.Node,
+  offset: number,
+): { node: globalThis.Node; offset: number } {
+  // If we're inside a widget span, find its parent and our position relative to it
+  let current: globalThis.Node | null = domNode
+  while (current) {
+    if (current.nodeType === 1 && (current as Element).hasAttribute('data-widget')) {
+      // We're inside a widget - return position before this widget in its parent
+      const parent = current.parentNode
+      if (parent) {
+        const children = Array.from(parent.childNodes)
+        const widgetIndex = children.indexOf(current as ChildNode)
+        if (widgetIndex >= 0) {
+          return { node: parent, offset: widgetIndex }
+        }
+      }
+      break
+    }
+    current = current.parentNode
+  }
+
+  // If the offset points to a widget child, adjust to before the widget
+  if (domNode.nodeType === 1 && offset < domNode.childNodes.length) {
+    const child = domNode.childNodes[offset]
+    if (child.nodeType === 1 && (child as Element).hasAttribute('data-widget')) {
+      // We're pointing at a widget - keep the position (before the widget)
+      return { node: domNode, offset }
+    }
+  }
+
+  return { node: domNode, offset }
+}
+
+/**
  * Set the DOM selection to match a model Selection
  */
 export function selectionToDOM(container: HTMLElement, selection: Selection): boolean {
@@ -369,8 +407,17 @@ export function selectionToDOM(container: HTMLElement, selection: Selection): bo
 
   if (!anchor || !head) return false
 
+  // Ensure positions are not inside widget elements
+  const adjustedAnchor = adjustPositionOutsideWidget(anchor.node, anchor.offset)
+  const adjustedHead = adjustPositionOutsideWidget(head.node, head.offset)
+
   try {
-    domSelection.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset)
+    domSelection.setBaseAndExtent(
+      adjustedAnchor.node,
+      adjustedAnchor.offset,
+      adjustedHead.node,
+      adjustedHead.offset,
+    )
     return true
   } catch {
     return false

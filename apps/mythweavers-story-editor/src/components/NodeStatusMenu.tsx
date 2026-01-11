@@ -1,10 +1,10 @@
 import { BsChevronRight, BsFlag } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createSignal } from 'solid-js'
-import { ChapterStatus } from '../types/core'
+import { NodeStatus } from '../types/core'
 import * as styles from './NodeStatusMenu.css'
 
 export interface StatusOption {
-  value: ChapterStatus | null
+  value: NodeStatus | null
   label: string
   color?: string
 }
@@ -18,8 +18,8 @@ export const STATUS_OPTIONS: StatusOption[] = [
 ]
 
 interface NodeStatusMenuProps {
-  currentStatus?: ChapterStatus | null
-  onSelect: (status: ChapterStatus | undefined) => void
+  currentStatus?: NodeStatus | null
+  onSelect: (status: NodeStatus | undefined) => void
   onOptionSelected?: () => void
   parentMenuOpen?: () => boolean
   labelPrefix?: string

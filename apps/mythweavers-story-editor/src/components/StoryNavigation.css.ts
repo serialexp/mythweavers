@@ -273,6 +273,11 @@ export const tokenEstimateError = style({
   color: '#ef4444',
 })
 
+export const cacheIndicator = style({
+  color: '#22c55e',
+  fontWeight: 500,
+})
+
 export const addButton = style({
   display: 'flex',
   alignItems: 'center',

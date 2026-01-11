@@ -11,66 +11,11 @@ const DEFAULT_GLOBAL_SCRIPT = `(data) => {
   // This script runs before every message script
   // Data is immutable - you can write normal mutation code but the original is never changed!
 
-  // Example: Set up time tracking
-  // data.storyStartDate = new Date('2023-01-01');
-  // data.currentDate = new Date('2023-01-01');
-  // data.daysPassed = 0;
+  // Example: Initialize a custom variable
+  // data.myVariable = 'initial value';
 
-  // Example: Character ages
-  // data.characterAges = {
-  //   'Luke': 19,
-  //   'Leia': 19
-  // };
-
-  // Define reusable functions for message scripts
-  // IMPORTANT: Make sure to return the modified data object!
-  return {
-    data: data,  // This should be the data object with your initializations
-    functions: {
-      // Time progression helper - just mutate directly!
-      advanceTime: (data, days) => {
-        data.currentDate = new Date(data.currentDate);
-        data.currentDate.setDate(data.currentDate.getDate() + days);
-        data.daysPassed += days;
-        // No need to return data - Immer handles it!
-      },
-
-      // Update all character ages based on time passed
-      updateAges: (data) => {
-        if (data.characterAges && data.daysPassed) {
-          Object.keys(data.characterAges).forEach(char => {
-            data.characterAges[char] = 19 + Math.floor(data.daysPassed / 365);
-          });
-        }
-      },
-
-      // Add a story event
-      addEvent: (data, eventName, details = {}) => {
-        if (!data.events) data.events = [];
-        data.events.push({
-          name: eventName,
-          date: new Date(data.currentDate),
-          turn: data.turnNumber || 0,
-          ...details
-        });
-      },
-
-      // Utility: Calculate days since start (doesn't modify data)
-      getDaysSinceStart: (data) => {
-        if (!data.storyStartDate || !data.currentDate) return 0;
-        const start = new Date(data.storyStartDate);
-        const current = new Date(data.currentDate);
-        return Math.floor((current - start) / (1000 * 60 * 60 * 24));
-      },
-
-      // Utility: Check if character exists
-      hasCharacter: (data, name) => {
-        return data.characterAges && name in data.characterAges;
-      }
-    }
-  };
-
-  // For backward compatibility, you can still return just data
+  // Return the data object (or { data, functions } if you want helper functions)
+  return data;
 }`
 
 // Plot Points Editor Component

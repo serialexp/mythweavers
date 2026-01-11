@@ -6,6 +6,14 @@ import { getCharacterDisplayName } from '../utils/character'
 import { storage } from '../utils/storage'
 import { currentStoryStore } from './currentStoryStore'
 
+// Refresh script data after character changes (lazy to avoid circular dependency)
+const refreshScriptData = () => {
+  // Import inline to break circular dependency at module load time
+  import('./scriptDataStore').then(({ scriptDataStore }) => {
+    scriptDataStore.refresh()
+  })
+}
+
 // Track if characters have been loaded
 let charactersLoaded = false
 
@@ -69,6 +77,8 @@ export const charactersStore = {
 
   updateCharacter: (id: string, updates: Partial<Character>) => {
     setCharactersState('characters', (char) => char.id === id, updates)
+    // Trigger script re-evaluation since character data (e.g., birthdate) affects script context
+    refreshScriptData()
     // SaveService handles local vs server logic
     if (currentStoryStore.id) {
       const character = charactersState.characters.find((c) => c.id === id)

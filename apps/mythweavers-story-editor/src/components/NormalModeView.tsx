@@ -62,7 +62,7 @@ export function NormalModeView(props: NormalModeViewProps) {
       <For each={displayMessages()}>
         {(message) => (
           <>
-            <div class="message-wrapper">
+            <div class={viewStyles.messageWrapper}>
               <Message
                 message={message}
                 storyTurnNumber={messagesStore.getStoryTurnNumbers().get(message.id) || 0}

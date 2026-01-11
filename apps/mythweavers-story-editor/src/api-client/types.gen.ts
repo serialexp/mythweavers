@@ -7377,13 +7377,17 @@ export type PostMyMessageRevisionsByRevisionIdParagraphsData = {
             action: 'introduce' | 'mentioned' | 'partially resolved' | 'resolved';
         }>;
         /**
-         * Array of inventory actions
+         * Array of inventory actions (deprecated, use script instead)
          */
         inventoryActions?: Array<{
             /**
              * Type of inventory action
              */
             type: 'add' | 'remove';
+            /**
+             * Display name of the character receiving/losing the item
+             */
+            character_name: string;
             /**
              * Name of the item
              */
@@ -7392,7 +7396,15 @@ export type PostMyMessageRevisionsByRevisionIdParagraphsData = {
              * Amount of the item
              */
             item_amount: number;
+            /**
+             * Optional description of the item (used when adding)
+             */
+            item_description?: string;
         }>;
+        /**
+         * JavaScript function to execute for this paragraph. Receives (data, functions) parameters.
+         */
+        script?: string;
         /**
          * Display order (auto-increments if not provided)
          */
@@ -7604,7 +7616,7 @@ export type PatchMyParagraphsByIdData = {
          */
         state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT';
         /**
-         * Array of plot point actions
+         * Array of plot point actions (deprecated, use script instead)
          */
         plotPointActions?: Array<{
             /**
@@ -7617,13 +7629,17 @@ export type PatchMyParagraphsByIdData = {
             action: 'introduce' | 'mentioned' | 'partially resolved' | 'resolved';
         }>;
         /**
-         * Array of inventory actions
+         * Array of inventory actions (deprecated, use script instead)
          */
         inventoryActions?: Array<{
             /**
              * Type of inventory action
              */
             type: 'add' | 'remove';
+            /**
+             * Display name of the character receiving/losing the item
+             */
+            character_name: string;
             /**
              * Name of the item
              */
@@ -7632,7 +7648,15 @@ export type PatchMyParagraphsByIdData = {
              * Amount of the item
              */
             item_amount: number;
+            /**
+             * Optional description of the item (used when adding)
+             */
+            item_description?: string;
         }>;
+        /**
+         * JavaScript function to execute for this paragraph. Receives (data, functions) parameters.
+         */
+        script?: string;
         /**
          * Display order
          */
@@ -7711,6 +7735,149 @@ export type PatchMyParagraphsByIdResponses = {
 
 export type PatchMyParagraphsByIdResponse = PatchMyParagraphsByIdResponses[keyof PatchMyParagraphsByIdResponses];
 
+export type PostMyMessageRevisionsByRevisionIdParagraphsBatchData = {
+    body: {
+        /**
+         * Array of paragraphs to create
+         */
+        paragraphs: Array<{
+            /**
+             * Optional client-provided ID (auto-generated if not provided)
+             */
+            id?: string;
+            /**
+             * Paragraph content text (plain text)
+             */
+            body: string;
+            /**
+             * ProseMirror JSON structure for rich text (optional)
+             */
+            contentSchema?: string | null;
+            /**
+             * Paragraph state (AI, DRAFT, REVISE, FINAL, SDT)
+             */
+            state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT';
+            /**
+             * Array of plot point actions
+             */
+            plotPointActions?: Array<{
+                /**
+                 * ID of the plot point
+                 */
+                plot_point_id: string;
+                /**
+                 * Type of plot point action
+                 */
+                action: 'introduce' | 'mentioned' | 'partially resolved' | 'resolved';
+            }>;
+            /**
+             * Array of inventory actions (deprecated, use script instead)
+             */
+            inventoryActions?: Array<{
+                /**
+                 * Type of inventory action
+                 */
+                type: 'add' | 'remove';
+                /**
+                 * Display name of the character receiving/losing the item
+                 */
+                character_name: string;
+                /**
+                 * Name of the item
+                 */
+                item_name: string;
+                /**
+                 * Amount of the item
+                 */
+                item_amount: number;
+                /**
+                 * Optional description of the item (used when adding)
+                 */
+                item_description?: string;
+            }>;
+            /**
+             * JavaScript function to execute for this paragraph. Receives (data, functions) parameters.
+             */
+            script?: string;
+            /**
+             * Display order (auto-increments if not provided)
+             */
+            sortOrder?: number;
+        }>;
+    };
+    path: {
+        /**
+         * MessageRevision ID
+         */
+        revisionId: string;
+    };
+    query?: never;
+    url: '/my/message-revisions/{revisionId}/paragraphs/batch';
+};
+
+export type PostMyMessageRevisionsByRevisionIdParagraphsBatchErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyMessageRevisionsByRevisionIdParagraphsBatchError = PostMyMessageRevisionsByRevisionIdParagraphsBatchErrors[keyof PostMyMessageRevisionsByRevisionIdParagraphsBatchErrors];
+
+export type PostMyMessageRevisionsByRevisionIdParagraphsBatchResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        success: true;
+        /**
+         * Number of paragraphs created
+         */
+        created: number;
+        /**
+         * IDs of created paragraphs
+         */
+        paragraphIds: Array<string>;
+    };
+};
+
+export type PostMyMessageRevisionsByRevisionIdParagraphsBatchResponse = PostMyMessageRevisionsByRevisionIdParagraphsBatchResponses[keyof PostMyMessageRevisionsByRevisionIdParagraphsBatchResponses];
+
 export type GetMyParagraphsByParagraphIdRevisionsData = {
     body?: never;
     path: {
@@ -7788,6 +7955,10 @@ export type GetMyParagraphsByParagraphIdRevisionsResponses = {
                  */
                 type: 'add' | 'remove';
                 /**
+                 * Display name of the character receiving/losing the item
+                 */
+                character_name: string;
+                /**
                  * Name of the item
                  */
                 item_name: string;
@@ -7795,6 +7966,10 @@ export type GetMyParagraphsByParagraphIdRevisionsResponses = {
                  * Amount of the item
                  */
                 item_amount: number;
+                /**
+                 * Optional description of the item (used when adding)
+                 */
+                item_description?: string;
             }> | null;
             createdAt: string;
         }>;

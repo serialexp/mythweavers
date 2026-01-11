@@ -19,6 +19,9 @@ export interface SolidEditorWrapperProps {
   /** Current paragraphs to display */
   paragraphs: Paragraph[]
 
+  /** Whether the editor is editable (default: true) */
+  editable?: boolean
+
   /** Callback when paragraphs change from editing */
   onParagraphsChange: (paragraphs: Paragraph[], changedIds: string[]) => void
 
@@ -45,6 +48,7 @@ export interface SolidEditorWrapperProps {
     setState: (paragraphId: string, state: Paragraph['state']) => void
     toggleInventory: (paragraphId: string) => void
     togglePlotpoint: (paragraphId: string) => void
+    editScript: (paragraphId: string) => void
     customRewrite: (paragraphId: string) => void
     convertPerspective: (paragraphId: string) => void
     splitScene: (paragraphId: string) => void
@@ -64,6 +68,9 @@ export interface SolidEditorWrapperProps {
 
   /** Show debug overlay with cursor position and document structure */
   debug?: boolean | 'top-right' | 'bottom-right' | 'top-left' | 'bottom-left'
+
+  /** Callback when editor loses focus */
+  onBlur?: () => void
 }
 
 /**
@@ -104,6 +111,7 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
       onSetState: props.onParagraphAction?.setState,
       onToggleInventory: props.onParagraphAction?.toggleInventory,
       onTogglePlotpoint: props.onParagraphAction?.togglePlotpoint,
+      onEditScript: props.onParagraphAction?.editScript,
       onCustomRewrite: props.onParagraphAction?.customRewrite,
       onConvertPerspective: props.onParagraphAction?.convertPerspective,
       onSplitScene: props.onParagraphAction?.splitScene,
@@ -111,19 +119,31 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     }),
   )
 
+  // Track last paragraph content for streaming updates
+  let lastParagraphContent: string[] = []
+
   // Initialize state when paragraphs structurally change (new/removed paragraphs)
-  // Content-only changes are handled by the editor itself
+  // During streaming (not editable), also update when content changes
   createEffect(() => {
     const paragraphs = props.paragraphs
     const currentIds = paragraphs.map((p) => p.id)
+    const currentContent = paragraphs.map((p) => p.body)
+
     const idsChanged =
       currentIds.length !== lastParagraphIds.length || currentIds.some((id, i) => id !== lastParagraphIds[i])
 
+    // During streaming (not editable), also check for content changes
+    const contentChanged =
+      props.editable === false &&
+      (currentContent.length !== lastParagraphContent.length ||
+        currentContent.some((body, i) => body !== lastParagraphContent[i]))
+
     const currentState = state()
 
-    // Only recreate state if this is initial load or paragraph structure changed
-    if (!currentState || idsChanged) {
+    // Recreate state if: initial load, structure changed, or content changed during streaming
+    if (!currentState || idsChanged || contentChanged) {
       lastParagraphIds = currentIds
+      lastParagraphContent = currentContent
       const doc = paragraphsToDoc(paragraphs)
       const newState = EditorState.create({
         doc,
@@ -141,10 +161,15 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     // Convert doc back to paragraphs
     const { paragraphs: newParagraphs, changedIds } = docToParagraphs(newState.doc, props.paragraphs)
 
-    if (changedIds.length > 0) {
+    // Check if paragraphs were deleted (doc has fewer paragraphs than props)
+    const newIds = newParagraphs.map((p) => p.id)
+    const deletedIds = props.paragraphs.filter((p) => !newIds.includes(p.id)).map((p) => p.id)
+    const allChangedIds = [...changedIds, ...deletedIds]
+
+    if (allChangedIds.length > 0) {
       // Update lastParagraphIds so the effect doesn't recreate state
-      lastParagraphIds = newParagraphs.map((p) => p.id)
-      props.onParagraphsChange(newParagraphs, changedIds)
+      lastParagraphIds = newIds
+      props.onParagraphsChange(newParagraphs, allChangedIds)
     }
 
     // Track selected paragraph
@@ -168,8 +193,27 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     decorations: createParagraphActionsDecorations(paragraphActionsConfig, isFocused),
   }))
 
+  // Handle clicks on paragraph action elements (like inventory badges)
+  const handleContainerClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement
+    const actionElement = target.closest('[data-paragraph-action]') as HTMLElement | null
+    if (!actionElement) return
+
+    const action = actionElement.dataset.paragraphAction
+    const paragraphId = actionElement.dataset.paragraphId
+    if (!paragraphId) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (action === 'edit-inventory' && props.onParagraphAction?.editScript) {
+      // Open the script modal (which has inventory tab)
+      props.onParagraphAction.editScript(paragraphId)
+    }
+  }
+
   return (
-    <div class={`${sceneEditor} ${editorContainer}`}>
+    <div class={`${sceneEditor} ${editorContainer}`} onClick={handleContainerClick}>
       {/* Read state() inside JSX to maintain reactivity */}
       {state() && (
         <EditorView
@@ -177,11 +221,16 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
           onStateChange={handleStateChange}
           dispatchTransaction={handleDispatch}
           nodeViews={nodeViews()}
-          editable={true}
-          autoFocus={true}
-          placeholder="Start writing..."
+          editable={props.editable ?? true}
+          autoFocus={props.editable ?? true}
+          placeholder={props.editable !== false ? 'Start writing...' : 'Generating...'}
           debug={props.debug}
-          onFocusChange={setIsFocused}
+          onFocusChange={(focused) => {
+            setIsFocused(focused)
+            if (!focused) {
+              props.onBlur?.()
+            }
+          }}
           props={editorProps()}
         />
       )}

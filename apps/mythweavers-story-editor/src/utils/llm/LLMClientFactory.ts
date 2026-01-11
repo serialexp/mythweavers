@@ -37,12 +37,14 @@ const mergeUsage = (current: UsageAccumulator, next: LLMGenerateResponse['usage'
     }
   }
 
+  // Input tokens (including cache) are reported once but may appear in multiple events
+  // so we take the max. Output tokens accumulate during streaming so we sum them.
   const merged: LLMGenerateResponse['usage'] = {
-    prompt_tokens: (current.prompt_tokens ?? 0) + (next.prompt_tokens ?? 0),
+    prompt_tokens: Math.max(current.prompt_tokens ?? 0, next.prompt_tokens ?? 0),
     completion_tokens: (current.completion_tokens ?? 0) + (next.completion_tokens ?? 0),
-    total_tokens: (current.total_tokens ?? 0) + (next.total_tokens ?? 0),
-    cache_creation_input_tokens: (current.cache_creation_input_tokens ?? 0) + (next.cache_creation_input_tokens ?? 0),
-    cache_read_input_tokens: (current.cache_read_input_tokens ?? 0) + (next.cache_read_input_tokens ?? 0),
+    total_tokens: Math.max(current.prompt_tokens ?? 0, next.prompt_tokens ?? 0) + (current.completion_tokens ?? 0) + (next.completion_tokens ?? 0),
+    cache_creation_input_tokens: Math.max(current.cache_creation_input_tokens ?? 0, next.cache_creation_input_tokens ?? 0),
+    cache_read_input_tokens: Math.max(current.cache_read_input_tokens ?? 0, next.cache_read_input_tokens ?? 0),
   }
 
   if (Object.keys(cacheCreation).length > 0) {

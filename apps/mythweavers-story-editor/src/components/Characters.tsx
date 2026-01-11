@@ -9,6 +9,7 @@ import { generateMessageId } from '../utils/id'
 import * as styles from './Characters.css'
 import { EJSCodeEditor } from './EJSCodeEditor'
 import { EJSRenderer } from './EJSRenderer'
+import { ImageCropModal } from './ImageCropModal'
 import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { StoryTimePicker } from './StoryTimePicker'
 import { TemplateChangeRequest } from './TemplateChangeRequest'
@@ -34,6 +35,10 @@ export const Characters: Component<CharactersProps> = (props) => {
   const [newCharacterImageData, setNewCharacterImageData] = createSignal<string | null>(null)
   const [editProfileImageData, setEditProfileImageData] = createSignal<string | null | undefined>(undefined)
   const [editProfileImagePreview, setEditProfileImagePreview] = createSignal<string | null>(null)
+
+  // Image crop modal state
+  const [cropModalImage, setCropModalImage] = createSignal<string | null>(null)
+  const [cropModalMode, setCropModalMode] = createSignal<'new' | 'edit'>('new')
 
   let panelRef: ListDetailPanelRef | undefined
   let newEditorRef: { insertAtCursor: (text: string) => void } | null = null
@@ -145,7 +150,8 @@ export const Characters: Component<CharactersProps> = (props) => {
       const reader = new FileReader()
       reader.onload = () => {
         if (typeof reader.result === 'string') {
-          setNewCharacterImageData(reader.result)
+          setCropModalImage(reader.result)
+          setCropModalMode('new')
         }
       }
       reader.readAsDataURL(file)
@@ -160,13 +166,27 @@ export const Characters: Component<CharactersProps> = (props) => {
       const reader = new FileReader()
       reader.onload = () => {
         if (typeof reader.result === 'string') {
-          setEditProfileImagePreview(reader.result)
-          setEditProfileImageData(reader.result)
+          setCropModalImage(reader.result)
+          setCropModalMode('edit')
         }
       }
       reader.readAsDataURL(file)
     }
     input.value = ''
+  }
+
+  const handleCropConfirm = (croppedImage: string) => {
+    if (cropModalMode() === 'new') {
+      setNewCharacterImageData(croppedImage)
+    } else {
+      setEditProfileImagePreview(croppedImage)
+      setEditProfileImageData(croppedImage)
+    }
+    setCropModalImage(null)
+  }
+
+  const handleCropCancel = () => {
+    setCropModalImage(null)
   }
 
   const clearNewImage = () => {
@@ -474,6 +494,16 @@ export const Characters: Component<CharactersProps> = (props) => {
             </Button>
           </div>
         )}
+      />
+
+      <ImageCropModal
+        isOpen={cropModalImage() !== null}
+        imageSrc={cropModalImage()}
+        onConfirm={handleCropConfirm}
+        onCancel={handleCropCancel}
+        aspectRatio={1}
+        circular={true}
+        outputSize={256}
       />
     </Show>
   )

@@ -23,6 +23,7 @@ export interface ParagraphActionsConfig {
   onSetState?: (paragraphId: string, state: ParagraphState) => void
   onToggleInventory?: (paragraphId: string) => void
   onTogglePlotpoint?: (paragraphId: string) => void
+  onEditScript?: (paragraphId: string) => void
   onCustomRewrite?: (paragraphId: string) => void
   onConvertPerspective?: (paragraphId: string) => void
   onSplitScene?: (paragraphId: string) => void
@@ -45,6 +46,7 @@ function hasAnyAction(config: ParagraphActionsConfig): boolean {
     config.onSetState ||
     config.onToggleInventory ||
     config.onTogglePlotpoint ||
+    config.onEditScript ||
     config.onCustomRewrite ||
     config.onConvertPerspective ||
     config.onSplitScene
@@ -142,7 +144,12 @@ function ParagraphActionButton(props: { paragraphId: string; config: ParagraphAc
           <DropdownDivider />
         </Show>
 
-        {/* Context section */}
+        {/* Script & Inventory section */}
+        <Show when={props.config.onEditScript}>
+          <DropdownItem onClick={() => props.config.onEditScript!(props.paragraphId)}>
+            {'{ }'} Edit script/inventory
+          </DropdownItem>
+        </Show>
         <Show when={props.config.onToggleInventory}>
           <DropdownItem onClick={() => props.config.onToggleInventory!(props.paragraphId)}>
             📦 Toggle inventory
@@ -154,7 +161,7 @@ function ParagraphActionButton(props: { paragraphId: string; config: ParagraphAc
           </DropdownItem>
         </Show>
 
-        <Show when={props.config.onToggleInventory || props.config.onTogglePlotpoint}>
+        <Show when={props.config.onEditScript || props.config.onToggleInventory || props.config.onTogglePlotpoint}>
           <DropdownDivider />
         </Show>
 

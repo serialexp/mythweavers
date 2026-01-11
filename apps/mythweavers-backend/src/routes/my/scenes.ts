@@ -282,6 +282,7 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           name,
           summary,
           sortOrder,
+          includeInFull,
           perspective,
           viewpointCharacterId,
           activeCharacterIds,
@@ -326,6 +327,7 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             summary: summary || null,
             chapterId,
             sortOrder: finalSortOrder,
+            includeInFull: includeInFull ?? 2, // Default to 2 (full content) for new scenes
             perspective: perspective || null,
             viewpointCharacterId: viewpointCharacterId || null,
             activeCharacterIds: (activeCharacterIds || null) as Prisma.InputJsonValue,

@@ -1,6 +1,6 @@
 // Store-related types
 
-import { Chapter, Character, ContextItem, Message, Node } from './core'
+import { Character, ContextItem, Message, Node } from './core'
 
 export interface CurrentStory {
   id: string
@@ -73,8 +73,7 @@ export interface SavedStory {
   messages: Message[]
   characters: Character[]
   contextItems?: ContextItem[]
-  chapters?: Chapter[]
-  nodes?: Node[] // New hierarchical structure
+  nodes?: Node[] // Hierarchical structure
   input: string
   storySetting: string
   storyFormat?: 'narrative' | 'cyoa' // story format
@@ -84,7 +83,6 @@ export interface SavedStory {
   syncedAt?: Date
   storageMode: 'server' | 'local'
   globalScript?: string // Global script to execute before message scripts
-  selectedChapterId?: string | null
   selectedNodeId?: string | null
   branchChoices?: Record<string, string> // branchMessageId -> selectedOptionId
   // Timeline settings (minutes from 0 BBY)
@@ -102,7 +100,6 @@ export interface StoryMetadata {
   savedAt: Date
   messageCount: number
   characterCount: number
-  chapterCount?: number
   storySetting: string
   storageMode: 'server' | 'local'
 }

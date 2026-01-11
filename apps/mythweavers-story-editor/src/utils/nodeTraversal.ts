@@ -40,44 +40,6 @@ export function getScenesInStoryOrder(nodes: Node[]): Node[] {
   return result
 }
 
-/**
- * Get all chapter nodes in story order.
- * @deprecated Use getScenesInStoryOrder instead - scenes now contain summaries
- */
-export function getChaptersInStoryOrder(nodes: Node[]): Node[] {
-  const result: Node[] = []
-
-  if (nodes.length === 0) {
-    return result
-  }
-
-  const childrenMap = new Map<string | null, Node[]>()
-  nodes.forEach((node) => {
-    const parentId = node.parentId || null
-    if (!childrenMap.has(parentId)) {
-      childrenMap.set(parentId, [])
-    }
-    childrenMap.get(parentId)!.push(node)
-  })
-
-  for (const children of childrenMap.values()) {
-    children.sort((a, b) => a.order - b.order)
-  }
-
-  const traverse = (parentId: string | null) => {
-    const children = childrenMap.get(parentId) || []
-    for (const child of children) {
-      if (child.type === 'chapter') {
-        result.push(child)
-      }
-      traverse(child.id)
-    }
-  }
-
-  traverse(null)
-
-  return result
-}
 
 /**
  * Get all scene nodes that come before the specified node in story order.
@@ -140,65 +102,6 @@ export function getSceneNodesBeforeNode(nodes: Node[], currentNodeId: string): N
   return result
 }
 
-/**
- * Get all chapter nodes that come before the specified node in story order.
- * @deprecated Use getSceneNodesBeforeNode instead - scenes now contain summaries
- */
-export function getChapterNodesBeforeNode(nodes: Node[], currentNodeId: string): Node[] {
-  const result: Node[] = []
-  const currentNode = nodes.find((n) => n.id === currentNodeId)
-  if (!currentNode) return result
-
-  // Build a map of parent to children for easy traversal
-  const childrenMap = new Map<string | null, Node[]>()
-  nodes.forEach((node) => {
-    const parentId = node.parentId || null
-    if (!childrenMap.has(parentId)) {
-      childrenMap.set(parentId, [])
-    }
-    childrenMap.get(parentId)!.push(node)
-  })
-
-  // Sort children by order
-  for (const children of childrenMap.values()) {
-    children.sort((a, b) => a.order - b.order)
-  }
-
-  // Traverse the tree and collect all chapter nodes before the current one
-  const traverse = (parentId: string | null, stopAtNode?: string): boolean => {
-    const children = childrenMap.get(parentId) || []
-
-    for (const child of children) {
-      if (child.id === stopAtNode) {
-        // Found the stop node, return true to indicate we should stop
-        return true
-      }
-
-      if (child.id === currentNodeId) {
-        // Found current node, stop traversing at this level
-        return true
-      }
-
-      // If it's a chapter node, add it to results
-      if (child.type === 'chapter') {
-        result.push(child)
-      }
-
-      // Traverse children, and if we hit the stop node, stop
-      if (traverse(child.id, currentNodeId)) {
-        // If current node was found in children, stop processing siblings
-        return true
-      }
-    }
-
-    return false
-  }
-
-  // Start traversal from root
-  traverse(null)
-
-  return result
-}
 
 /**
  * Get all nodes (of any type) that come before and including the specified node in story order.

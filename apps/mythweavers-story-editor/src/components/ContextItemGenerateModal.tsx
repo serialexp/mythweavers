@@ -3,10 +3,9 @@ import * as Diff from 'diff'
 import { BsExclamationTriangle } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
 import { contextItemsStore } from '../stores/contextItemsStore'
-import { nodeStore } from '../stores/nodeStore'
 import type { ContextItem } from '../types/core'
 import { generateMessageId } from '../utils/id'
-import { buildNodeMarkdown } from '../utils/nodeContentExport'
+import { buildMarkedNodesMarkdown, getMarkedNodesContent } from '../utils/nodeContentExport'
 import {
   estimateContextItemTokens,
   generateContextItemDescription,
@@ -34,22 +33,13 @@ export const ContextItemGenerateModal: Component<ContextItemGenerateModalProps> 
   const [tokenEstimate, setTokenEstimate] = createSignal<TokenEstimateResult | null>(null)
   const [isEstimating, setIsEstimating] = createSignal(false)
 
-  // Get nodes marked for full content (includeInFull === 2)
-  const fullContentNodes = createMemo(() => {
-    return nodeStore.nodesArray
-      .filter((node) => node.includeInFull === 2)
-      .sort((a, b) => a.order - b.order)
-  })
+  // Get marked nodes content using shared utility
+  const markedNodes = createMemo(() => getMarkedNodesContent())
 
-  // Get nodes marked for summary (includeInFull === 1)
-  const summaryNodes = createMemo(() => {
-    return nodeStore.nodesArray
-      .filter((node) => node.includeInFull === 1 && node.summary)
-      .sort((a, b) => a.order - b.order)
-  })
-
-  // Check if we have any context nodes
-  const hasContextNodes = createMemo(() => fullContentNodes().length > 0 || summaryNodes().length > 0)
+  // Derived memos for UI display
+  const fullContentNodes = createMemo(() => markedNodes().filter((n) => n.isFullContent))
+  const summaryNodes = createMemo(() => markedNodes().filter((n) => !n.isFullContent))
+  const hasContextNodes = createMemo(() => markedNodes().length > 0)
 
   // Get selected context item (for update mode)
   const selectedContextItem = createMemo(() => {
@@ -74,30 +64,10 @@ export const ContextItemGenerateModal: Component<ContextItemGenerateModalProps> 
     return newType()
   })
 
-  // Build combined story content from context nodes
+  // Build combined story content from context nodes using shared utility
   const getStoryContent = () => {
-    const fullNodes = fullContentNodes()
-    const summNodes = summaryNodes()
-    if (fullNodes.length === 0 && summNodes.length === 0) return undefined
-
-    const sections: string[] = []
-
-    // Add full content sections
-    for (const node of fullNodes) {
-      const markdown = buildNodeMarkdown(node.id)
-      if (markdown) {
-        sections.push(`## ${node.title}\n\n${markdown}`)
-      }
-    }
-
-    // Add summary sections
-    for (const node of summNodes) {
-      if (node.summary) {
-        sections.push(`## ${node.title} (Summary)\n\n${node.summary}`)
-      }
-    }
-
-    return sections.length > 0 ? sections.join('\n\n---\n\n') : undefined
+    const content = buildMarkedNodesMarkdown()
+    return content || undefined
   }
 
   // Compute diff between current and proposed description (for update mode)
