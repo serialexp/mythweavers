@@ -14,7 +14,7 @@ const messageRevisionSchema = z.strictObject({
   messageId: z.string().meta({ example: 'clx1234567890' }),
   version: z.number().int().meta({ example: 1 }),
   versionType: z
-    .enum(['initial', 'regeneration', 'edit', 'rewrite', 'cli_edit'])
+    .enum(['initial', 'regeneration', 'edit', 'rewrite', 'cli_edit', 'auto'])
     .meta({ example: 'initial', description: 'Type of revision' }),
   model: z.string().nullable().meta({ example: 'claude-sonnet-4.5' }),
   tokensPerSecond: z.number().nullable().meta({ example: 42.5 }),
@@ -34,7 +34,7 @@ const listMessageRevisionsResponseSchema = z.strictObject({
 })
 
 // Type for the expected versionType enum values
-type VersionType = 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit'
+type VersionType = 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit' | 'auto'
 
 // Helper to transform message revision with properly typed versionType
 function transformMessageRevision<T extends { versionType: string }>(

@@ -410,7 +410,7 @@ model MessageRevision {
   messageId           String
   message             Message   @relation("AllRevisions", fields: [messageId], references: [id], onDelete: Cascade)
   version             Int       // 1, 2, 3, etc.
-  versionType         String    @default("initial") // initial, regeneration, edit, rewrite, cli_edit
+  versionType         String    @default("initial") // initial, regeneration, edit, rewrite, cli_edit, auto
 
   // AI generation metadata
   model               String?   // LLM model used
