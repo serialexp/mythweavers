@@ -231,9 +231,10 @@ export const getStoryInstructions = (
 
   // CYOA-specific instructions
   if (storyFormat === 'cyoa') {
+    const protagonistRef = viewpointName || 'the protagonist'
     const paragraphGuidance =
       paragraphsPerTurn && paragraphsPerTurn > 0
-        ? `\n\n- Write no more than ${paragraphsPerTurn} paragraph${paragraphsPerTurn !== 1 ? 's' : ''} before presenting the choices`
+        ? `\n\n- Write no more than ${paragraphsPerTurn} paragraph${paragraphsPerTurn !== 1 ? 's' : ''} before asking what the protagonist does`
         : ''
     return `WRITING INSTRUCTIONS:
 ${styleText} ${taskText}${goalText}
@@ -255,7 +256,7 @@ PACING AND TONE GUIDELINES:
 - Focus on authentic character actions and dialogue rather than overly dramatic internal monologues
 
 PLAYER AGENCY:
-The reader controls ONLY the main character (the POV character for this scene). You, as the author, control all other characters, NPCs, world events, and story developments. Choices should always be actions the protagonist can take - never ask what happens in the world or what other characters do. The reader decides their character's actions; you decide how the world responds.
+The reader controls ONLY the main character (the POV character for this scene). You, as the author, control all other characters, NPCs, world events, and story developments. The reader decides their character's actions; you decide how the world responds.
 
 INTERPRETING PLAYER INPUT:
 - Player input describes their intent or general action, NOT literal dialogue or exact wording
@@ -264,16 +265,15 @@ INTERPRETING PLAYER INPUT:
 - Example: "I ask about the artifact" → Write a natural scene where the character inquires about the artifact
 - Example: "I say 'Give me the artifact or else'" → Use that exact dialogue in the scene
 
-CYOA FORMAT REQUIREMENT:
-After completing this turn's story content, you MUST present 2-4 choices for the reader. Format them as:
+ENDING FORMAT:
+After completing this turn's story content, end by asking what the protagonist does next. Do NOT provide numbered options or choices - just ask the open-ended question.
 
-**What do you do?**
-1. [First choice - brief action description]
-2. [Second choice - brief action description]
-3. [Third choice - brief action description]
-4. Something else...
+CORRECT ending format:
+[End of narrative paragraph]
 
-Make choices meaningful and distinct. They should lead to genuinely different story paths. Each choice must be an action the protagonist can take. The last option should always be "Something else..." to allow the reader to type their own action.${paragraphGuidance}`
+What does ${protagonistRef} do?
+
+Do NOT add dramatic setup sentences before the question. Do NOT ask what NPCs do or what happens - ONLY ask what ${protagonistRef} does.${paragraphGuidance}`
   }
 
   // Standard narrative mode
