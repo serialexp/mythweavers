@@ -13,7 +13,6 @@ import { getTemplatedCharacterContext, getTemplatedContextItems } from '../utils
 import { MissingSummariesError } from '../utils/errors'
 import { generateMessageId } from '../utils/id'
 import { saveMessageVersion } from '../utils/messageVersions'
-import { analyzeStoryBeat, extractKnownEntities } from '../utils/smartContext'
 
 interface UseStoryGenerationProps {
   generateResponse: (
@@ -99,7 +98,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
 
     try {
       console.log('[generateMessagesWithContext] Calling generateContextMessages with:', {
-        contextType: settingsStore.useSmartContext ? 'smart-story' : 'story',
+        contextType: 'story',
         hasCharacterContext: fullContext.length > 0,
         charactersCount: charactersStore.characters.length,
         contextItemsCount: contextItemsStore.contextItems.length,
@@ -111,7 +110,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       const result = await generateContextMessages({
         inputText,
         messages,
-        contextType: settingsStore.useSmartContext ? 'smart-story' : 'story',
+        contextType: 'story',
         storySetting: currentStoryStore.storySetting,
         storyFormat: currentStoryStore.storyFormat,
         person: currentStoryStore.person,
@@ -568,46 +567,6 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     messagesStore.setSummarizing(messageId, false)
   }
 
-  const handleAnalyzeMessage = async (messageId: string) => {
-    const message = messagesStore.messages.find((m) => m.id === messageId)
-    if (!message) return
-
-    messagesStore.setAnalyzing(messageId, true)
-
-    try {
-      const entities = extractKnownEntities(charactersStore.characters, contextItemsStore.contextItems)
-
-      const analysis = await analyzeStoryBeat(message, entities, generateAnalysis)
-
-      messagesStore.updateMessage(messageId, { sceneAnalysis: analysis })
-
-      // TODO: Add smartEntityDetection to settingsStore if needed
-      // if (settingsStore.smartEntityDetection) {
-      //   const newEntities = await detectNewEntities(
-      //     message.content,
-      //     entities.knownCharacters,
-      //     entities.knownLocations,
-      //     entities.knownThemes,
-      //     generateAnalysis
-      //   )
-      //
-      //   if ((newEntities.characters.length > 0 || newEntities.locations.length > 0 || newEntities.themes.length > 0)) {
-      //     const descriptions = await generateEntityDescriptions(
-      //       newEntities,
-      //       messagesStore.getStoryContext(),
-      //       generateAnalysis
-      //     )
-      //
-      //     addDiscoveredEntitiesToStores(newEntities, descriptions)
-      //   }
-      // }
-    } catch (error) {
-      console.error('Analysis failed:', error)
-    }
-
-    messagesStore.setAnalyzing(messageId, false)
-  }
-
   const handleShowContextPreview = async () => {
     console.log('[useStoryGeneration] handleShowContextPreview started')
     const inputText = messagesStore.input.trim() || '[Empty input]'
@@ -710,7 +669,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       }
 
       const result = {
-        type: settingsStore.useSmartContext ? 'Smart Context' : 'Full History',
+        type: 'Full History',
         messages: limitedMessages,
       }
       console.log(
@@ -743,7 +702,6 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     handleRegenerateFromMessage,
     handleRegenerateQuery,
     handleSummarizeMessage,
-    handleAnalyzeMessage,
     handleShowContextPreview,
   }
 }

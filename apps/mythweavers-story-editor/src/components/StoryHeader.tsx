@@ -61,7 +61,6 @@ interface StoryHeaderProps {
     storySetting: string,
   ) => void
   onBulkSummarize: () => void
-  onBulkAnalysis: () => void
   onMigrateInstructions: () => void
   onRemoveUserMessages: () => void
   onCleanupThinkTags: () => void
@@ -394,7 +393,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           isLoadingModels={modelsStore.isLoadingModels}
           onRefreshModels={() => modelsStore.fetchModels()}
           onBulkSummarize={props.onBulkSummarize}
-          onBulkAnalysis={props.onBulkAnalysis}
           onMigrateInstructions={props.onMigrateInstructions}
           onRemoveUserMessages={props.onRemoveUserMessages}
           onCleanupThinkTags={props.onCleanupThinkTags}

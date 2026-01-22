@@ -23,7 +23,6 @@ const [settingsState, setSettingsState] = createStore({
   openrouterApiKey: localStorage.getItem('story-openrouter-api-key') || '',
   anthropicApiKey: localStorage.getItem('story-anthropic-api-key') || '',
   openaiApiKey: localStorage.getItem('story-openai-api-key') || '',
-  useSmartContext: localStorage.getItem('story-use-smart-context') === 'true',
   person: localStorage.getItem('story-person') || 'third',
   tense: localStorage.getItem('story-tense') || 'past',
   autoGenerate: localStorage.getItem('story-auto-generate') === 'true',
@@ -67,10 +66,6 @@ createEffect(() => {
 
 createEffect(() => {
   localStorage.setItem('story-openai-api-key', settingsState.openaiApiKey)
-})
-
-createEffect(() => {
-  localStorage.setItem('story-use-smart-context', settingsState.useSmartContext.toString())
 })
 
 createEffect(() => {
@@ -130,9 +125,6 @@ export const settingsStore = {
   get openaiApiKey() {
     return settingsState.openaiApiKey
   },
-  get useSmartContext() {
-    return settingsState.useSmartContext
-  },
   get person() {
     return settingsState.person
   },
@@ -187,7 +179,6 @@ export const settingsStore = {
   setOpenrouterApiKey: (key: string) => setSettingsState('openrouterApiKey', key),
   setAnthropicApiKey: (key: string) => setSettingsState('anthropicApiKey', key),
   setOpenaiApiKey: (key: string) => setSettingsState('openaiApiKey', key),
-  setUseSmartContext: (enabled: boolean) => setSettingsState('useSmartContext', enabled),
   setPerson: (person: string) => setSettingsState('person', person),
   setTense: (tense: string) => setSettingsState('tense', tense),
   setAutoGenerate: (enabled: boolean) => setSettingsState('autoGenerate', enabled),

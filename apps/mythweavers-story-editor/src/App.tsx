@@ -90,7 +90,6 @@ const App: Component = () => {
     handleSubmit,
     regenerateLastMessage,
     handleSummarizeMessage,
-    handleAnalyzeMessage,
     handleShowContextPreview,
   } = useStoryGeneration({
     generateResponse,
@@ -666,24 +665,6 @@ const App: Component = () => {
     }
   }
 
-  const handleBulkAnalysis = async () => {
-    if (!confirm('This will analyze all story messages for scene context. Continue?')) return
-
-    messagesStore.setIsAnalyzing(true)
-
-    try {
-      const storyMessages = messagesStore.messages.filter(
-        (m) => m.role === 'assistant' && !m.isQuery && !m.sceneAnalysis,
-      )
-
-      for (const message of storyMessages) {
-        await handleAnalyzeMessage(message.id)
-      }
-    } finally {
-      messagesStore.setIsAnalyzing(false)
-    }
-  }
-
   const handleMigrateInstructions = () => {
     if (!confirm('This will update all messages to use the new instruction format. Continue?')) return
     // TODO: Implement migrateToInstructionFormat in messagesStore
@@ -1125,7 +1106,6 @@ const App: Component = () => {
                         <StoryHeader
                           onLoadStory={handleLoadStory}
                           onBulkSummarize={handleBulkSummarize}
-                          onBulkAnalysis={handleBulkAnalysis}
                           onMigrateInstructions={handleMigrateInstructions}
                           onRemoveUserMessages={handleRemoveUserMessages}
                           onCleanupThinkTags={handleCleanupThinkTags}

@@ -9,7 +9,6 @@ import {
   BsLink45deg,
   BsListTask,
   BsPencilSquare,
-  BsSearch,
   BsTrash,
   BsUpload,
 } from 'solid-icons/bs'
@@ -56,7 +55,6 @@ interface SettingsProps {
   isLoadingModels: boolean
   onRefreshModels: () => void
   onBulkSummarize: () => void
-  onBulkAnalysis: () => void
   onMigrateInstructions: () => void
   onRemoveUserMessages: () => void
   onCleanupThinkTags: () => void
@@ -112,7 +110,6 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   const needsMigrationCount = createMemo(() => messagesStore.getNeedsMigrationCount())
   const standaloneUserCount = createMemo(() => messagesStore.getStandaloneUserMessageCount())
-  const missingAnalysisCount = createMemo(() => messagesStore.getMessagesNeedingAnalysis().length)
   const thinkTagsToCleanup = createMemo(
     () =>
       messagesStore.messages.filter((msg) => msg.content?.includes('<think>') && msg.content.includes('</think>'))
@@ -434,24 +431,6 @@ export const Settings: Component<SettingsProps> = (props) => {
         </button>
       </div>
 
-      <div class={styles.settingRow}>
-        <button
-          onClick={props.onBulkAnalysis}
-          disabled={props.isLoading || !props.model || globalOperationStore.isOperationInProgress() || props.isGenerating}
-          class={styles.button}
-          title={
-            props.isGenerating
-              ? 'AI is currently generating content - please wait'
-              : globalOperationStore.isOperationInProgress()
-                ? 'Another operation is in progress'
-                : !props.model
-                  ? 'Select a model first'
-                  : `Generate scene analysis for ${missingAnalysisCount()} story messages that don't have one yet`
-          }
-        >
-          <BsSearch /> Generate Missing Analysis
-        </button>
-      </div>
 
       <Show when={needsMigrationCount() > 0}>
         <div class={styles.settingRow}>

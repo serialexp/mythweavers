@@ -50,11 +50,10 @@ interface MessageProps {
 export const Message: Component<MessageProps> = (props) => {
   // Get hooks for generation functions
   const { generateResponse, generateSummaries } = useOllama()
-  const { handleRegenerateFromMessage, handleRegenerateQuery, handleSummarizeMessage, handleAnalyzeMessage } =
-    useStoryGeneration({
-      generateResponse,
-      generateSummaries,
-    })
+  const { handleRegenerateFromMessage, handleRegenerateQuery, handleSummarizeMessage } = useStoryGeneration({
+    generateResponse,
+    generateSummaries,
+  })
   const [isEditingInstruction, setIsEditingInstruction] = createSignal(false)
 
   // Determine if this message should use the always-on editor (story content)
@@ -1085,7 +1084,6 @@ export const Message: Component<MessageProps> = (props) => {
               <Show when={!props.message.isQuery && props.message.type !== 'event'}>
                 <MessageActionsDropdown
                   onSummarize={() => handleSummarizeMessage(props.message.id)}
-                  onAnalyze={() => handleAnalyzeMessage(props.message.id)}
                   onToggleDebug={() => setShowAnalysisDebug(!showAnalysisDebug())}
                   onEditScript={props.message.script ? undefined : () => setShowScriptModal(true)}
                   onRewrite={() => singleRewriteDialogStore.show(props.message.id)}
@@ -1093,11 +1091,9 @@ export const Message: Component<MessageProps> = (props) => {
                   onUncut={handleUncut}
                   isCut={uiStore.isCut(props.message.id)}
                   isSummarizing={props.message.isSummarizing}
-                  isAnalyzing={props.message.isAnalyzing}
                   hasSummary={Boolean(
                     props.message.sentenceSummary || props.message.summary || props.message.paragraphSummary,
                   )}
-                  hasAnalysis={!!props.message.sceneAnalysis}
                   hasScript={!!props.message.script}
                   showDebug={showAnalysisDebug()}
                 />
@@ -1110,7 +1106,6 @@ export const Message: Component<MessageProps> = (props) => {
                   onToggleDebug={() => setShowAnalysisDebug(!showAnalysisDebug())}
                   showDebug={showAnalysisDebug()}
                   onSummarize={() => {}}
-                  onAnalyze={() => {}}
                 />
               </Show>
             </Show>

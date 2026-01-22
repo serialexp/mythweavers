@@ -1,6 +1,5 @@
 import { cacheStore } from '../stores/cacheStore'
 import { charactersStore } from '../stores/charactersStore'
-import { contextItemsStore } from '../stores/contextItemsStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
@@ -13,12 +12,6 @@ import { generateNextStoryBeatInstructions, isStoryReadyForGeneration } from '..
 import { getCharacterDisplayName } from '../utils/character'
 import { evaluateCharacterTemplates, getTemplatedActiveCharacters } from '../utils/contextTemplating'
 import { LLMClientFactory } from '../utils/llm'
-import {
-  analyzeStoryBeat,
-  detectNewEntities,
-  extractKnownEntities,
-  generateEntityDescriptions,
-} from '../utils/smartContext'
 import {
   getParagraphSummarizationPrompt,
   getSentenceSummarizationPrompt,
@@ -685,104 +678,6 @@ Title:`
             } finally {
               // Always clear the summarizing flag
               messagesStore.setSummarizing(assistantMessageId, false)
-            }
-          }
-
-          // Generate scene analysis and discover entities if this is a story message and smart context is enabled (and no API error)
-          if (shouldSummarize && cleanedContent.trim() && settingsStore.useSmartContext && !hasApiError) {
-            // Starting scene analysis
-
-            // Set analyzing flag before starting
-            messagesStore.setAnalyzing(assistantMessageId, true)
-
-            try {
-              // Create a message object for analysis
-              const messageForAnalysis = messagesStore.messages.find((msg) => msg.id === assistantMessageId)
-              if (!messageForAnalysis) {
-                throw new Error('Message not found for analysis')
-              }
-              // Found message for analysis
-
-              // Get known entities for consistency
-              // Getting known entities
-              const knownEntities = extractKnownEntities(
-                charactersStore.characters || [],
-                contextItemsStore.contextItems || [],
-              )
-              // Extracted known entities
-
-              if (!knownEntities) {
-                throw new Error('Failed to extract known entities')
-              }
-
-              // Analyze the story beat for scene information
-              // Analyzing story beat
-              const sceneAnalysis = await analyzeStoryBeat(messageForAnalysis, knownEntities, generateAnalysis)
-              // Scene analysis completed
-
-              // Update message with scene analysis
-              messagesStore.updateMessage(assistantMessageId, { sceneAnalysis })
-
-              // Detect new entities in the story beat
-              const newEntities = detectNewEntities(sceneAnalysis, knownEntities)
-
-              if (
-                newEntities.newCharacters.length > 0 ||
-                newEntities.newThemes.length > 0 ||
-                newEntities.newLocations.length > 0
-              ) {
-                // Discovered new entities
-
-                // Generate descriptions for discovered entities
-                const entityDescriptions = await generateEntityDescriptions(
-                  newEntities,
-                  cleanedContent,
-                  generateAnalysis,
-                )
-
-                // Import pendingEntitiesStore here to avoid circular dependency
-                const { pendingEntitiesStore } = await import('../stores/pendingEntitiesStore')
-
-                // Create pending entities for user confirmation
-                const pendingEntities = [
-                  ...Object.entries(entityDescriptions.characterDescriptions).map(([name, description]) => ({
-                    id: crypto.randomUUID(),
-                    type: 'character' as const,
-                    name: name,
-                    description: description,
-                    originalName: name,
-                    isSelected: true, // Default to selected
-                  })),
-                  ...Object.entries(entityDescriptions.themeDescriptions).map(([name, description]) => ({
-                    id: crypto.randomUUID(),
-                    type: 'theme' as const,
-                    name: name,
-                    description: description,
-                    originalName: name,
-                    isSelected: true,
-                  })),
-                  ...Object.entries(entityDescriptions.locationDescriptions).map(([name, description]) => ({
-                    id: crypto.randomUUID(),
-                    type: 'location' as const,
-                    name: name,
-                    description: description,
-                    originalName: name,
-                    isSelected: true,
-                  })),
-                ]
-
-                // Add batch to pending entities store
-                pendingEntitiesStore.addBatch({
-                  id: crypto.randomUUID(),
-                  entities: pendingEntities,
-                  messageId: assistantMessageId,
-                })
-              }
-            } catch (error) {
-              console.error('Failed to analyze story beat:', error)
-            } finally {
-              // Always clear the analyzing flag
-              messagesStore.setAnalyzing(assistantMessageId, false)
             }
           }
 

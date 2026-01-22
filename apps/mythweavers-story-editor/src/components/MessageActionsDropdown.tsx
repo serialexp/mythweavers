@@ -5,23 +5,19 @@ import {
   BsListCheck,
   BsPencilSquare,
   BsScissors,
-  BsSearch,
   BsThreeDots,
 } from 'solid-icons/bs'
 import { Component, Show } from 'solid-js'
 
 interface MessageActionsDropdownProps {
   onSummarize: () => void
-  onAnalyze: () => void
   onToggleDebug: () => void
   onEditScript?: () => void
   onRewrite?: () => void
   onCut?: () => void
   onUncut?: () => void
   isSummarizing?: boolean
-  isAnalyzing?: boolean
   hasSummary?: boolean
-  hasAnalysis?: boolean
   hasScript?: boolean
   showDebug?: boolean
   disabled?: boolean
@@ -45,14 +41,6 @@ export const MessageActionsDropdown: Component<MessageActionsDropdownProps> = (p
         icon={props.isSummarizing ? <Spinner size="sm" /> : <BsListCheck />}
       >
         {props.hasSummary ? 'Re-summarize' : 'Summarize'}
-      </DropdownItem>
-
-      <DropdownItem
-        onClick={props.onAnalyze}
-        disabled={props.isAnalyzing}
-        icon={props.isAnalyzing ? <Spinner size="sm" /> : <BsSearch />}
-      >
-        {props.hasAnalysis ? 'Re-analyze' : 'Analyze'}
       </DropdownItem>
 
       <Show when={props.onRewrite}>
