@@ -199,14 +199,14 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
         spineArtFileId: null,
         pages: 0,
         sortOrder: 0,
-        nodeType: 'linear',
+        nodeType: 'story', // Valid: 'story' | 'non-story' | 'context'
         arcs: [
           {
             id: arcId,
             name: 'Arc 1',
             summary: null,
             sortOrder: 0,
-            nodeType: 'linear',
+            nodeType: 'story', // Valid: 'story' | 'non-story' | 'context'
             chapters: [
               {
                 id: chapterId,
@@ -214,7 +214,7 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
                 summary: null,
                 publishedOn: null,
                 sortOrder: 0,
-                nodeType: 'linear',
+                nodeType: 'story', // Valid: 'story' | 'non-story' | 'context'
                 status: 'DRAFT',
                 publishingStatus: [],
                 scenes: [
