@@ -61,10 +61,19 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
   const protagonistId = generateId()
 
   // Build messages from CYOA message pairs
+  // User messages become the instruction for the following assistant message
   const messages: any[] = []
   let sortOrder = 0
+  let pendingInstruction: string | null = null
 
   for (const msg of cyoa.messages) {
+    if (msg.role === 'user') {
+      // Save user message as pending instruction for next assistant message
+      pendingInstruction = msg.content
+      continue
+    }
+
+    // Assistant message - create a message with optional instruction from preceding user message
     const messageId = generateId()
     const revisionId = generateId()
     const paragraphId = generateId()
@@ -73,9 +82,9 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
     messages.push({
       id: messageId,
       sortOrder: sortOrder++,
-      instruction: null,
+      instruction: pendingInstruction, // User message becomes instruction
       script: null,
-      type: msg.role === 'user' ? 'user' : 'prose',
+      type: 'prose',
       options: null,
       currentMessageRevisionId: revisionId,
       plotPointStates: [],
@@ -103,7 +112,7 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
                   body: msg.content,
                   contentSchema: null,
                   version: 1,
-                  state: 'FINAL', // Valid ParagraphState enum value
+                  state: 'FINAL',
                   script: null,
                   plotPointActions: null,
                   inventoryActions: null,
@@ -115,6 +124,9 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
         },
       ],
     })
+
+    // Clear pending instruction after use
+    pendingInstruction = null
   }
 
   // Create protagonist character from cyoa data

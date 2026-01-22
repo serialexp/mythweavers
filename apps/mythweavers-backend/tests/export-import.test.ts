@@ -909,30 +909,22 @@ describe('Story Export/Import', () => {
       expect(books[0].arcs[0].chapters[0].scenes).toHaveLength(1)
 
       const scene = books[0].arcs[0].chapters[0].scenes[0]
-      expect(scene.messages).toHaveLength(4)
+      // User messages become instructions on following assistant messages
+      // So 4 CYOA messages (2 user, 2 assistant) become 2 prose messages with instructions
+      expect(scene.messages).toHaveLength(2)
 
-      // Check first message (assistant/prose)
+      // First message: assistant with no preceding user message
       expect(scene.messages[0].type).toBe('prose')
+      expect(scene.messages[0].instruction).toBeNull()
       expect(scene.messages[0].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
         'You wake up in a mysterious forest.',
       )
 
-      // Check second message (user)
-      expect(scene.messages[1].type).toBe('user')
+      // Second message: assistant with preceding user message as instruction
+      expect(scene.messages[1].type).toBe('prose')
+      expect(scene.messages[1].instruction).toBe('I look around for any signs of civilization.')
       expect(scene.messages[1].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
-        'I look around for any signs of civilization.',
-      )
-
-      // Check third message (assistant/prose)
-      expect(scene.messages[2].type).toBe('prose')
-      expect(scene.messages[2].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
         'You spot smoke rising in the distance.',
-      )
-
-      // Check fourth message (user)
-      expect(scene.messages[3].type).toBe('user')
-      expect(scene.messages[3].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
-        'I head toward the smoke.',
       )
     })
 
@@ -941,6 +933,7 @@ describe('Story Export/Import', () => {
         messages: [
           { role: 'assistant', content: 'Welcome to the adventure!' },
           { role: 'user', content: 'Hello!' },
+          { role: 'assistant', content: 'The adventure begins!' },
         ],
         pitch: 'A simple test adventure',
         savedAt: new Date().toISOString(),
