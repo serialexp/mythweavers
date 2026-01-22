@@ -474,10 +474,19 @@ export class SaveService {
 
       if (sameEntityType) {
         if (existingInsert && newUpdate) {
-          // Apply update fields to the pending insert so the initial create carries latest data
-          this.mergeOperationData(existing, op)
-          existing.timestamp = op.timestamp
-          shouldQueueOperation = false
+          // For messages, don't merge updates into inserts.
+          // Message inserts only send metadata (instruction, script, sortOrder).
+          // Content is saved separately via saveParagraphs after generation.
+          // For other entity types, merge updates into pending inserts.
+          if (op.entityType === 'message') {
+            // Let both operations run separately - insert first, then update
+            // The update will be processed after the insert completes
+          } else {
+            // Apply update fields to the pending insert so the initial create carries latest data
+            this.mergeOperationData(existing, op)
+            existing.timestamp = op.timestamp
+            shouldQueueOperation = false
+          }
         } else if (existingInsert && newDelete) {
           // Created then deleted before sync; drop both
           this.state.queue.splice(existingIndex, 1)
@@ -638,6 +647,7 @@ export class SaveService {
         }
         // Insert message using new endpoint
         // Note: id is passed for client-side ID generation (offline-first support)
+        // Content/paragraphs are NOT sent here - they are saved separately via saveParagraphs()
         const insertResponse = await postMyScenesBySceneIdMessages({
           path: { sceneId },
           body: {
@@ -647,7 +657,6 @@ export class SaveService {
             sortOrder: operation.data.order,
           } as { instruction?: string; script?: string; sortOrder?: number; id?: string },
         })
-        // Message inserted
         if (insertResponse.data?.message) {
           this.updateLastKnownTimestamp(insertResponse.data.message.updatedAt)
 
@@ -655,31 +664,6 @@ export class SaveService {
           const revisionId = insertResponse.data.message.currentMessageRevisionId
           if (revisionId) {
             this.onMessageCreated?.(operation.data.id, { currentMessageRevisionId: revisionId })
-          }
-
-          // If the message has content, create paragraphs for it (split on double newlines)
-          if (revisionId && operation.data.content) {
-            const paragraphTexts = operation.data.content
-              .split(/\n\n+/)
-              .map((p) => p.trim())
-              .filter((p) => p.length > 0)
-
-            // Create all paragraphs using bulk endpoint
-            if (paragraphTexts.length > 0) {
-              try {
-                await postMyMessageRevisionsByRevisionIdParagraphsBatch({
-                  path: { revisionId },
-                  body: {
-                    paragraphs: paragraphTexts.map((text, index) => ({
-                      body: text,
-                      sortOrder: index,
-                    })),
-                  },
-                })
-              } catch (err) {
-                console.error('[SaveService] Failed to create paragraphs:', err)
-              }
-            }
           }
         }
         break

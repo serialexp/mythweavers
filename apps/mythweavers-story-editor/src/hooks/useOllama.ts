@@ -490,7 +490,8 @@ Title:`
         if (part.response) {
           accumulatedContent += part.response
           tokenCount++
-          messagesStore.updateMessage(assistantMessageId, { content: accumulatedContent })
+          // Use NoSave variant during streaming - content is saved via saveParagraphs after generation
+          messagesStore.updateMessageNoSave(assistantMessageId, { content: accumulatedContent })
         }
 
         // Accumulate usage data from message_delta events
