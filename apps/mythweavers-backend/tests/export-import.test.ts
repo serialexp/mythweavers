@@ -815,4 +815,224 @@ describe('Story Export/Import', () => {
       expect(importedBooks[0].arcs[0].chapters[0].scenes[0].goal).toBe('Introduce the protagonist')
     })
   })
+
+  describe('CYOA Format Import', () => {
+    test('should import CYOA format with messages array', async () => {
+      // Create CYOA format data (like from artifact exports)
+      const cyoaData = {
+        messages: [
+          { role: 'assistant', content: 'You wake up in a mysterious forest.' },
+          { role: 'user', content: 'I look around for any signs of civilization.' },
+          { role: 'assistant', content: 'You spot smoke rising in the distance.' },
+          { role: 'user', content: 'I head toward the smoke.' },
+        ],
+        memory: '# Adventure Memory\n\n## Setting\nMedieval fantasy world',
+        protagonist: 'Alex',
+        pitch: 'A mysterious adventure in an enchanted forest',
+        savedAt: new Date().toISOString(),
+      }
+
+      // Import as JSON
+      const form = new FormData()
+      form.append('file', Buffer.from(JSON.stringify(cyoaData)), {
+        filename: 'cyoa-story.json',
+        contentType: 'application/json',
+      })
+
+      const importResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories/import-zip',
+        headers: { ...form.getHeaders() },
+        payload: form,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+
+      expect(importResponse.statusCode).toBe(201)
+      const importBody = importResponse.json()
+      expect(importBody.success).toBe(true)
+      expect(importBody.storyId).toBeDefined()
+      expect(importBody.storyName).toBe('A mysterious adventure in an enchanted forest')
+
+      // Verify the imported story
+      const story = await prisma.story.findUnique({
+        where: { id: importBody.storyId },
+      })
+      expect(story).toBeDefined()
+      expect(story!.format).toBe('cyoa')
+      expect(story!.defaultPerspective).toBe('SECOND')
+      expect(story!.globalScript).toBe('# Adventure Memory\n\n## Setting\nMedieval fantasy world')
+
+      // Verify protagonist character was created
+      const characters = await prisma.character.findMany({
+        where: { storyId: importBody.storyId },
+      })
+      expect(characters).toHaveLength(1)
+      expect(characters[0].firstName).toBe('Alex')
+      expect(characters[0].isMainCharacter).toBe(true)
+
+      // Verify messages were converted
+      const books = await prisma.book.findMany({
+        where: { storyId: importBody.storyId },
+        include: {
+          arcs: {
+            include: {
+              chapters: {
+                include: {
+                  scenes: {
+                    include: {
+                      messages: {
+                        orderBy: { sortOrder: 'asc' },
+                        include: {
+                          messageRevisions: {
+                            include: {
+                              paragraphs: {
+                                include: {
+                                  paragraphRevisions: true,
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      expect(books).toHaveLength(1)
+      expect(books[0].arcs).toHaveLength(1)
+      expect(books[0].arcs[0].chapters).toHaveLength(1)
+      expect(books[0].arcs[0].chapters[0].scenes).toHaveLength(1)
+
+      const scene = books[0].arcs[0].chapters[0].scenes[0]
+      expect(scene.messages).toHaveLength(4)
+
+      // Check first message (assistant/prose)
+      expect(scene.messages[0].type).toBe('prose')
+      expect(scene.messages[0].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
+        'You wake up in a mysterious forest.',
+      )
+
+      // Check second message (user)
+      expect(scene.messages[1].type).toBe('user')
+      expect(scene.messages[1].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
+        'I look around for any signs of civilization.',
+      )
+
+      // Check third message (assistant/prose)
+      expect(scene.messages[2].type).toBe('prose')
+      expect(scene.messages[2].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
+        'You spot smoke rising in the distance.',
+      )
+
+      // Check fourth message (user)
+      expect(scene.messages[3].type).toBe('user')
+      expect(scene.messages[3].messageRevisions[0].paragraphs[0].paragraphRevisions[0].body).toBe(
+        'I head toward the smoke.',
+      )
+    })
+
+    test('should import CYOA format without protagonist', async () => {
+      const cyoaData = {
+        messages: [
+          { role: 'assistant', content: 'Welcome to the adventure!' },
+          { role: 'user', content: 'Hello!' },
+        ],
+        pitch: 'A simple test adventure',
+        savedAt: new Date().toISOString(),
+      }
+
+      const form = new FormData()
+      form.append('file', Buffer.from(JSON.stringify(cyoaData)), {
+        filename: 'simple-cyoa.json',
+        contentType: 'application/json',
+      })
+
+      const importResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories/import-zip',
+        headers: { ...form.getHeaders() },
+        payload: form,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+
+      expect(importResponse.statusCode).toBe(201)
+
+      const importBody = importResponse.json()
+
+      // Should have no characters
+      const characters = await prisma.character.findMany({
+        where: { storyId: importBody.storyId },
+      })
+      expect(characters).toHaveLength(0)
+
+      // Story should exist with messages
+      const story = await prisma.story.findUnique({
+        where: { id: importBody.storyId },
+      })
+      expect(story!.defaultProtagonistId).toBeNull()
+    })
+
+    test('should generate story name from pitch if no name provided', async () => {
+      const cyoaData = {
+        messages: [
+          { role: 'assistant', content: 'Start of the adventure.' },
+        ],
+        pitch:
+          'This is a very long pitch that describes the entire story premise and should be truncated when used as a name',
+        savedAt: new Date().toISOString(),
+      }
+
+      const form = new FormData()
+      form.append('file', Buffer.from(JSON.stringify(cyoaData)), {
+        filename: 'long-pitch.json',
+        contentType: 'application/json',
+      })
+
+      const importResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories/import-zip',
+        headers: { ...form.getHeaders() },
+        payload: form,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+
+      expect(importResponse.statusCode).toBe(201)
+      const importBody = importResponse.json()
+
+      // Name should be truncated from the first line of pitch
+      expect(importBody.storyName.length).toBeLessThanOrEqual(100)
+    })
+
+    test('should use default name when no pitch provided', async () => {
+      const cyoaData = {
+        messages: [
+          { role: 'assistant', content: 'Nameless adventure begins.' },
+        ],
+        savedAt: new Date().toISOString(),
+      }
+
+      const form = new FormData()
+      form.append('file', Buffer.from(JSON.stringify(cyoaData)), {
+        filename: 'nameless.json',
+        contentType: 'application/json',
+      })
+
+      const importResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories/import-zip',
+        headers: { ...form.getHeaders() },
+        payload: form,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+
+      expect(importResponse.statusCode).toBe(201)
+      const importBody = importResponse.json()
+      expect(importBody.storyName).toBe('Imported CYOA Story')
+    })
+  })
 })

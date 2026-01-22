@@ -12,6 +12,245 @@ import { errorSchema } from '../../schemas/common.js'
 // Export manifest schema
 const EXPORT_VERSION = '1.0.0'
 
+// CYOA (Choose Your Own Adventure) format from artifact exports
+interface CyoaMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+interface CyoaFormat {
+  messages: CyoaMessage[]
+  memory?: string
+  protagonist?: string
+  pitch?: string
+  alwaysInstructions?: string
+  compactions?: Record<string, unknown>
+  messagesSinceUpdate?: number
+  savedAt?: string
+}
+
+// Helper to generate CUID-like IDs for internal use during conversion
+function generateId(): string {
+  const timestamp = Date.now().toString(36)
+  const random = Math.random().toString(36).substring(2, 10)
+  return `c${timestamp}${random}`
+}
+
+// Detect if data is CYOA format
+function isCyoaFormat(data: any): data is CyoaFormat {
+  return (
+    data &&
+    Array.isArray(data.messages) &&
+    data.messages.length > 0 &&
+    data.messages.every(
+      (m: any) =>
+        typeof m === 'object' &&
+        (m.role === 'user' || m.role === 'assistant') &&
+        typeof m.content === 'string',
+    )
+  )
+}
+
+// Convert CYOA format to MythWeavers export format
+function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
+  // Generate IDs for all entities
+  const bookId = generateId()
+  const arcId = generateId()
+  const chapterId = generateId()
+  const sceneId = generateId()
+  const protagonistId = generateId()
+
+  // Build messages from CYOA message pairs
+  const messages: any[] = []
+  let sortOrder = 0
+
+  for (const msg of cyoa.messages) {
+    const messageId = generateId()
+    const revisionId = generateId()
+    const paragraphId = generateId()
+    const paragraphRevisionId = generateId()
+
+    messages.push({
+      id: messageId,
+      sortOrder: sortOrder++,
+      instruction: null,
+      script: null,
+      type: msg.role === 'user' ? 'user' : 'prose',
+      options: null,
+      currentMessageRevisionId: revisionId,
+      plotPointStates: [],
+      messageRevisions: [
+        {
+          id: revisionId,
+          version: 1,
+          versionType: 'auto',
+          model: null,
+          tokensPerSecond: null,
+          totalTokens: null,
+          promptTokens: null,
+          cacheCreationTokens: null,
+          cacheReadTokens: null,
+          think: null,
+          showThink: false,
+          paragraphs: [
+            {
+              id: paragraphId,
+              sortOrder: 0,
+              currentParagraphRevisionId: paragraphRevisionId,
+              paragraphRevisions: [
+                {
+                  id: paragraphRevisionId,
+                  body: msg.content,
+                  contentSchema: null,
+                  version: 1,
+                  state: 'FINAL', // Valid ParagraphState enum value
+                  script: null,
+                  plotPointActions: null,
+                  inventoryActions: null,
+                  paragraphComments: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+  }
+
+  // Create protagonist character from cyoa data
+  const characters: any[] = []
+  if (cyoa.protagonist) {
+    characters.push({
+      id: protagonistId,
+      pictureFileId: null,
+      firstName: cyoa.protagonist,
+      middleName: null,
+      lastName: null,
+      nickname: null,
+      description: null,
+      background: null,
+      personality: null,
+      personalityQuirks: null,
+      likes: null,
+      dislikes: null,
+      age: null,
+      gender: null,
+      sexualOrientation: null,
+      height: null,
+      hairColor: null,
+      eyeColor: null,
+      distinguishingFeatures: null,
+      writingStyle: null,
+      isMainCharacter: true,
+      laterVersionOfId: null,
+      significantActions: null,
+      birthdate: null,
+      inventory: [],
+    })
+  }
+
+  // Build story name from pitch or default
+  const storyName = cyoa.pitch
+    ? cyoa.pitch.split('\n')[0].substring(0, 100)
+    : 'Imported CYOA Story'
+
+  return {
+    story: {
+      name: storyName,
+      summary: cyoa.pitch || null,
+      status: 'ONGOING',
+      type: 'ORIGINAL',
+      published: false,
+      wordsPerWeek: null,
+      spellingLevel: 3,
+      chapters: 1,
+      firstChapterReleasedAt: null,
+      lastChapterReleasedAt: null,
+      coverArtFileId: null,
+      coverColor: '#000000', // Required field with default
+      coverTextColor: '#FFFFFF', // Required field with default
+      coverFontFamily: 'Georgia', // Required field with default
+      defaultPerspective: 'SECOND',
+      defaultTense: 'PRESENT',
+      genre: null,
+      paragraphsPerTurn: 3,
+      format: 'cyoa', // Lowercase format
+      defaultProtagonistId: cyoa.protagonist ? protagonistId : null,
+      defaultCalendarId: null,
+      sortOrder: 0,
+      pages: null, // Nullable field
+      timelineStartTime: null,
+      timelineEndTime: null,
+      timelineGranularity: 'hour', // Required field with default
+      branchChoices: null,
+      selectedNodeId: sceneId,
+      provider: 'ollama', // Required field with default
+      model: null,
+      globalScript: cyoa.memory || null,
+      plotPointDefaults: null,
+    },
+    tags: [],
+    books: [
+      {
+        id: bookId,
+        name: 'Book 1',
+        summary: null,
+        coverArtFileId: null,
+        spineArtFileId: null,
+        pages: 0,
+        sortOrder: 0,
+        nodeType: 'linear',
+        arcs: [
+          {
+            id: arcId,
+            name: 'Arc 1',
+            summary: null,
+            sortOrder: 0,
+            nodeType: 'linear',
+            chapters: [
+              {
+                id: chapterId,
+                name: 'Chapter 1',
+                summary: null,
+                publishedOn: null,
+                sortOrder: 0,
+                nodeType: 'linear',
+                status: 'DRAFT',
+                publishingStatus: [],
+                scenes: [
+                  {
+                    id: sceneId,
+                    name: 'Scene 1',
+                    summary: null,
+                    sortOrder: 0,
+                    status: 'DRAFT',
+                    includeInFull: 2, // 0=not included, 1=summary only, 2=full content
+                    perspective: 'SECOND',
+                    viewpointCharacterId: cyoa.protagonist ? protagonistId : null,
+                    activeCharacterIds: cyoa.protagonist ? [protagonistId] : [],
+                    activeContextItemIds: [],
+                    goal: null,
+                    storyTime: null,
+                    mediaLinks: [],
+                    messages,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    characters,
+    contextItems: [],
+    calendars: [],
+    maps: [],
+    mediaAttachments: [],
+    plotPointStates: [],
+    files: [],
+  }
+}
+
 const manifestSchema = z.object({
   version: z.string(),
   exportDate: z.string(),
@@ -632,14 +871,19 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
       try {
         const jsonData = JSON.parse(fileBuffer.toString('utf-8'))
 
-        // Check if it's a bundle format (with manifest and story)
-        if (jsonData.manifest && jsonData.story) {
-          // Bundle format from artifact export
+        // Check if it's CYOA format (has messages array with role/content)
+        if (isCyoaFormat(jsonData)) {
+          // Convert CYOA to MythWeavers format
+          exportData = convertCyoaToMythWeavers(jsonData)
+          originalStoryId = null
+          fastify.log.info('Detected CYOA format, converting to MythWeavers format')
+        } else if (jsonData.manifest && jsonData.story) {
+          // Bundle format from artifact export (manifest + story)
           exportData = jsonData.story
           originalStoryId = jsonData.manifest.storyId
           // Skip checksum verification for JSON imports (artifact uses simplified hash)
         } else if (jsonData.story) {
-          // Direct story format
+          // Direct story format (has story key at root)
           exportData = jsonData
           originalStoryId = null
         } else {
