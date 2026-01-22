@@ -37,6 +37,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Imports**: Group by npm packages first, then local modules
 - **File Organization**: Colocate related files (component + styles + tests)
 
+## Git Commits
+Use conventional commit format for all commit messages:
+
+```
+<type>: <description>
+
+[optional body]
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+```
+
+**Types:**
+- `feat`: New feature or functionality
+- `fix`: Bug fix
+- `refactor`: Code change that neither fixes a bug nor adds a feature
+- `docs`: Documentation only changes
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks (deps, config, etc.)
+
+**Examples:**
+- `feat: Add CYOA format import support`
+- `fix: Correct auth token validation in middleware`
+- `refactor: Extract message conversion to separate function`
+
 ## Critical Systems
 
 ### AI/LLM Integration
