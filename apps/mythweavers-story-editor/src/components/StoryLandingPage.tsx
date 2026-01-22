@@ -371,11 +371,12 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         const formData = new FormData()
         formData.append('file', file)
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/my/stories/import-zip`, {
+        const baseUrl = (import.meta.env.VITE_UNIFIED_API_URL ||
+                        (typeof window !== 'undefined' && (window as any).RUNTIME_CONFIG?.BACKEND_URL) ||
+                        'http://localhost:3201')
+
+        const response = await fetch(`${baseUrl}/my/stories/import-zip`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${authStore.sessionToken}`,
-          },
           body: formData,
           credentials: 'include',
         })
