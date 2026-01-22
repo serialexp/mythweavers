@@ -53,6 +53,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
   const [activeTab, setActiveTab] = createSignal<'new' | 'load'>('new')
   const [localFingerprints, setLocalFingerprints] = createSignal<Map<string, string>>(new Map())
   const [showClaudeChatImport, setShowClaudeChatImport] = createSignal(false)
+  const [importingMythWeavers, setImportingMythWeavers] = createSignal(false)
 
   // Combined stories list
   const combinedStories = createMemo((): StoryListItem[] => {
@@ -357,6 +358,51 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     navigate('/login')
   }
 
+  const handleImportMythWeavers = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json,.zip'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      setImportingMythWeavers(true)
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/my/stories/import-zip`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${authStore.sessionToken}`,
+          },
+          body: formData,
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Import failed')
+        }
+
+        const result = await response.json()
+        console.log('Story imported:', result)
+
+        // Reload stories list
+        await loadStories()
+
+        // Navigate to the imported story
+        props.onSelectStory(result.storyId)
+      } catch (error) {
+        console.error('Failed to import story:', error)
+        alert(`Failed to import story: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      } finally {
+        setImportingMythWeavers(false)
+      }
+    }
+    input.click()
+  }
+
   return (
     <div class={styles.pageWrapper}>
       <NavBar variant="elevated" style={{ 'flex-shrink': '0' }}>
@@ -430,9 +476,18 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
                 <Text size="sm" color="secondary" style={{ 'margin-bottom': '0.75rem' }}>
                   Or import from external source:
                 </Text>
-                <Button variant="secondary" onClick={() => setShowClaudeChatImport(true)}>
-                  Import Claude Chat
-                </Button>
+                <div style={{ display: 'flex', gap: '0.5rem', 'flex-wrap': 'wrap' }}>
+                  <Button variant="secondary" onClick={() => setShowClaudeChatImport(true)}>
+                    Import Claude Chat
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleImportMythWeavers}
+                    disabled={!serverAvailable() || importingMythWeavers()}
+                  >
+                    {importingMythWeavers() ? 'Importing...' : 'Import MythWeavers Export'}
+                  </Button>
+                </div>
               </div>
             </CardBody>
           </TabPanel>
