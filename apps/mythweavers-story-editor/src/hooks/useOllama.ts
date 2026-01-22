@@ -661,6 +661,7 @@ Title:`
                   sentenceSummary: summaries.sentenceSummary,
                   summary: summaries.summary,
                   paragraphSummary: summaries.paragraphSummary,
+                  isExpanded: true, // Keep showing full content after summaries are generated
                 })
 
                 // Update story name if we got a good one
@@ -676,6 +677,7 @@ Title:`
                   sentenceSummary: summaries.sentenceSummary,
                   summary: summaries.summary,
                   paragraphSummary: summaries.paragraphSummary,
+                  isExpanded: true, // Keep showing full content after summaries are generated
                 })
               }
             } catch (error) {

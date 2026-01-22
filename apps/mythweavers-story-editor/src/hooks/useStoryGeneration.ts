@@ -559,6 +559,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         sentenceSummary,
         summary,
         paragraphSummary,
+        isExpanded: true, // Keep showing full content after summaries are generated
       })
     } catch (error) {
       console.error('Summarization failed:', error)
