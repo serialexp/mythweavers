@@ -1845,6 +1845,11 @@ export class SaveService {
     originalParagraphs: Paragraph[],
     newParagraphs: Paragraph[],
   ): Promise<{ created: number; updated: number; deleted: number }> {
+    // DEBUG: Track calls with unique ID and stack trace
+    const callId = Math.random().toString(36).substring(7)
+    console.log(`[SaveService.saveParagraphs] START callId=${callId} revisionId=${messageRevisionId} origCount=${originalParagraphs.length} newCount=${newParagraphs.length}`)
+    console.trace(`[SaveService.saveParagraphs] Stack trace for callId=${callId}`)
+
     // Convert frontend state to API state format
     const toApiState = (
       state: Paragraph['state'] | undefined,

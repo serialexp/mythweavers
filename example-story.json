@@ -1,0 +1,428 @@
+{
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "You wake up to the smell of pancakes drifting up from the kitchen. It's a Saturday morning in Austin, Texas, and sunlight streams through your bedroom window. Your dad must be making breakfast before heading to work—he's a contractor, and lately he's been pulling double shifts on some big construction project across town. You can hear him moving around downstairs, probably burning the edges of the pancakes like he always does.\n\nYour phone buzzes on the nightstand. It's a text from your best friend Emma: \"Did you see the news? Some weird flu thing spreading. My mom won't let me go to the mall lol.\" You scroll through your social media feed and see a few posts about hospitals being crowded somewhere on the East Coast, but nothing that seems too serious. Just another news cycle freaking out about something that'll blow over in a week.\n\nWhat does the protagonist do?"
+    },
+    {
+      "role": "user",
+      "content": "It’ll probably be fine. The flu sucks though. "
+    },
+    {
+      "role": "assistant",
+      "content": "You toss your phone back onto the nightstand and stretch. Emma's always been a bit of a worrier, and her mom even more so. It's probably just the regular flu season getting blown out of proportion by the media. You've got more important things to think about—like whether you want to brave your dad's burnt pancakes or just grab a granola bar.\n\nYou head downstairs in your pajamas and find your dad at the stove, spatula in hand, wearing his faded UT Longhorns t-shirt. Sure enough, smoke is curling up from the pan. \"Morning, kiddo,\" he says with a grin. \"Made your favorite—slightly crispy.\" He slides two pancakes onto a plate for you. The edges are definitely black, but the middles look okay. Through the kitchen window, you can see your neighbor, old Mr. Chen, out watering his garden like he does every Saturday morning. Everything feels completely normal.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Look at the pancakes as if they’re a particularly fascinating specimen. But dad made them, so I’m going to eat them."
+    },
+    {
+      "role": "assistant",
+      "content": "You pick up your fork and examine the pancakes like you're a food critic on one of those cooking shows. The char patterns are actually pretty impressive—dad's managed to create what looks like a map of Texas burned into the bottom one. \"Thanks, Dad,\" you say, cutting into them. The middle is fluffy at least, even if you have to navigate around the crispy perimeter like a minefield.\n\nYour dad chuckles and ruffles your hair as he walks past to grab his keys. \"I know, I know. I'm not winning any cooking awards. There's cereal in the pantry if you want a backup plan.\" He checks his watch. \"I gotta head out. Big project deadline coming up. There's leftover pizza in the fridge for lunch, and I should be home by dinner.\" He pauses at the door. \"Oh, and your aunt called last night. She's asking if you want to visit her in Dallas next weekend. Said something about taking you to that new escape room place.\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Sure, I say. Escape room sounds fun. I’m trying to figure if that’ll conflict with my soccer match next Sunday though. Ask dad if we can do that saturday."
+    },
+    {
+      "role": "assistant",
+      "content": "\"Yeah, escape room sounds fun!\" you say between bites of pancake. \"But wait—can we do it Saturday? I've got that soccer match Sunday afternoon.\" You're playing center mid this season, and Coach Martinez has been really pushing the team hard for the upcoming tournament. Missing a game would put you on the bench for the next one, and you've been working too hard to let that happen.\n\nYour dad nods, already texting on his phone. \"I'll let her know. Saturday should work fine.\" He pockets his phone and grabs his work jacket from the hook. \"Alright, I'm off. Don't forget to lock up if you go anywhere, and text me if you need anything.\" The door closes behind him, and you hear his truck rumble to life in the driveway. You're alone in the house now, with most of the day ahead of you. Your homework is mostly done, and Emma's text is still unanswered on your phone upstairs.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "First I make sure dad is really gone. Then I go get my wallet. He’s been complaining about his broken watch, and today is his birthday, so I’m going to get him a new one."
+    },
+    {
+      "role": "assistant",
+      "content": "You wait until you hear your dad's truck pull out of the driveway and turn down the street. Once the engine noise fades, you sprint upstairs to your room and grab your wallet from your desk drawer. You've been saving up from babysitting the Rodriguez twins down the street—three months of dealing with their dinosaur obsession and endless energy has finally paid off. You count the bills: $247. It should be enough for a decent watch, maybe not anything fancy, but something better than the cracked digital one he's been wearing that stops working every other day.\n\nYou pull up Google Maps on your phone. There's a department store about two miles away at the strip mall, and you're pretty sure they have a watch section. You could bike there in about twenty minutes. Or there's that locally owned jewelry shop downtown that your mom used to like—it's farther, but they might have something more special. Emma lives pretty close to the strip mall too, so you could potentially swing by and see if she wants to come along, despite her mom's paranoia about the flu thing.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Two things in one hit sounds good. And dad won’t care about fancy anyway. Just indestructable and functional."
+    },
+    {
+      "role": "assistant",
+      "content": "You grab your bike helmet and stuff your wallet into your backpack. The strip mall it is—you can get dad something practical and durable, and maybe convince Emma to stop doom-scrolling about the flu and actually hang out. You fire off a text: \"Going to the strip mall. Want to come? I'm buying my dad a birthday present.\"\n\nBy the time you've biked halfway there, your phone buzzes with Emma's reply: \"OMG yes. So bored. Meet you at the food court in 15?\" You pedal faster, the morning sun warming your back. The streets are pretty empty for a Saturday—usually there's more traffic heading to the farmers market downtown. When you arrive at the strip mall, you lock your bike up at the rack near the entrance. Emma's already there, sitting on a bench and scrolling through her phone. She looks up and waves. \"Okay, so my mom is being totally insane. She wanted me to wear a mask to come here. A mask! For the flu!\" She rolls her eyes dramatically.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Laugh. Parents are overprotective. Dad would probably say the same, but he’s off to work so I’m freeee."
+    },
+    {
+      "role": "assistant",
+      "content": "You laugh and plop down on the bench next to her. \"Parents are so overprotective. My dad would probably be the same if he wasn't already at work. But he is, so I'm freeee.\" You stretch your arms out dramatically. Emma grins and stands up, slinging her bag over her shoulder.\n\n\"So what kind of watch are we looking for?\" she asks as you both head toward the department store entrance. The automatic doors slide open and you're hit with that familiar blast of air conditioning and the faint smell of popcorn from the food court. The store is surprisingly quiet—only a handful of people browsing the aisles. A tired-looking employee is restocking shelves near the entrance, and you can see the jewelry and watch section toward the back corner, past the clothing racks and home goods.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Lets get this thing over with, then we can just hang out after. I’ll walk to the watch section."
+    },
+    {
+      "role": "assistant",
+      "content": "You head straight for the watch section with Emma following behind. The display case has maybe twenty different watches ranging from cheap digital ones for $30 to some fancier brands that are way out of your budget. A sales associate—her name tag says \"Linda\"—is organizing something behind the counter. She looks up and gives you a polite smile. \"Let me know if you need help with anything.\"\n\nYou scan the options. There's a solid Timex with a metal band for $89 that looks pretty indestructible, exactly the kind of thing your dad would wear. Next to it is a Casio with all sorts of features—stopwatch, alarm, backlight—for $65. That one's cheaper and he might actually use those features on job sites. Emma leans over your shoulder. \"What about that one?\" She points to a black G-Shock for $120. \"My uncle has one and he says it's basically indestructible. He's dropped it off a roof.\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Thst sounds like the one dad would need! I’ll get that. There’s no poknt if he breaks the new one too, and ghen walks around without one for months again!"
+    },
+    {
+      "role": "assistant",
+      "content": "\"That's perfect!\" you say, pointing at the G-Shock. \"There's no point if he breaks the new one too, and then walks around without one for months again!\" You signal to Linda, who comes over and unlocks the display case. She pulls out the watch and sets it on the counter so you can get a better look. It's hefty, with a thick rubber strap and a face that looks like it could survive a nuclear blast. Definitely dad-proof.\n\nLinda rings it up and you hand over the cash from your wallet. $120 even, plus tax brings it to $129.60. You've still got over a hundred bucks left. She puts the watch in a small box and slides it into a bag. \"Does he need batteries or anything?\" she asks. You shake your head—it's good to go. Emma's already wandering toward the exit, texting on her phone. \"Food court?\" she calls back. \"I'm starving and my mom gave me money for lunch.\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Sounds good. Kinda funny how she didn’t want you to go at all, but then still gave you money for lunch!"
+    },
+    {
+      "role": "assistant",
+      "content": "You catch up to Emma, laughing. \"Kinda funny how she didn't want you to go at all, but then still gave you money for lunch!\" Emma shrugs with a grin. \"Yeah, she's weird like that. All worried about germs but also feels guilty if I don't eat properly.\" You both head toward the food court, which is even emptier than the store. Usually on a Saturday it's packed with families and teenagers, but today there's maybe ten people scattered across the tables.\n\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Damn, she’s not the only one worried. I don’t think I’ve ever seen it this empty before!\n\nDon’t have to wait in line then."
+    },
+    {
+      "role": "assistant",
+      "content": "\"Damn, she's not the only one worried,\" you say, looking around at the nearly empty food court. \"I don't think I've ever seen it this empty before!\" There are only two places open—the pizza joint and a Chinese food spot. The burger place and the taco stand have their shutters pulled down, which is weird for a Saturday.\n\nEmma doesn't seem bothered. \"No line though! What do you want? I'm thinking orange chicken.\" You walk up to the counter together. The guy working the Chinese place looks bored, leaning against the register and watching something on his phone. When you approach, he straightens up. \"What can I get you?\" he asks in a monotone voice. The steam tables are full of food that looks like it's been sitting there a while.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Sure, lets get the same thing. Then at least if it’s terrible we can both relate. I look at the food  dubiously."
+    },
+    {
+      "role": "assistant",
+      "content": "\"Yeah, I'll get the same,\" you say, eyeing the orange chicken dubiously. It looks okay, but the glaze has that weird congealed shine that food gets when it's been under a heat lamp too long. The guy scoops two portions onto plates with fried rice and hands them over. Emma pays with the cash her mom gave her, and you both grab drinks from the fountain before finding a table near the window.\n\nYou poke at the chicken with your fork. It's not terrible, just... not great. Emma takes a bite and makes a face. \"Okay, yeah, this is definitely been sitting there since breakfast.\" She laughs and takes another bite anyway. Outside the window, you can see the parking lot is only about a quarter full. A security guard walks past, talking into his radio. Your phone buzzes—it's a text from your dad: \"How's your Saturday going? Don't forget to eat lunch.\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Text back. Eating lunch right now! Think you’ll be home on time today? (No pressure)"
+    },
+    {
+      "role": "assistant",
+      "content": "You text back: \"Eating lunch right now! Think you'll be home on time today? (No pressure)\" and set your phone down. Emma is scrolling through her social media feed while eating, occasionally showing you funny videos. Your dad responds almost immediately: \"Should be. Boss is talking about maybe letting us go early actually. Not much happening on site today. A bunch of guys called in sick.\"\n\nEmma looks up from her phone. \"Oh weird, Sarah Martinez from our English class just posted that her whole family is sick. Like, all of them at once.\" She shows you the post—it's a selfie of Sarah looking miserable in bed with the caption \"whole fam down with the worst flu ever, send help.\" You remember seeing a few empty desks in class yesterday, more than usual. Emma scrolls further. \"Okay this is creepy. Like half my feed is people talking about being sick or their parents keeping them home.\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "That would explain why it’s so empty here. Doesn’t it seem sudden though? A week ago nobody was sick."
+    },
+    {
+      "role": "assistant",
+      "content": "\"That would explain why it's so empty here,\" you say, glancing around the food court again. \"Doesn't it seem sudden though? A week ago nobody was sick.\" You think back to school on Friday—there were definitely some empty desks, but nothing crazy. Now Emma's feed is blowing up with people talking about it.\n\nEmma nods slowly, her expression shifting from amused to concerned. \"Yeah, that is weird. My mom was reading something this morning about hospitals in Boston being totally overwhelmed. She said they're running out of beds.\" She puts her phone down and pushes her orange chicken around on her plate. \"Maybe she wasn't being completely paranoid.\" The security guard walks past the window again, this time talking more urgently into his radio. Through the glass, you can see him gesturing toward the parking lot entrance.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Ok, maybe we better just take a hint and make for home too? I don’t want to spend the next five days in bed feeling horrible."
+    },
+    {
+      "role": "assistant",
+      "content": "\"Ok, maybe we better just take a hint and make for home too?\" you say, standing up and grabbing your tray. \"I don't want to spend the next five days in bed feeling horrible.\" Emma nods in agreement, tossing her half-eaten lunch in the trash. You both head toward the exit, and the automatic doors slide open to let you out into the parking lot.\n\nOutside, the afternoon sun is bright and warm. Your bike is still locked up where you left it. Emma pulls out her phone to text her mom for a ride, then pauses. \"Actually, my house is only like ten minutes away. I'll just walk. You good to bike home?\" You nod, unlocking your bike and slinging your backpack over your shoulders. The bag with your dad's watch is safely tucked inside. Emma waves and starts walking toward the street. The parking lot feels weirdly quiet—just a few scattered cars and that security guard still talking into his radio near the entrance.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Whatever. Today is weird apparently. I just bike home and flop down on the sofa."
+    },
+    {
+      "role": "assistant",
+      "content": "You hop on your bike and start pedaling home, glad to be away from the weird empty mall. The ride back feels longer than usual—the streets are quiet, and you pass a couple of houses with cars in the driveway but no one outside. When you finally get home, you dump your bike in the garage, kick off your shoes, and flop down on the living room sofa with your backpack still on.\n\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Run up the stairs to my room, grab a book. Then pick up my headphones and put my favorite rock band “The Bash” on. Lie down on the sofa downstairs and just read."
+    },
+    {
+      "role": "assistant",
+      "content": "You drag yourself off the sofa and run upstairs to grab your current read—a fantasy novel you've been working through all week—and your headphones. You queue up The Bash's latest album and hit play, the familiar guitar riffs filling your ears as you head back downstairs. You sprawl out on the sofa, cracking open your book to where you left off.\n\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Not much. Apparently I fell asleep at some point because I wake up to my dad telling me to scoot over. He really was home on time today!"
+    },
+    {
+      "role": "assistant",
+      "content": "You blink awake, disoriented. Your headphones are askew and your book has fallen onto the floor. Your dad is standing over you, still in his work clothes with concrete dust on his boots. \"Scoot over, kiddo,\" he says with a tired smile. \"Long day.\" You glance at the clock on the wall—it's only 4:30. He really did get home early.\n\nYou shift over and he drops onto the other end of the couch with a heavy sigh, reaching for the TV remote. He looks exhausted, more than usual. \"They sent us all home around noon,\" he says, flipping through channels. \"Half the crew didn't show up, and the ones who did looked like death warmed over. Boss said to just call it a day.\" He settles on the news. A reporter is standing outside a hospital, and the chyron at the bottom reads \"HOSPITALS REPORTING SURGE IN RESPIRATORY CASES.\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Ugh, can you put on literally anything else? The whole day has been sick people. Also, I got something for you!\n\nHe jokes it’s broken already, then when he asks how I afforded this, I’ll joke it’s all drug money."
+    },
+    {
+      "role": "assistant",
+      "content": "\"Ugh, can you put on literally anything else?\" you groan, sitting up properly. \"The whole day has been sick people. Also, I got something for you!\" You grab your backpack from where it fell on the floor and pull out the bag with the watch box inside.\n\nYour dad takes it, eyebrows raised. \"What's this? My watch broke already?\" He opens the box and his expression shifts to genuine surprise when he sees the G-Shock. \"Sarah, this is... this is really nice. How'd you afford this?\" He turns it over in his hands, clearly impressed. You grin. \"All drug money, obviously.\" He laughs and shakes his head, then pulls you into a one-armed hug. \"Thank you, kid. Really. This is perfect.\" He immediately takes off his broken watch and straps on the new one, adjusting the band. The TV is still on the news in the background, now showing footage of long lines outside pharmacies.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Just settle in next to dad to watch TV. Hopefully he’ll put something different on water when he sees it’s all the same."
+    },
+    {
+      "role": "assistant",
+      "content": "You settle in next to your dad, leaning against his shoulder. He's still admiring the watch on his wrist, turning it to catch the light. \"Seriously, this is great,\" he says. \"Indestructible, huh? We'll see about that.\" He finally looks back at the TV and frowns. He flips through a few channels—every news station seems to be covering the same story. Hospitals overwhelmed, CDC issuing statements, people being urged to stay home. He tries a sports channel, but even that cuts to a news update about games being postponed due to player illnesses.\n\n\"Alright, enough of this,\" he mutters, switching over to a streaming service. He puts on some cooking competition show you've both watched before. The familiar theme music plays and you feel yourself relaxing a bit. Your dad stretches his legs out and props his boots on the coffee table. Outside, the late afternoon sun casts long shadows across the front yard. It's quiet except for the TV.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "At some point I fall asleep again. Then wake up a bit when he picks me up to carry me to bed. I’m really too old for that in sixth grade, but he’s strong, and it’s nice, so I close my eyes again and let him. I don’t even notice when he puts me down on the bed. But I awake nearly at midnight."
+    },
+    {
+      "role": "assistant",
+      "content": "You drift off at some point during the show, the voices and kitchen sounds blending into background noise. You're vaguely aware of your dad turning off the TV, then feel yourself being lifted. You're definitely too old for this—sixth grade and all—but he's strong from construction work, and honestly it's nice. You keep your eyes closed and let yourself be carried upstairs, barely registering when he sets you down on your bed and pulls the blanket over you.\n\nWhen you wake up, your room is dark except for the glow of your alarm clock: 11:47 PM. You're still in your clothes from earlier, lying on top of your covers. The house is quiet, but not the usual quiet—there's something else. Then you hear it: sirens outside, multiple ones, getting louder then fading away. Then more sirens. Your mouth is dry and you need water.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "I stand up, shuffle out of the room, still half asleep. Accidentally step into the bathroom across the hall before I remember I’m looking for dad.\n\nHe’s not in his bedroom, but the TV is turned on. Some news report about a people having to get away because of a gas leak? Then there’s an explosion in the image and the broadcast cuts out.\n\nStill no sign or sound of dad."
+    },
+    {
+      "role": "assistant",
+      "content": "You stand up and shuffle out of your room, still half asleep. You accidentally push open the bathroom door before remembering you're looking for your dad, not water. You backtrack and head to his bedroom. The door is open and the TV is on, casting flickering light across the empty bed. On screen, a shaky news broadcast shows people running, a reporter shouting something about evacuating. Then there's a massive explosion—bright orange flames filling the frame—and the feed cuts to static.\n\nYour dad's not in his room. The bed is made, like he never went to sleep. Another siren wails past outside, closer this time. You can hear it even through the closed windows.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "I turn back to the door. He must still be downstairs, when the night sky lights up through the window. A second later another flash follows, and while I’m turning around to look, two dull explosions sound in quick succession. Clouds of fire roil up into the night sky, somewhere down in the city, but far too close for comfort."
+    },
+    {
+      "role": "assistant",
+      "content": "You turn back toward the door to head downstairs when the night sky outside the window suddenly lights up in a brilliant orange glow. A second later, another flash follows. You spin around to look just as two dull explosions boom in quick succession, deep enough that you feel them in your chest. Massive clouds of fire roil up into the night sky, somewhere down in the city—maybe five or six miles away, but far too close for comfort.\n\nThe TV static behind you suddenly cuts back to a different news anchor, looking disheveled and terrified. \"—repeat, residents of downtown are urged to evacuate immediately—\" More sirens outside. You can hear them layering over each other now, a constant wail.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Dad?! I turn back around, half in tears now. Where is dad? I stumble down the stairs. He’s not in the living, not in the kitchen. His office then? (He’s not there either)"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Dad?!\" you call out, your voice cracking. You're half in tears now as you stumble down the stairs, gripping the railing. The living room is empty, the TV still showing that cooking show from earlier, muted. You rush into the kitchen—nothing. His coffee mug from this morning is still in the sink. \n\nYou run to his office, the small room he converted from the downstairs closet. The door is open. His desk lamp is on, papers scattered across the surface, but no dad. The window shows more orange light flickering in the distance. Another siren screams past, so close it sounds like it's right in front of the house.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Stare around wildly. Where did he go? Then suddenly dad slides open the veranda door, and comes stumbling into the house, saying something about the neighbor being sick.\n\nThen he opens the drawer in his desk, pulls out his gun case, and starts assembling it…\n\nDad, is everything ok?…"
+    },
+    {
+      "role": "assistant",
+      "content": "You stare around wildly, panic rising in your chest. Where did he go? Then suddenly the sliding glass door to the veranda scrapes open and your dad stumbles inside, breathing hard. \"The Hendersons next door—Jim's sick, real sick. His wife called me over and—\" He stops mid-sentence, seeming to notice you for the first time. \"Sarah, what are you doing up?\"\n\nHe doesn't wait for an answer. He strides past you into his office, pulls open the bottom drawer of his desk, and takes out his gun case. You watch, frozen, as he opens it and starts assembling the pistol with practiced movements—magazine, chamber check, safety. His hands are shaking slightly.\n\n\"Dad, is everything okay?\" you ask, your voice small.\n\nHe looks up at you, and his expression makes your stomach drop. \"I don't know, kiddo. I honestly don't know.\" Another explosion booms in the distance, this one further away. The TV in the living room suddenly cuts from the cooking show to an emergency broadcast signal.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Jump back behind dad when Jim suddenly crashes into the veranda door, looking half dead and dragging bloody streaks over the window. He smashes the window harder, and harder.\n\nAnd then he dives through, shattering the glass completely. Dad steps between us, and tells him to stay back. But Jim is like a rabid animal. And dad fires."
+    },
+    {
+      "role": "assistant",
+      "content": "You jump back behind your dad just as something crashes against the veranda door. It's Jim Henderson from next door—but he doesn't look like Jim anymore. His face is deathly pale, his eyes unfocused and wild. Blood streaks down his shirt and smears across the glass as he slams against it again. And again. Each impact harder than the last.\n\nThen he throws himself through the glass. It shatters inward in an explosion of shards. Jim stumbles into the office, glass crunching under his feet, making a horrible wet gurgling sound. Your dad steps between you and Jim, raising the gun. \"Jim! Stay back! Jim, I'm warning you!\"\n\nBut Jim doesn't stop. He lunges forward like a rabid animal, arms outstretched, that terrible sound still coming from his throat. The gunshot is deafening in the small room. Jim drops.\n\nYour ears are ringing. Your dad is breathing hard, the gun still pointed at Jim's motionless body on the floor. Glass is everywhere. Cold night air pours in through the shattered door. Outside, more sirens, more distant screams.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Stare at Jim in disbelief and despair. Then back to dad.\n\nYou shot him…\n\nThen there’s the noise of a car arriving in the driveway. And dad says uncle is here."
+    },
+    {
+      "role": "assistant",
+      "content": "You stare at Jim's body sprawled on the floor, glass glittering around him in the lamplight. Blood pools beneath him. Your mind can't process what you just saw. You look back at your dad, tears streaming down your face now.\n\n\"You shot him...\" you whisper.\n\nYour dad doesn't respond. He's staring at Jim too, his chest heaving. Then headlights sweep across the front of the house. Tires screech in the driveway. A car door slams. Your dad's head snaps toward the sound and some of the tension leaves his shoulders. \"That's your uncle,\" he says, his voice hoarse. He doesn't lower the gun though, not yet. Outside, you hear footsteps running toward the front door, then pounding. \"Tommy! Open up!\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Follow dad when he leads me away. Still in shock. Tommy says something about the highway being safe.\n\nDad tells me to get into the car. I sit in the back, staring at all the police cars racing by at full speed.\n\nTommy asks me if I’m ok, and I look at him blankly. “Fine…” i almost whisper."
+    },
+    {
+      "role": "assistant",
+      "content": "You follow your dad in a daze as he grabs your arm and leads you through the house, stepping around Jim's body. Your uncle Tommy bursts through the front door—tall, usually smiling, but now looking as terrified as you feel. \"Highway's still clear heading north,\" he says quickly. \"We need to go NOW.\"\n\nYour dad doesn't argue. \"Sarah, get in the car. Now.\" His voice is firm but not angry. You stumble out the front door and into the backseat of Tommy's truck. The engine is still running. Through the window, you watch police cars racing past on the street, their sirens wailing, going so fast they're just streaks of red and blue light.\n\nTommy twists around in the driver's seat to look at you. \"You okay, kiddo?\" His face is pale in the dashboard lights.\n\nYou look at him blankly, your voice barely a whisper. \"Fine...\"\n\nYour dad climbs into the passenger seat, still holding the gun. He's saying something to Tommy about getting out of the city, about the explosions. The truck lurches backward out of the driveway.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Look around in shock. We drice past houses with people panicked and packing everywhere. Drive past a car that plowed straight into a tree, smoke still coming out the engine.\n\nThen we drive past the Wilkinson farm, and it’s completely alight. Tommy says he hopes the old man made it out. Dad says he can’t imagine anything else."
+    },
+    {
+      "role": "assistant",
+      "content": "You press your face against the window, watching the neighborhood blur past. Houses have their doors flung open, people running to their cars with suitcases and children. Mrs. Patterson is screaming at her husband to hurry up. A car has plowed straight into a tree two blocks down, smoke pouring from under the crumpled hood. No one is helping. Everyone is just running.\n\nTommy takes a sharp turn onto the county road heading north. The Wilkinson farm appears on the right—the old barn is completely engulfed in flames, fire climbing into the night sky. The main house too. Everything is burning.\n\n\"Jesus,\" Tommy mutters. \"I hope old man Wilkinson made it out.\"\n\nYour dad stares at the inferno as you drive past. \"Can't imagine anything else,\" he says quietly, but his voice doesn't sound convincing.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Wait, and stare. When we turn into the main access road to the highway there’s whole lines of cars in front of us. Dad tells Tommy to go around, when suddenly some man, or woman comes running into the street covered in blood, and begins hammering the car in front of us. The man that steps out is immediately jumped, and then she bites him. Just takes a huge chunk out.\n\nDrive! Dad roars at Tommy, who is just as paralyzed as I am."
+    },
+    {
+      "role": "assistant",
+      "content": "You wait in silence, staring out at the darkness beyond the flames. When Tommy turns onto the main access road to the highway, there are whole lines of cars ahead—bumper to bumper, brake lights stretching into the distance like a river of red.\n\n\"Go around,\" your dad says urgently. \"Use the shoulder.\"\n\nTommy starts to pull right when suddenly a figure comes running out between the cars—covered in blood, moving with that same jerky, wrong movement Jim had. It's a woman, or used to be. She slams into the car directly in front of you, hammering on the window with both fists. The driver's door opens and a man steps out, probably trying to help or tell her to stop.\n\nShe jumps on him immediately. Her head snaps down and she bites—just tears a huge chunk out of his neck. Blood sprays across the pavement.\n\n\"DRIVE!\" your dad roars at Tommy, who's frozen, hands locked on the wheel, staring at the scene. \"TOMMY, DRIVE!\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Tommy backs up, turns around, and races into the city. Says something about cutting through that passes by me. There’s so many people fleeing everywhere.\n\nWe get stuck between a huge crowd of people swarming all around us, and dad tells Tommy to drive again. Tommy looks at dad, and tells he he can’t! They’re both in front and behind."
+    },
+    {
+      "role": "assistant",
+      "content": "Tommy slams the truck into reverse, tires squealing as he backs up and swings around. He floors it back toward the city. \"We can cut through downtown, take the back roads to the other highway,\" he's saying, but his words wash over you like water. You can barely process anything.\n\nThe streets are chaos. People are running everywhere—some toward their cars, some just running. A woman sprints past carrying a screaming toddler. A man is trying to board up his storefront while someone else smashes his window from the inside.\n\nTommy turns down a side street and suddenly you're surrounded. A massive crowd of people surges around the truck from both directions, fleeing from something. Hands slap against the windows. Someone pounds on the hood. The truck slows to a crawl, hemmed in on all sides.\n\n\"Drive!\" your dad shouts.\n\nTommy stares at him, then at the people pressed against the windshield. \"I can't! They're in front! They're behind!\"\n\nThe crowd keeps growing, people shoving and screaming. The truck rocks slightly from the press of bodies.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Eventually the stream stops, and Tommy maneuvers us around a huge bus parked in the middle of the street. We barely swing by two stragglers that have to jump out of the way.\n\nThen I look towards the other side of our car, see the headlights. Start shouting “Look ou…” *crash*"
+    },
+    {
+      "role": "assistant",
+      "content": "Eventually the stream of people thins out and stops. Tommy guns the engine and maneuvers around a huge bus parked diagonally in the middle of the street. You barely swing past two stragglers who have to dive out of the way. \n\nThen you look toward the other side of the truck and see headlights—bright, close, coming fast. \"Look ou—\"\n\nThe impact is massive. Metal screams. Glass explodes inward. Your whole body jerks violently against the seatbelt as the truck spins. Your head slams against something hard. Everything tilts wrong. There's a final grinding crunch as the truck comes to rest.\n\nYour ears are ringing. Smoke or steam is pouring from somewhere. The windshield is a spiderweb of cracks. You taste blood in your mouth. Tommy is slumped over the steering wheel, not moving. Your dad is groaning, trying to unbuckle his seatbelt with shaking hands.\n\nOutside, you hear screaming. Running footsteps. And underneath it all, that awful gurgling sound. More than one this time. Many more.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "I shake dad. Dad? He focuses on me, then tells me to sit tight. My leg hurts something fierce. Then he kicks the front window a few times, until the glass shatters, and he crawls out. This wakes uncle tommy too, and I sigh in relief."
+    },
+    {
+      "role": "assistant",
+      "content": "You shake your dad's shoulder. \"Dad?\" Your voice comes out thin and scared.\n\nHe turns to look at you, blinking hard like he's trying to focus. Blood is trickling down from a cut on his forehead. \"Sit tight, kiddo. Just sit tight.\" His voice is strained. He braces against the dashboard and kicks at the shattered windshield—once, twice, three times. The safety glass finally gives way and he crawls through onto the crumpled hood.\n\nThe movement jostles the truck and Tommy jerks awake with a gasp, lifting his head from the steering wheel. There's blood on his temple but his eyes are open. You feel a wave of relief wash over you.\n\n\"Tommy...\" he mutters, disoriented. Outside the truck, your dad has dropped to the pavement. You can see him through the broken windshield, getting to his feet, looking around. The gurgling sounds are getting closer. Your leg is throbbing—you look down and see your jeans are torn and there's blood, but you're not sure how bad it is.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Dad turns back and reaches for me, tells me to crawl out. I try to, but my leg doesn’t want to. It hurts. Broken or twisted, I’m not sure. But eventually I make it out.\n\nTommy has made his way out on his own side. Dad asks me how bad it is. Can I walk?\n\nI look at my leg and grimace. Pretty bad. I don’t think so."
+    },
+    {
+      "role": "assistant",
+      "content": "Your dad turns back and reaches through the broken windshield. \"Come on, Sarah. Crawl out to me.\" \n\nYou try to move but your leg screams in protest. Broken or twisted, you can't tell—it just hurts. You grit your teeth and drag yourself forward anyway, using your arms. Glass cuts into your palms. Your dad grabs your shoulders and helps pull you through, lifting you down onto the street. Tommy has made it out on his own side, leaning heavily against the truck.\n\nYour dad crouches down to look at your leg, his hands gentle but urgent. \"How bad is it? Can you walk?\"\n\nYou look down at your leg—the jeans are torn and soaked with blood. When you try to put weight on it, white-hot pain shoots up to your hip. You grimace and shake your head. \"Pretty bad. I don't think so.\"\n\nYour dad's jaw tightens. The gurgling sounds are definitely closer now—you can hear them coming from multiple directions. Tommy rounds the front of the truck, limping but mobile. In the distance, more screams. More sirens. The orange glow of fires reflects off the buildings around you.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "I look at dad. Then dad seems to come to a decision, and hands his revolver to Tommy. Tells him to keep us safe!\n\nThen he lifts me up just like this evening, which seems like a lifetime ago now. And they set off into the city."
+    },
+    {
+      "role": "assistant",
+      "content": "You look up at your dad, fear written all over your face. He seems to come to a decision. He pulls the revolver from his waistband and hands it to Tommy. \"Keep us safe,\" he says, his voice steady despite everything.\n\nThen he bends down and lifts you up in his arms, just like he did this evening—which feels like a lifetime ago now. You wrap your arms around his neck, trying not to cry out when the movement jostles your leg. Tommy falls in beside you both, the gun held low but ready.\n\nThey set off into the city at a fast walk, your dad breathing hard with your weight. The street is littered with abandoned cars, broken glass, scattered belongings. A fire hydrant somewhere is spraying water into the air. You pass a storefront with its windows smashed in, the alarm still blaring uselessly. The gurgling sounds echo off the buildings behind you, impossible to pinpoint exactly where they're coming from. Tommy keeps looking back over his shoulder.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Hold on to dad for dear life, as he walks steadily foward through the streets. We’re still surrounded by other fleeing people. Moving the same way we are. The we turn a corner, and the street is a battlefield. People, or what remains of them, sitting on top of others and tearing into them. Sometimes the targets are dead, other times… not yet.\n\nDad and Tommy weave between them. Somehow the attention of the things is focused mostly on their meals. But the fewer people there are, the more they follow us."
+    },
+    {
+      "role": "assistant",
+      "content": "You hold onto your dad for dear life as he walks steadily forward. Other people are still fleeing alongside you—running, stumbling, helping each other. Safety in numbers. Then you turn a corner and the street becomes a battlefield.\n\nBodies everywhere. Some of them are dead, torn apart. Others aren't dead yet—they're screaming, thrashing, while those things sit on top of them and tear into their flesh with teeth and hands. The gurgling, wet sounds are overwhelming. Your dad's grip on you tightens. \"Don't look,\" he whispers, but you can't close your eyes.\n\nYour dad and Tommy weave between the horrors, moving as fast as they can without drawing attention. Most of the infected are focused on their victims, too absorbed in their feeding to notice you passing. But as the crowd of fleeing people thins out—as fewer and fewer living people surround you—more of those pale, blood-smeared faces start to turn in your direction.\n\nOne of them lifts its head from a body, gore dripping from its mouth. It looks right at you. Then it stands up.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Whisper to dad. Dad, they’re coming! Dad says he knows."
+    },
+    {
+      "role": "assistant",
+      "content": "\"Dad, they're coming!\" you whisper urgently, watching more of them turn toward you.\n\n\"I know,\" your dad says through gritted teeth. He's moving faster now, his breathing labored. Tommy is right beside you, the gun raised. Two of the infected break away from their victims and start shambling toward you—then three more. Their movements are jerky but getting faster.\n\nYour dad breaks into an awkward jog, trying not to jostle your injured leg too much but needing the speed. Tommy fires twice—the gunshots are deafening. One of the infected drops. The others keep coming. You can see an alley up ahead on the right, and beyond it what looks like a clearer street. But the infected are closing the distance, drawn by the noise, by movement, by you.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Tommy runs up to some sort of cafe? i’m not sure. It has a sturdy wood door, and runs inside, tells dad to come here!\n\nWe run in moments later, but when tommy slams the door, the creatures were too close, and their arms are stuck in the door. Tommy can’t close it."
+    },
+    {
+      "role": "assistant",
+      "content": "Tommy spots some kind of cafe or restaurant ahead and sprints toward it. The door is heavy wood with a metal frame. He yanks it open and disappears inside. \"Here! In here!\" he shouts.\n\nYour dad runs in moments later, his arms burning with your weight. But when Tommy tries to slam the door behind you, the infected were too close. Three pale arms thrust through the gap, clawing and grasping. The door won't close. Tommy leans his full weight against it, pushing, but the arms keep forcing their way in. One hand grabs the edge of the doorframe. The gurgling sounds grow louder as more bodies press against the other side.\n\n\"I can't close it!\" Tommy yells. Your dad sets you down quickly against the wall inside, your injured leg screaming as it touches the ground. He moves to help Tommy push the door, but the infected are stronger than they should be, driven by something inhuman. The wooden door shudders with each impact from outside. You can see pale, blood-streaked faces through the gap, eyes wild and unseeing.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Tommy shouts at dad to keep going. Get to the highway! He’ll catch up. Dad looks at Tommy as if he’s crazy, but then he looks at me, and something seems to harden in him. He picks me up again and sets off. Leaving Tommy behind. \n\nI cry, we can’t leave uncle tommy behind! But dad stumbles on through the building and back out into the night. And there, just a hundred yards away, on an embankment, the highway."
+    },
+    {
+      "role": "assistant",
+      "content": "Tommy braces his shoulder against the door, the gun still in his hand. \"Keep going! Get to the highway!\" he shouts at your dad. \"I'll catch up!\"\n\nYour dad stares at him like he's lost his mind. Then he looks down at you, and something in his expression changes—becomes harder, more resolved. He bends down and lifts you back into his arms.\n\n\"No! We can't leave Uncle Tommy behind!\" you cry out, reaching back toward the door. But your dad is already moving, carrying you deeper into the building. You can hear Tommy shouting behind you, another gunshot, the sound of wood splintering. Your dad stumbles through what looks like a kitchen, then crashes through a back exit into an alley.\n\nAnd there, just a hundred yards away up on an embankment, you can see it—the highway. Elevated, lit by streetlights, with cars streaming north. Your dad breaks into a run, his breath coming in ragged gasps. Your leg bounces with each step and you bite back screams.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Try not to cry, but right next to our path one of those things is sitting, eating a corpse. And it follows. Dad has to walk up the slope, and carry me, and it’s too much. Another one comes out of nowhere, and now there’s two behind us. Catching up.\n\nThe first is reaching for dad’s back, when its head and body suddenly snap backwards, the second following soon after.\n\nThere, on the embankment, stands a soldier with a smoking rifle, but he doesn’t look friendly. Tells us to stay back."
+    },
+    {
+      "role": "assistant",
+      "content": "You try not to cry but right next to your path one of those things is crouched over a body, tearing into it. Its head snaps up at the sound of your dad's footsteps. It stands and follows.\n\nYour dad starts up the slope toward the highway, his legs shaking with exhaustion and your weight. It's too much. He's slowing down. Another infected emerges from behind an abandoned car—now there are two of them behind you, their gurgling getting louder, closer. Your dad is gasping for air, stumbling.\n\nThe first one reaches out, its fingers inches from your dad's back—\n\nTwo sharp cracks echo out. The infected's head snaps backward and it drops. The second one falls a moment later.\n\nYou look up. On the embankment above stands a soldier in full combat gear, rifle still raised, smoke curling from the barrel. But he doesn't lower the weapon. He's pointing it at you and your dad now. \"Stay back!\" he shouts. \"Don't come any closer!\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Dad looks like he can’t believe what he’s hearing. They’re not infected! She has a child! He should let them through already.\n\nThe soldier looks conflicted, and radios what appears to be his commander. We catch only fragments, but it doesn’t sound good. But sir! There’s a child?! Eventually the soldier accepts whatever he’s hearing though, yes sir, he says, but it sounds heavy. And his face is ful of regret as he raises the rifle again."
+    },
+    {
+      "role": "assistant",
+      "content": "Your dad can't believe what he's hearing. \"We're not infected!\" he shouts up at the soldier. \"She has a child! Let us through already!\"\n\nThe soldier's face twists with conflict. He keeps the rifle trained on you but reaches for his radio with his other hand. \"Command, I've got two civilians, one adult male, one juvenile female injured. Requesting permission to—\" Static crackles. You can only catch fragments of the response. \"—no exceptions—\" \"—quarantine protocol—\" \"—orders are clear—\"\n\n\"But sir! There's a child!\" the soldier says into the radio, his voice breaking slightly. More static. A voice on the other end, firm and unyielding. The soldier's shoulders sag. \"Yes sir,\" he says quietly. The word sounds heavy, final.\n\nHe lowers the radio and raises the rifle again, his hands steady but his face full of regret. He's aiming at your dad's chest.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Dad sees it a moment before I realize what is going to happen. A slight twitch in the way he holds that rifle, some tell of the eyes. But he suddenly shouts “Noo!” And swings his body around to protect me as another burst of gunfire erupts. A pain unlike anything I’ve ever felt erupts in my stomach, and I fall to the floor. \n\nDad fell too, somehow unscratched, but the soldier walks up to him and points his rifle at his head. I’d shout, but numbness is already spreading"
+    },
+    {
+      "role": "assistant",
+      "content": "Your dad sees it a moment before you do—some slight twitch in the way the soldier holds the rifle, some tell in his eyes. \"Nooo!\" your dad shouts, and he suddenly swings his body around, turning to shield you with his back.\n\nThe gunfire erupts. Three shots, maybe four. A pain unlike anything you've ever felt explodes in your stomach and you fall, hitting the ground hard. Your dad falls too, rolling off to the side—somehow he's unscratched, the bullets passed right through you to him. Or maybe they missed him entirely when he turned.\n\nThe soldier walks up, his boots crunching on gravel. He points his rifle down at your dad's head. You try to shout, to do something, but numbness is already spreading from your stomach outward. Your dad is looking at you, not at the gun. His face is twisted in agony. \"Sarah,\" he's saying, but it sounds far away. \"Sarah, no, please—\"\n\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "I’m gasping in pain… dad. Then the soldier stops, and is suddenly falling over, a gunshot ringing out. Then Tommy coming "
+    },
+    {
+      "role": "assistant",
+      "content": "You're gasping, each breath sending fire through your stomach. \"Dad...\" you manage to whisper. Blood is spreading across your shirt, warm and wet.\n\nThe soldier suddenly jerks and falls over sideways, a gunshot ringing out from somewhere behind you. His rifle clatters to the ground. Then Tommy is there, limping badly, his shirt torn and bloody, the revolver smoking in his hand. \"No, no, no,\" he's saying as he drops to his knees beside you and your dad.\n\nYour dad crawls over to you, his hands hovering over the wound but afraid to touch it. \"Sarah, stay with me. Stay with me, baby.\" His voice is breaking. Tommy is saying something about getting help, about finding a medic, but his words sound hollow. The numbness is spreading faster now, creeping up toward your chest. The pain is fading into something cold. You can see more soldiers on the highway above, shouting, pointing. Your dad's face is right above yours, and he's crying.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Cry. I’m not really sure what is happening. But dad is telling me to stay with him, so I do. Until I don’t, and everything turns black.\n\nOoc: Ok, so much for the canon events. Does she actually survive?"
+    },
+    {
+      "role": "assistant",
+      "content": "You cry, tears mixing with the blood and dirt on your face. Everything is confused—voices, lights, the sound of more gunfire in the distance. But dad is right there, his hand holding yours, telling you to stay with him. So you try. You focus on his face, on the watch you bought him still strapped to his wrist.\n\nBut the cold keeps spreading. The numbness swallows the pain, then swallows everything else. Your dad's voice gets quieter, farther away, even though you can see his mouth still moving. The lights from the highway blur into stars.\n\nThen everything turns black.\n\n---\n\n**OOC:** In the original Last of Us prologue, Sarah dies from her gunshot wound despite Joel and Tommy's efforts. The game begins with her death as the inciting incident that shapes Joel's character for the next twenty years.\n\nHowever, this is your story. If you want Sarah to survive against the odds—maybe Tommy gets her to a field medic, maybe the bullet missed vital organs, maybe they find help—we can absolutely continue from there. It would create a very different story than the canon version.\n\nDo you want Sarah to survive this, or should we honor the tragic original ending?"
+    },
+    {
+      "role": "user",
+      "content": "The thing is, I thought it was really sad, since they absolutely stuffed those two rooms of the house you see full of stuff. Of course the original is fantastic, but this is a what if scenario, and it doesn’t quite work if the protagonist dies. So what is the most likely way she is saved? Some field medic with moral compunctions about shooting a child (probably technically insubordination, but in this situation, who cares)"
+    },
+    {
+      "role": "assistant",
+      "content": "**OOC:** You're absolutely right - they did pack those opening sections with environmental storytelling and character development, which makes the tragedy hit harder. For a survival scenario, here's the most plausible path:\n\nA field medic or National Guard member with medical training who is horrified by what just happened could disobey orders and stabilize Sarah. The wound would need to have missed major arteries (incredibly lucky given abdominal gunshots). In the chaos of the initial outbreak, with command structure breaking down and soldiers questioning orders to shoot civilians, one person acting on conscience is believable. They'd have minutes at most before more soldiers arrive or the position is overrun.\n\nSarah would survive but be critically injured - she'd need serious medical attention soon, be unable to walk, and the recovery would be long and difficult. This creates ongoing stakes and vulnerability.\n\nLet's continue from there.\n\n---\n\nThe darkness isn't complete. It's more like... floating. Distant voices. Pressure on your stomach that sends lightning bolts of pain through the numbness. Someone is shouting \"I'm not shooting a goddamn kid!\" and there are hands on you, doing something that hurts. Your dad's voice, closer: \"Please, please help her.\"\n\nYou force your eyes open. Everything is blurry. There's a young guy in fatigues kneeling over you with a medical kit, his hands covered in your blood. He's working fast, packing the wound. \"Entry and exit, missed the major vessels by maybe an inch,\" he's saying. \"She's lucky but she needs a hospital NOW.\" More shouting from above - someone ordering him to stand down. He ignores them.\n\nTommy and your dad are both hovering over you. The infected are still out there - you can hear them getting closer.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Sarah doesn’t do anything. She lies there and focuses on her dad’s face."
+    },
+    {
+      "role": "assistant",
+      "content": "You lie there, barely conscious, and focus on your dad's face. Everything else—the shouting, the medic's hands working on your stomach, the distant groans of the infected—it all blurs into background noise. Your dad's face is the only thing that's real. His eyes are red, tears streaming down his cheeks. He's holding your hand so tight it almost hurts, but the pain is distant, muffled.\n\n\"Stay with me, baby girl,\" he keeps saying. \"You stay with me.\"\n\nThe medic finishes packing the wound and wraps something tight around your middle. \"That's all I can do here. She needs surgery, proper facilities. The temporary FEMA station is maybe two miles north but I don't know if it's still standing.\" He looks up at the highway where more soldiers are gathering, some pointing rifles down at your position. \"You need to move. Now. They're going to open fire again in about thirty seconds.\"\n\nTommy still has the revolver. Your dad is looking between you and the medic, clearly trying to figure out how to carry you without making the bleeding worse.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Just reach out to dad. Whatever pain he puts me through by carrying me is undoubtedly better than getting shot again."
+    },
+    {
+      "role": "assistant",
+      "content": "You reach out weakly toward your dad with your free hand. He understands immediately—whatever pain comes from being carried is better than staying here and getting shot again. He looks at the medic. \"How do I—\"\n\n\"Support under her shoulders and knees, keep the torso as stable as possible,\" the medic says quickly, helping position your dad's arms. \"Don't jostle her if you can help it.\"\n\nYour dad lifts you as gently as he can, but even that sends white-hot agony through your abdomen. You gasp and bite down hard on your lip to keep from screaming. The medic grabs his kit and stands. \"There's a service tunnel under the highway about fifty yards east. Maintenance access. It'll get you away from the checkpoint.\"\n\nRifle bolts click above. Someone is shouting final warnings. Tommy fires twice up at the highway—not hitting anyone, just buying seconds. Your dad runs, hunched over you protectively. Each footfall jostles you and the pain is excruciating but you focus on his face, on breathing, on staying conscious. The medic runs alongside, one hand steadying the bandage on your stomach. Behind you, gunfire erupts—soldiers shooting at Tommy, who's running after you.\n\nYou reach the tunnel entrance, a dark concrete mouth in the embankment. Your dad doesn't slow down, plunging into the darkness.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Try not to scream. But I can’t help but whimper."
+    },
+    {
+      "role": "assistant",
+      "content": "You try not to scream but you can't help the whimpers that escape with each jarring step. The sound echoes in the concrete tunnel, mixing with your dad's ragged breathing and the slap of boots on pavement. The darkness swallows you whole—no lights, just the faint glow from the tunnel entrance behind getting smaller.\n\nYour dad's arms are shaking from exhaustion and adrenaline but he doesn't slow down. The medic is using his phone's flashlight to guide the way, the beam bouncing wildly. Behind you, more gunfire, then Tommy's voice shouting something you can't make out. Then his footsteps pounding into the tunnel after you.\n\nThe tunnel seems endless. Your stomach feels like it's on fire despite the numbness spreading through your limbs. You can feel wetness—blood seeping through the bandages. The medic notices too. \"We need to stop and repack that wound or she's going to bleed out before we get anywhere.\"\n\nYour dad keeps running. \"How much further to the other side?\"\n\n\"Maybe two hundred yards. But she needs—\"\n\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Gaps out a question if they’re coming after us?"
+    },
+    {
+      "role": "assistant",
+      "content": "You try to form words through the pain. \"Are they... coming after us?\" you gasp out.\n\nTommy catches up, breathing hard. \"I don't think so. Too busy with the infected breaking through from the south side. Whole perimeter's collapsing.\" He's limping worse than before, favoring his left leg.\n\nThe medic—you can see his name tape now in the phone light, Martinez—checks over his shoulder. \"They're not following. They've got bigger problems.\" He turns back to your dad. \"But she's still bleeding. I can see it soaking through. We stop now for two minutes or she doesn't make it another ten.\"\n\nYour dad's jaw clenches. You can feel his heart hammering against your side where he's holding you. The tunnel slopes upward ahead—you must be getting close to the other side. In the distance behind you, the sounds of chaos: screams, gunfire, explosions. The city is tearing itself apart.\n\nYour dad finally stops, dropping carefully to his knees and laying you down on the cold concrete as gently as he can. Even that sends fresh waves of agony through you. Martinez is already opening his medical kit.\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Still trying not to scream. Look in horror at all the blood."
+    },
+    {
+      "role": "assistant",
+      "content": "You're still trying not to scream, biting your lip so hard you taste blood. Martinez peels back the soaked bandages and you look down at yourself. There's so much blood—your shirt is completely red, pooling on the concrete beneath you. The sight makes everything spin.\n\n\"Don't look,\" your dad says, but it's too late. You've seen the entry wound in your stomach, the way Martinez has to pack it with gauze that immediately turns crimson. The exit wound in your back is worse—you can feel it, a burning hole that seems to go straight through you.\n\nMartinez works quickly, his hands steady despite the chaos. \"The packing is holding but she needs fluids, antibiotics, proper surgery. This is field triage at best.\" He wraps fresh bandages tight around your middle, and you do scream this time, a short sharp cry you can't hold back. Your dad flinches like he's been shot himself.\n\nTommy is standing guard at the tunnel entrance ahead, watching for threats. The phone light casts harsh shadows. Martinez finishes and sits back. \"That's all I can do. We need to move.\"\n\nYour dad lifts you again. You're so cold now, shivering despite the blood loss making you feel feverish. The tunnel opens ahead into another street—you can see the night sky through the exit.\n\nWhat does Sarah do?"
+    },
+    { "role": "user", "content": "Ask if I’m going to die." },
+    {
+      "role": "assistant",
+      "content": "\"Am I going to die?\" you whisper, looking up at your dad's face as he carries you out of the tunnel.\n\nYour dad's expression crumbles for just a second before he forces it back together. \"No. No, baby, you're going to be fine. I promise you're going to be fine.\"\n\nMartinez glances back at you, his face conflicted. \"You're a fighter, kid. You've made it this far.\" It's not exactly a yes or no, but there's something genuine in his voice. \"We get you somewhere with proper medical supplies and you've got a real shot.\"\n\nYou emerge from the tunnel onto a residential street. It's quieter here, away from the highway checkpoint. Houses stand dark and empty. A few abandoned cars block the road. In the distance you can still hear sirens and screams, but they're muffled now, maybe a mile away. Tommy limps ahead, checking corners with his revolver raised.\n\nYour dad adjusts his grip on you, trying to jostle you less. The cold is getting worse. You can't stop shivering. Martinez is walking beside you, one hand keeping pressure on the bandages. \"FEMA station should be about a mile and a half northeast,\" he says quietly. \"If it's still operational.\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Pass in and out of consciousness. There’s only so much I can do with pure willpower."
+    },
+    {
+      "role": "assistant",
+      "content": "You try to stay awake but consciousness keeps slipping away from you. One moment you're aware of your dad carrying you down a dark street, his arms trembling with exhaustion. The next moment everything goes black and you're falling through nothing.\n\nYou come back and Tommy is arguing with Martinez about which way to go. The words blur together. Then darkness again.\n\nWhen you surface again, there are houses sliding past. You can't feel your legs anymore. Your dad is talking to you, saying your name over and over. \"Stay with me, Sarah. Stay with me.\" You try to respond but your mouth won't work right.\n\nDarkness. \n\nLight. You're being laid down on something hard. Martinez is cutting away your shirt, checking the wound. Blood everywhere. \"She's lost too much,\" he's saying. Your dad's face appears above you, and you try to smile at him but you're not sure if your face moves.\n\nDarkness.\n\nWhen you come back this time, you're moving again. There are lights ahead—bright spotlights, like a checkpoint or camp. Voices shouting. Your dad is running now, actually running despite carrying you. \"Help! We need help! She's been shot!\"\n\nWhat does Sarah do?"
+    },
+    {
+      "role": "user",
+      "content": "Think that Martinez is nice. He brought them all the way here."
+    },
+    {
+      "role": "assistant",
+      "content": "Error: Internal server error while processing action"
+    }
+  ],
+  "memory": "# Adventure Memory\n\n## Inspiration\nThe Last of Us style zombie apocalypse. As seen from Sarah’s perspective.\n\n## Sarah's Background\n- Lives with her dad who works construction/manual labor\n- Dad recently broke his watch and has been without one for months\n- Saved up money to buy him a replacement watch as a gift\n\n## Recent Events\n- Bought dad a G-Shock watch as a gift - he loved it\n- Outbreak began with respiratory illness spreading through town\n- Neighbor Jim became infected and attacked Sarah - dad shot him\n- Fled city with dad and Uncle Tommy in truck\n- Got caught in military checkpoint on highway\n- Soldier shot Sarah in the abdomen when she ran toward him\n- Field medic Martinez defied orders and stabilized her wound\n- Escaped through service tunnel under highway with dad carrying her\n- Sarah critically injured with gunshot wound (entry and exit, packed but bleeding through)\n- Currently in tunnel, dad just laid her down so Martinez can repack the wound\n- Tommy caught up with them, says soldiers aren't following\n- Military checkpoint collapsing as infected break through\n\n## Key Characters\n- Dad: Construction worker, armed, desperately trying to save Sarah\n- Uncle Tommy: Dad's brother, armed with revolver, limping from injury\n- Martinez: Young field medic who defied orders to save Sarah, helping them escape",
+  "compactions": {},
+  "protagonist": "Sarah",
+  "alwaysInstructions": "",
+  "pitch": "The start of the zombie apocalypse, the last of us style. Start before anything bad happens. I’m Sarah.",
+  "messagesSinceUpdate": 3,
+  "savedAt": "2026-01-22T11:33:03.409Z"
+}

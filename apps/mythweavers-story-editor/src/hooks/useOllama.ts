@@ -482,6 +482,8 @@ Title:`
         cacheStore.addCacheEntry(cacheId, cacheContent, messages.length - 1)
       }
 
+      let doneProcessed = false // Guard to prevent processing part.done multiple times
+
       for await (const part of response) {
         if (signal.aborted) {
           throw new DOMException('Generation aborted', 'AbortError')
@@ -515,12 +517,14 @@ Title:`
           }
         }
 
-        if (part.done) {
+        if (part.done && !doneProcessed) {
+          doneProcessed = true // Prevent processing multiple done events
           const endTime = Date.now()
           const duration = (endTime - startTime) / 1000
           const tokensPerSecond = tokenCount / duration
 
-          // Completion data received
+          // DEBUG: Track when part.done fires
+          console.log('[useOllama] part.done received', { assistantMessageId, isRegeneration, tokenCount })
 
           // Use accumulated usage data if available, fallback to part.usage
           const usage = accumulatedUsage || part.usage
@@ -727,7 +731,9 @@ Title:`
                     })) as import('@mythweavers/shared').Paragraph[]
 
                   // Save paragraphs to the existing revision
+                  console.log('[useOllama] Calling saveParagraphs', { revisionId, paragraphCount: paragraphs.length, assistantMessageId })
                   await saveService.saveParagraphs(revisionId, [], paragraphs)
+                  console.log('[useOllama] saveParagraphs completed')
 
                   // Update local message with content and paragraphs
                   messagesStore.updateMessageNoSave(assistantMessageId, {
