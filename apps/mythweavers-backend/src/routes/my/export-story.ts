@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import archiver from 'archiver'
-import type { FastifyPluginAsyncZod } from 'fastify-zod-openapi'
+import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsyncZodOpenApi } from 'fastify-zod-openapi'
 import unzipper from 'unzipper'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
@@ -67,12 +68,12 @@ function remapId<T extends string | null | undefined>(
 function remapIdArray(
   ids: unknown,
   map: Map<string, string>,
-): string[] | null {
-  if (!Array.isArray(ids)) return null
+): string[] | undefined {
+  if (!Array.isArray(ids)) return undefined
   return ids.map((id) => map.get(id) ?? id).filter(Boolean)
 }
 
-const exportStoryRoutes: FastifyPluginAsyncZod = async (fastify) => {
+const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
   // GET /my/stories/:storyId/export-zip - Export story as ZIP
   fastify.get(
     '/stories/:storyId/export-zip',
@@ -92,9 +93,9 @@ const exportStoryRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
-      const userId = request.user!.id
-      const { storyId } = request.params
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const userId = (request as any).user!.id
+      const { storyId } = (request.params as any)
 
       // Load story with ownership check
       const story = await prisma.story.findFirst({
@@ -607,11 +608,11 @@ const exportStoryRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
-      const userId = request.user!.id
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const userId = (request as any).user!.id
 
       // Get uploaded file
-      const data = await request.file()
+      const data = await (request as any).file()
       if (!data) {
         return reply.status(400).send({ error: 'No file uploaded' })
       }
