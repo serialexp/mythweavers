@@ -156,6 +156,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const saveScrollPosition = () => {
     if (messagesRef) {
       // Always save the current scroll position
+      console.log('[SCROLL DEBUG] saveScrollPosition:', messagesRef.scrollTop, new Error().stack?.split('\n').slice(1, 4).join(' <- '))
       localStorage.setItem('messagesScrollTop', messagesRef.scrollTop.toString())
     }
   }
@@ -167,6 +168,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
     // Before the DOM updates, save the current scroll position
     if (messagesRef && currentMessageCount !== previousMessageCount) {
       scrollPositionBeforeUpdate = messagesRef.scrollTop
+      console.log('[SCROLL DEBUG] Message count effect: count changed from', previousMessageCount, 'to', currentMessageCount, 'saving scrollTop:', scrollPositionBeforeUpdate)
 
       // After DOM updates, restore the scroll position
       requestAnimationFrame(() => {
@@ -176,9 +178,11 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
           if (wasNearBottom && currentMessageCount > previousMessageCount) {
             // If user was near bottom and messages were added, scroll to bottom
+            console.log('[SCROLL DEBUG] Message count effect RAF: scrolling to bottom', messagesRef.scrollHeight)
             messagesRef.scrollTop = messagesRef.scrollHeight
           } else {
             // Otherwise, maintain the exact scroll position
+            console.log('[SCROLL DEBUG] Message count effect RAF: restoring to', scrollPositionBeforeUpdate)
             messagesRef.scrollTop = scrollPositionBeforeUpdate
           }
 
@@ -226,6 +230,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
           // Auto-scroll during streaming if user is near bottom
           requestAnimationFrame(() => {
             if (messagesRef && !userHasScrolledDuringGeneration) {
+              console.log('[SCROLL DEBUG] Streaming effect: scrolling to bottom', messagesRef.scrollHeight)
               messagesRef.scrollTop = messagesRef.scrollHeight
             }
           })
@@ -262,7 +267,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
   // Unified scroll restoration effect - runs after messages are loaded
   createEffect(() => {
     // Only run once when messages are loaded and DOM is ready
-    if (!hasRestoredInitialScroll && displayMessages().length > 0 && messagesRef) {
+    const msgCount = displayMessages().length
+    console.log('[SCROLL DEBUG] Initial scroll restoration effect running - hasRestoredInitialScroll:', hasRestoredInitialScroll, 'msgCount:', msgCount, 'hasRef:', !!messagesRef)
+    if (!hasRestoredInitialScroll && msgCount > 0 && messagesRef) {
       // Wait for content to stabilize before restoring scroll position
       // The editor content loads asynchronously, so we need to wait for
       // scrollHeight to stop changing before we can accurately restore position
@@ -300,6 +307,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
         // Restore saved scroll position
         const savedScrollTop = localStorage.getItem('messagesScrollTop')
+        console.log('[SCROLL DEBUG] performScrollRestoration: restoring to', savedScrollTop, 'current:', messagesRef.scrollTop)
         if (savedScrollTop) {
           messagesRef.scrollTop = Number.parseInt(savedScrollTop, 10)
         }
@@ -317,6 +325,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   // Setup event listeners on mount
   onMount(() => {
+    console.log('[SCROLL DEBUG] MessageList MOUNTED - hasRestoredInitialScroll:', hasRestoredInitialScroll)
     // Save scroll position when user scrolls
     if (messagesRef) {
       messagesRef.addEventListener('scroll', handleScroll)
@@ -327,6 +336,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
   })
 
   onCleanup(() => {
+    console.log('[SCROLL DEBUG] MessageList UNMOUNTING')
     if (messagesRef) {
       messagesRef.removeEventListener('scroll', handleScroll)
     }
@@ -335,7 +345,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   return (
     <>
-      <div class={styles.messages} ref={messagesRef}>
+      <div class={styles.messages} ref={messagesRef} data-messages-container>
         {/* Orphaned chapters section removed - chapters are now nodes */}
         <Show when={false}>
           <div class={styles.orphanedChaptersSection}>

@@ -399,6 +399,10 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         'regeneration',
       )
 
+      // Save scroll position before deleting message (which could cause focus escape and scroll jump)
+      const messagesContainer = document.querySelector('[data-messages-container]') as HTMLElement | null
+      const savedScrollTop = messagesContainer?.scrollTop
+
       // Import batch from solid-js to batch updates
       const { batch } = await import('solid-js')
 
@@ -410,6 +414,13 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         // Set the input after deletion
         messagesStore.setInput(instruction)
       })
+
+      // Restore scroll position after DOM updates
+      if (messagesContainer && savedScrollTop !== undefined) {
+        requestAnimationFrame(() => {
+          messagesContainer.scrollTop = savedScrollTop
+        })
+      }
 
       // Submit the regeneration after the batch completes
       await handleSubmit(isQuery, maxTokens, false)
@@ -425,8 +436,19 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     // Save the current version before regenerating
     await saveMessageVersion(messageId, message.content, message.instruction, message.model, 'regeneration')
 
+    // Save scroll position before clearing content (which causes editor unmount and focus escape)
+    const messagesContainer = document.querySelector('[data-messages-container]') as HTMLElement | null
+    const savedScrollTop = messagesContainer?.scrollTop
+
     messagesStore.setIsLoading(true)
     messagesStore.updateMessage(messageId, { content: '', paragraphs: [] })
+
+    // Restore scroll position after DOM updates from content clearing
+    if (messagesContainer && savedScrollTop !== undefined) {
+      requestAnimationFrame(() => {
+        messagesContainer.scrollTop = savedScrollTop
+      })
+    }
 
     try {
       // Find the index of the message being regenerated
@@ -491,8 +513,19 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     const message = messagesStore.messages.find((m) => m.id === messageId)
     if (!message || !message.isQuery) return
 
+    // Save scroll position before clearing content (which causes editor unmount and focus escape)
+    const messagesContainer = document.querySelector('[data-messages-container]') as HTMLElement | null
+    const savedScrollTop = messagesContainer?.scrollTop
+
     messagesStore.setIsLoading(true)
     messagesStore.updateMessage(messageId, { content: '', paragraphs: [] })
+
+    // Restore scroll position after DOM updates from content clearing
+    if (messagesContainer && savedScrollTop !== undefined) {
+      requestAnimationFrame(() => {
+        messagesContainer.scrollTop = savedScrollTop
+      })
+    }
 
     try {
       // Find the index of the query being regenerated
