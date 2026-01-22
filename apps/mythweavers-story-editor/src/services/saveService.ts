@@ -2022,6 +2022,10 @@ export class SaveService {
       showThink?: boolean
     },
   ): Promise<{ revisionId: string }> {
+    const callId = Math.random().toString(36).substring(7)
+    console.log(`[SaveService.createMessageRevision] START callId=${callId} messageId=${messageId}`)
+    console.trace(`[SaveService.createMessageRevision] Stack trace for callId=${callId}`)
+
     // Create new revision via regenerate endpoint
     const { data, error } = await postMyMessagesByIdRegenerate({
       path: { id: messageId },
@@ -2042,6 +2046,7 @@ export class SaveService {
 
     if (paragraphTexts.length > 0) {
       try {
+        console.log(`[SaveService.createMessageRevision] callId=${callId} Creating ${paragraphTexts.length} paragraphs for revisionId=${revisionId}`)
         await postMyMessageRevisionsByRevisionIdParagraphsBatch({
           path: { revisionId },
           body: {
@@ -2051,11 +2056,13 @@ export class SaveService {
             })),
           },
         })
+        console.log(`[SaveService.createMessageRevision] callId=${callId} Paragraphs created successfully`)
       } catch (err) {
         console.error('[SaveService.createMessageRevision] Failed to create paragraphs:', err)
       }
     }
 
+    console.log(`[SaveService.createMessageRevision] END callId=${callId}`)
     return { revisionId }
   }
 
