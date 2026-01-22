@@ -34,6 +34,8 @@ const pathSchema = z.strictObject({
   id: z.string().meta({ description: 'Path ID', example: 'clx1234567890' }),
   mapId: z.string().meta({ description: 'Map ID', example: 'clx0987654321' }),
   speedMultiplier: z.number().meta({ description: 'Speed multiplier', example: 10.0 }),
+  createdAt: z.string().datetime().meta({ description: 'Creation timestamp', example: '2025-01-01T00:00:00.000Z' }),
+  updatedAt: z.string().datetime().meta({ description: 'Last update timestamp', example: '2025-01-01T00:00:00.000Z' }),
 })
 
 const pathWithSegmentsSchema = pathSchema.extend({
@@ -194,12 +196,17 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       return reply.code(200).send({
         paths: map.paths.map((path) => {
-          const { id, mapId, speedMultiplier } = path
+          const { id, mapId, speedMultiplier, createdAt, updatedAt } = path
+          const basePath = {
+            id,
+            mapId,
+            speedMultiplier,
+            createdAt: createdAt.toISOString(),
+            updatedAt: updatedAt.toISOString(),
+          }
           if (includeSegments && 'segments' in path) {
             return {
-              id,
-              mapId,
-              speedMultiplier,
+              ...basePath,
               segments: (path as any).segments.map((s: any) => ({
                 id: s.id,
                 pathId: s.pathId,
@@ -214,7 +221,7 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
               })),
             }
           }
-          return { id, mapId, speedMultiplier, segments: [] }
+          return { ...basePath, segments: [] }
         }),
       })
     },

@@ -68,7 +68,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         tags: ['auth'],
         body: registerBodySchema,
         response: {
-          200: authSuccessSchema,
+          201: authSuccessSchema,
           400: errorSchema,
           409: errorSchema,
           500: errorSchema,
@@ -123,14 +123,14 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // Set cookie
         reply.setCookie('sessionToken', sessionToken, getCookieOptions())
 
-        return {
+        return reply.status(201).send({
           success: true as const,
           user: {
             id: user.id,
             email: user.email,
             username: user.username,
           },
-        }
+        })
       } catch (error) {
         fastify.log.error({ error }, 'Registration failed')
         return reply.status(500).send({ error: 'Registration failed' })

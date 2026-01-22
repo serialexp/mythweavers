@@ -26,7 +26,7 @@ describe('Auth Endpoints', () => {
         },
       })
 
-      expect(response.statusCode).toBe(200)
+      expect(response.statusCode).toBe(201)
       const body = response.json()
       expect(body.success).toBe(true)
       expect(body.user).toMatchObject({

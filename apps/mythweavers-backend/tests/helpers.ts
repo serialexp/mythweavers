@@ -37,6 +37,7 @@ import myScenesRoutes from '../src/routes/my/scenes.js'
 import myStoriesRoutes from '../src/routes/my/stories.js'
 import myStoryCalendarRoutes from '../src/routes/my/story-calendar.js'
 import myStoryTagsRoutes from '../src/routes/my/story-tags.js'
+import myExportStoryRoutes from '../src/routes/my/export-story.js'
 import publicStoriesRoutes from '../src/routes/stories/public.js'
 import publicTagRoutes from '../src/routes/tags/public.js'
 
@@ -147,6 +148,7 @@ async function buildAppInternal() {
   await app.register(myPathsRoutes, { prefix: '/my' })
   await app.register(myPathSegmentsRoutes, { prefix: '/my' })
   await app.register(myPlotPointStatesRoutes, { prefix: '/my' })
+  await app.register(myExportStoryRoutes, { prefix: '/my' })
   await app.register(publicStoriesRoutes, { prefix: '/stories' })
   await app.register(publicTagRoutes, { prefix: '' })
   await app.register(calendarPresetsRoutes, { prefix: '/calendars' })

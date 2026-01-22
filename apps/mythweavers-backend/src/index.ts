@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import formbody from '@fastify/formbody'
@@ -14,6 +16,13 @@ import {
   validatorCompiler,
 } from 'fastify-zod-openapi'
 import { z } from 'zod'
+
+// Get version from package.json
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const packageJson = JSON.parse(
+  readFileSync(path.join(__dirname, '../package.json'), 'utf-8'),
+)
+const VERSION = packageJson.version
 import authRoutes from './routes/auth/index.js'
 import calendarPresetsRoutes from './routes/calendars/presets.js'
 import devicePageRoutes from './routes/device/index.js'
@@ -44,6 +53,7 @@ import myStoriesRoutes from './routes/my/stories.js'
 import myStoryCalendarRoutes from './routes/my/story-calendar.js'
 import myStoryTagsRoutes from './routes/my/story-tags.js'
 import myExportPdfRoutes from './routes/my/export-pdf.js'
+import myExportStoryRoutes from './routes/my/export-story.js'
 import publicStoriesRoutes from './routes/stories/public.js'
 import publicTagRoutes from './routes/tags/public.js'
 
@@ -122,7 +132,7 @@ await server.register(swagger, {
     info: {
       title: 'Writer Unified API',
       description: 'Unified backend API for Writer2 and Story projects',
-      version: '1.0.0',
+      version: VERSION,
     },
     openapi: '3.1.0',
     servers: [
@@ -230,6 +240,7 @@ server.addHook('onResponse', async (request, reply) => {
 // Health check
 const healthResponseSchema = z.strictObject({
   status: z.string().meta({ example: 'ok' }),
+  version: z.string().meta({ example: '1.0.0' }),
   timestamp: z.string().meta({ example: '2025-12-05T12:00:00.000Z' }),
 })
 
@@ -247,6 +258,7 @@ server.get(
   async (_request, _reply) => {
     return {
       status: 'ok',
+      version: VERSION,
       timestamp: new Date().toISOString(),
     }
   },
@@ -282,6 +294,7 @@ await server.register(myPathsRoutes, { prefix: '/my' })
 await server.register(myPathSegmentsRoutes, { prefix: '/my' })
 await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
 await server.register(myExportPdfRoutes, { prefix: '/my' })
+await server.register(myExportStoryRoutes, { prefix: '/my' })
 await server.register(publicStoriesRoutes, { prefix: '/stories' })
 await server.register(publicTagRoutes, { prefix: '' })
 await server.register(calendarPresetsRoutes, { prefix: '/calendars' })

@@ -97,7 +97,7 @@ describe('Paragraph Endpoints', () => {
           body: 'The hero awakened to find the world transformed.',
           state: 'DRAFT',
           plotPointActions: [{ plot_point_id: 'plot123', action: 'introduce' }],
-          inventoryActions: [{ type: 'add', item_name: 'Magic Sword', item_amount: 1 }],
+          inventoryActions: [{ type: 'add', character_name: 'Hero', item_name: 'Magic Sword', item_amount: 1 }],
           sortOrder: 5,
         },
       })
@@ -337,7 +337,7 @@ describe('Paragraph Endpoints', () => {
           body: 'Original',
           state: 'DRAFT',
           plotPointActions: [{ plot_point_id: 'plot123', action: 'introduce' }],
-          inventoryActions: [{ type: 'add', item_name: 'Magic Sword', item_amount: 1 }],
+          inventoryActions: [{ type: 'add', character_name: 'Hero', item_name: 'Magic Sword', item_amount: 1 }],
         },
       })
       const newParagraphId = createResponse.json().paragraph.id
@@ -362,10 +362,10 @@ describe('Paragraph Endpoints', () => {
       expect(latestRevision.body).toBe('Updated body only')
       expect(latestRevision.state).toBe('DRAFT') // Preserved
       expect(latestRevision.plotPointActions).toEqual([{ plot_point_id: 'plot123', action: 'introduce' }]) // Preserved
-      expect(latestRevision.inventoryActions).toEqual([{ type: 'add', item_name: 'Magic Sword', item_amount: 1 }]) // Preserved
+      expect(latestRevision.inventoryActions).toEqual([{ type: 'add', character_name: 'Hero', item_name: 'Magic Sword', item_amount: 1 }]) // Preserved
     })
 
-    test('should reject with empty body', async () => {
+    test('should allow empty body (for prelude to deletion)', async () => {
       const response = await app.inject({
         method: 'PATCH',
         url: `/my/paragraphs/${paragraphId}`,
@@ -375,7 +375,8 @@ describe('Paragraph Endpoints', () => {
         },
       })
 
-      expect(response.statusCode).toBe(400)
+      // Empty string is intentionally allowed for update (prelude to deletion)
+      expect(response.statusCode).toBe(200)
     })
   })
 

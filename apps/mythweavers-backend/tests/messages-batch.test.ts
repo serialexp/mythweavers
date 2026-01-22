@@ -30,7 +30,7 @@ describe('Messages Batch API', () => {
       method: 'POST',
       url: '/auth/login',
       payload: {
-        email: 'batch-test@example.com',
+        username: 'batch-test@example.com',
         password: 'testpassword123',
       },
     })

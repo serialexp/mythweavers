@@ -17,6 +17,10 @@ const paragraphRevisionSchema = z.strictObject({
   contentSchema: z.string().nullable().meta({ example: '{"type":"doc","content":[...]}' }),
   version: z.number().int().meta({ example: 1 }),
   state: z.enum(['AI', 'DRAFT', 'REVISE', 'FINAL', 'SDT']).nullable().meta({ example: 'DRAFT' }),
+  script: z.string().nullable().meta({
+    description: 'JavaScript function to execute for this paragraph',
+    example: '(data, { addItem }) => { addItem(data, "Hero", { name: "sword", amount: 1 }) }',
+  }),
   plotPointActions: z
     .array(plotPointActionSchema)
     .nullable()
