@@ -46,7 +46,6 @@ import { EpisodeViewer } from './EpisodeViewer'
 import { HeaderButton } from './HeaderButton'
 import { LlmActivityPanel } from './LlmActivityPanel'
 import { Maps } from './Maps'
-import { NewStoryForm } from './NewStoryForm'
 import { OverlayPanel } from './OverlayPanel'
 import { SaveIndicator } from './SaveIndicator'
 import { Settings } from './Settings'
@@ -90,8 +89,6 @@ interface StoryHeaderProps {
 export const StoryHeader: Component<StoryHeaderProps> = (props) => {
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
-  const [showNewStoryModal, setShowNewStoryModal] = createSignal(false)
-  const [serverAvailable, setServerAvailable] = createSignal(false)
   const [activeSection, setActiveSection] = createSignal<
     'settings' | 'characters' | 'context' | 'maps' | 'navigation' | null
   >(null)
@@ -117,23 +114,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   })
-
-  // Check server availability
-  import('../utils/storyManager').then(({ storyManager }) => {
-    storyManager.isServerAvailable().then(setServerAvailable)
-  })
-
-  const handleNewStory = (name: string, storageMode: 'local' | 'server', _calendarPresetId?: string) => {
-    messagesStore.clearMessages()
-    charactersStore.setCharacters([])
-    contextItemsStore.setContextItems([])
-    currentStoryStore.newStory(storageMode, settingsStore.provider, settingsStore.model)
-    currentStoryStore.setName(name, false) // false = not a placeholder name
-
-    setShowNewStoryModal(false)
-    // Navigate to the new story
-    navigate(`/story/${currentStoryStore.id}`)
-  }
 
   return (
     <>
@@ -342,13 +322,9 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               </DropdownItem>
               <DropdownItem
                 icon={<BsBook />}
-                onClick={() => {
-                  import('../stores/storyManagerStore').then(({ storyManagerStore }) => {
-                    storyManagerStore.open()
-                  })
-                }}
+                onClick={() => navigate('/stories')}
               >
-                Story Manager
+                Return to Story List
               </DropdownItem>
               <Show when={messagesStore.hasStoryMessages}>
                 <DropdownItem icon={<BsSearch />} onClick={() => searchModalStore.show()}>
@@ -374,11 +350,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               <DropdownDivider />
               <Show when={messagesStore.hasQueries}>
                 <DropdownItem onClick={() => messagesStore.clearQueries()}>Clear Queries</DropdownItem>
-              </Show>
-              <Show when={messagesStore.hasStoryMessages}>
-                <DropdownItem icon={<BsPlus />} onClick={() => setShowNewStoryModal(true)}>
-                  New Story
-                </DropdownItem>
               </Show>
               <DropdownDivider />
               <DropdownItem
@@ -525,28 +496,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
       >
         <LlmActivityPanel />
       </OverlayPanel>
-
-      {/* New Story Modal */}
-      <Show when={showNewStoryModal()}>
-        <div class="modal-overlay" onClick={() => setShowNewStoryModal(false)}>
-          <div class="modal-content" onClick={(e) => e.stopPropagation()} style="max-width: 400px;">
-            <div class="modal-header">
-              <h3>Create New Story</h3>
-              <button class="modal-close" onClick={() => setShowNewStoryModal(false)}>
-                ×
-              </button>
-            </div>
-            <div class="modal-body">
-              <p style="margin-bottom: 1.5rem;">This will clear the current story and create a new one.</p>
-              <NewStoryForm
-                serverAvailable={serverAvailable()}
-                onCreateStory={handleNewStory}
-                onCancel={() => setShowNewStoryModal(false)}
-              />
-            </div>
-          </div>
-        </div>
-      </Show>
 
       {/* Only show modal version when not in docked mode */}
       <Show when={!episodeViewerStore.isDocked}>
