@@ -444,6 +444,7 @@ const exportStoryResponseSchema = z.strictObject({
                       instruction: z.string().nullable(),
                       script: z.string().nullable(),
                       deleted: z.boolean(),
+                      isQuery: z.boolean(),
                       type: z.string().nullable(),
                       options: z.any().nullable(),
                       currentMessageRevisionId: z.string().nullable(),
