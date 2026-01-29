@@ -176,3 +176,25 @@ export const plotPointOptions = style({
   gap: tokens.space['1'],
   marginTop: tokens.space['1'],
 })
+
+// Edit form styles
+export const editPlotPointForm = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['3'],
+  padding: tokens.space['3'],
+  backgroundColor: tokens.color.bg.raised,
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.thin} solid ${tokens.color.border.focus}`,
+})
+
+export const editFormHeader = style({
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+})
+
+export const editFormButtons = style({
+  display: 'flex',
+  gap: tokens.space['2'],
+})

@@ -20,14 +20,21 @@ const DEFAULT_GLOBAL_SCRIPT = `(data) => {
 
 // Plot Points Editor Component
 function PlotPointsEditor() {
+  // State for adding new plot points
   const [newKey, setNewKey] = createSignal('')
   const [newType, setNewType] = createSignal<'string' | 'number' | 'enum' | 'boolean'>('string')
   const [newDefault, setNewDefault] = createSignal('')
   const [newBoolDefault, setNewBoolDefault] = createSignal(false)
   const [newOptions, setNewOptions] = createSignal<string[]>([])
   const [newOptionInput, setNewOptionInput] = createSignal('')
+
+  // State for editing existing plot points
   const [editingKey, setEditingKey] = createSignal<string | null>(null)
-  const [editValue, setEditValue] = createSignal('')
+  const [editKey, setEditKey] = createSignal('')
+  const [editDefault, setEditDefault] = createSignal('')
+  const [editBoolDefault, setEditBoolDefault] = createSignal(false)
+  const [editOptions, setEditOptions] = createSignal<string[]>([])
+  const [editOptionInput, setEditOptionInput] = createSignal('')
 
   const handleAddOption = () => {
     const option = newOptionInput().trim()
@@ -45,6 +52,25 @@ function PlotPointsEditor() {
     // If the removed option was the default, clear default
     if (newDefault() === option) {
       setNewDefault(newOptions()[0] || '')
+    }
+  }
+
+  const handleAddEditOption = () => {
+    const option = editOptionInput().trim()
+    if (!option) return
+    if (editOptions().includes(option)) {
+      alert('This option already exists')
+      return
+    }
+    setEditOptions([...editOptions(), option])
+    setEditOptionInput('')
+  }
+
+  const handleRemoveEditOption = (option: string) => {
+    setEditOptions(editOptions().filter((o) => o !== option))
+    // If the removed option was the default, update default to first available
+    if (editDefault() === option) {
+      setEditDefault(editOptions().filter((o) => o !== option)[0] || '')
     }
   }
 
@@ -106,19 +132,62 @@ function PlotPointsEditor() {
 
   const startEdit = (def: PlotPointDefinition) => {
     setEditingKey(def.key)
-    setEditValue(String(def.default))
+    setEditKey(def.key)
+    setEditDefault(String(def.default))
+    setEditBoolDefault(def.type === 'boolean' ? Boolean(def.default) : false)
+    setEditOptions(def.options ? [...def.options] : [])
+    setEditOptionInput('')
   }
 
-  const saveEdit = (key: string, type: 'string' | 'number' | 'enum' | 'boolean') => {
-    let value: string | number | boolean
-    if (type === 'number') {
-      value = Number(editValue()) || 0
-    } else if (type === 'boolean') {
-      value = editValue() === 'true'
-    } else {
-      value = editValue()
+  const saveEdit = (originalKey: string, type: 'string' | 'number' | 'enum' | 'boolean') => {
+    const newKeyValue = editKey().trim()
+
+    // Validate key format
+    if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(newKeyValue)) {
+      alert('Key must be a valid JavaScript variable name')
+      return
     }
-    plotPointsStore.updateDefinition(key, { default: value })
+
+    // Check for duplicate (only if key changed)
+    if (newKeyValue !== originalKey && plotPointsStore.definitions.some((d) => d.key === newKeyValue)) {
+      alert('A plot point with this key already exists')
+      return
+    }
+
+    // Validate enum has options
+    if (type === 'enum' && editOptions().length === 0) {
+      alert('Enum type requires at least one option')
+      return
+    }
+
+    let defaultValue: string | number | boolean
+    if (type === 'number') {
+      defaultValue = Number(editDefault()) || 0
+    } else if (type === 'boolean') {
+      defaultValue = editBoolDefault()
+    } else if (type === 'enum') {
+      // Ensure default is valid option
+      defaultValue = editOptions().includes(editDefault()) ? editDefault() : editOptions()[0] || ''
+    } else {
+      defaultValue = editDefault()
+    }
+
+    const updates: Partial<PlotPointDefinition> = {
+      default: defaultValue,
+    }
+
+    // Include options update for enum types
+    if (type === 'enum') {
+      updates.options = editOptions()
+    }
+
+    // If key changed, we need to rename
+    if (newKeyValue !== originalKey) {
+      plotPointsStore.renameDefinition(originalKey, newKeyValue, updates)
+    } else {
+      plotPointsStore.updateDefinition(originalKey, updates)
+    }
+
     setEditingKey(null)
   }
 
@@ -138,74 +207,141 @@ function PlotPointsEditor() {
         <div class={styles.plotPointsList}>
           <For each={plotPointsStore.definitions}>
             {(def) => (
-              <div class={styles.plotPointRow} style={{ 'flex-wrap': 'wrap' }}>
-                <code class={styles.plotPointKey}>{def.key}</code>
-                <span class={styles.plotPointType}>{def.type}</span>
-                <Show
-                  when={editingKey() === def.key}
-                  fallback={
-                    <>
-                      <span class={styles.plotPointValue}>= {JSON.stringify(def.default)}</span>
-                      <Button variant="ghost" size="sm" onClick={() => startEdit(def)}>
-                        Edit
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleRemove(def.key)}>
-                        Remove
-                      </Button>
-                    </>
-                  }
-                >
-                  <Show when={def.type === 'enum' && def.options}>
-                    <select
-                      value={editValue()}
-                      onChange={(e) => setEditValue(e.currentTarget.value)}
-                      class={styles.select}
-                      style={{ flex: 1 }}
-                    >
-                      <For each={def.options}>{(option) => <option value={option}>{option}</option>}</For>
-                    </select>
-                  </Show>
-                  <Show when={def.type === 'boolean'}>
-                    <select
-                      value={editValue()}
-                      onChange={(e) => setEditValue(e.currentTarget.value)}
-                      class={styles.select}
-                      style={{ flex: 1 }}
-                    >
-                      <option value="true">true</option>
-                      <option value="false">false</option>
-                    </select>
-                  </Show>
-                  <Show when={def.type !== 'enum' && def.type !== 'boolean'}>
-                    <input
-                      type={def.type === 'number' ? 'number' : 'text'}
-                      value={editValue()}
-                      onInput={(e) => setEditValue(e.currentTarget.value)}
-                      class={styles.input}
-                      style={{ flex: 1 }}
-                    />
-                  </Show>
-                  <Button variant="primary" size="sm" onClick={() => saveEdit(def.key, def.type)}>
-                    Save
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                    Cancel
-                  </Button>
-                </Show>
-                {/* Show options for enum types */}
-                <Show when={def.type === 'enum' && def.options && def.options.length > 0}>
-                  <div class={styles.plotPointOptions} style={{ width: '100%' }}>
-                    <For each={def.options}>
-                      {(option) => (
-                        <span class={styles.enumOptionTag}>
-                          {option}
-                          {option === def.default && ' ✓'}
-                        </span>
-                      )}
-                    </For>
+              <Show
+                when={editingKey() === def.key}
+                fallback={
+                  <div class={styles.plotPointRow} style={{ 'flex-wrap': 'wrap' }}>
+                    <code class={styles.plotPointKey}>{def.key}</code>
+                    <span class={styles.plotPointType}>{def.type}</span>
+                    <span class={styles.plotPointValue}>= {JSON.stringify(def.default)}</span>
+                    <Button variant="ghost" size="sm" onClick={() => startEdit(def)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleRemove(def.key)}>
+                      Remove
+                    </Button>
+                    {/* Show options for enum types */}
+                    <Show when={def.type === 'enum' && def.options && def.options.length > 0}>
+                      <div class={styles.plotPointOptions} style={{ width: '100%' }}>
+                        <For each={def.options}>
+                          {(option) => (
+                            <span class={styles.enumOptionTag}>
+                              {option}
+                              {option === def.default && ' ✓'}
+                            </span>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
                   </div>
-                </Show>
-              </div>
+                }
+              >
+                {/* Full edit form */}
+                <div class={styles.editPlotPointForm}>
+                  <div class={styles.editFormHeader}>
+                    <span class={styles.plotPointType}>{def.type}</span>
+                    <div class={styles.editFormButtons}>
+                      <Button variant="primary" size="sm" onClick={() => saveEdit(def.key, def.type)}>
+                        Save
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Key (name) field */}
+                  <div class={styles.formField}>
+                    <label class={styles.formLabel}>Key (variable name)</label>
+                    <input
+                      type="text"
+                      value={editKey()}
+                      onInput={(e) => setEditKey(e.currentTarget.value)}
+                      class={styles.input}
+                    />
+                  </div>
+
+                  {/* Default value field - varies by type */}
+                  <Show when={def.type === 'string' || def.type === 'number'}>
+                    <div class={styles.formField}>
+                      <label class={styles.formLabel}>Default value</label>
+                      <input
+                        type={def.type === 'number' ? 'number' : 'text'}
+                        value={editDefault()}
+                        onInput={(e) => setEditDefault(e.currentTarget.value)}
+                        class={styles.input}
+                      />
+                    </div>
+                  </Show>
+
+                  <Show when={def.type === 'boolean'}>
+                    <div class={styles.formField}>
+                      <label class={styles.formLabel}>Default value</label>
+                      <select
+                        value={editBoolDefault() ? 'true' : 'false'}
+                        onChange={(e) => setEditBoolDefault(e.currentTarget.value === 'true')}
+                        class={styles.select}
+                      >
+                        <option value="false">false</option>
+                        <option value="true">true</option>
+                      </select>
+                    </div>
+                  </Show>
+
+                  <Show when={def.type === 'enum'}>
+                    {/* Enum options editor */}
+                    <div class={styles.formField}>
+                      <label class={styles.formLabel}>Options</label>
+                      <Show when={editOptions().length > 0}>
+                        <div class={styles.enumOptionsList}>
+                          <For each={editOptions()}>
+                            {(option) => (
+                              <span class={styles.enumOptionTag}>
+                                {option}
+                                <span class={styles.enumOptionRemove} onClick={() => handleRemoveEditOption(option)}>
+                                  ×
+                                </span>
+                              </span>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                      <div class={styles.enumOptionsRow}>
+                        <input
+                          type="text"
+                          placeholder="Add new option..."
+                          value={editOptionInput()}
+                          onInput={(e) => setEditOptionInput(e.currentTarget.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddEditOption()}
+                          class={styles.input}
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleAddEditOption}
+                          disabled={!editOptionInput().trim()}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Default selection for enum */}
+                    <Show when={editOptions().length > 0}>
+                      <div class={styles.formField}>
+                        <label class={styles.formLabel}>Default value</label>
+                        <select
+                          value={editDefault()}
+                          onChange={(e) => setEditDefault(e.currentTarget.value)}
+                          class={styles.select}
+                        >
+                          <For each={editOptions()}>{(option) => <option value={option}>{option}</option>}</For>
+                        </select>
+                      </div>
+                    </Show>
+                  </Show>
+                </div>
+              </Show>
             )}
           </For>
         </div>
