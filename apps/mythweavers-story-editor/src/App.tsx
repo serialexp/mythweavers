@@ -358,7 +358,7 @@ const App: Component = () => {
                     order: message.sortOrder,
                     sceneId: scene.id,
                     currentMessageRevisionId: message.currentMessageRevisionId, // Needed for paragraph operations
-                    isQuery: false,
+                    isQuery: message.isQuery ?? false,
                     think: message.revision.think || undefined,
                     model: message.revision.model || undefined,
                     tokensPerSecond: message.revision.tokensPerSecond || undefined,

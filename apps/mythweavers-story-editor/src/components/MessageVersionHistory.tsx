@@ -11,7 +11,7 @@ interface MessageVersionHistoryProps {
 
 interface MessageVersion {
   id: string
-  versionType?: 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit'
+  versionType?: 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit' | 'auto'
   content?: string
   instruction?: string | null
   model: string | null

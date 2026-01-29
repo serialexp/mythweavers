@@ -460,6 +460,8 @@ export class SaveService {
       (existing) => existing.entityType === op.entityType && existing.entityId === op.entityId,
     )
 
+    console.log('[saveService.queueSave] Operation:', op.type, op.entityId, 'existingIndex:', existingIndex, 'queueLength:', this.state.queue.length)
+
     let shouldQueueOperation = true
 
     if (existingIndex !== -1) {
@@ -539,16 +541,19 @@ export class SaveService {
     this.state.isProcessing = true
     this.onSaveStatusChange?.(true)
 
+    console.log('[saveService.processQueue] Starting processing, queue length:', this.state.queue.length)
     while (this.state.queue.length > 0 && !this.state.isFullSaveInProgress) {
       const operation = this.state.queue.shift()!
       this.state.currentOperation = operation
+
+      console.log('[saveService.processQueue] Processing operation:', operation.type, operation.entityId, 'remaining:', this.state.queue.length)
 
       // Notify about queue length change after removing item
       this.onQueueLengthChange?.(this.state.queue.length)
 
       try {
         await this.executeSaveOperation(operation)
-        // Operation completed
+        console.log('[saveService.processQueue] Completed operation:', operation.type, operation.entityId)
       } catch (error) {
         console.error(`Failed ${operation.type} for ${operation.entityType} ${operation.entityId}:`, error)
 
@@ -626,6 +631,7 @@ export class SaveService {
       }
     }
 
+    console.log('[saveService.processQueue] Finished processing queue')
     this.state.currentOperation = null
     this.state.isProcessing = false
     this.onSaveStatusChange?.(false)
@@ -655,7 +661,8 @@ export class SaveService {
             instruction: operation.data.instruction,
             script: operation.data.script,
             sortOrder: operation.data.order,
-          } as { instruction?: string; script?: string; sortOrder?: number; id?: string },
+            isQuery: operation.data.isQuery,
+          } as { instruction?: string; script?: string; sortOrder?: number; id?: string; isQuery?: boolean },
         })
         if (insertResponse.data?.message) {
           this.updateLastKnownTimestamp(insertResponse.data.message.updatedAt)
@@ -680,6 +687,7 @@ export class SaveService {
             script: operation.data.script,
             sortOrder: operation.data.order,
             nodeId: operation.data.sceneId, // sceneId on frontend = nodeId on backend
+            isQuery: operation.data.isQuery,
             type: operation.data.type,
             options: operation.data.options,
           },
@@ -773,6 +781,7 @@ export class SaveService {
       }
 
       case 'character-update': {
+        console.log('[saveService] Processing character-update for:', entityId, 'description length:', operation.data.description?.length)
         let pictureFileId = operation.data.pictureFileId
 
         // Upload profile image if present as base64 data URI
@@ -803,7 +812,8 @@ export class SaveService {
           }
         }
 
-        await patchMyCharactersById({
+        console.log('[saveService] Calling patchMyCharactersById for:', entityId)
+        const result = await patchMyCharactersById({
           path: { id: entityId },
           body: {
             firstName: operation.data.firstName,
@@ -816,6 +826,7 @@ export class SaveService {
             pictureFileId: pictureFileId,
           },
         })
+        console.log('[saveService] patchMyCharactersById completed for:', entityId, 'success:', result.data?.success)
         break
       }
 
@@ -1397,6 +1408,7 @@ export class SaveService {
   }
 
   updateCharacter(storyId: string, characterId: string, character: Character) {
+    console.log('[saveService.updateCharacter] Queueing character update:', characterId, 'description length:', character.description?.length)
     this.queueSave({
       type: 'character-update',
       entityType: 'character',
@@ -1845,11 +1857,6 @@ export class SaveService {
     originalParagraphs: Paragraph[],
     newParagraphs: Paragraph[],
   ): Promise<{ created: number; updated: number; deleted: number }> {
-    // DEBUG: Track calls with unique ID and stack trace
-    const callId = Math.random().toString(36).substring(7)
-    console.log(`[SaveService.saveParagraphs] START callId=${callId} revisionId=${messageRevisionId} origCount=${originalParagraphs.length} newCount=${newParagraphs.length}`)
-    console.trace(`[SaveService.saveParagraphs] Stack trace for callId=${callId}`)
-
     // Convert frontend state to API state format
     const toApiState = (
       state: Paragraph['state'] | undefined,
@@ -2022,10 +2029,6 @@ export class SaveService {
       showThink?: boolean
     },
   ): Promise<{ revisionId: string }> {
-    const callId = Math.random().toString(36).substring(7)
-    console.log(`[SaveService.createMessageRevision] START callId=${callId} messageId=${messageId}`)
-    console.trace(`[SaveService.createMessageRevision] Stack trace for callId=${callId}`)
-
     // Create new revision via regenerate endpoint
     const { data, error } = await postMyMessagesByIdRegenerate({
       path: { id: messageId },
@@ -2046,7 +2049,6 @@ export class SaveService {
 
     if (paragraphTexts.length > 0) {
       try {
-        console.log(`[SaveService.createMessageRevision] callId=${callId} Creating ${paragraphTexts.length} paragraphs for revisionId=${revisionId}`)
         await postMyMessageRevisionsByRevisionIdParagraphsBatch({
           path: { revisionId },
           body: {
@@ -2056,13 +2058,11 @@ export class SaveService {
             })),
           },
         })
-        console.log(`[SaveService.createMessageRevision] callId=${callId} Paragraphs created successfully`)
       } catch (err) {
         console.error('[SaveService.createMessageRevision] Failed to create paragraphs:', err)
       }
     }
 
-    console.log(`[SaveService.createMessageRevision] END callId=${callId}`)
     return { revisionId }
   }
 

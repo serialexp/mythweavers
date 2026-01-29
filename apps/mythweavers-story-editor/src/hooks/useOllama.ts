@@ -523,9 +523,6 @@ Title:`
           const duration = (endTime - startTime) / 1000
           const tokensPerSecond = tokenCount / duration
 
-          // DEBUG: Track when part.done fires
-          console.log('[useOllama] part.done received', { assistantMessageId, isRegeneration, tokenCount })
-
           // Use accumulated usage data if available, fallback to part.usage
           const usage = accumulatedUsage || part.usage
 
@@ -731,9 +728,7 @@ Title:`
                     })) as import('@mythweavers/shared').Paragraph[]
 
                   // Save paragraphs to the existing revision
-                  console.log('[useOllama] Calling saveParagraphs', { revisionId, paragraphCount: paragraphs.length, assistantMessageId })
                   await saveService.saveParagraphs(revisionId, [], paragraphs)
-                  console.log('[useOllama] saveParagraphs completed')
 
                   // Update local message with content and paragraphs
                   messagesStore.updateMessageNoSave(assistantMessageId, {

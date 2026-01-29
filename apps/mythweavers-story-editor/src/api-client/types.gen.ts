@@ -17,6 +17,7 @@ export type GetHealthResponses = {
      */
     200: {
         status: string;
+        version: string;
         timestamp: string;
     };
 };
@@ -70,7 +71,7 @@ export type PostAuthRegisterResponses = {
     /**
      * Default Response
      */
-    200: {
+    201: {
         success: true;
         user: {
             id: number;
@@ -199,6 +200,561 @@ export type GetAuthSessionResponses = {
 };
 
 export type GetAuthSessionResponse = GetAuthSessionResponses[keyof GetAuthSessionResponses];
+
+export type PostOauthDeviceData = {
+    body: {
+        /**
+         * Optional client identifier
+         */
+        client_id?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/oauth/device';
+};
+
+export type PostOauthDeviceErrors = {
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostOauthDeviceError = PostOauthDeviceErrors[keyof PostOauthDeviceErrors];
+
+export type PostOauthDeviceResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Device code for polling
+         */
+        device_code: string;
+        /**
+         * Human-readable code for user to enter
+         */
+        user_code: string;
+        /**
+         * URL where user should go to enter the code
+         */
+        verification_uri: string;
+        /**
+         * Seconds until device code expires
+         */
+        expires_in: number;
+        /**
+         * Minimum seconds between polling requests
+         */
+        interval: number;
+    };
+};
+
+export type PostOauthDeviceResponse = PostOauthDeviceResponses[keyof PostOauthDeviceResponses];
+
+export type PostOauthTokenData = {
+    body: {
+        /**
+         * OAuth grant type for device flow
+         */
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code';
+        /**
+         * Device code from initial request
+         */
+        device_code: string;
+        /**
+         * Optional client identifier
+         */
+        client_id?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/oauth/token';
+};
+
+export type PostOauthTokenErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * OAuth error code
+         */
+        error: 'authorization_pending' | 'slow_down' | 'expired_token' | 'access_denied' | 'invalid_request';
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostOauthTokenError = PostOauthTokenErrors[keyof PostOauthTokenErrors];
+
+export type PostOauthTokenResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Access token for API calls
+         */
+        access_token: string;
+        /**
+         * Token type
+         */
+        token_type: 'Bearer';
+        /**
+         * Seconds until token expires
+         */
+        expires_in: number;
+    };
+};
+
+export type PostOauthTokenResponse = PostOauthTokenResponses[keyof PostOauthTokenResponses];
+
+export type PostOauthApproveData = {
+    body: {
+        /**
+         * User code to approve
+         */
+        user_code: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/oauth/approve';
+};
+
+export type PostOauthApproveErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostOauthApproveError = PostOauthApproveErrors[keyof PostOauthApproveErrors];
+
+export type PostOauthApproveResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        message: string;
+    };
+};
+
+export type PostOauthApproveResponse = PostOauthApproveResponses[keyof PostOauthApproveResponses];
+
+export type GetDeviceData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Pre-filled user code
+         */
+        code?: string;
+    };
+    url: '/device/';
+};
+
+export type GetDeviceResponses = {
+    /**
+     * Default Response
+     */
+    200: unknown;
+};
+
+export type PostDeviceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/device/';
+};
+
+export type PostDeviceResponses = {
+    /**
+     * Default Response
+     */
+    200: unknown;
+};
+
+export type GetMyAdventuresData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/adventures';
+};
+
+export type GetMyAdventuresErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type GetMyAdventuresError = GetMyAdventuresErrors[keyof GetMyAdventuresErrors];
+
+export type GetMyAdventuresResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        adventures: Array<{
+            id: string;
+            name: string;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetMyAdventuresResponse = GetMyAdventuresResponses[keyof GetMyAdventuresResponses];
+
+export type PostMyAdventuresData = {
+    body: {
+        /**
+         * Adventure name
+         */
+        name?: string;
+        /**
+         * Full adventure state as JSON
+         */
+        data: {
+            messages?: Array<{
+                role: 'user' | 'assistant';
+                content: string;
+            }>;
+            memory?: string;
+            compactions?: {
+                [key: string]: unknown;
+            };
+            protagonist?: string;
+            alwaysInstructions?: string;
+            pitch?: string;
+            messagesSinceUpdate?: number;
+            [key: string]: unknown | Array<{
+                role: 'user' | 'assistant';
+                content: string;
+            }> | string | {
+                [key: string]: unknown;
+            } | number | undefined;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/my/adventures';
+};
+
+export type PostMyAdventuresErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostMyAdventuresError = PostMyAdventuresErrors[keyof PostMyAdventuresErrors];
+
+export type PostMyAdventuresResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        adventure: {
+            id: string;
+            name: string;
+            data: {
+                messages?: Array<{
+                    role: 'user' | 'assistant';
+                    content: string;
+                }>;
+                memory?: string;
+                compactions?: {
+                    [key: string]: unknown;
+                };
+                protagonist?: string;
+                alwaysInstructions?: string;
+                pitch?: string;
+                messagesSinceUpdate?: number;
+                [key: string]: unknown | Array<{
+                    role: 'user' | 'assistant';
+                    content: string;
+                }> | string | {
+                    [key: string]: unknown;
+                } | number | undefined;
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type PostMyAdventuresResponse = PostMyAdventuresResponses[keyof PostMyAdventuresResponses];
+
+export type DeleteMyAdventuresByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Adventure ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/adventures/{id}';
+};
+
+export type DeleteMyAdventuresByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type DeleteMyAdventuresByIdError = DeleteMyAdventuresByIdErrors[keyof DeleteMyAdventuresByIdErrors];
+
+export type DeleteMyAdventuresByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyAdventuresByIdResponse = DeleteMyAdventuresByIdResponses[keyof DeleteMyAdventuresByIdResponses];
+
+export type GetMyAdventuresByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Adventure ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/adventures/{id}';
+};
+
+export type GetMyAdventuresByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type GetMyAdventuresByIdError = GetMyAdventuresByIdErrors[keyof GetMyAdventuresByIdErrors];
+
+export type GetMyAdventuresByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        adventure: {
+            id: string;
+            name: string;
+            data: {
+                messages?: Array<{
+                    role: 'user' | 'assistant';
+                    content: string;
+                }>;
+                memory?: string;
+                compactions?: {
+                    [key: string]: unknown;
+                };
+                protagonist?: string;
+                alwaysInstructions?: string;
+                pitch?: string;
+                messagesSinceUpdate?: number;
+                [key: string]: unknown | Array<{
+                    role: 'user' | 'assistant';
+                    content: string;
+                }> | string | {
+                    [key: string]: unknown;
+                } | number | undefined;
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type GetMyAdventuresByIdResponse = GetMyAdventuresByIdResponses[keyof GetMyAdventuresByIdResponses];
+
+export type PutMyAdventuresByIdData = {
+    body: {
+        /**
+         * Adventure name
+         */
+        name?: string;
+        /**
+         * Full adventure state as JSON
+         */
+        data?: {
+            messages?: Array<{
+                role: 'user' | 'assistant';
+                content: string;
+            }>;
+            memory?: string;
+            compactions?: {
+                [key: string]: unknown;
+            };
+            protagonist?: string;
+            alwaysInstructions?: string;
+            pitch?: string;
+            messagesSinceUpdate?: number;
+            [key: string]: unknown | Array<{
+                role: 'user' | 'assistant';
+                content: string;
+            }> | string | {
+                [key: string]: unknown;
+            } | number | undefined;
+        };
+    };
+    path: {
+        /**
+         * Adventure ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/adventures/{id}';
+};
+
+export type PutMyAdventuresByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PutMyAdventuresByIdError = PutMyAdventuresByIdErrors[keyof PutMyAdventuresByIdErrors];
+
+export type PutMyAdventuresByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        adventure: {
+            id: string;
+            name: string;
+            data: {
+                messages?: Array<{
+                    role: 'user' | 'assistant';
+                    content: string;
+                }>;
+                memory?: string;
+                compactions?: {
+                    [key: string]: unknown;
+                };
+                protagonist?: string;
+                alwaysInstructions?: string;
+                pitch?: string;
+                messagesSinceUpdate?: number;
+                [key: string]: unknown | Array<{
+                    role: 'user' | 'assistant';
+                    content: string;
+                }> | string | {
+                    [key: string]: unknown;
+                } | number | undefined;
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type PutMyAdventuresByIdResponse = PutMyAdventuresByIdResponses[keyof PutMyAdventuresByIdResponses];
 
 export type GetMyStoriesData = {
     body?: never;
@@ -6454,6 +7010,10 @@ export type GetMyScenesBySceneIdMessagesResponses = {
              */
             deleted: boolean;
             /**
+             * True for meta/query messages not visible to content generation
+             */
+            isQuery: boolean;
+            /**
              * Message type: null for normal, branch for choices, event for events
              */
             type: string | null;
@@ -6494,6 +7054,10 @@ export type PostMyScenesBySceneIdMessagesData = {
          * Display order (auto-increments if not provided)
          */
         sortOrder?: number;
+        /**
+         * True for meta/query messages not visible to content generation
+         */
+        isQuery?: boolean;
         /**
          * Message type: null for normal, branch for choices, event for events
          */
@@ -6579,6 +7143,10 @@ export type PostMyScenesBySceneIdMessagesResponses = {
              * Soft delete flag
              */
             deleted: boolean;
+            /**
+             * True for meta/query messages not visible to content generation
+             */
+            isQuery: boolean;
             /**
              * Message type: null for normal, branch for choices, event for events
              */
@@ -6718,6 +7286,10 @@ export type GetMyMessagesByIdResponses = {
              */
             deleted: boolean;
             /**
+             * True for meta/query messages not visible to content generation
+             */
+            isQuery: boolean;
+            /**
              * Message type: null for normal, branch for choices, event for events
              */
             type: string | null;
@@ -6758,6 +7330,10 @@ export type PatchMyMessagesByIdData = {
          * Move message to a different scene (sceneId)
          */
         nodeId?: string;
+        /**
+         * True for meta/query messages not visible to content generation
+         */
+        isQuery?: boolean;
         /**
          * Message type: null for normal, branch for choices, event for events
          */
@@ -6847,6 +7423,10 @@ export type PatchMyMessagesByIdResponses = {
              * Soft delete flag
              */
             deleted: boolean;
+            /**
+             * True for meta/query messages not visible to content generation
+             */
+            isQuery: boolean;
             /**
              * Message type: null for normal, branch for choices, event for events
              */
@@ -7155,7 +7735,7 @@ export type GetMyMessagesByMessageIdRevisionsResponses = {
             /**
              * Type of revision
              */
-            versionType: 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit';
+            versionType: 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit' | 'auto';
             model: string | null;
             tokensPerSecond: number | null;
             totalTokens: number | null;
@@ -7264,7 +7844,7 @@ export type PostMyMessagesByIdRegenerateResponses = {
             /**
              * Type of revision
              */
-            versionType: 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit';
+            versionType: 'initial' | 'regeneration' | 'edit' | 'rewrite' | 'cli_edit' | 'auto';
             model: string | null;
             tokensPerSecond: number | null;
             totalTokens: number | null;
@@ -7604,7 +8184,7 @@ export type GetMyParagraphsByIdResponse = GetMyParagraphsByIdResponses[keyof Get
 export type PatchMyParagraphsByIdData = {
     body: {
         /**
-         * Paragraph content text (creates new revision)
+         * Paragraph content text (creates new revision). Empty string allowed as prelude to deletion.
          */
         body?: string;
         /**
@@ -7933,6 +8513,10 @@ export type GetMyParagraphsByParagraphIdRevisionsResponses = {
             contentSchema: string | null;
             version: number;
             state: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT' | null;
+            /**
+             * JavaScript function to execute for this paragraph
+             */
+            script: string | null;
             /**
              * Array of plot point actions
              */
@@ -12409,6 +12993,14 @@ export type GetMyMapsByMapIdPathsResponses = {
              */
             speedMultiplier: number;
             /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+            /**
              * Path segments
              */
             segments: Array<{
@@ -12552,6 +13144,14 @@ export type PostMyMapsByMapIdPathsResponses = {
              * Speed multiplier
              */
             speedMultiplier: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
         };
     };
 };
@@ -12725,6 +13325,14 @@ export type GetMyPathsByIdResponses = {
              * Speed multiplier
              */
             speedMultiplier: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
         };
     };
 };
@@ -12824,6 +13432,14 @@ export type PutMyPathsByIdResponses = {
              * Speed multiplier
              */
             speedMultiplier: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
         };
     };
 };
@@ -13852,6 +14468,139 @@ export type GetMyStoriesByStoryIdPdfResponses = {
 };
 
 export type GetMyStoriesByStoryIdPdfResponse = GetMyStoriesByStoryIdPdfResponses[keyof GetMyStoriesByStoryIdPdfResponses];
+
+export type GetMyStoriesByStoryIdExportZipData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/export-zip';
+};
+
+export type GetMyStoriesByStoryIdExportZipErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdExportZipError = GetMyStoriesByStoryIdExportZipErrors[keyof GetMyStoriesByStoryIdExportZipErrors];
+
+export type GetMyStoriesByStoryIdExportZipResponses = {
+    /**
+     * ZIP file stream
+     */
+    200: unknown;
+};
+
+export type PostMyStoriesImportZipData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/stories/import-zip';
+};
+
+export type PostMyStoriesImportZipErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesImportZipError = PostMyStoriesImportZipErrors[keyof PostMyStoriesImportZipErrors];
+
+export type PostMyStoriesImportZipResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        success: true;
+        /**
+         * ID of the newly created story
+         */
+        storyId: string;
+        /**
+         * Name of the imported story
+         */
+        storyName: string;
+    };
+};
+
+export type PostMyStoriesImportZipResponse = PostMyStoriesImportZipResponses[keyof PostMyStoriesImportZipResponses];
 
 export type GetStoriesData = {
     body?: never;

@@ -1030,6 +1030,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                   instruction: message.instruction,
                   script: message.script,
                   deleted: message.deleted,
+                  isQuery: message.isQuery,
                   type: message.type,
                   options: message.options,
                   currentMessageRevisionId: message.currentMessageRevisionId,

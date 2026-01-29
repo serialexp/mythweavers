@@ -76,6 +76,7 @@ export const charactersStore = {
   },
 
   updateCharacter: (id: string, updates: Partial<Character>) => {
+    console.log('[charactersStore.updateCharacter] Updating character:', id, 'with updates:', Object.keys(updates))
     setCharactersState('characters', (char) => char.id === id, updates)
     // Trigger script re-evaluation since character data (e.g., birthdate) affects script context
     refreshScriptData()
@@ -83,7 +84,10 @@ export const charactersStore = {
     if (currentStoryStore.id) {
       const character = charactersState.characters.find((c) => c.id === id)
       if (character) {
+        console.log('[charactersStore.updateCharacter] Queueing save for character:', id, 'description length:', character.description?.length)
         saveService.updateCharacter(currentStoryStore.id, id, { ...character, ...updates })
+      } else {
+        console.error('[charactersStore.updateCharacter] Character not found after update:', id)
       }
     }
   },

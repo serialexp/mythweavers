@@ -386,6 +386,7 @@ model Message {
   instruction             String?          @db.Text  // Generation instruction for this message
   script                  String?          @db.Text  // JavaScript to execute
   deleted                 Boolean          @default(false) // Soft delete flag
+  isQuery                 Boolean          @default(false) // True for meta/query messages not visible to content generation
 
   // Branch support (from Story Project)
   type                    String?          // Message type: null for normal, 'chapter' for chapter markers, 'event' for events, 'branch' for branch points

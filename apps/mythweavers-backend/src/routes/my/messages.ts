@@ -78,6 +78,7 @@ const messageSchema = z.strictObject({
   instruction: z.string().nullable().meta({ example: 'Write a dramatic opening' }),
   script: z.string().nullable().meta({ example: 'console.log("hello")' }),
   deleted: z.boolean().meta({ example: false, description: 'Soft delete flag' }),
+  isQuery: z.boolean().meta({ example: false, description: 'True for meta/query messages not visible to content generation' }),
   type: z
     .string()
     .nullable()
@@ -109,6 +110,10 @@ const createMessageBodySchema = z.strictObject({
     description: 'Display order (auto-increments if not provided)',
     example: 0,
   }),
+  isQuery: z.boolean().optional().meta({
+    description: 'True for meta/query messages not visible to content generation',
+    example: false,
+  }),
   type: z.string().optional().meta({
     description: 'Message type: null for normal, branch for choices, event for events',
     example: 'branch',
@@ -131,6 +136,9 @@ const updateMessageBodySchema = z.strictObject({
   }),
   nodeId: z.string().optional().meta({
     description: 'Move message to a different scene (sceneId)',
+  }),
+  isQuery: z.boolean().optional().meta({
+    description: 'True for meta/query messages not visible to content generation',
   }),
   type: z.string().nullable().optional().meta({
     description: 'Message type: null for normal, branch for choices, event for events',
@@ -248,6 +256,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           sortOrder,
           instruction: request.body.instruction || null,
           script: request.body.script || null,
+          isQuery: request.body.isQuery ?? false,
           type: request.body.type || null,
           options: toJsonInput(request.body.options), // undefined if not provided, array if provided
           messageRevisions: {
@@ -473,6 +482,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           script: request.body.script,
           sortOrder: request.body.sortOrder,
           sceneId: request.body.nodeId, // nodeId on API = sceneId in database
+          isQuery: request.body.isQuery,
           type: request.body.type,
           options: toJsonInput(request.body.options),
           deleted: request.body.deleted,
