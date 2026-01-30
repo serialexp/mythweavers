@@ -866,19 +866,18 @@ Title:`
   }
   interface GenerateNodeSummaryParams {
     nodeId: string
-    title: string
-    content: string
+    messageContents: string[]
     viewpointCharacterId?: string
   }
 
+  const CHUNK_SIZE = 10
+
   const generateNodeSummary = async ({
     nodeId,
-    title,
-    content,
+    messageContents,
     viewpointCharacterId,
   }: GenerateNodeSummaryParams): Promise<string> => {
     const client = getClient()
-    let summary = ''
 
     try {
       const nodeMessages = messagesStore.messages.filter(
@@ -912,55 +911,62 @@ Title:`
         ? findCharacter((char) => char.id === viewpointCharacterId)
         : undefined
 
-      const formatCharacterNote = (label: string, character: Character | undefined, extraNote?: string): string => {
-        if (!character) return ''
-        const description = character.description?.trim()
-        const charName = getCharacterDisplayName(character)
-        const baseLine = `\n\n${label}: ${charName}${extraNote ? ` ${extraNote}` : ''}`
-        return description ? `${baseLine}\n${description}` : baseLine
-      }
-
-      const protagonistNote = formatCharacterNote('Protagonist', protagonist)
-      const viewpointNote = formatCharacterNote(
-        'Viewpoint Character',
-        viewpointCharacter,
-        '(this chapter is written from their perspective)',
-      )
-
-      // Create a prompt for content summarization
       const protagonistName = protagonist ? getCharacterDisplayName(protagonist) : null
       const viewpointName = viewpointCharacter ? getCharacterDisplayName(viewpointCharacter) : null
-      const prompt = `Create a concise summary of the following content from a story. The summary should capture the key events, character developments, and plot points.${protagonistName ? ` Focus on ${protagonistName}'s role and experiences as the protagonist.` : ''}${viewpointName ? ` Note that this chapter is written from ${viewpointName}'s perspective.` : ''} Be objective and comprehensive. Do NOT include any preamble, introduction, or meta-commentary. Output ONLY the summary itself:
 
-Title: ${title}${protagonistNote}${viewpointNote}
-
-${content}
-
----
-Now write the summary of the above content. Remember: capture key events, character developments, and plot points. Be concise and objective. Output ONLY the summary text itself - no headers like "Summary:" or "Chapter Summary:", no preamble, no meta-commentary. Start directly with the summary content.`
-
-      const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
-
-      const response = client.generate({
-        model: settingsStore.model,
-        messages,
-        stream: true,
-        providerOptions:
-          settingsStore.provider === 'ollama'
-            ? {
-                num_ctx: getEffectiveContextSize(),
-              }
-            : undefined,
-        metadata: { callType: 'summary:node' },
-      })
-
-      for await (const part of response) {
-        if (part.response) {
-          summary += part.response
-        }
+      // Split messages into chunks of CHUNK_SIZE
+      const chunks: string[][] = []
+      for (let i = 0; i < messageContents.length; i += CHUNK_SIZE) {
+        chunks.push(messageContents.slice(i, i + CHUNK_SIZE))
       }
 
-      return summary.trim()
+      console.log(
+        `[generateNodeSummary] Splitting ${messageContents.length} messages into ${chunks.length} chunks of up to ${CHUNK_SIZE}`,
+      )
+
+      // Generate a summary for each chunk
+      const chunkSummaries: string[] = []
+
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex]
+        const chunkContent = chunk.join('\n\n')
+
+        const prompt = `Create a summary of the following content from a story in 3-4 paragraphs. The summary should capture the key events, character developments, and plot points.${protagonistName ? ` Focus on ${protagonistName}'s role and experiences as the protagonist.` : ''}${viewpointName ? ` Note that this chapter is written from ${viewpointName}'s perspective.` : ''} Be objective and comprehensive. Do NOT include any preamble, introduction, or meta-commentary. Output ONLY the summary itself:
+
+${chunkContent}
+
+---
+Now write the summary of the above content in 3-4 paragraphs. Remember: capture key events, character developments, and plot points. Be concise and objective. Output ONLY the summary text itself - no headers, no preamble, no meta-commentary. Start directly with the summary content.`
+
+        const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
+
+        const response = client.generate({
+          model: settingsStore.model,
+          messages,
+          stream: true,
+          providerOptions:
+            settingsStore.provider === 'ollama'
+              ? {
+                  num_ctx: getEffectiveContextSize(),
+                }
+              : undefined,
+          metadata: { callType: 'summary:node' },
+        })
+
+        let chunkSummary = ''
+        for await (const part of response) {
+          if (part.response) {
+            chunkSummary += part.response
+          }
+        }
+
+        chunkSummaries.push(chunkSummary.trim())
+        console.log(`[generateNodeSummary] Generated summary for chunk ${chunkIndex + 1}/${chunks.length}`)
+      }
+
+      // Combine all chunk summaries
+      const finalSummary = chunkSummaries.join('\n\n')
+      return finalSummary
     } catch (error) {
       console.error('Error generating summary:', error)
       throw error

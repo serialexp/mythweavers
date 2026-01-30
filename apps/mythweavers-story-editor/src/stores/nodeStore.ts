@@ -650,8 +650,7 @@ export const nodeStore = {
     nodeId: string,
     generateSummaryFn: (params: {
       nodeId: string
-      title: string
-      content: string
+      messageContents: string[]
       viewpointCharacterId?: string
     }) => Promise<string>,
   ): Promise<string> {
@@ -680,14 +679,13 @@ export const nodeStore = {
         throw new Error('No messages found in this node to summarize')
       }
 
-      // Combine all node content
-      const nodeContent = nodeMessages.map((msg) => msg.content).join('\n\n')
+      // Extract message contents as an array (for chunked summarization)
+      const messageContents = nodeMessages.map((msg) => msg.content)
 
       // Generate the summary using the provided function, including viewpoint character if set
       const summary = await generateSummaryFn({
         nodeId,
-        title: node.title,
-        content: nodeContent,
+        messageContents,
         viewpointCharacterId: node.viewpointCharacterId,
       })
 
