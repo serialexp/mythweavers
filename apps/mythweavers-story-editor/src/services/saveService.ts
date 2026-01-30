@@ -2239,6 +2239,7 @@ export class SaveService {
       queueLength: this.state.queue.length,
       currentOperation: this.state.currentOperation,
       isFullSaveInProgress: this.state.isFullSaveInProgress,
+      queue: this.state.queue,
     }
   }
 

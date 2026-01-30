@@ -689,16 +689,15 @@ Title:`
           }
 
           // Save content: for regeneration, create a new revision; for initial generation, save to existing revision
+          // IMPORTANT: Don't await these saves - fire them off in the background so the LLM activity log
+          // can be created immediately after streaming completes. The saveService handles queuing.
           const finalMessage = messagesStore.messages.find((msg) => msg.id === assistantMessageId)
           if (cleanedContent.trim()) {
-            const { saveService } = await import('../services/saveService')
-            try {
+            import('../services/saveService').then(({ saveService }) => {
               if (isRegeneration) {
                 // Regeneration: create a new revision with the content
-                const { revisionId } = await saveService.createMessageRevision(
-                  assistantMessageId,
-                  cleanedContent,
-                  {
+                saveService
+                  .createMessageRevision(assistantMessageId, cleanedContent, {
                     model: finalMessage?.model,
                     tokensPerSecond: finalMessage?.tokensPerSecond,
                     totalTokens: finalMessage?.totalTokens,
@@ -707,10 +706,14 @@ Title:`
                     cacheReadTokens: finalMessage?.cacheReadTokens,
                     think: finalMessage?.think,
                     showThink: finalMessage?.showThink,
-                  },
-                )
-                // Update local state with new revision ID
-                messagesStore.updateMessageNoSave(assistantMessageId, { currentMessageRevisionId: revisionId })
+                  })
+                  .then(({ revisionId }) => {
+                    // Update local state with new revision ID
+                    messagesStore.updateMessageNoSave(assistantMessageId, { currentMessageRevisionId: revisionId })
+                  })
+                  .catch((error) => {
+                    console.error('Failed to save generated content (regeneration):', error)
+                  })
               } else {
                 // Initial generation: save paragraphs to existing revision (v1)
                 const revisionId = finalMessage?.currentMessageRevisionId
@@ -727,19 +730,19 @@ Title:`
                       comments: [],
                     })) as import('@mythweavers/shared').Paragraph[]
 
-                  // Save paragraphs to the existing revision
-                  await saveService.saveParagraphs(revisionId, [], paragraphs)
-
-                  // Update local message with content and paragraphs
+                  // Update local message with content and paragraphs immediately
                   messagesStore.updateMessageNoSave(assistantMessageId, {
                     content: cleanedContent,
                     paragraphs,
                   })
+
+                  // Save paragraphs to the existing revision (fire and forget)
+                  saveService.saveParagraphs(revisionId, [], paragraphs).catch((error) => {
+                    console.error('Failed to save generated content (initial):', error)
+                  })
                 }
               }
-            } catch (error) {
-              console.error('Failed to save generated content:', error)
-            }
+            })
           }
         }
       }
