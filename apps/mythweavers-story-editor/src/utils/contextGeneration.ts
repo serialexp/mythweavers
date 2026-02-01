@@ -383,8 +383,22 @@ export async function generateContextMessages(options: ContextGenerationOptions)
   }
 
   // Add query history if needed (for query context)
+  // Only include queries that come AFTER the last story message to preserve temporal context
   if (contextType === 'query' && includeQueryHistory) {
-    const queryMessages = messages.filter((msg) => msg.isQuery && msg.role === 'assistant')
+    // Find the index of the last story message in the original array
+    let lastStoryMessageIndex = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (!msg.isQuery && msg.role === 'assistant' && msg.type !== 'chapter') {
+        lastStoryMessageIndex = i
+        break
+      }
+    }
+
+    // Only include queries that come after the last story message
+    const queryMessages = messages.filter((msg, index) => {
+      return msg.isQuery && msg.role === 'assistant' && index > lastStoryMessageIndex
+    })
     const recentQueries = queryMessages.slice(-maxQueryHistory)
 
     recentQueries.forEach((queryMsg) => {

@@ -17,6 +17,9 @@ vi.mock('./storyUtils', () => ({
   getStoryPrompt: vi.fn().mockImplementation((setting) => {
     return `System prompt for ${setting} story`
   }),
+  getStoryInstructions: vi.fn().mockImplementation(() => {
+    return 'Story writing instructions'
+  }),
 }))
 
 describe('generateContextMessages', () => {
@@ -185,7 +188,7 @@ describe('generateContextMessages', () => {
   // Context is now built using nodes (scenes) which are tested separately.
 
   describe('Query Context', () => {
-    it('should generate query context with different system prompt', async () => {
+    it('should generate query context with same system prompt as story (for cache efficiency)', async () => {
       const messages: Message[] = [
         createMessage({ content: 'Story content' }),
         createMessage({ content: 'More story', isQuery: true, instruction: 'What happened?' }),
@@ -199,10 +202,11 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
+      // System message is now the same for both story and query contexts (cache efficiency)
       expect(result[0]).toEqual({
         role: 'system',
         content:
-          'You are a helpful assistant answering questions about a story in progress. Provide clear, concise answers about the story, its characters, plot, or any other aspect the user is asking about. Do not continue the story itself.',
+          'You are an assistant helping with creative story writing. You can continue the narrative, refine existing content, or answer questions about the story.',
       })
 
       // Should only include story messages, not query messages
@@ -283,6 +287,33 @@ describe('generateContextMessages', () => {
       expect(result.filter((m) => m.content.includes('Question 9'))).toHaveLength(1)
       expect(result.filter((m) => m.content.includes('Question 10'))).toHaveLength(1)
       expect(result.find((m) => m.content.includes('Question 7'))).toBeUndefined()
+    })
+
+    it('should only include queries that come after the last story message', async () => {
+      const messages: Message[] = [
+        createMessage({ id: 'story-1', content: 'Early story content' }),
+        createMessage({ id: 'query-1', content: 'Early answer', isQuery: true, instruction: 'Early question' }),
+        createMessage({ id: 'story-2', content: 'Later story content' }), // Last story message
+        createMessage({ id: 'query-2', content: 'Recent answer', isQuery: true, instruction: 'Recent question' }),
+      ]
+
+      const options: ContextGenerationOptions = {
+        inputText: 'New question',
+        messages,
+        contextType: 'query',
+        includeQueryHistory: true,
+        maxQueryHistory: 5,
+      }
+
+      const result = await generateContextMessages(options)
+
+      // Should NOT include query-1 (comes before story-2)
+      expect(result.find((m) => m.content.includes('Early question'))).toBeUndefined()
+      expect(result.find((m) => m.content === 'Early answer')).toBeUndefined()
+
+      // Should include query-2 (comes after story-2)
+      expect(result.filter((m) => m.content.includes('Recent question'))).toHaveLength(1)
+      expect(result.filter((m) => m.content === 'Recent answer')).toHaveLength(1)
     })
   })
 
