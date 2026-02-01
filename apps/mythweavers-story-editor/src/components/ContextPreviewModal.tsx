@@ -26,6 +26,23 @@ const TRUNCATE_LENGTH = 200
 
 export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) => {
   const [expandedMessages, setExpandedMessages] = createSignal<Set<number>>(new Set())
+  const [copyStatus, setCopyStatus] = createSignal<'idle' | 'copied'>('idle')
+
+  const copyAllContext = async () => {
+    if (!props.data?.messages) return
+
+    const formatted = props.data.messages
+      .map((msg, i) => {
+        const roleLabel = msg.role === 'system' ? 'SYSTEM' : msg.role === 'user' ? 'USER' : 'ASSISTANT'
+        const cacheLabel = msg.cache_control ? ` [CACHED ${msg.cache_control.ttl || '5m'}]` : ''
+        return `=== ${roleLabel} MESSAGE ${i + 1}${cacheLabel} ===\n\n${msg.content}`
+      })
+      .join('\n\n')
+
+    await navigator.clipboard.writeText(formatted)
+    setCopyStatus('copied')
+    setTimeout(() => setCopyStatus('idle'), 2000)
+  }
 
   const toggleExpand = (index: number) => {
     setExpandedMessages((prev) => {
@@ -58,6 +75,14 @@ export const ContextPreviewModal: Component<ContextPreviewModalProps> = (props) 
       size="xl"
     >
       <Stack direction="vertical" gap="lg" style={{ 'max-height': '70vh', 'overflow-y': 'auto', padding: '20px' }}>
+        <Stack direction="horizontal" justify="between" align="center">
+          <span class={styles.messageTitle}>
+            {props.data?.messages.length || 0} messages
+          </span>
+          <button class={styles.expandButton} onClick={copyAllContext}>
+            {copyStatus() === 'copied' ? 'Copied!' : 'Copy All'}
+          </button>
+        </Stack>
         <For each={props.data?.messages}>
           {(msg, index) => (
             <div>
