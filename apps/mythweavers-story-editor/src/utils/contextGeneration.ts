@@ -4,7 +4,7 @@ import { MissingSummariesError } from './errors'
 import { getMarkedNodesContent } from './nodeContentExport'
 import { calculateActivePath, getSceneNodesBeforeNode } from './nodeTraversal'
 import { buildSmartContext } from './smartContext'
-import { ChatMessage, getMinimalSystemPrompt, getStoryInstructions } from './storyUtils'
+import { ChatMessage, getStoryInstructions } from './storyUtils'
 
 export type ContextType = 'story' | 'query' | 'smart-story'
 
@@ -94,7 +94,7 @@ export async function generateContextMessages(options: ContextGenerationOptions)
     inputText,
     messages,
     contextType,
-    storySetting = '',
+    storySetting: _storySetting = '', // unused but kept for API compatibility
     storyFormat = 'narrative',
     person,
     tense,
@@ -171,18 +171,11 @@ export async function generateContextMessages(options: ContextGenerationOptions)
     }
   }
 
-  // Add minimal system message based on context type
-  // Detailed instructions are added near the end for better LLM attention
-  if (contextType === 'query') {
-    const systemContent =
-      'You are a helpful assistant answering questions about a story in progress. Provide clear, concise answers about the story, its characters, plot, or any other aspect the user is asking about. Do not continue the story itself.'
-    chatMessages.push({ role: 'system', content: systemContent })
-  } else {
-    // Story or smart-story context - use minimal system prompt
-    // Detailed instructions will be added near the end
-    const systemContent = getMinimalSystemPrompt(storySetting, storyFormat)
-    chatMessages.push({ role: 'system', content: systemContent })
-  }
+  // Add minimal system message - same for all context types to preserve cache
+  // Detailed instructions (story continuation vs query) are added near the end
+  const systemContent =
+    'You are an assistant helping with creative story writing. You can continue the narrative, refine existing content, or answer questions about the story.'
+  chatMessages.push({ role: 'system', content: systemContent })
 
   // Handle smart context if requested
   if (contextType === 'smart-story') {
@@ -431,9 +424,12 @@ export async function generateContextMessages(options: ContextGenerationOptions)
 
   // Add the final user message
   if (contextType === 'query') {
+    // Add query instructions inline with the question
+    const queryInstructions =
+      'Answer the following question about the story. Provide a clear, concise answer about the story, its characters, plot, or any other aspect being asked about. Do not continue the story itself.'
     chatMessages.push({
       role: 'user',
-      content: `Question: ${inputText}`,
+      content: `${queryInstructions}\n\nQuestion: ${inputText}`,
     })
   } else if (storyFormat === 'cyoa') {
     // CYOA mode: user input is their choice, not a meta-instruction
