@@ -1,7 +1,7 @@
 import { scriptDataStore } from '../stores/scriptDataStore'
 import { Character, ContextItem, Message, Node } from '../types/core'
 import { getCharacterDisplayName } from './character'
-import { calculateAge, formatAge } from './coruscantCalendar'
+import { calculateAge, formatAge, formatStoryTime } from './coruscantCalendar'
 import { ScriptData, evaluateTemplate, executeScriptsUpToMessage } from './scriptEngine'
 
 /**
@@ -164,11 +164,25 @@ export function getTemplatedCharacterContext(
     forceRefresh,
   )
 
+  const storyTime = chapterNode?.storyTime
+
   const characterElements = evaluatedCharacters
     .map((char) => {
       const name = getCharacterDisplayName(char)
       const role = char.isMainCharacter ? ' role="protagonist"' : ''
-      return `  <character name="${name}"${role}>\n${char.description}\n  </character>`
+
+      // Build birthdate/age info if available
+      let ageInfo = ''
+      if (char.birthdate != null && storyTime != null) {
+        const birthDateStr = formatStoryTime(char.birthdate, false)
+        const ageYears = Math.floor(calculateAge(char.birthdate, storyTime))
+        ageInfo = ` birthdate="${birthDateStr}" age="${ageYears}"`
+      } else if (char.birthdate != null) {
+        const birthDateStr = formatStoryTime(char.birthdate, false)
+        ageInfo = ` birthdate="${birthDateStr}"`
+      }
+
+      return `  <character name="${name}"${role}${ageInfo}>\n${char.description}\n  </character>`
     })
     .join('\n')
 
@@ -227,4 +241,15 @@ export function getTemplatedContextItems(
     .join('\n')
 
   return `<world>\n${contextElements}\n</world>`
+}
+
+/**
+ * Generate the current story date context
+ * This should be placed after character and world context to avoid cache invalidation
+ */
+export function getStoryDateContext(chapterNode: Node | undefined): string {
+  if (!chapterNode?.storyTime) return ''
+
+  const formattedDate = formatStoryTime(chapterNode.storyTime, true)
+  return `<current-date>${formattedDate}</current-date>\n`
 }

@@ -9,7 +9,11 @@ import { generateAnalysis } from '../utils/analysisClient'
 import { generateNextStoryBeatInstructions } from '../utils/autoGeneration'
 import { getCharacterDisplayName } from '../utils/character'
 import { generateContextMessages } from '../utils/contextGeneration'
-import { getTemplatedCharacterContext, getTemplatedContextItems } from '../utils/contextTemplating'
+import {
+  getStoryDateContext,
+  getTemplatedCharacterContext,
+  getTemplatedContextItems,
+} from '../utils/contextTemplating'
 import { MissingSummariesError } from '../utils/errors'
 import { generateMessageId } from '../utils/id'
 import { saveMessageVersion } from '../utils/messageVersions'
@@ -79,7 +83,8 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       chapterNode,
       currentStoryStore.globalScript,
     )
-    const fullContext = characterContext + contextItemsContext
+    const storyDateContext = getStoryDateContext(chapterNode)
+    const fullContext = characterContext + contextItemsContext + storyDateContext
 
     // For protagonist name, we need the evaluated version
     const evaluatedCharacters = charactersStore.characters
@@ -243,11 +248,12 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           chapterNode,
           currentStoryStore.globalScript,
         )
+        const storyDateContext = getStoryDateContext(chapterNode)
         const queryMessages = await generateContextMessages({
           inputText,
           messages: messagesForContext,
           contextType: 'query',
-          characterContext: characterContext + contextItemsContext,
+          characterContext: characterContext + contextItemsContext + storyDateContext,
           model: settingsStore.model,
           nodes: nodeStore.nodesArray,
           branchChoices: currentStoryStore.branchChoices,
@@ -554,11 +560,12 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         chapterNode,
         currentStoryStore.globalScript,
       )
+      const storyDateContext = getStoryDateContext(chapterNode)
       const queryMessages = await generateContextMessages({
         inputText: queryText,
         messages: allMessages,
         contextType: 'query',
-        characterContext: characterContext + contextItemsContext,
+        characterContext: characterContext + contextItemsContext + storyDateContext,
         model: settingsStore.model,
         nodes: nodeStore.nodesArray,
         branchChoices: currentStoryStore.branchChoices,
