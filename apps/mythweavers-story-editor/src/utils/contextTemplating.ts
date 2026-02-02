@@ -1,7 +1,7 @@
+import { calendarStore } from '../stores/calendarStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
 import { Character, ContextItem, Message, Node } from '../types/core'
 import { getCharacterDisplayName } from './character'
-import { calculateAge, formatAge, formatStoryTime } from './coruscantCalendar'
 import { ScriptData, evaluateTemplate, executeScriptsUpToMessage } from './scriptEngine'
 
 /**
@@ -65,11 +65,11 @@ export function evaluateCharacterTemplates(
     data = executeScriptsUpToMessage(messages, messageId, nodes, globalScript)
   }
 
-  // Add utility functions to the data context
+  // Add utility functions to the data context (using the story's configured calendar)
   const dataWithUtils: ScriptData = {
     ...data,
-    calculateAge,
-    formatAge,
+    calculateAge: (birthdate: number, currentTime: number) => calendarStore.calculateAge(birthdate, currentTime),
+    formatAge: (birthdate: number, currentTime: number) => calendarStore.formatAge(birthdate, currentTime),
   }
 
   return characters.map((char) => {
@@ -114,11 +114,11 @@ export function evaluateContextItemTemplates(
     data = executeScriptsUpToMessage(messages, messageId, nodes, globalScript)
   }
 
-  // Add utility functions to the data context
+  // Add utility functions to the data context (using the story's configured calendar)
   const dataWithUtils: ScriptData = {
     ...data,
-    calculateAge,
-    formatAge,
+    calculateAge: (birthdate: number, currentTime: number) => calendarStore.calculateAge(birthdate, currentTime),
+    formatAge: (birthdate: number, currentTime: number) => calendarStore.formatAge(birthdate, currentTime),
   }
 
   return contextItems.map((item) => {
@@ -171,14 +171,14 @@ export function getTemplatedCharacterContext(
       const name = getCharacterDisplayName(char)
       const role = char.isMainCharacter ? ' role="protagonist"' : ''
 
-      // Build birthdate/age info if available
+      // Build birthdate/age info if available (using the story's configured calendar)
       let ageInfo = ''
       if (char.birthdate != null && storyTime != null) {
-        const birthDateStr = formatStoryTime(char.birthdate, false)
-        const ageYears = Math.floor(calculateAge(char.birthdate, storyTime))
+        const birthDateStr = calendarStore.formatStoryTimeShort(char.birthdate)
+        const ageYears = Math.floor(calendarStore.calculateAge(char.birthdate, storyTime))
         ageInfo = ` birthdate="${birthDateStr}" age="${ageYears}"`
       } else if (char.birthdate != null) {
-        const birthDateStr = formatStoryTime(char.birthdate, false)
+        const birthDateStr = calendarStore.formatStoryTimeShort(char.birthdate)
         ageInfo = ` birthdate="${birthDateStr}"`
       }
 
@@ -246,10 +246,13 @@ export function getTemplatedContextItems(
 /**
  * Generate the current story date context
  * This should be placed after character and world context to avoid cache invalidation
+ * Uses the story's configured calendar for formatting
  */
 export function getStoryDateContext(chapterNode: Node | undefined): string {
   if (!chapterNode?.storyTime) return ''
 
-  const formattedDate = formatStoryTime(chapterNode.storyTime, true)
+  const formattedDate = calendarStore.formatStoryTime(chapterNode.storyTime)
+  if (!formattedDate) return ''
+
   return `<current-date>${formattedDate}</current-date>\n`
 }
