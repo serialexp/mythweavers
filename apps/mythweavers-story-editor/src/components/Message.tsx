@@ -787,9 +787,9 @@ export const Message: Component<MessageProps> = (props) => {
         <div class={styles.content}>
           {/* Story content */}
           <Show when={isStoryContent()}>
+            {/* Show regenerate button when content is empty but has instruction */}
             <Show when={canRegenerateThisAssistant()}>
-              <div style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
-                <em>Response cleared - click to regenerate</em>
+              <div style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem', 'margin-bottom': '0.5rem' }}>
                 <MessageRegenerateButton
                   onRegenerate={(maxTokens) =>
                     handleRegenerateFromMessage(props.message.id, props.message.instruction!, maxTokens)
@@ -803,60 +803,58 @@ export const Message: Component<MessageProps> = (props) => {
                 />
               </div>
             </Show>
-            <Show when={!canRegenerateThisAssistant()}>
-              {/* Collapsed: show summary */}
-              <Show when={shouldShowSummary() && !isExpanded()}>
-                <div class={styles.summary}>
-                  <div class={styles.summaryHeader}>
-                    <div class={styles.summaryTitle}>{summaryTitle()}</div>
-                    <div class={styles.summaryTabs}>
-                      <For each={summaryTabs}>
-                        {(tab) => {
-                          const isAvailable = () => tab.key === 'auto' || summaryAvailability()[tab.key as SummaryLevel]
-                          const isActive = () => activeSummaryTab() === tab.key
-                          return (
-                            <button
-                              class={cn(styles.summaryTab, isActive() && styles.summaryTabActive)}
-                              disabled={!isAvailable()}
-                              onClick={() => uiStore.setSummaryView(tab.key)}
-                              title={tab.description}
-                            >
-                              {tab.label}
-                            </button>
-                          )
-                        }}
-                      </For>
-                    </div>
+            {/* Collapsed: show summary */}
+            <Show when={shouldShowSummary() && !isExpanded()}>
+              <div class={styles.summary}>
+                <div class={styles.summaryHeader}>
+                  <div class={styles.summaryTitle}>{summaryTitle()}</div>
+                  <div class={styles.summaryTabs}>
+                    <For each={summaryTabs}>
+                      {(tab) => {
+                        const isAvailable = () => tab.key === 'auto' || summaryAvailability()[tab.key as SummaryLevel]
+                        const isActive = () => activeSummaryTab() === tab.key
+                        return (
+                          <button
+                            class={cn(styles.summaryTab, isActive() && styles.summaryTabActive)}
+                            disabled={!isAvailable()}
+                            onClick={() => uiStore.setSummaryView(tab.key)}
+                            title={tab.description}
+                          >
+                            {tab.label}
+                          </button>
+                        )
+                      }}
+                    </For>
                   </div>
-                  <div class={styles.summaryContent}>{summaryText()}</div>
                 </div>
+                <div class={styles.summaryContent}>{summaryText()}</div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                class={styles.summaryToggle}
+                onClick={toggleExpanded}
+                title="Show full content"
+              >
+                <BsChevronDown /> Show full content
+              </Button>
+            </Show>
+            {/* Expanded: show editor instead of plain text - always show editor */}
+            <Show when={!shouldShowSummary() || isExpanded()}>
+              <SceneEditorWrapper
+                messageId={props.message.id}
+                editable={!props.isGenerating}
+              />
+              <Show when={shouldShowSummary() && isExpanded()}>
                 <Button
                   variant="ghost"
                   size="sm"
                   class={styles.summaryToggle}
                   onClick={toggleExpanded}
-                  title="Show full content"
+                  title="Show summary"
                 >
-                  <BsChevronDown /> Show full content
+                  <BsChevronUp /> Show summary
                 </Button>
-              </Show>
-              {/* Expanded: show editor instead of plain text */}
-              <Show when={!shouldShowSummary() || isExpanded()}>
-                <SceneEditorWrapper
-                  messageId={props.message.id}
-                  editable={!props.isGenerating}
-                />
-                <Show when={shouldShowSummary() && isExpanded()}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class={styles.summaryToggle}
-                    onClick={toggleExpanded}
-                    title="Show summary"
-                  >
-                    <BsChevronUp /> Show summary
-                  </Button>
-                </Show>
               </Show>
             </Show>
             {/* Think section for story content */}
