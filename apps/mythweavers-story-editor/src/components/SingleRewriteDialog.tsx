@@ -9,6 +9,7 @@ import { settingsStore } from '../stores/settingsStore'
 import { singleRewriteDialogStore } from '../stores/singleRewriteDialogStore'
 import type { Node } from '../types/core'
 import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { buildDiffRewritePrompt, processLLMDiffResponse } from '../utils/unifiedDiff'
 import * as styles from './SingleRewriteDialog.css'
 
 interface RewriteResult {
@@ -193,23 +194,8 @@ export function SingleRewriteDialog() {
           ? `For reference, here is relevant earlier story content that you should keep in mind:\n\n${contextParts.join('\n\n')}\n\n---\n\n`
           : ''
 
-      const prompt = `${contextSection}Rewrite the following text according to these instructions: "${rewriteInstruction()}"
-
-Important guidelines:
-- You may rewrite larger sections around the specific change to ensure smooth narrative flow
-- Make sure transitions between sentences and paragraphs remain natural
-- If changing a specific detail, adjust surrounding context as needed so everything makes sense
-- Preserve the overall story, tone, style, and narrative perspective
-- Maintain approximately the same length overall
-- Ensure the rewritten section reads as a cohesive whole, not as if a single sentence was copy-pasted
-${contextParts.length > 0 ? '- Keep the rewrite consistent with the earlier story content provided above' : ''}
-
-The goal is to make the requested change while ensuring the entire passage flows naturally and coherently.
-
-Original text:
-${msg.content}
-
-Rewritten text:`
+      // Use the unified diff approach - LLM returns only the changes, not the whole text
+      const prompt = buildDiffRewritePrompt(msg.content, rewriteInstruction(), contextSection)
 
       const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
@@ -226,19 +212,25 @@ Rewritten text:`
         metadata: { callType: 'rewrite:single' },
       })
 
-      let rewrittenContent = ''
+      let llmResponse = ''
       for await (const part of response) {
         if (part.response) {
-          rewrittenContent += part.response
+          llmResponse += part.response
         }
       }
 
-      const trimmedContent = rewrittenContent.trim()
+      // Process the diff response and apply it to get the result
+      const diffResult = processLLMDiffResponse(msg.content, llmResponse.trim())
+
+      if (diffResult.noChanges) {
+        alert('The AI determined no changes were needed for this content.')
+        return
+      }
 
       // Store the result for preview instead of applying directly
       setRewriteResult({
         originalContent: msg.content,
-        proposedContent: trimmedContent,
+        proposedContent: diffResult.resultContent,
       })
     } catch (error) {
       console.error('Error rewriting message:', error)
@@ -256,18 +248,15 @@ Rewritten text:`
     // Create a new revision with the rewritten content
     const { saveService } = await import('../services/saveService')
     try {
-      const { revisionId } = await saveService.createMessageRevision(msg.id, result.proposedContent)
-      // Update local state with new content and revision ID
-      // Clear paragraphs to force editor to re-parse from new content
+      const { revisionId, paragraphs } = await saveService.createMessageRevision(msg.id, result.proposedContent)
+      // Update local state with new content, revision ID, and paragraphs
       messagesStore.updateMessage(msg.id, {
         content: result.proposedContent,
         currentMessageRevisionId: revisionId,
-        paragraphs: undefined,
+        paragraphs,
       })
     } catch (error) {
       console.error('Failed to create message revision:', error)
-      // Fall back to just updating local state
-      messagesStore.updateMessage(msg.id, { content: result.proposedContent, paragraphs: undefined })
     }
 
     singleRewriteDialogStore.hide()

@@ -7,7 +7,6 @@ import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
-import { contentToParagraphs } from '../utils/contentToParagraphs'
 import { generateMessageId } from '../utils/id'
 import { ParagraphScriptModal } from './ParagraphScriptModal'
 
@@ -78,19 +77,14 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     return node?.type === 'scene' ? node : null
   })
 
-  // Source paragraphs from the message - reactive to updates during streaming
+  // Source paragraphs from the message - paragraphs are authoritative, no fallback to content
   const sourceParagraphs = createMemo((): Paragraph[] => {
     const msg = message()
     if (!msg) return []
 
-    // Use existing paragraphs if available (post-generation)
+    // Only use structured paragraphs - never parse from raw content
     if (msg.paragraphs && msg.paragraphs.length > 0) {
       return msg.paragraphs as Paragraph[]
-    }
-
-    // Convert content to paragraphs (during streaming or when paragraphs not yet created)
-    if (msg.content) {
-      return contentToParagraphs(msg.content, props.messageId)
     }
 
     return []

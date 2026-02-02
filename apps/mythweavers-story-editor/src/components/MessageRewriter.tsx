@@ -7,6 +7,7 @@ import { modelsStore } from '../stores/modelsStore'
 import { settingsStore } from '../stores/settingsStore'
 import { Message } from '../types/core'
 import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { buildDiffRewritePrompt, processLLMDiffResponse } from '../utils/unifiedDiff'
 import * as styles from './MessageRewriter.css'
 
 interface RewriteResult {
@@ -97,22 +98,8 @@ export function MessageRewriter(props: MessageRewriterProps) {
         const messagePreview = message.content.slice(0, 100) + (message.content.length > 100 ? '...' : '')
 
         try {
-          const prompt = `Rewrite the following text according to these instructions: "${rewriteInstruction()}"
-
-Important guidelines:
-- You may rewrite larger sections around the specific change to ensure smooth narrative flow
-- Make sure transitions between sentences and paragraphs remain natural
-- If changing a specific detail, adjust surrounding context as needed so everything makes sense
-- Preserve the overall story, tone, style, and narrative perspective
-- Maintain approximately the same length overall
-- Ensure the rewritten section reads as a cohesive whole, not as if a single sentence was copy-pasted
-
-The goal is to make the requested change while ensuring the entire passage flows naturally and coherently.
-
-Original text:
-${message.content}
-
-Rewritten text:`
+          // Use the unified diff approach - LLM returns only the changes, not the whole text
+          const prompt = buildDiffRewritePrompt(message.content, rewriteInstruction())
 
           const llmMessages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
@@ -129,27 +116,30 @@ Rewritten text:`
             metadata: { callType: 'rewrite:message' },
           })
 
-          let rewrittenContent = ''
+          let llmResponse = ''
           for await (const part of response) {
             if (part.response) {
-              rewrittenContent += part.response
+              llmResponse += part.response
             }
           }
 
-          const trimmedContent = rewrittenContent.trim()
+          // Process the diff response and apply it to get the result
+          const diffResult = processLLMDiffResponse(message.content, llmResponse.trim())
 
-          // Store the result for preview
-          setResults((prev) => [
-            ...prev,
-            {
-              messageId,
-              messagePreview,
-              originalContent: message.content,
-              proposedContent: trimmedContent,
-              error: null,
-              accepted: false,
-            },
-          ])
+          // Store the result for preview (skip if no changes)
+          if (!diffResult.noChanges) {
+            setResults((prev) => [
+              ...prev,
+              {
+                messageId,
+                messagePreview,
+                originalContent: message.content,
+                proposedContent: diffResult.resultContent,
+                error: null,
+                accepted: false,
+              },
+            ])
+          }
         } catch (error) {
           // Store error result
           setResults((prev) => [
@@ -183,18 +173,15 @@ Rewritten text:`
     // Create a new revision with the rewritten content
     const { saveService } = await import('../services/saveService')
     try {
-      const { revisionId } = await saveService.createMessageRevision(messageId, result.proposedContent)
-      // Update local state with new content and revision ID
-      // Clear paragraphs to force editor to re-parse from new content
+      const { revisionId, paragraphs } = await saveService.createMessageRevision(messageId, result.proposedContent)
+      // Update local state with new content, revision ID, and paragraphs
       messagesStore.updateMessage(messageId, {
         content: result.proposedContent,
         currentMessageRevisionId: revisionId,
-        paragraphs: undefined,
+        paragraphs,
       })
     } catch (error) {
       console.error('Failed to create message revision:', error)
-      // Fall back to just updating local state
-      messagesStore.updateMessage(messageId, { content: result.proposedContent, paragraphs: undefined })
     }
 
     // Mark as accepted
@@ -211,15 +198,14 @@ Rewritten text:`
 
     for (const result of pendingResults) {
       try {
-        const { revisionId } = await saveService.createMessageRevision(result.messageId, result.proposedContent!)
+        const { revisionId, paragraphs } = await saveService.createMessageRevision(result.messageId, result.proposedContent!)
         messagesStore.updateMessage(result.messageId, {
           content: result.proposedContent!,
           currentMessageRevisionId: revisionId,
-          paragraphs: undefined,
+          paragraphs,
         })
       } catch (error) {
         console.error('Failed to create message revision:', error)
-        messagesStore.updateMessage(result.messageId, { content: result.proposedContent!, paragraphs: undefined })
       }
     }
 

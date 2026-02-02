@@ -1,3 +1,4 @@
+import { generateMessageId } from '../utils/id'
 import { cacheStore } from '../stores/cacheStore'
 import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -707,9 +708,12 @@ Title:`
                     think: finalMessage?.think,
                     showThink: finalMessage?.showThink,
                   })
-                  .then(({ revisionId }) => {
-                    // Update local state with new revision ID
-                    messagesStore.updateMessageNoSave(assistantMessageId, { currentMessageRevisionId: revisionId })
+                  .then(({ revisionId, paragraphs }) => {
+                    // Update local state with new revision ID and paragraphs
+                    messagesStore.updateMessageNoSave(assistantMessageId, {
+                      currentMessageRevisionId: revisionId,
+                      paragraphs,
+                    })
                   })
                   .catch((error) => {
                     console.error('Failed to save generated content (regeneration):', error)
@@ -718,13 +722,13 @@ Title:`
                 // Initial generation: save paragraphs to existing revision (v1)
                 const revisionId = finalMessage?.currentMessageRevisionId
                 if (revisionId) {
-                  // Parse content into paragraphs
+                  // Parse content into paragraphs with client-generated IDs
                   const paragraphs = cleanedContent
                     .split(/\n\n+/)
                     .map((p) => p.trim())
                     .filter((p) => p.length > 0)
-                    .map((body, i) => ({
-                      id: `${assistantMessageId}-p${i}`,
+                    .map((body) => ({
+                      id: generateMessageId(),
                       body,
                       state: 'ai' as const,
                       comments: [],

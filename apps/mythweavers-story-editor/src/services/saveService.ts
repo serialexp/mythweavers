@@ -1,4 +1,5 @@
 import type { Paragraph } from '@mythweavers/shared'
+import { generateMessageId } from '../utils/id'
 import {
   deleteMyArcsById,
   deleteMyBooksById,
@@ -2028,7 +2029,7 @@ export class SaveService {
       think?: string
       showThink?: boolean
     },
-  ): Promise<{ revisionId: string }> {
+  ): Promise<{ revisionId: string; paragraphs: Paragraph[] }> {
     // Create new revision via regenerate endpoint
     const { data, error } = await postMyMessagesByIdRegenerate({
       path: { id: messageId },
@@ -2041,19 +2042,29 @@ export class SaveService {
 
     const revisionId = data.revision.id
 
-    // Split content and create paragraphs on the new revision using bulk endpoint
+    // Split content and create paragraphs with client-generated IDs
     const paragraphTexts = newContent
       .split(/\n\n+/)
       .map((p) => p.trim())
       .filter((p) => p.length > 0)
 
-    if (paragraphTexts.length > 0) {
+    // Create paragraph objects with client-generated IDs (local state is authoritative)
+    const paragraphs: Paragraph[] = paragraphTexts.map((text) => ({
+      id: generateMessageId(),
+      body: text,
+      state: 'ai' as const,
+      comments: [],
+    }))
+
+    if (paragraphs.length > 0) {
       try {
         await postMyMessageRevisionsByRevisionIdParagraphsBatch({
           path: { revisionId },
           body: {
-            paragraphs: paragraphTexts.map((text, index) => ({
-              body: text,
+            paragraphs: paragraphs.map((p, index) => ({
+              id: p.id,
+              body: p.body,
+              state: 'AI' as const,
               sortOrder: index,
             })),
           },
@@ -2063,7 +2074,7 @@ export class SaveService {
       }
     }
 
-    return { revisionId }
+    return { revisionId, paragraphs }
   }
 
   // ============================================================================

@@ -8,6 +8,7 @@ import { nodeStore } from '../stores/nodeStore'
 import { settingsStore } from '../stores/settingsStore'
 import type { Message, Node } from '../types/core'
 import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { buildDiffRewritePrompt, processLLMDiffResponse } from '../utils/unifiedDiff'
 import * as styles from './MassRewriteDialog.css'
 
 interface RewriteResult {
@@ -240,23 +241,11 @@ export function MassRewriteDialog() {
           ? `\n\nHere is the updated content from messages you've already rewritten in this batch:\n\n${processedContext}\n\n---\n\n`
           : ''
 
-        const prompt = `${contextSection}${accumulatedContextSection}Rewrite the following text according to these instructions: "${rewriteInstruction()}"
+        // Build the full context for the diff prompt
+        const fullContext = `${contextSection}${accumulatedContextSection}${contextParts.length > 0 ? 'Keep the rewrite consistent with the earlier story content provided above.\n' : ''}${processedContext ? 'Ensure consistency with the already-rewritten messages in this batch.\n' : ''}`
 
-Important guidelines:
-- If the instructions do not apply to this text and no changes are needed, respond with exactly: NO_CHANGE
-- You may rewrite larger sections around the specific change to ensure smooth narrative flow
-- Make sure transitions between sentences and paragraphs remain natural
-- If changing a specific detail, adjust surrounding context as needed so everything makes sense
-- Preserve the overall story, tone, style, and narrative perspective
-- Maintain approximately the same length overall
-- Ensure the rewritten section reads as a cohesive whole
-${contextParts.length > 0 ? '- Keep the rewrite consistent with the earlier story content provided above' : ''}
-${processedContext ? '- Ensure consistency with the already-rewritten messages in this batch' : ''}
-
-Original text:
-${msg.content}
-
-Rewritten text (or NO_CHANGE if no changes needed):`
+        // Use the unified diff approach - LLM returns only the changes, not the whole text
+        const prompt = buildDiffRewritePrompt(msg.content, rewriteInstruction(), fullContext)
 
         const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
@@ -273,21 +262,21 @@ Rewritten text (or NO_CHANGE if no changes needed):`
           metadata: { callType: 'rewrite:mass' },
         })
 
-        let rewrittenContent = ''
+        let llmResponse = ''
         for await (const part of response) {
           if (part.response) {
-            rewrittenContent += part.response
+            llmResponse += part.response
           }
         }
 
-        const trimmedContent = rewrittenContent.trim()
-        const isNoChange = trimmedContent === 'NO_CHANGE' || trimmedContent.startsWith('NO_CHANGE')
+        // Process the diff response and apply it to get the result
+        const diffResult = processLLMDiffResponse(msg.content, llmResponse.trim())
 
         newResults.push({
           messageId: msg.id,
           originalContent: msg.content,
-          proposedContent: isNoChange ? msg.content : trimmedContent,
-          status: isNoChange ? 'skipped' : 'pending',
+          proposedContent: diffResult.noChanges ? msg.content : diffResult.resultContent,
+          status: diffResult.noChanges ? 'skipped' : 'pending',
         })
 
         setResults([...newResults])
@@ -367,18 +356,14 @@ Rewritten text (or NO_CHANGE if no changes needed):`
 
     for (const result of accepted) {
       try {
-        const { revisionId } = await saveService.createMessageRevision(result.messageId, result.proposedContent)
+        const { revisionId, paragraphs } = await saveService.createMessageRevision(result.messageId, result.proposedContent)
         messagesStore.updateMessage(result.messageId, {
           content: result.proposedContent,
           currentMessageRevisionId: revisionId,
-          paragraphs: undefined,
+          paragraphs,
         })
       } catch (error) {
         console.error('Failed to create message revision:', error)
-        messagesStore.updateMessage(result.messageId, {
-          content: result.proposedContent,
-          paragraphs: undefined,
-        })
       }
     }
 
