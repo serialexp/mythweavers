@@ -65,6 +65,7 @@ export const statusBadge = style({
 
 export const nodeMetadata = style({
   display: 'flex',
+  flexWrap: 'wrap',
   gap: tokens.space['4'],
   fontSize: '0.875rem',
   color: tokens.color.text.secondary,
