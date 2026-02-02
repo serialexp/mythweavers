@@ -31,30 +31,22 @@ function getRandomElements<T>(array: T[], count: number): T[] {
 }
 
 /**
- * Get a set of random first names
+ * Get a set of random full names (first + last combinations)
  */
-export function getRandomFirstNames(count: number = 10): string[] {
-  return getRandomElements(firstNames, count)
-}
+export function getRandomFullNames(count: number = 10): string[] {
+  const randomFirstNames = getRandomElements(firstNames, count)
+  const randomLastNames = getRandomElements(lastNames, count)
 
-/**
- * Get a set of random last names
- */
-export function getRandomLastNames(count: number = 10): string[] {
-  return getRandomElements(lastNames, count)
+  return randomFirstNames.map((first, i) => `${first} ${randomLastNames[i]}`)
 }
 
 /**
  * Generate random name suggestions context for LLM
- * Returns XML with random first and last names to choose from
+ * Returns XML with random full name combinations to choose from
  */
-export function getRandomNamesContext(firstCount: number = 10, lastCount: number = 10): string {
-  const randomFirstNames = getRandomFirstNames(firstCount)
-  const randomLastNames = getRandomLastNames(lastCount)
+export function getRandomNamesContext(count: number = 10): string {
+  const fullNames = getRandomFullNames(count)
 
-  return `<name-suggestions>
-  <first-names>${randomFirstNames.join(', ')}</first-names>
-  <last-names>${randomLastNames.join(', ')}</last-names>
-</name-suggestions>
+  return `<name-suggestions>${fullNames.join(', ')}</name-suggestions>
 `
 }
