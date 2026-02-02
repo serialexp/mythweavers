@@ -35,10 +35,10 @@ export async function createParagraphsBulk(
     const sortOrder = paraData.sortOrder ?? i
 
     // Create paragraph with initial revision
-    // Note: We intentionally don't pass client-provided IDs to avoid duplicate key errors
-    // The server always generates paragraph IDs for bulk operations
+    // Use client-provided ID if given (e.g., when splitting paragraphs in the editor)
     const paragraph = await tx.paragraph.create({
       data: {
+        id: paraData.id,
         messageRevisionId,
         sortOrder,
         paragraphRevisions: {
