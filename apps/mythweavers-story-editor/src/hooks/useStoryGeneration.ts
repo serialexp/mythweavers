@@ -17,6 +17,7 @@ import {
 import { MissingSummariesError } from '../utils/errors'
 import { generateMessageId } from '../utils/id'
 import { saveMessageVersion } from '../utils/messageVersions'
+import { getRandomNamesContext } from '../utils/names/randomNames'
 
 interface UseStoryGenerationProps {
   generateResponse: (
@@ -84,7 +85,8 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       currentStoryStore.globalScript,
     )
     const storyDateContext = getStoryDateContext(chapterNode)
-    const fullContext = characterContext + contextItemsContext + storyDateContext
+    const randomNamesContext = getRandomNamesContext()
+    const fullContext = characterContext + contextItemsContext + storyDateContext + randomNamesContext
 
     // For protagonist name, we need the evaluated version
     const evaluatedCharacters = charactersStore.characters
@@ -249,11 +251,12 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           currentStoryStore.globalScript,
         )
         const storyDateContext = getStoryDateContext(chapterNode)
+        const randomNamesContext = getRandomNamesContext()
         const queryMessages = await generateContextMessages({
           inputText,
           messages: messagesForContext,
           contextType: 'query',
-          characterContext: characterContext + contextItemsContext + storyDateContext,
+          characterContext: characterContext + contextItemsContext + storyDateContext + randomNamesContext,
           model: settingsStore.model,
           nodes: nodeStore.nodesArray,
           branchChoices: currentStoryStore.branchChoices,
@@ -561,11 +564,12 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         currentStoryStore.globalScript,
       )
       const storyDateContext = getStoryDateContext(chapterNode)
+      const randomNamesContext = getRandomNamesContext()
       const queryMessages = await generateContextMessages({
         inputText: queryText,
         messages: allMessages,
         contextType: 'query',
-        characterContext: characterContext + contextItemsContext + storyDateContext,
+        characterContext: characterContext + contextItemsContext + storyDateContext + randomNamesContext,
         model: settingsStore.model,
         nodes: nodeStore.nodesArray,
         branchChoices: currentStoryStore.branchChoices,
