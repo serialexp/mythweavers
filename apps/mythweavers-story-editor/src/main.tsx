@@ -122,42 +122,6 @@ if ('serviceWorker' in navigator) {
 
 console.log('About to render app...')
 
-// Fallback: Check if anything rendered after 500ms
-const renderCheck = setTimeout(() => {
-  const root = document.getElementById('root')
-  if (!root || root.children.length === 0 || root.textContent?.trim() === '') {
-    console.error('RENDER CHECK: Nothing rendered after 500ms!')
-
-    // Get the error if it was stored by ErrorBoundary
-    const error = (window as any).__lastRenderError
-
-    const sections: Array<{ label?: string; content: string; isStack?: boolean }> = [
-      {
-        content:
-          '<strong>The application failed to render.</strong><br/><p style="margin-top: 10px; color: #ffa94d;">The ErrorBoundary caught an error but failed to display the fallback UI.</p>',
-      },
-    ]
-
-    if (error) {
-      sections.push({
-        label: 'Error Message',
-        content: `<pre style="white-space: pre-wrap; margin-top: 10px; color: #fff;">${error.message || error.toString()}</pre>`,
-      })
-      if (error.stack) {
-        sections.push({ label: 'Stack Trace', content: error.stack, isStack: true })
-      }
-    } else {
-      sections.push({
-        content: '<p>No error details available. Check the browser console for more information.</p>',
-      })
-    }
-
-    showErrorOverlay('Application Error', sections)
-  } else {
-    console.log('RENDER CHECK: Content rendered successfully')
-  }
-}, 500)
-
 try {
   render(() => {
     console.log('Inside render function...')
@@ -173,7 +137,6 @@ try {
   }, document.getElementById('root')!)
   console.log('Render completed')
 } catch (error) {
-  clearTimeout(renderCheck) // Cancel the check if we caught error immediately
   console.error('CAUGHT ERROR IN RENDER:', error)
 
   const sections: Array<{ label?: string; content: string; isStack?: boolean }> = [
