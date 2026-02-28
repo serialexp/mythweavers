@@ -96,6 +96,7 @@ await server.register(cors, {
     cb(null, true)
   },
   credentials: true,
+  exposedHeaders: ['Content-Disposition'],
 })
 
 // Cookie support (required for session management)

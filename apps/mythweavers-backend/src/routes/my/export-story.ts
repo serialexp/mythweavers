@@ -1047,7 +1047,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
             timelineStartTime: storyData.timelineStartTime,
             timelineEndTime: storyData.timelineEndTime,
             timelineGranularity: storyData.timelineGranularity,
-            branchChoices: storyData.branchChoices,
+            branchChoices: null, // Will be remapped later
             selectedNodeId: null, // Will be remapped later
             provider: storyData.provider,
             model: storyData.model,
@@ -1556,15 +1556,33 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           })
         }
 
-        // 11. Update story selectedNodeId if it was set
+        // 11. Update story selectedNodeId and branchChoices if they were set
+        const storyUpdates: Record<string, any> = {}
+
         if (storyData.selectedNodeId) {
           const newSelectedNodeId = idMaps.scenes.get(storyData.selectedNodeId)
           if (newSelectedNodeId) {
-            await tx.story.update({
-              where: { id: story.id },
-              data: { selectedNodeId: newSelectedNodeId },
-            })
+            storyUpdates.selectedNodeId = newSelectedNodeId
           }
+        }
+
+        if (storyData.branchChoices && typeof storyData.branchChoices === 'object') {
+          const remapped: Record<string, string> = {}
+          for (const [oldMessageId, selectedOptionId] of Object.entries(storyData.branchChoices)) {
+            const newMessageId = idMaps.messages.get(oldMessageId)
+            const newOptionId = idMaps.messages.get(selectedOptionId as string)
+            if (newMessageId && newOptionId) {
+              remapped[newMessageId] = newOptionId
+            }
+          }
+          storyUpdates.branchChoices = remapped
+        }
+
+        if (Object.keys(storyUpdates).length > 0) {
+          await tx.story.update({
+            where: { id: story.id },
+            data: storyUpdates,
+          })
         }
 
         return story

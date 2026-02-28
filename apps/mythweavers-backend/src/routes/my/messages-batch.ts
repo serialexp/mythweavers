@@ -219,7 +219,7 @@ const messagesBatchRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
           createdMessageIds.push(message.id)
         }
-      })
+      }, { timeout: 120_000, maxWait: 30_000 })
 
       return reply.code(201).send({
         success: true as const,
