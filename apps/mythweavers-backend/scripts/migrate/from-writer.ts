@@ -370,8 +370,30 @@ export async function migrateWriterStory(
     const characters = Object.values(story.characters || {})
 
     for (const char of characters) {
+      // Skip empty placeholder characters (no name and no content)
+      const hasName = !!(char.firstName?.trim() || char.name?.trim() || char.nickname?.trim())
+      const hasContent = !!(char.summary?.trim() || char.personality?.trim() || char.background?.trim())
+      if (!hasName && !hasContent) {
+        logger.warn(`  Skipping empty character: ${char.id}`)
+        continue
+      }
+
       const newCharId = generateCuid()
       idMapper.setMapping('character', char.id, newCharId)
+
+      // Build description from summary, falling back to composing from other non-empty fields
+      // so the AI generation field always has useful content
+      let description = char.summary || null
+      if (!description) {
+        const parts: string[] = []
+        if (char.personality) parts.push(char.personality)
+        if (char.background) parts.push(char.background)
+        if (char.personalityQuirks) parts.push(char.personalityQuirks)
+        if (char.distinguishingFeatures) parts.push(char.distinguishingFeatures)
+        if (parts.length > 0) {
+          description = parts.join('\n\n')
+        }
+      }
 
       if (!dryRun) {
         await prisma.character.create({
@@ -382,7 +404,7 @@ export async function migrateWriterStory(
             middleName: char.middleName,
             lastName: char.lastName || char.name?.split(' ').slice(1).join(' ') || null,
             nickname: char.nickname,
-            description: char.summary, // Map summary to description (used for AI generation)
+            description,
             background: char.background,
             personality: char.personality,
             personalityQuirks: char.personalityQuirks,
