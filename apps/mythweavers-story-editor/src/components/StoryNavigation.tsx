@@ -3,6 +3,7 @@ import {
   BsArrowDown,
   BsArrowUp,
   BsBook,
+  BsBoxArrowRight,
   BsCheckCircle,
   BsChevronDown,
   BsChevronRight,
@@ -22,6 +23,7 @@ import {
 } from 'solid-icons/bs'
 import { FaRegularCircle, FaSolidBookOpen, FaSolidCircleCheck, FaSolidCircleHalfStroke } from 'solid-icons/fa'
 import { VsCode } from 'solid-icons/vs'
+import { useNavigate } from '@solidjs/router'
 import { Dropdown, DropdownItem } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { useOllama } from '../hooks/useOllama'
@@ -52,6 +54,7 @@ interface NodeItemProps {
   level: number
   onSelectChapter?: () => void
   onSplitScene?: (nodeId: string) => void
+  onExtractBook?: (bookId: string) => void
 }
 
 const getAllowedParentType = (type: NodeType): NodeType | null => {
@@ -1020,6 +1023,14 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             <DropdownItem icon={<BsFileEarmarkText />} onClick={handleCopyAsMarkdown}>
               Copy as Markdown
             </DropdownItem>
+            <Show when={node()?.type === 'book'}>
+              <DropdownItem
+                icon={<BsBoxArrowRight />}
+                onClick={() => props.onExtractBook?.(props.treeNode.id)}
+              >
+                Export to New Story
+              </DropdownItem>
+            </Show>
             <Show when={node()?.type === 'chapter' || node()?.type === 'scene'}>
               <DropdownItem
                 icon={
@@ -1094,7 +1105,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       <Show when={isExpanded() && hasChildren()}>
         <div class={styles.childrenContainer}>
           <For each={props.treeNode.children}>
-            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} />}
+            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} onExtractBook={props.onExtractBook} />}
           </For>
         </div>
       </Show>
@@ -1211,6 +1222,60 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   const handleCloseSplitSceneModal = () => {
     setShowSplitSceneModal(false)
     setSplitTargetNodeId(null)
+  }
+
+  const navigate = useNavigate()
+
+  const handleExtractBook = async (bookId: string) => {
+    if (!confirm('This will create a new story from this book. Continue?')) return
+
+    try {
+      const { getMyStoriesByIdExport, getApiBaseUrl } = await import('../client/config')
+      const result = await getMyStoriesByIdExport({ path: { id: currentStoryStore.id } })
+      const exportData = result.data
+
+      if (!exportData) {
+        throw new Error('Failed to fetch story export data')
+      }
+
+      const targetBook = exportData.books.find((b) => b.id === bookId)
+      if (!targetBook) {
+        throw new Error('Book not found in export data')
+      }
+
+      const bookTitle = targetBook.name || 'Extracted Book'
+
+      const filteredExport = {
+        story: { ...exportData.story, name: bookTitle },
+        books: [targetBook],
+        characters: exportData.characters,
+        contextItems: exportData.contextItems,
+        calendars: exportData.calendars,
+        maps: exportData.maps,
+      }
+
+      const blob = new Blob([JSON.stringify(filteredExport)], { type: 'application/json' })
+      const formData = new FormData()
+      formData.append('file', blob, `${bookTitle}.json`)
+
+      const baseUrl = getApiBaseUrl()
+      const response = await fetch(`${baseUrl}/my/stories/import-zip`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Import failed')
+      }
+
+      const importResult = await response.json()
+      navigate(`/story/${importResult.storyId}`)
+    } catch (error) {
+      console.error('Failed to extract book to new story:', error)
+      alert(`Failed to export book to new story: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   // Signal to hold the async token count result
@@ -1418,7 +1483,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
       <div class={styles.navigation}>
         <div class={styles.treeContainer} ref={treeContainerRef}>
           <For each={nodeStore.tree}>
-            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} />}
+            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} onExtractBook={handleExtractBook} />}
           </For>
 
           <Show when={nodeStore.tree.length === 0}>

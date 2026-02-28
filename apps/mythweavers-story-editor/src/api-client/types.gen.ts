@@ -1998,6 +1998,7 @@ export type GetMyStoriesByIdExportResponses = {
                             instruction: string | null;
                             script: string | null;
                             deleted: boolean;
+                            isQuery: boolean;
                             type: string | null;
                             options: unknown | null;
                             currentMessageRevisionId: string | null;

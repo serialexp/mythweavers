@@ -373,27 +373,23 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
       ] = await Promise.all([
         // Books with full hierarchy
         prisma.book.findMany({
-          where: { storyId, deleted: false },
+          where: { storyId },
           orderBy: { sortOrder: 'asc' },
           include: {
             coverArtFile: true,
             spineArtFile: true,
             arcs: {
-              where: { deleted: false },
               orderBy: { sortOrder: 'asc' },
               include: {
                 chapters: {
-                  where: { deleted: false },
                   orderBy: { sortOrder: 'asc' },
                   include: {
                     publishingStatus: true,
                     scenes: {
-                      where: { deleted: false },
                       orderBy: { sortOrder: 'asc' },
                       include: {
                         mediaLinks: true,
                         messages: {
-                          where: { deleted: false },
                           orderBy: { sortOrder: 'asc' },
                           include: {
                             plotPointStates: true,
@@ -538,12 +534,16 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           pages: book.pages,
           sortOrder: book.sortOrder,
           nodeType: book.nodeType,
+          deleted: book.deleted,
+          deletedAt: book.deletedAt?.toISOString() ?? null,
           arcs: book.arcs.map((arc) => ({
             id: arc.id,
             name: arc.name,
             summary: arc.summary,
             sortOrder: arc.sortOrder,
             nodeType: arc.nodeType,
+            deleted: arc.deleted,
+            deletedAt: arc.deletedAt?.toISOString() ?? null,
             chapters: arc.chapters.map((chapter) => ({
               id: chapter.id,
               name: chapter.name,
@@ -552,6 +552,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
               sortOrder: chapter.sortOrder,
               nodeType: chapter.nodeType,
               status: chapter.status,
+              deleted: chapter.deleted,
+              deletedAt: chapter.deletedAt?.toISOString() ?? null,
               publishingStatus: chapter.publishingStatus.map((ps) => ({
                 platform: ps.platform,
                 status: ps.status,
@@ -564,6 +566,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                 sortOrder: scene.sortOrder,
                 status: scene.status,
                 includeInFull: scene.includeInFull,
+                deleted: scene.deleted,
+                deletedAt: scene.deletedAt?.toISOString() ?? null,
                 perspective: scene.perspective,
                 viewpointCharacterId: scene.viewpointCharacterId,
                 activeCharacterIds: scene.activeCharacterIds,
@@ -581,6 +585,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                   sortOrder: message.sortOrder,
                   instruction: message.instruction,
                   script: message.script,
+                  deleted: message.deleted,
                   isQuery: message.isQuery,
                   type: message.type,
                   options: message.options,
@@ -831,7 +836,11 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
       })
 
       // Set response headers
-      const filename = `story-export-${story.id}.zip`
+      const slug = story.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+      const filename = `${slug}-${story.id}.zip`
       return reply
         .header('Content-Type', 'application/zip')
         .header('Content-Disposition', `attachment; filename="${filename}"`)
@@ -971,7 +980,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         mediaAttachments: new Map(),
       }
 
-      // Import in transaction
+      // Import in transaction (generous timeout for large stories)
       const newStory = await prisma.$transaction(async (tx) => {
         // 1. Import files first (only from ZIP, skip for JSON imports)
         if (directory) {
@@ -1169,6 +1178,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
               pages: bookData.pages,
               sortOrder: bookData.sortOrder,
               nodeType: bookData.nodeType,
+              deleted: bookData.deleted ?? false,
+              deletedAt: bookData.deletedAt ? new Date(bookData.deletedAt) : null,
             },
           })
           idMaps.books.set(bookData.id, newBook.id)
@@ -1181,6 +1192,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                 summary: arcData.summary,
                 sortOrder: arcData.sortOrder,
                 nodeType: arcData.nodeType,
+                deleted: arcData.deleted ?? false,
+                deletedAt: arcData.deletedAt ? new Date(arcData.deletedAt) : null,
               },
             })
             idMaps.arcs.set(arcData.id, newArc.id)
@@ -1197,6 +1210,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                   sortOrder: chapterData.sortOrder,
                   nodeType: chapterData.nodeType,
                   status: chapterData.status,
+                  deleted: chapterData.deleted ?? false,
+                  deletedAt: chapterData.deletedAt ? new Date(chapterData.deletedAt) : null,
                   // Don't copy royalRoadId - would cause conflicts
                 },
               })
@@ -1222,6 +1237,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                     sortOrder: sceneData.sortOrder,
                     status: sceneData.status,
                     includeInFull: sceneData.includeInFull,
+                    deleted: sceneData.deleted ?? false,
+                    deletedAt: sceneData.deletedAt ? new Date(sceneData.deletedAt) : null,
                     perspective: sceneData.perspective,
                     viewpointCharacterId: remapId(
                       sceneData.viewpointCharacterId,
@@ -1250,6 +1267,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                       instruction: messageData.instruction,
                       script: messageData.script,
                       isQuery: messageData.isQuery ?? false,
+                      deleted: messageData.deleted ?? false,
                       type: messageData.type,
                       options: messageData.options,
                     },
@@ -1550,7 +1568,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         }
 
         return story
-      })
+      }, { timeout: 120_000, maxWait: 30_000 })
 
       fastify.log.info(
         { storyId: newStory.id, originalStoryId },
