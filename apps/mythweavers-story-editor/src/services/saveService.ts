@@ -38,6 +38,7 @@ import {
   putMyPathsById,
   putMyPawnsById,
   postMyStoriesByStoryIdMessagesReorder,
+  postMyStoriesByStoryIdNodesBulkUpdate,
   postMyStoriesByStoryIdNodesReorder,
   postMyLandmarksByLandmarkIdStates,
   postMyMessagesByMessageIdPlotPointStates,
@@ -1078,55 +1079,37 @@ export class SaveService {
       }
 
       case 'node-bulk-update': {
-        // Bulk update needs to be split into individual updates
-        for (const node of operation.data) {
-          if (node.type === 'book') {
-            await patchMyBooksById({
-              path: { id: node.id },
-              body: {
-                name: node.title,
-                summary: node.summary,
-                sortOrder: node.order,
-              },
-            })
-          } else if (node.type === 'arc') {
-            await patchMyArcsById({
-              path: { id: node.id },
-              body: {
-                name: node.title,
-                summary: node.summary,
-                sortOrder: node.order,
-              },
-            })
-          } else if (node.type === 'chapter') {
-            await patchMyChaptersById({
-              path: { id: node.id },
-              body: {
-                name: node.title,
-                summary: node.summary,
-                sortOrder: node.order,
-                nodeType: node.nodeType,
-                status: node.status,
-              },
-            })
-          } else if (node.type === 'scene') {
-            const { patchMyScenesById } = await import('../client/config')
-            await patchMyScenesById({
-              path: { id: node.id },
-              body: {
-                name: node.title,
-                summary: node.summary,
-                sortOrder: node.order,
-                includeInFull: node.includeInFull,
-                // Scene-specific fields for context/characters
-                activeCharacterIds: node.activeCharacterIds,
-                activeContextItemIds: node.activeContextItemIds,
-                viewpointCharacterId: node.viewpointCharacterId,
-                goal: node.goal,
-                storyTime: node.storyTime,
-              },
-            })
+        const items = operation.data.map((node: Node) => {
+          const base = {
+            nodeId: node.id,
+            nodeType: node.type as 'book' | 'arc' | 'chapter' | 'scene',
+            name: node.title,
+            summary: node.summary,
+            sortOrder: node.order,
+            nodeType_: node.nodeType,
           }
+          if (node.type === 'scene') {
+            return {
+              ...base,
+              includeInFull: node.includeInFull,
+              activeCharacterIds: node.activeCharacterIds,
+              activeContextItemIds: node.activeContextItemIds,
+              viewpointCharacterId: node.viewpointCharacterId,
+              goal: node.goal,
+              storyTime: node.storyTime,
+            }
+          }
+          if (node.type === 'chapter') {
+            return { ...base, status: node.status }
+          }
+          return base
+        })
+        const { data: bulkResponse } = await postMyStoriesByStoryIdNodesBulkUpdate({
+          path: { storyId },
+          body: { items },
+        })
+        if (bulkResponse?.updatedAt) {
+          this.updateLastKnownTimestamp(bulkResponse.updatedAt)
         }
         break
       }

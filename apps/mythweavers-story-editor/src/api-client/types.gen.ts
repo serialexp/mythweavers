@@ -2791,6 +2791,103 @@ export type PostMyStoriesByStoryIdNodesReorderResponses = {
 
 export type PostMyStoriesByStoryIdNodesReorderResponse = PostMyStoriesByStoryIdNodesReorderResponses[keyof PostMyStoriesByStoryIdNodesReorderResponses];
 
+export type PostMyStoriesByStoryIdNodesBulkUpdateData = {
+    body: {
+        /**
+         * Array of node updates
+         */
+        items: Array<{
+            /**
+             * Node ID to update
+             */
+            nodeId: string;
+            /**
+             * Type of node
+             */
+            nodeType: 'book' | 'arc' | 'chapter' | 'scene';
+            name?: string;
+            summary?: string | null;
+            sortOrder?: number;
+            /**
+             * Node display type (linear/branch)
+             */
+            nodeType_?: string;
+            status?: string | null;
+            includeInFull?: number;
+            perspective?: string | null;
+            viewpointCharacterId?: string | null;
+            activeCharacterIds?: Array<string> | null;
+            activeContextItemIds?: Array<string> | null;
+            goal?: string | null;
+            storyTime?: number | null;
+        }>;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/nodes/bulk-update';
+};
+
+export type PostMyStoriesByStoryIdNodesBulkUpdateErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdNodesBulkUpdateError = PostMyStoriesByStoryIdNodesBulkUpdateErrors[keyof PostMyStoriesByStoryIdNodesBulkUpdateErrors];
+
+export type PostMyStoriesByStoryIdNodesBulkUpdateResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        updatedAt: string;
+    };
+};
+
+export type PostMyStoriesByStoryIdNodesBulkUpdateResponse = PostMyStoriesByStoryIdNodesBulkUpdateResponses[keyof PostMyStoriesByStoryIdNodesBulkUpdateResponses];
+
 export type GetMyStoriesByStoryIdBooksData = {
     body?: never;
     path: {

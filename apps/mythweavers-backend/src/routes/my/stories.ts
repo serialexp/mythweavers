@@ -1931,6 +1931,155 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
     },
   )
+  // Bulk update node properties (books, arcs, chapters, scenes)
+  fastify.post(
+    '/:storyId/nodes/bulk-update',
+    {
+      preHandler: requireAuth,
+      schema: {
+        description: 'Bulk update node properties (name, summary, sortOrder, etc.) in a single request',
+        tags: ['stories'],
+        params: z.strictObject({
+          storyId: z.string().meta({
+            description: 'Story ID',
+            example: 'clx1234567890',
+          }),
+        }),
+        body: z.strictObject({
+          items: z
+            .array(
+              z.strictObject({
+                nodeId: z.string().meta({ description: 'Node ID to update' }),
+                nodeType: z.enum(['book', 'arc', 'chapter', 'scene']).meta({ description: 'Type of node' }),
+                // Common fields
+                name: z.string().min(1).max(200).optional(),
+                summary: z.string().nullable().optional(),
+                sortOrder: z.number().int().optional(),
+                nodeType_: z.string().optional().meta({ description: 'Node display type (linear/branch)' }),
+                // Chapter fields
+                status: z.string().nullable().optional(),
+                // Scene fields
+                includeInFull: z.number().int().optional(),
+                perspective: z.string().nullable().optional(),
+                viewpointCharacterId: z.string().nullable().optional(),
+                activeCharacterIds: z.array(z.string()).nullable().optional(),
+                activeContextItemIds: z.array(z.string()).nullable().optional(),
+                goal: z.string().nullable().optional(),
+                storyTime: z.number().int().nullable().optional(),
+              }),
+            )
+            .meta({ description: 'Array of node updates' }),
+        }),
+        response: {
+          200: z.strictObject({
+            success: z.literal(true),
+            updatedAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
+          }),
+          400: errorSchema,
+          401: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { storyId } = request.params
+      const { items } = request.body
+      const userId = request.user!.id
+
+      // Verify story exists and user owns it
+      const story = await prisma.story.findUnique({
+        where: { id: storyId },
+        select: { ownerId: true },
+      })
+
+      if (!story) {
+        return reply.code(404).send({ error: 'Story not found' })
+      }
+
+      if (story.ownerId !== userId) {
+        return reply.code(404).send({ error: 'Story not found' })
+      }
+
+      if (items.length === 0) {
+        return {
+          success: true as const,
+          updatedAt: new Date().toISOString(),
+        }
+      }
+
+      // Group items by type for batch updates
+      const books = items.filter((i) => i.nodeType === 'book')
+      const arcs = items.filter((i) => i.nodeType === 'arc')
+      const chapters = items.filter((i) => i.nodeType === 'chapter')
+      const scenes = items.filter((i) => i.nodeType === 'scene')
+
+      const updatedAt = new Date()
+
+      // Update all nodes in a transaction
+      await prisma.$transaction([
+        ...books.map((item) =>
+          prisma.book.update({
+            where: { id: item.nodeId },
+            data: {
+              ...(item.name !== undefined && { name: item.name }),
+              ...(item.summary !== undefined && { summary: item.summary }),
+              ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
+              ...(item.nodeType_ !== undefined && { nodeType: item.nodeType_ }),
+              updatedAt,
+            },
+          }),
+        ),
+        ...arcs.map((item) =>
+          prisma.arc.update({
+            where: { id: item.nodeId },
+            data: {
+              ...(item.name !== undefined && { name: item.name }),
+              ...(item.summary !== undefined && { summary: item.summary }),
+              ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
+              ...(item.nodeType_ !== undefined && { nodeType: item.nodeType_ }),
+              updatedAt,
+            },
+          }),
+        ),
+        ...chapters.map((item) =>
+          prisma.chapter.update({
+            where: { id: item.nodeId },
+            data: {
+              ...(item.name !== undefined && { name: item.name }),
+              ...(item.summary !== undefined && { summary: item.summary }),
+              ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
+              ...(item.nodeType_ !== undefined && { nodeType: item.nodeType_ }),
+              ...(item.status !== undefined && { status: item.status }),
+              updatedAt,
+            },
+          }),
+        ),
+        ...scenes.map((item) => {
+          const data: Record<string, unknown> = { updatedAt }
+          if (item.name !== undefined) data.name = item.name
+          if (item.summary !== undefined) data.summary = item.summary
+          if (item.sortOrder !== undefined) data.sortOrder = item.sortOrder
+          if (item.status !== undefined) data.status = item.status
+          if (item.includeInFull !== undefined) data.includeInFull = item.includeInFull
+          if (item.perspective !== undefined) data.perspective = item.perspective
+          if (item.viewpointCharacterId !== undefined) data.viewpointCharacterId = item.viewpointCharacterId
+          if (item.activeCharacterIds !== undefined) data.activeCharacterIds = item.activeCharacterIds ?? Prisma.JsonNull
+          if (item.activeContextItemIds !== undefined) data.activeContextItemIds = item.activeContextItemIds ?? Prisma.JsonNull
+          if (item.goal !== undefined) data.goal = item.goal
+          if (item.storyTime !== undefined) data.storyTime = item.storyTime
+          return prisma.scene.update({
+            where: { id: item.nodeId },
+            data: data as Prisma.SceneUpdateInput,
+          })
+        }),
+      ])
+
+      return {
+        success: true as const,
+        updatedAt: updatedAt.toISOString(),
+      }
+    },
+  )
 }
 
 export default myStoriesRoutes
