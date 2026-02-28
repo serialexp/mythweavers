@@ -1047,7 +1047,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
             timelineStartTime: storyData.timelineStartTime,
             timelineEndTime: storyData.timelineEndTime,
             timelineGranularity: storyData.timelineGranularity,
-            branchChoices: null, // Will be remapped later
+            // branchChoices omitted here — will be remapped and set after messages are created
             selectedNodeId: null, // Will be remapped later
             provider: storyData.provider,
             model: storyData.model,
