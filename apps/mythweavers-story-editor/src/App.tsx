@@ -849,15 +849,26 @@ const App: Component = () => {
         }}
       />
 
-      {/* Root route - story selection (same as /stories) */}
+      {/* Root route - redirects to /stories/new */}
       <Route
         path="/"
+        component={() => {
+          const navigate = useNavigate()
+          onMount(() => navigate('/stories/new', { replace: true }))
+          return <div class={styles.app}>Loading...</div>
+        }}
+      />
+
+      {/* Story selection routes with tab segments */}
+      <Route
+        path="/stories/list"
         component={() => {
           const navigate = useNavigate()
           return (
             <Show when={!authStore.isLoading} fallback={<div class={styles.app}>Loading...</div>}>
               <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
                 <StoryLandingPage
+                  initialTab="load"
                   onSelectStory={(storyId: string) => {
                     navigate(`/story/${storyId}`)
                   }}
@@ -868,17 +879,16 @@ const App: Component = () => {
         }}
       />
 
-      {/* Story selection route (legacy, same as root) */}
       <Route
-        path="/stories"
+        path={["/stories/new", "/stories"]}
         component={() => {
           const navigate = useNavigate()
           return (
             <Show when={!authStore.isLoading} fallback={<div class={styles.app}>Loading...</div>}>
               <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
                 <StoryLandingPage
+                  initialTab="new"
                   onSelectStory={(storyId: string) => {
-                    // Navigate to the story route
                     navigate(`/story/${storyId}`)
                   }}
                 />
@@ -1122,7 +1132,7 @@ const App: Component = () => {
                                       // Keep local version
                                       setServerDataConflict(null)
                                       // Go back to stories page
-                                      navigate('/stories')
+                                      navigate('/stories/list')
                                     }}
                                   >
                                     Keep Local Version

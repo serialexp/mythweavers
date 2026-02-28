@@ -42,15 +42,17 @@ import * as styles from './StoryLandingPage.css'
 
 interface StoryLandingPageProps {
   onSelectStory: (storyId: string) => void
+  initialTab?: 'new' | 'load'
 }
 
 export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
+  const navigate = useNavigate()
   const [localStories, setLocalStories] = createSignal<StoryMetadata[]>([])
   const [serverStories, setServerStories] = createSignal<ApiStoryMetadata[]>([])
   const [serverAvailable, setServerAvailable] = createSignal(false)
   const [loading, setLoading] = createSignal(true)
   const [syncing, setSyncing] = createSignal<string | null>(null)
-  const [activeTab, setActiveTab] = createSignal<'new' | 'load'>('new')
+  const [activeTab, setActiveTab] = createSignal<'new' | 'load'>(props.initialTab ?? 'new')
   const [localFingerprints, setLocalFingerprints] = createSignal<Map<string, string>>(new Map())
   const [showClaudeChatImport, setShowClaudeChatImport] = createSignal(false)
   const [importingMythWeavers, setImportingMythWeavers] = createSignal(false)
@@ -344,7 +346,6 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     }
   }
 
-  const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
 
   const toggleTheme = () => {
@@ -490,7 +491,11 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
       >
         <Tabs
           activeTab={activeTab()}
-          onTabChange={(id) => setActiveTab(id as 'new' | 'load')}
+          onTabChange={(id) => {
+            const tab = id as 'new' | 'load'
+            setActiveTab(tab)
+            navigate(`/stories/${tab === 'new' ? 'new' : 'list'}`, { replace: true })
+          }}
           size="md"
           style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
         >

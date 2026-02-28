@@ -319,7 +319,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               </DropdownItem>
               <DropdownItem
                 icon={<BsBook />}
-                onClick={() => navigate('/stories')}
+                onClick={() => navigate('/stories/list')}
               >
                 Return to Story List
               </DropdownItem>
