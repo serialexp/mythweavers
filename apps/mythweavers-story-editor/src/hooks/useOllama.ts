@@ -636,53 +636,7 @@ Title:`
             // API error detected, skipping summarization
           }
 
-          // Generate summaries if requested and this is a story message (and no API error)
-          if (shouldSummarize && cleanedContent.trim() && !hasApiError) {
-            // Generating summaries
-
-            // Set summarizing flag before starting
-            messagesStore.setSummarizing(assistantMessageId, true)
-
-            try {
-              // Check if this is the first story turn and we have a placeholder name
-              const storyMessages = messagesStore.messages.filter((msg) => !msg.isQuery && msg.role === 'assistant')
-              const isFirstTurn = storyMessages.length === 1
-              const summariesPromise = generateSummaries(assistantMessageId, cleanedContent)
-
-              if (isFirstTurn && currentStoryStore.isPlaceholderName) {
-                // Generate story name along with summaries
-                const [summaries, storyName] = await Promise.all([summariesPromise, generateStoryName(cleanedContent)])
-
-                messagesStore.updateMessage(assistantMessageId, {
-                  sentenceSummary: summaries.sentenceSummary,
-                  summary: summaries.summary,
-                  paragraphSummary: summaries.paragraphSummary,
-                  isExpanded: true, // Keep showing full content after summaries are generated
-                })
-
-                // Update story name if we got a good one
-                if (storyName && storyName !== 'Untitled Story') {
-                  currentStoryStore.setName(storyName, false)
-                  // Generated story name
-                }
-              } else {
-                // Just generate summaries as usual
-                const summaries = await summariesPromise
-
-                messagesStore.updateMessage(assistantMessageId, {
-                  sentenceSummary: summaries.sentenceSummary,
-                  summary: summaries.summary,
-                  paragraphSummary: summaries.paragraphSummary,
-                  isExpanded: true, // Keep showing full content after summaries are generated
-                })
-              }
-            } catch (error) {
-              console.error('Failed to generate summaries:', error)
-            } finally {
-              // Always clear the summarizing flag
-              messagesStore.setSummarizing(assistantMessageId, false)
-            }
-          }
+          // Summary generation and auto story naming disabled
 
           // Check for auto-generation after all processing is complete
           if (shouldSummarize && cleanedContent.trim()) {
