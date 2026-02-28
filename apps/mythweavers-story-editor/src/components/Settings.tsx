@@ -10,7 +10,6 @@ import {
   BsListTask,
   BsPencilSquare,
   BsTrash,
-  BsUpload,
 } from 'solid-icons/bs'
 import { type Component, For, type JSX, Show, createMemo, createSignal, onMount } from 'solid-js'
 import { CONTEXT_SIZE_STEP, STORY_FORMATS, STORY_SETTINGS } from '../constants'
@@ -59,8 +58,6 @@ interface SettingsProps {
   onRemoveUserMessages: () => void
   onCleanupThinkTags: () => void
   onRewriteMessages: () => void
-  onExportStory: () => void
-  onImportStory: (storyText: string) => void
   onImportClaudeChat: (
     conversationName: string,
     messages: Message[],
@@ -91,15 +88,12 @@ interface SettingsProps {
 }
 
 export const Settings: Component<SettingsProps> = (props) => {
-  const [showImportDialog, setShowImportDialog] = createSignal(false)
   const [showClaudeChatImportModal, setShowClaudeChatImportModal] = createSignal(false)
-  const [importText, setImportText] = createSignal('')
   const [showOpenRouterKey, setShowOpenRouterKey] = createSignal(false)
   const [showAnthropicKey, setShowAnthropicKey] = createSignal(false)
   const [showOpenAIKey, setShowOpenAIKey] = createSignal(false)
   const [showDeletedTurnsModal, setShowDeletedTurnsModal] = createSignal(false)
   const [showDeletedNodesModal, setShowDeletedNodesModal] = createSignal(false)
-  const [importError, setImportError] = createSignal('')
 
   let panelRef: ListDetailPanelRef | undefined
 
@@ -118,20 +112,6 @@ export const Settings: Component<SettingsProps> = (props) => {
   const orphanedMessagesCount = createMemo(
     () => messagesStore.messages.filter((msg) => !msg.sceneId).length,
   )
-
-  const handleImportStory = () => {
-    const text = importText().trim()
-    if (text) {
-      try {
-        setImportError('')
-        props.onImportStory(text)
-        setImportText('')
-        setShowImportDialog(false)
-      } catch (error) {
-        setImportError(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
-    }
-  }
 
   const handleAttachOrphanedMessages = () => {
     const chapterNodes = nodeStore.nodesArray.filter((n) => n.type === 'chapter').sort((a, b) => a.order - b.order)
@@ -501,30 +481,6 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   const renderImportExportSection = () => (
     <div class={styles.section}>
-      <Show when={messagesStore.hasStoryMessages}>
-        <div class={styles.settingRow}>
-          <button
-            onClick={props.onExportStory}
-            disabled={props.isLoading || globalOperationStore.isOperationInProgress()}
-            class={styles.button}
-            title="Copy entire story with all data as JSON to clipboard"
-          >
-            <BsDownload /> Export as JSON
-          </button>
-        </div>
-      </Show>
-
-      <div class={styles.settingRow}>
-        <button
-          onClick={() => setShowImportDialog(true)}
-          disabled={props.isLoading || globalOperationStore.isOperationInProgress()}
-          class={styles.button}
-          title="Import story from JSON or text"
-        >
-          <BsUpload /> Import Story
-        </button>
-      </div>
-
       <div class={styles.settingRow}>
         <button
           onClick={() => setShowClaudeChatImportModal(true)}
@@ -593,52 +549,6 @@ export const Settings: Component<SettingsProps> = (props) => {
         detailTitle={(section) => section.name}
         renderDetail={(section) => renderSectionContent(section.id)}
       />
-
-      <Show when={showImportDialog()}>
-        <div class={styles.dialogOverlay}>
-          <div class={styles.dialog}>
-            <div class={styles.dialogHeader}>
-              <h3 class={styles.dialogTitle}>Import Story</h3>
-              <button onClick={() => setShowImportDialog(false)} class={styles.dialogCloseButton} title="Close">
-                ×
-              </button>
-            </div>
-            <div class={styles.dialogContent}>
-              <p class={styles.dialogInfo}>
-                Paste either JSON export data (preserves all story data, characters, and settings) or plain text story
-                content.
-              </p>
-              <textarea
-                value={importText()}
-                onInput={(e) => {
-                  setImportText(e.target.value)
-                  setImportError('')
-                }}
-                placeholder="Paste JSON export or story text here..."
-                class={styles.textarea}
-                rows={10}
-              />
-              <Show when={importError()}>
-                <div class={styles.errorText}>{importError()}</div>
-              </Show>
-              <div class={styles.dialogActions}>
-                <button onClick={handleImportStory} disabled={!importText().trim()} class={styles.primaryButton}>
-                  Import Story
-                </button>
-                <button
-                  onClick={() => {
-                    setShowImportDialog(false)
-                    setImportText('')
-                  }}
-                  class={styles.secondaryButton}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Show>
 
       <DeletedTurnsModal
         show={showDeletedTurnsModal()}

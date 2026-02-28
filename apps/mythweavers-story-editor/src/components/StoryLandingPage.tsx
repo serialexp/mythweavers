@@ -22,7 +22,7 @@ import {
 import { useNavigate } from '@solidjs/router'
 import { Component, Show, createMemo, createSignal, onMount } from 'solid-js'
 import { authStore } from '../stores/authStore'
-import { getCalendarsPresets, postMyStories, postMyStoriesByStoryIdCalendars } from '../client/config'
+import { getApiBaseUrl, getCalendarsPresets, postMyStories, postMyStoriesByStoryIdCalendars } from '../client/config'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -404,6 +404,36 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     input.click()
   }
 
+  const handleExportZip = async (storyId: string) => {
+    try {
+      const baseUrl = getApiBaseUrl()
+      const response = await fetch(`${baseUrl}/my/stories/${storyId}/export-zip`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Export failed' }))
+        throw new Error(error.error || 'Export failed')
+      }
+
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const filenameMatch = contentDisposition?.match(/filename="?(.+?)"?$/)
+      const filename = filenameMatch?.[1] || `story-${storyId}.zip`
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to export story:', error)
+      alert(`Failed to export story: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   return (
     <div class={styles.pageWrapper}>
       <NavBar variant="elevated" style={{ 'flex-shrink': '0' }}>
@@ -529,6 +559,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
                     stories={combinedStories()}
                     onLoadStory={handleLoadStory}
                     onDeleteStory={handleDeleteStory}
+                    onExportZip={serverAvailable() ? handleExportZip : undefined}
                     onSyncToServer={serverAvailable() ? handleSyncToServer : undefined}
                     syncing={syncing()}
                     editingEnabled={true}

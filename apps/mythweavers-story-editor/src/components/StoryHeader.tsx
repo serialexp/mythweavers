@@ -65,8 +65,6 @@ interface StoryHeaderProps {
   onRemoveUserMessages: () => void
   onCleanupThinkTags: () => void
   onRewriteMessages: () => void
-  onExportStory: () => void
-  onImportStory: () => void
   onImportClaudeChat: (
     conversationName: string,
     messages: Message[],
@@ -397,8 +395,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           onRemoveUserMessages={props.onRemoveUserMessages}
           onCleanupThinkTags={props.onCleanupThinkTags}
           onRewriteMessages={props.onRewriteMessages}
-          onExportStory={props.onExportStory}
-          onImportStory={props.onImportStory}
           onImportClaudeChat={props.onImportClaudeChat}
           onImportClaudeChatWithBranches={props.onImportClaudeChatWithBranches}
           serverAvailable={props.serverAvailable}

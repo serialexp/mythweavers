@@ -686,109 +686,6 @@ const App: Component = () => {
     rewriteDialogStore.show(messageId ? [messageId] : [])
   }
 
-  const handleExportStory = () => {
-    const storyMessages = messagesStore.messages.filter((m) => m.role === 'assistant' && !m.isQuery)
-    const chapters = storyMessages.map((msg, index) => {
-      const chapterHeader = `--- Chapter ${index + 1} ---\n\n`
-      return chapterHeader + msg.content
-    })
-
-    const storyContent = chapters.join('\n\n\n')
-    const blob = new Blob([storyContent], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'story-export.txt'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handleImportStory = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.txt,.json'
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (!file) return
-
-      const text = await file.text()
-      await importStoryFromText(text)
-    }
-    input.click()
-  }
-
-  const importStoryFromText = async (importText: string) => {
-    try {
-      const importData = JSON.parse(importText)
-
-      if (Array.isArray(importData.messages)) {
-        messagesStore.clearMessages()
-
-        importData.messages.forEach((msg: Message) => {
-          const message: Message = {
-            ...msg,
-            timestamp: new Date(msg.timestamp),
-            isSummarizing: false,
-          }
-          messagesStore.appendMessage(message)
-        })
-
-        if (importData.characters) {
-          charactersStore.setCharacters(importData.characters)
-        }
-
-        if (importData.contextItems) {
-          contextItemsStore.setContextItems(importData.contextItems)
-        }
-
-        if (importData.settings) {
-          if (importData.settings.storySetting) {
-            settingsStore.setStorySetting(importData.settings.storySetting)
-          }
-          if (importData.settings.provider) {
-            settingsStore.setProvider(importData.settings.provider)
-          }
-          if (importData.settings.model) {
-            settingsStore.setModel(importData.settings.model)
-          }
-        }
-
-        if (importData.currentInput) {
-          messagesStore.setInput(importData.currentInput)
-        }
-
-        // Story imported from JSON
-        return
-      }
-    } catch (_jsonError) {
-      // JSON import failed, trying text import
-    }
-
-    messagesStore.clearMessages()
-
-    const chapters = importText
-      .split(/--- Chapter \d+ ---|\n\n\n/)
-      .map((chapter) => chapter.trim())
-      .filter((chapter) => chapter.length > 0)
-
-    const { generateMessageId } = await import('./utils/id')
-
-    chapters.forEach((chapter, index) => {
-      const message: Message = {
-        id: generateMessageId(),
-        role: 'assistant',
-        content: chapter,
-        instruction: index === 0 ? 'Begin the story' : 'Continue the story',
-        timestamp: new Date(Date.now() + index * 1000),
-        order: index, // Use index as order for imported messages
-        isQuery: false,
-      }
-      messagesStore.appendMessage(message)
-    })
-
-    // Story imported from text
-  }
-
   const handleImportClaudeChat = async (
     conversationName: string,
     messages: Message[],
@@ -1110,8 +1007,6 @@ const App: Component = () => {
                           onRemoveUserMessages={handleRemoveUserMessages}
                           onCleanupThinkTags={handleCleanupThinkTags}
                           onRewriteMessages={handleRewriteMessages}
-                          onExportStory={handleExportStory}
-                          onImportStory={handleImportStory}
                           onImportClaudeChat={handleImportClaudeChat}
                           onImportClaudeChatWithBranches={handleImportClaudeChatWithBranches}
                           serverAvailable={serverStore.isAvailable}

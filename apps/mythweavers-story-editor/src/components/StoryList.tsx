@@ -1,5 +1,5 @@
 import { Badge, Card, CardBody, IconButton, Input, Spinner } from '@mythweavers/ui'
-import { BsCloudFill, BsExclamationTriangle, BsFilePdf, BsHddFill, BsPencil, BsServer, BsTrash } from 'solid-icons/bs'
+import { BsCloudFill, BsDownload, BsExclamationTriangle, BsFilePdf, BsHddFill, BsPencil, BsServer, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { storyManager } from '../utils/storyManager'
@@ -23,6 +23,7 @@ interface StoryListProps {
   onLoadStory: (storyId: string, type: 'local' | 'server') => void | Promise<void>
   onDeleteStory?: (storyId: string, type: 'local' | 'server') => void
   onExportPdf?: (storyId: string) => void
+  onExportZip?: (storyId: string) => void
   onSyncToServer?: (storyId: string) => void
   onRename?: () => void
   syncing?: string | null
@@ -224,6 +225,17 @@ export const StoryList: Component<StoryListProps> = (props) => {
                       onClick={() => props.onExportPdf!(story.id)}
                     >
                       <BsFilePdf />
+                    </IconButton>
+                  </Show>
+
+                  <Show when={story.type === 'server' && props.onExportZip}>
+                    <IconButton
+                      aria-label="Export as ZIP"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => props.onExportZip!(story.id)}
+                    >
+                      <BsDownload />
                     </IconButton>
                   </Show>
 
