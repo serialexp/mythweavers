@@ -3,12 +3,8 @@ import { Router } from '@solidjs/router'
 import { render } from 'solid-js/web'
 import App from './App.tsx'
 import { AppErrorBoundary } from './components/ErrorBoundary.tsx'
-import { initializeClientLogger } from './utils/clientLogger.ts'
 import './index.css'
 import './styles/variables.css'
-
-// Initialize client logger to send logs to server
-initializeClientLogger()
 
 // Reusable error overlay function
 function showErrorOverlay(title: string, sections: Array<{ label?: string; content: string; isStack?: boolean }>) {
@@ -104,12 +100,6 @@ window.addEventListener('unhandledrejection', (event) => {
   event.preventDefault()
 })
 
-// Log that we're starting the app
-console.log('Starting Story App...')
-
-// Debug: Test if console.log was overridden
-console.log('This should be sent to server if logger is working')
-
 // Unregister any existing service workers
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -120,11 +110,8 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-console.log('About to render app...')
-
 try {
   render(() => {
-    console.log('Inside render function...')
     return (
       <ThemeProvider defaultTheme="chronicle">
         <Router>
@@ -135,7 +122,6 @@ try {
       </ThemeProvider>
     )
   }, document.getElementById('root')!)
-  console.log('Render completed')
 } catch (error) {
   console.error('CAUGHT ERROR IN RENDER:', error)
 

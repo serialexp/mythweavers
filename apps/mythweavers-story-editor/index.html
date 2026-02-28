@@ -27,76 +27,9 @@
     <title>MythWeavers</title>
     <!-- Runtime configuration -->
     <script src="/config.js"></script>
-    <script>
-      // Store original console methods
-      const originalConsole = {
-        log: console.log.bind(console),
-        error: console.error.bind(console),
-        warn: console.warn.bind(console)
-      };
-      
-      // Override console methods to send to server
-      const sendToServer = (level, args) => {
-        const message = args.map(arg => {
-          try {
-            return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
-          } catch {
-            return String(arg);
-          }
-        }).join(' ');
-        
-        // Use the same logic as getApiBaseUrl in apiClient.ts
-        const backendUrl = window.RUNTIME_CONFIG?.BACKEND_URL || `http://${window.location.hostname}:3001`;
-        fetch(`${backendUrl}/api/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            level,
-            message,
-            timestamp: new Date().toISOString()
-          })
-        }).catch(() => {});
-      };
-      
-      // Check if we're in a desktop browser (not mobile)
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        // Only override console on mobile devices
-        console.log = (...args) => {
-          originalConsole.log(...args);
-          sendToServer('log', args);
-        };
-        
-        console.error = (...args) => {
-          originalConsole.error(...args);
-          sendToServer('error', args);
-        };
-        
-        console.warn = (...args) => {
-          originalConsole.warn(...args);
-          sendToServer('warn', args);
-        };
-        
-        // Capture unhandled errors
-        window.addEventListener('error', (event) => {
-          sendToServer('error', [`Unhandled error: ${event.message} at ${event.filename}:${event.lineno}:${event.colno}`]);
-        });
-        
-        console.log('Console override installed in HTML (mobile device detected)');
-      } else {
-        console.log('Desktop browser detected - console override disabled');
-      }
-    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      console.log('Body loaded - about to load main.tsx');
-    </script>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      console.log('Script tag added - main.tsx should be loading');
-    </script>
   </body>
 </html>
