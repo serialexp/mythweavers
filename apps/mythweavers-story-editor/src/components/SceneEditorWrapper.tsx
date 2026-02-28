@@ -1,7 +1,7 @@
 import { paragraphsToText, type Paragraph, type ParagraphInventoryAction } from '@mythweavers/shared'
 import { SceneEditor } from '@mythweavers/ui'
 import type { EditorCharacter, EditorScene } from '@mythweavers/ui'
-import { Component, Show, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
+import { Component, Show, createMemo, createSignal, onCleanup } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -93,16 +93,6 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
   // Current paragraphs: edited if user has made changes, otherwise source
   const currentParagraphs = createMemo(() => editedParagraphs() ?? sourceParagraphs())
 
-  // Reset edited paragraphs when source changes (e.g., after streaming completes)
-  createEffect(
-    on(sourceParagraphs, () => {
-      // Only reset if we don't have unsaved changes
-      if (!isDirty()) {
-        setEditedParagraphs(null)
-      }
-    }),
-  )
-
   // Convert characters to editor format
   const editorCharacters = createMemo((): Record<string, EditorCharacter> => {
     const chars: Record<string, EditorCharacter> = {}
@@ -144,27 +134,39 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
       return
     }
 
+    // Snapshot what we're saving — if new edits arrive during the async save,
+    // editedParagraphs() will be a different reference (handleParagraphsChange
+    // always sets a new array).
+    const savingParagraphs = edited
+
     console.log('[SceneEditorWrapper] Saving changes...')
 
     try {
       // Save paragraphs to backend with diffing
       const original = msg.paragraphs || []
-      const result = await saveService.saveParagraphs(revisionId, original as Paragraph[], edited)
+      const result = await saveService.saveParagraphs(revisionId, original as Paragraph[], savingParagraphs)
       console.log(
         `[SceneEditorWrapper] Saved: ${result.created} created, ${result.updated} updated, ${result.deleted} deleted`,
       )
 
-      // Update local message store with new paragraphs and flattened content
-      // Use NoSave variant since we already saved paragraphs directly above
-      const flattenedContent = paragraphsToText(edited)
+      // Update local message store with saved paragraphs and flattened content
+      const flattenedContent = paragraphsToText(savingParagraphs)
       messagesStore.updateMessageNoSave(props.messageId, {
         content: flattenedContent,
-        paragraphs: edited,
+        paragraphs: savingParagraphs,
       })
 
-      // Clear dirty state
-      setIsDirty(false)
-      setEditedParagraphs(null)
+      // Only clear dirty state if NO new edits arrived during the save.
+      // handleParagraphsChange always creates a new array reference, so
+      // reference-equality tells us whether the user kept editing.
+      if (editedParagraphs() === savingParagraphs) {
+        setIsDirty(false)
+        setEditedParagraphs(null)
+      } else {
+        // New edits arrived during save — keep dirty state, reschedule
+        console.log('[SceneEditorWrapper] New edits arrived during save, keeping dirty state')
+        scheduleAutoSave()
+      }
     } catch (error) {
       console.error('[SceneEditorWrapper] Failed to save paragraphs:', error)
     }

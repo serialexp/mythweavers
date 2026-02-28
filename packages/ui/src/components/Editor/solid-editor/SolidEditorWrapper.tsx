@@ -121,29 +121,58 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
 
   // Track last paragraph content for streaming updates
   let lastParagraphContent: string[] = []
+  // Track previous editable state to detect transitions
+  let lastEditable = props.editable ?? true
 
-  // Initialize state when paragraphs structurally change (new/removed paragraphs)
-  // During streaming (not editable), also update when content changes
+  // Sync external paragraph state into the editor.
+  //
+  // The editor OWNS its state while editable — external paragraph changes are
+  // ignored so that saves, WebSocket events, or store updates can never blow
+  // away the user's in-flight edits.
+  //
+  // External state is accepted in three cases:
+  //  1. Initial load (no EditorState yet)
+  //  2. While not editable (streaming generation)
+  //  3. Transition from not-editable → editable (lock in generated content)
   createEffect(() => {
     const paragraphs = props.paragraphs
+    const editable = props.editable ?? true
     const currentIds = paragraphs.map((p) => p.id)
     const currentContent = paragraphs.map((p) => p.body)
 
     const idsChanged =
       currentIds.length !== lastParagraphIds.length || currentIds.some((id, i) => id !== lastParagraphIds[i])
 
-    // During streaming (not editable), also check for content changes
     const contentChanged =
-      props.editable === false &&
-      (currentContent.length !== lastParagraphContent.length ||
-        currentContent.some((body, i) => body !== lastParagraphContent[i]))
+      currentContent.length !== lastParagraphContent.length ||
+      currentContent.some((body, i) => body !== lastParagraphContent[i])
+
+    // Detect transition from not-editable to editable
+    const becameEditable = editable && !lastEditable
+    lastEditable = editable
 
     const currentState = state()
 
-    // Recreate state if: initial load, structure changed, or content changed during streaming
-    if (!currentState || idsChanged || contentChanged) {
-      lastParagraphIds = currentIds
-      lastParagraphContent = currentContent
+    // Determine whether to recreate EditorState from external props
+    let shouldRecreate = false
+
+    if (!currentState) {
+      // Initial load — always create
+      shouldRecreate = true
+    } else if (!editable && (idsChanged || contentChanged)) {
+      // Streaming / not editable — accept all external changes
+      shouldRecreate = true
+    } else if (becameEditable) {
+      // Just became editable — accept final streamed state
+      shouldRecreate = true
+    }
+    // When editable: do NOT recreate. The editor's internal state is authoritative.
+
+    // Always update tracking vars to prevent stale comparisons on next run
+    lastParagraphIds = currentIds
+    lastParagraphContent = currentContent
+
+    if (shouldRecreate) {
       const doc = paragraphsToDoc(paragraphs)
       const newState = EditorState.create({
         doc,
