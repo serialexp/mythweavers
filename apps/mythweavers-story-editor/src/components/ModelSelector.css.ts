@@ -21,14 +21,20 @@ export const modelDisplay = style({
   whiteSpace: 'nowrap',
 })
 
+export const tableWrapper = style({
+  overflowX: 'auto',
+  WebkitOverflowScrolling: 'touch',
+})
+
 export const table = style({
   width: '100%',
+  minWidth: '500px',
   borderCollapse: 'collapse',
 })
 
 export const tableHeader = style({
   display: 'grid',
-  gridTemplateColumns: '1fr 100px 100px 120px 80px',
+  gridTemplateColumns: '1fr 80px 80px 120px 60px',
   gap: tokens.space['2'],
   padding: `${tokens.space['2']} ${tokens.space['3']}`,
   backgroundColor: tokens.color.bg.base,
@@ -45,7 +51,7 @@ export const tableBody = style({
 
 export const tableRow = style({
   display: 'grid',
-  gridTemplateColumns: '1fr 100px 100px 120px 80px',
+  gridTemplateColumns: '1fr 80px 80px 120px 60px',
   gap: tokens.space['2'],
   padding: `${tokens.space['2']} ${tokens.space['3']}`,
   borderBottom: `1px solid ${tokens.color.border.subtle}`,
