@@ -1,7 +1,7 @@
 import { paragraphsToText, type Paragraph, type ParagraphInventoryAction } from '@mythweavers/shared'
 import { SceneEditor } from '@mythweavers/ui'
 import type { EditorCharacter, EditorScene } from '@mythweavers/ui'
-import { Component, Show, createMemo, createSignal, onCleanup } from 'solid-js'
+import { Component, Show, createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -61,6 +61,16 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     // Save any pending changes when unmounting
     if (isDirty()) {
       saveChanges()
+    }
+  })
+
+  // When editor becomes non-editable (regeneration starts), clear local edits
+  // so currentParagraphs falls through to sourceParagraphs from the store
+  createEffect(() => {
+    if (!(props.editable ?? true)) {
+      setEditedParagraphs(null)
+      setIsDirty(false)
+      clearAutoSaveTimer()
     }
   })
 
