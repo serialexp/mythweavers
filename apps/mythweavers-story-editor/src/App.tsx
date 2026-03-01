@@ -99,6 +99,19 @@ const App: Component = () => {
   // Initialize cache management
   useCacheManagement()
 
+  // Update window title with active story and selected node
+  createEffect(() => {
+    const storyName = currentStoryStore.name
+    const selectedNode = nodeStore.getSelectedNode()
+    if (!storyName) {
+      document.title = 'MythWeavers'
+    } else if (selectedNode) {
+      document.title = `${selectedNode.title} — ${storyName} — MythWeavers`
+    } else {
+      document.title = `${storyName} — MythWeavers`
+    }
+  })
+
   // Effective context size based on model and provider
   const effectiveContextSize = createMemo(() => {
     const selectedModel = modelsStore.availableModels.find((m) => m.name === settingsStore.model)
