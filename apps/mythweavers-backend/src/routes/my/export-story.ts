@@ -198,6 +198,7 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
       selectedNodeId: sceneId,
       provider: 'ollama', // Required field with default
       model: null,
+      openaiEndpoint: null,
       globalScript: cyoa.memory || null,
       plotPointDefaults: null,
     },
@@ -521,6 +522,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           selectedNodeId: story.selectedNodeId,
           provider: story.provider,
           model: story.model,
+          openaiEndpoint: story.openaiEndpoint,
           globalScript: story.globalScript,
           plotPointDefaults: story.plotPointDefaults,
         },
@@ -1051,6 +1053,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
             selectedNodeId: null, // Will be remapped later
             provider: storyData.provider,
             model: storyData.model,
+            openaiEndpoint: storyData.openaiEndpoint || null,
             globalScript: storyData.globalScript,
             plotPointDefaults: storyData.plotPointDefaults,
             // These will be set after creating related entities
