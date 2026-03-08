@@ -46,10 +46,13 @@ export class OpenAILLMClient extends BaseLLMClient {
       const data = await response.json()
       this.log('Models response:', data)
 
-      // Filter and map models that are useful for text generation
-      const textModels = data.data.filter(
-        (model: any) => model.id.includes('gpt') && !model.id.includes('vision') && !model.id.includes('instruct'),
-      )
+      // Filter models - for custom endpoints show all models, for OpenAI filter to GPT models
+      const isCustomEndpoint = !!currentStoryStore.openaiEndpoint
+      const textModels = isCustomEndpoint
+        ? data.data
+        : data.data.filter(
+            (model: any) => model.id.includes('gpt') && !model.id.includes('vision') && !model.id.includes('instruct'),
+          )
 
       // Pricing map for different models (prices per million tokens)
       const pricingMap: Record<string, ModelPricing> = {
@@ -149,7 +152,8 @@ export class OpenAILLMClient extends BaseLLMClient {
       const models: LLMModel[] = textModels.map((model: any) => {
         // Find pricing - try exact match first, then pattern matching
         let pricing = pricingMap[model.id]
-        let contextLength = contextLengthMap[model.id] || 8192 // default
+        // Use context_length from API response if available, then lookup, then default
+        let contextLength = model.context_length || contextLengthMap[model.id] || 8192
 
         if (!pricing) {
           // Fall back to pattern matching for partial matches
