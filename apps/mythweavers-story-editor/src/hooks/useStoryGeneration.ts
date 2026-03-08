@@ -85,7 +85,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
       currentStoryStore.globalScript,
     )
     const storyDateContext = getStoryDateContext(chapterNode)
-    const randomNamesContext = getRandomNamesContext()
+    const randomNamesContext = settingsStore.includeNameSuggestions ? getRandomNamesContext() : ''
     const fullContext = characterContext + contextItemsContext + storyDateContext + randomNamesContext
 
     // For protagonist name, we need the evaluated version

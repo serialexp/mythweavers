@@ -331,6 +331,21 @@ export const Settings: Component<SettingsProps> = (props) => {
           Uses more tokens but produces better quality content.
         </span>
       </div>
+
+      <div class={styles.settingRow}>
+        <label class={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={settingsStore.includeNameSuggestions}
+            onChange={(e) => settingsStore.setIncludeNameSuggestions(e.target.checked)}
+            class={styles.checkbox}
+          />
+          Include name suggestions
+        </label>
+        <span class={styles.infoText}>
+          Append a list of random name suggestions to the context. Some models overuse these names — disable if characters are being named too eagerly.
+        </span>
+      </div>
     </div>
   )
 
