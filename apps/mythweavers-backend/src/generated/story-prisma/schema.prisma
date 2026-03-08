@@ -72,8 +72,9 @@ model Story {
   userId            String? // Nullable initially for migration
 
   // LLM settings
-  provider String  @default("ollama") // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
-  model    String? // Model name for the selected provider
+  provider       String  @default("ollama") // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
+  model          String? // Model name for the selected provider
+  openaiEndpoint String? // Custom base URL for OpenAI-compatible APIs
 
   // Timeline settings (minutes from 0 BBY)
   timelineStartTime   Int? // Story timeline start (negative = BBY, positive = ABY)

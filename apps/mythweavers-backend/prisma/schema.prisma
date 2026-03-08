@@ -211,6 +211,7 @@ model Story {
   // LLM settings (from Story Project)
   provider               String            @default("ollama") // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
   model                  String?
+  openaiEndpoint         String?           // Custom base URL for OpenAI-compatible APIs
 
   // Script support
   globalScript           String?           @db.Text // JavaScript function for initializing story data and defining reusable functions

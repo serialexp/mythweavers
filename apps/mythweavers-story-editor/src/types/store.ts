@@ -24,6 +24,7 @@ export interface CurrentStory {
   // LLM settings
   provider?: string // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
   model?: string | null // Model name for the selected provider
+  openaiEndpoint?: string // Custom base URL for OpenAI-compatible APIs
 }
 
 export interface CacheEntry {
@@ -92,6 +93,7 @@ export interface SavedStory {
   // LLM settings
   provider?: string // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
   model?: string | null // Model name for the selected provider
+  openaiEndpoint?: string // Custom base URL for OpenAI-compatible APIs
 }
 
 export interface StoryMetadata {

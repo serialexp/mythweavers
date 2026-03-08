@@ -335,6 +335,7 @@ interface StorySettingsOperation extends SaveOperationBase {
     timelineGranularity: 'hour' | 'day'
     provider: string
     model: string | null
+    openaiEndpoint: string
     plotPointDefaults: unknown[]
   }>
 }
@@ -766,7 +767,7 @@ export class SaveService {
           }
         }
 
-        await postMyStoriesByStoryIdCharacters({
+        const insertResult = await postMyStoriesByStoryIdCharacters({
           path: { storyId },
           body: {
             firstName: operation.data.firstName,
@@ -779,6 +780,10 @@ export class SaveService {
             pictureFileId: pictureFileId || undefined,
           },
         })
+        if (insertResult.error) {
+          console.error('[saveService] postMyStoriesByStoryIdCharacters failed:', insertResult.error)
+          throw new Error((insertResult.error as any)?.error || 'Character create failed')
+        }
         break
       }
 
@@ -828,13 +833,22 @@ export class SaveService {
             pictureFileId: pictureFileId,
           },
         })
+        if (result.error) {
+          console.error('[saveService] patchMyCharactersById failed for:', entityId, result.error)
+          throw new Error((result.error as any)?.error || 'Character update failed')
+        }
         console.log('[saveService] patchMyCharactersById completed for:', entityId, 'success:', result.data?.success)
         break
       }
 
-      case 'character-delete':
-        await deleteMyCharactersById({ path: { id: entityId } })
+      case 'character-delete': {
+        const deleteResult = await deleteMyCharactersById({ path: { id: entityId } })
+        if (deleteResult.error) {
+          console.error('[saveService] deleteMyCharactersById failed:', deleteResult.error)
+          throw new Error((deleteResult.error as any)?.error || 'Character delete failed')
+        }
         break
+      }
 
       case 'context-insert': {
         await postMyStoriesByStoryIdContextItems({
@@ -1276,6 +1290,7 @@ export class SaveService {
           timelineGranularity: operation.data.timelineGranularity,
           provider: operation.data.provider,
           model: operation.data.model,
+          openaiEndpoint: operation.data.openaiEndpoint,
           globalScript: operation.data.globalScript,
           selectedNodeId: operation.data.selectedNodeId,
           branchChoices: operation.data.branchChoices,
@@ -1643,6 +1658,7 @@ export class SaveService {
       timelineGranularity: 'hour' | 'day'
       provider: string
       model: string | null
+      openaiEndpoint: string
     }>,
   ) {
     // Generate a unique ID for this settings update

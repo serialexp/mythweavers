@@ -1,3 +1,4 @@
+import { currentStoryStore } from '../../stores/currentStoryStore'
 import { settingsStore } from '../../stores/settingsStore'
 import { LLMGenerateOptions, LLMGenerateResponse, LLMMessage, LLMModel, ModelPricing } from '../../types/llm'
 import { BaseLLMClient } from './BaseLLMClient'
@@ -10,6 +11,15 @@ interface OpenAIMessage {
 export class OpenAILLMClient extends BaseLLMClient {
   protected provider = 'openai'
 
+  private getBaseUrl(): string {
+    const custom = currentStoryStore.openaiEndpoint
+    if (custom) {
+      // Strip trailing slash for consistency
+      return custom.replace(/\/+$/, '')
+    }
+    return 'https://api.openai.com'
+  }
+
   async list(): Promise<{ models: LLMModel[] }> {
     try {
       const apiKey = settingsStore.openaiApiKey
@@ -20,7 +30,7 @@ export class OpenAILLMClient extends BaseLLMClient {
 
       this.log('Fetching models from OpenAI...')
 
-      const response = await fetch('https://api.openai.com/v1/models', {
+      const response = await fetch(`${this.getBaseUrl()}/v1/models`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -214,7 +224,7 @@ export class OpenAILLMClient extends BaseLLMClient {
 
       this.log('Request:', { model, messageCount: messages.length })
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`${this.getBaseUrl()}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

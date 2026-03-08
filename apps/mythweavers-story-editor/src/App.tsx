@@ -214,6 +214,7 @@ const App: Component = () => {
         story.timelineGranularity || 'hour',
         story.provider || 'ollama',
         story.model,
+        story.openaiEndpoint || '',
       )
 
       console.log('[loadServerStoryData] Setting last known updated at...')
@@ -539,6 +540,7 @@ const App: Component = () => {
         story.timelineGranularity,
         story.provider,
         story.model,
+        story.openaiEndpoint,
       )
 
       // Sync provider and model from story to settingsStore

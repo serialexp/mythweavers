@@ -140,6 +140,10 @@ const storySchema = z.strictObject({
     description: 'LLM model',
     example: 'claude-sonnet-4',
   }),
+  openaiEndpoint: z.string().nullable().meta({
+    description: 'Custom base URL for OpenAI-compatible APIs',
+    example: 'https://api.openai.com',
+  }),
   coverColor: z.string().meta({
     description: 'Cover background color',
     example: '#000000',
@@ -242,6 +246,10 @@ const createStoryBodySchema = z.strictObject({
     description: 'LLM model name',
     example: 'claude-sonnet-4',
   }),
+  openaiEndpoint: z.string().optional().meta({
+    description: 'Custom base URL for OpenAI-compatible APIs',
+    example: 'https://api.openai.com',
+  }),
 })
 
 // Update story request body (all fields optional)
@@ -293,6 +301,10 @@ const updateStoryBodySchema = z.strictObject({
   model: z.string().nullable().optional().meta({
     description: 'LLM model name',
     example: 'claude-sonnet-4',
+  }),
+  openaiEndpoint: z.string().nullable().optional().meta({
+    description: 'Custom base URL for OpenAI-compatible APIs',
+    example: 'https://api.openai.com',
   }),
   coverColor: z.string().optional(),
   coverTextColor: z.string().optional(),

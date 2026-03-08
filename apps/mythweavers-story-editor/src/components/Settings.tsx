@@ -202,6 +202,19 @@ export const Settings: Component<SettingsProps> = (props) => {
             </button>
           </div>
         </div>
+        <div class={styles.settingRow}>
+          <label class={styles.label}>Custom Endpoint</label>
+          <input
+            type="text"
+            value={currentStoryStore.openaiEndpoint}
+            onChange={(e) => currentStoryStore.setOpenaiEndpoint(e.target.value)}
+            class={styles.input}
+            placeholder="https://api.openai.com (default)"
+          />
+          <span class={styles.infoText}>
+            Override the base URL for OpenAI-compatible APIs (e.g. LM Studio, vLLM, etc.)
+          </span>
+        </div>
       </Show>
 
       <div class={styles.settingRow}>
