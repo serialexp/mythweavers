@@ -79,6 +79,18 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     return messagesStore.messages.find((m) => m.id === props.messageId)
   })
 
+  // When contentVersion bumps, clear local edits so the editor picks up the new store content
+  let lastContentVersion = message()?.contentVersion ?? 0
+  createEffect(() => {
+    const version = message()?.contentVersion ?? 0
+    if (version !== lastContentVersion) {
+      lastContentVersion = version
+      setEditedParagraphs(null)
+      setIsDirty(false)
+      clearAutoSaveTimer()
+    }
+  })
+
   // Get the scene node (if the message belongs to a scene)
   const scene = createMemo(() => {
     const msg = message()
@@ -262,6 +274,7 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
         locations={{}}
         sceneId={props.messageId}
         editable={props.editable ?? true}
+        contentVersion={message()?.contentVersion}
         onParagraphsChange={handleParagraphsChange}
         onParagraphCreate={handleParagraphCreate}
         onParagraphDelete={handleParagraphDelete}

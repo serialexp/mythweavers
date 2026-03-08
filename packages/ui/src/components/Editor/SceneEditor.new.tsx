@@ -92,6 +92,7 @@ export function SceneEditor(props: SceneEditorProps) {
     <SolidEditorWrapper
       paragraphs={props.scene.paragraphs}
       editable={props.editable ?? true}
+      contentVersion={props.contentVersion}
       onParagraphsChange={handleParagraphsChange}
       onParagraphCreate={props.onParagraphCreate}
       onParagraphDelete={props.onParagraphDelete}

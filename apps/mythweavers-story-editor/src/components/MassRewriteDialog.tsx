@@ -362,6 +362,7 @@ export function MassRewriteDialog() {
           currentMessageRevisionId: revisionId,
           paragraphs,
         })
+        messagesStore.bumpContentVersion(result.messageId)
       } catch (error) {
         console.error('Failed to create message revision:', error)
       }

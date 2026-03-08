@@ -451,6 +451,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
 
     messagesStore.setIsLoading(true)
     messagesStore.updateMessage(messageId, { content: '', paragraphs: [] })
+    messagesStore.bumpContentVersion(messageId)
 
     // Restore scroll position after DOM updates from content clearing
     if (messagesContainer && savedScrollTop !== undefined) {
@@ -528,6 +529,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
 
     messagesStore.setIsLoading(true)
     messagesStore.updateMessage(messageId, { content: '', paragraphs: [] })
+    messagesStore.bumpContentVersion(messageId)
 
     // Restore scroll position after DOM updates from content clearing
     if (messagesContainer && savedScrollTop !== undefined) {

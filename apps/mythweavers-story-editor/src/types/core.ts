@@ -55,6 +55,7 @@ export interface Message {
   options?: BranchOption[] // Branch options - only for branch messages
   sceneId?: string // References the scene this message belongs to
   currentMessageRevisionId?: string | null // ID of the current message revision (needed for paragraph operations)
+  contentVersion?: number // Ephemeral counter bumped when external content should be accepted by the editor
 }
 
 export interface SceneAnalysis {

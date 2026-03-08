@@ -658,11 +658,13 @@ Title:`
                 comments: [],
               })) as import('@mythweavers/shared').Paragraph[]
 
-            // Update store with paragraphs immediately (synchronous)
+            // Update store with paragraphs immediately (synchronous) and bump content version
+            // so the editor accepts this as authoritative content
             messagesStore.updateMessageNoSave(assistantMessageId, {
               content: cleanedContent,
               paragraphs: localParagraphs,
             })
+            messagesStore.bumpContentVersion(assistantMessageId)
 
             // Fire-and-forget: persist to backend
             import('../services/saveService').then(({ saveService }) => {
@@ -685,6 +687,7 @@ Title:`
                       currentMessageRevisionId: revisionId,
                       paragraphs,
                     })
+                    messagesStore.bumpContentVersion(assistantMessageId)
                   })
                   .catch((error) => {
                     console.error('Failed to save generated content (regeneration):', error)

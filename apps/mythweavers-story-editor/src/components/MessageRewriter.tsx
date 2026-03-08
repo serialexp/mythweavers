@@ -180,6 +180,7 @@ export function MessageRewriter(props: MessageRewriterProps) {
         currentMessageRevisionId: revisionId,
         paragraphs,
       })
+      messagesStore.bumpContentVersion(messageId)
     } catch (error) {
       console.error('Failed to create message revision:', error)
     }
@@ -204,6 +205,7 @@ export function MessageRewriter(props: MessageRewriterProps) {
           currentMessageRevisionId: revisionId,
           paragraphs,
         })
+        messagesStore.bumpContentVersion(result.messageId)
       } catch (error) {
         console.error('Failed to create message revision:', error)
       }

@@ -22,6 +22,13 @@ export interface SolidEditorWrapperProps {
   /** Whether the editor is editable (default: true) */
   editable?: boolean
 
+  /**
+   * Content version counter. When this changes, the editor accepts the new
+   * paragraphs regardless of editable state. Producers bump this when they
+   * set authoritative content (generation complete, rewrite accepted, etc.)
+   */
+  contentVersion?: number
+
   /** Callback when paragraphs change from editing */
   onParagraphsChange: (paragraphs: Paragraph[], changedIds: string[]) => void
 
@@ -80,10 +87,11 @@ export interface SolidEditorWrapperProps {
 export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
   const [state, setState] = createSignal<EditorState | null>(null)
   const [isFocused, setIsFocused] = createSignal(false)
-  // Track paragraph IDs to detect structural changes vs content changes
+  // Track paragraph IDs/content for detecting streaming changes
   let lastParagraphIds: string[] = []
-  // Track whether user has made content edits since last becameEditable transition
-  let hasUserEditedSinceEditable = false
+  let lastParagraphContent: string[] = []
+  // Track content version to detect explicit external content pushes
+  let lastContentVersion = props.contentVersion ?? 0
 
   // Create plugins (memoized to avoid recreating on every render)
   const editorPlugins = createMemo(
@@ -121,25 +129,20 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     }),
   )
 
-  // Track last paragraph content for streaming updates
-  let lastParagraphContent: string[] = []
-  // Track previous editable state to detect transitions
-  let lastEditable = props.editable ?? true
-
   // Sync external paragraph state into the editor.
   //
   // The editor OWNS its state while editable — external paragraph changes are
   // ignored so that saves, WebSocket events, or store updates can never blow
   // away the user's in-flight edits.
   //
-  // External state is accepted in four cases:
+  // External state is accepted in three cases:
   //  1. Initial load (no EditorState yet)
-  //  2. While not editable (streaming generation)
-  //  3. Transition from not-editable → editable (lock in generated content)
-  //  4. While editable but before any user edits (late paragraph updates from server)
+  //  2. While not editable (streaming generation) — accept incremental changes
+  //  3. contentVersion changed — producer explicitly pushed new authoritative content
   createEffect(() => {
     const paragraphs = props.paragraphs
     const editable = props.editable ?? true
+    const contentVersion = props.contentVersion ?? 0
     const currentIds = paragraphs.map((p) => p.id)
     const currentContent = paragraphs.map((p) => p.body)
 
@@ -150,9 +153,8 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
       currentContent.length !== lastParagraphContent.length ||
       currentContent.some((body, i) => body !== lastParagraphContent[i])
 
-    // Detect transition from not-editable to editable
-    const becameEditable = editable && !lastEditable
-    lastEditable = editable
+    const versionChanged = contentVersion !== lastContentVersion
+    lastContentVersion = contentVersion
 
     const currentState = state()
 
@@ -165,16 +167,11 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     } else if (!editable && (idsChanged || contentChanged)) {
       // Streaming / not editable — accept all external changes
       shouldRecreate = true
-    } else if (becameEditable) {
-      // Just became editable — accept final streamed state
-      shouldRecreate = true
-      hasUserEditedSinceEditable = false
-    } else if (editable && !hasUserEditedSinceEditable && (idsChanged || contentChanged)) {
-      // Editable but user hasn't edited yet — accept late external updates
-      // (e.g., server returning paragraph IDs after generation completes)
+    } else if (versionChanged) {
+      // Producer explicitly pushed new content — always accept
       shouldRecreate = true
     }
-    // When editable AND user has edited: do NOT recreate. The editor's internal state is authoritative.
+    // When editable and version unchanged: editor's internal state is authoritative.
 
     // Always update tracking vars to prevent stale comparisons on next run
     lastParagraphIds = currentIds
@@ -204,8 +201,6 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     const allChangedIds = [...changedIds, ...deletedIds]
 
     if (allChangedIds.length > 0) {
-      // User made content edits — stop accepting external updates
-      hasUserEditedSinceEditable = true
       // Update lastParagraphIds so the effect doesn't recreate state
       lastParagraphIds = newIds
       props.onParagraphsChange(newParagraphs, allChangedIds)

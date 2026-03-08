@@ -70,6 +70,9 @@ export interface SceneEditorProps {
   /** Whether the editor is editable (default: true) */
   editable?: boolean
 
+  /** Content version counter — when bumped, editor accepts new content regardless of editable state */
+  contentVersion?: number
+
   /** Tree context (book → arc → chapter) for the current scene */
   treeContext?: {
     book?: EditorTreeNode

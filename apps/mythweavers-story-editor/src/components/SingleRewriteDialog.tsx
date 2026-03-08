@@ -255,6 +255,7 @@ export function SingleRewriteDialog() {
         currentMessageRevisionId: revisionId,
         paragraphs,
       })
+      messagesStore.bumpContentVersion(msg.id)
     } catch (error) {
       console.error('Failed to create message revision:', error)
     }

@@ -755,6 +755,15 @@ export const messagesStore = {
     }
   },
 
+  // Bump the content version for a message, signaling the editor to accept new content.
+  // Call this after setting paragraphs from any external source (generation, rewrite, revision switch, etc.)
+  bumpContentVersion: (id: string) => {
+    const index = messagesState.messages.findIndex((msg) => msg.id === id)
+    if (index !== -1) {
+      setMessagesState('messages', index, 'contentVersion', (prev) => (prev ?? 0) + 1)
+    }
+  },
+
   setInput: (input: string) => {
     setMessagesState('input', input)
     // Persist input to localStorage
@@ -1109,6 +1118,9 @@ export const messagesStore = {
 
     if (hasChanges) {
       messagesStore.updateMessage(messageId, updates)
+      if (updatedParagraphIds.length > 0) {
+        messagesStore.bumpContentVersion(messageId)
+      }
 
       // Save updated paragraphs to backend
       if (updatedParagraphIds.length > 0 && updates.paragraphs) {
@@ -1179,6 +1191,9 @@ export const messagesStore = {
 
     if (replacementCount > 0) {
       messagesStore.updateMessage(messageId, updates)
+      if (updatedParagraphIds.length > 0) {
+        messagesStore.bumpContentVersion(messageId)
+      }
 
       // Save updated paragraphs to backend
       if (updatedParagraphIds.length > 0 && updates.paragraphs) {

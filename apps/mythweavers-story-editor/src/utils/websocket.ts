@@ -168,6 +168,9 @@ export const websocketManager = {
 
     // Update the message in the store without triggering save
     messagesStore.updateMessageNoSave(message.id, message)
+    if (message.paragraphs) {
+      messagesStore.bumpContentVersion(message.id)
+    }
   },
 
   handleMessageCreated(data: { storyId: string; message: any; afterMessageId: string | null }) {
