@@ -82,6 +82,8 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
   const [isFocused, setIsFocused] = createSignal(false)
   // Track paragraph IDs to detect structural changes vs content changes
   let lastParagraphIds: string[] = []
+  // Track whether user has made content edits since last becameEditable transition
+  let hasUserEditedSinceEditable = false
 
   // Create plugins (memoized to avoid recreating on every render)
   const editorPlugins = createMemo(
@@ -130,10 +132,11 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
   // ignored so that saves, WebSocket events, or store updates can never blow
   // away the user's in-flight edits.
   //
-  // External state is accepted in three cases:
+  // External state is accepted in four cases:
   //  1. Initial load (no EditorState yet)
   //  2. While not editable (streaming generation)
   //  3. Transition from not-editable → editable (lock in generated content)
+  //  4. While editable but before any user edits (late paragraph updates from server)
   createEffect(() => {
     const paragraphs = props.paragraphs
     const editable = props.editable ?? true
@@ -165,8 +168,13 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     } else if (becameEditable) {
       // Just became editable — accept final streamed state
       shouldRecreate = true
+      hasUserEditedSinceEditable = false
+    } else if (editable && !hasUserEditedSinceEditable && (idsChanged || contentChanged)) {
+      // Editable but user hasn't edited yet — accept late external updates
+      // (e.g., server returning paragraph IDs after generation completes)
+      shouldRecreate = true
     }
-    // When editable: do NOT recreate. The editor's internal state is authoritative.
+    // When editable AND user has edited: do NOT recreate. The editor's internal state is authoritative.
 
     // Always update tracking vars to prevent stale comparisons on next run
     lastParagraphIds = currentIds
@@ -196,6 +204,8 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     const allChangedIds = [...changedIds, ...deletedIds]
 
     if (allChangedIds.length > 0) {
+      // User made content edits — stop accepting external updates
+      hasUserEditedSinceEditable = true
       // Update lastParagraphIds so the effect doesn't recreate state
       lastParagraphIds = newIds
       props.onParagraphsChange(newParagraphs, allChangedIds)

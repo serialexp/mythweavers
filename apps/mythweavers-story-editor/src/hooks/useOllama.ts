@@ -643,11 +643,28 @@ Title:`
             checkForAutoGeneration()
           }
 
-          // Save content: for regeneration, create a new revision; for initial generation, save to existing revision
-          // IMPORTANT: Don't await these saves - fire them off in the background so the LLM activity log
-          // can be created immediately after streaming completes. The saveService handles queuing.
+          // Parse paragraphs synchronously so they're in the store BEFORE isGenerating goes false.
+          // This ensures the editor picks up the new content during the editable transition.
           const finalMessage = messagesStore.messages.find((msg) => msg.id === assistantMessageId)
           if (cleanedContent.trim()) {
+            const localParagraphs = cleanedContent
+              .split(/\n\n+/)
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0)
+              .map((body) => ({
+                id: generateMessageId(),
+                body,
+                state: 'ai' as const,
+                comments: [],
+              })) as import('@mythweavers/shared').Paragraph[]
+
+            // Update store with paragraphs immediately (synchronous)
+            messagesStore.updateMessageNoSave(assistantMessageId, {
+              content: cleanedContent,
+              paragraphs: localParagraphs,
+            })
+
+            // Fire-and-forget: persist to backend
             import('../services/saveService').then(({ saveService }) => {
               if (isRegeneration) {
                 // Regeneration: create a new revision with the content
@@ -663,7 +680,7 @@ Title:`
                     showThink: finalMessage?.showThink,
                   })
                   .then(({ revisionId, paragraphs }) => {
-                    // Update local state with new revision ID and paragraphs
+                    // Update local state with server revision ID and paragraph IDs
                     messagesStore.updateMessageNoSave(assistantMessageId, {
                       currentMessageRevisionId: revisionId,
                       paragraphs,
@@ -673,29 +690,10 @@ Title:`
                     console.error('Failed to save generated content (regeneration):', error)
                   })
               } else {
-                // Initial generation: save paragraphs to existing revision (v1)
+                // Initial generation: save paragraphs to existing revision
                 const revisionId = finalMessage?.currentMessageRevisionId
                 if (revisionId) {
-                  // Parse content into paragraphs with client-generated IDs
-                  const paragraphs = cleanedContent
-                    .split(/\n\n+/)
-                    .map((p) => p.trim())
-                    .filter((p) => p.length > 0)
-                    .map((body) => ({
-                      id: generateMessageId(),
-                      body,
-                      state: 'ai' as const,
-                      comments: [],
-                    })) as import('@mythweavers/shared').Paragraph[]
-
-                  // Update local message with content and paragraphs immediately
-                  messagesStore.updateMessageNoSave(assistantMessageId, {
-                    content: cleanedContent,
-                    paragraphs,
-                  })
-
-                  // Save paragraphs to the existing revision (fire and forget)
-                  saveService.saveParagraphs(revisionId, [], paragraphs).catch((error) => {
+                  saveService.saveParagraphs(revisionId, [], localParagraphs).catch((error) => {
                     console.error('Failed to save generated content (initial):', error)
                   })
                 }
