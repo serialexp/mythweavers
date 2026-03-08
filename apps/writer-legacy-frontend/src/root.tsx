@@ -55,6 +55,12 @@ export const Root = (props: ParentProps) => {
   })
 
   createEffect(() => {
+    const name = storyState.story?.name
+    const title = name ? `${name} - Writer` : 'Writer'
+    getCurrentWindow().setTitle(title)
+  })
+
+  createEffect(() => {
     if (autosaveTimeout) {
       clearInterval(autosaveTimeout)
     }
