@@ -62,6 +62,7 @@ const HOST = process.env.HOST || '0.0.0.0'
 const LOG_LEVEL = process.env.LOG_LEVEL || 'info'
 
 const server = Fastify({
+  bodyLimit: 20 * 1024 * 1024, // 20MB
   logger: {
     level: LOG_LEVEL,
     serializers: {
