@@ -149,3 +149,74 @@ export const currentVersionNotice = style({
   color: tokens.color.text.primary,
   marginBottom: tokens.space['4'],
 })
+
+export const paragraphBlock = style({
+  padding: `${tokens.space['3']} 0`,
+  borderBottom: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  ':last-child': {
+    borderBottom: 'none',
+  },
+})
+
+export const paragraphHeader = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  marginBottom: tokens.space['2'],
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.secondary,
+})
+
+export const paragraphVersionIndicator = style({
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  ':hover': {
+    opacity: '0.8',
+  },
+})
+
+export const paragraphVersionSelector = style({
+  display: 'flex',
+  gap: tokens.space['1'],
+  flexWrap: 'wrap',
+  padding: tokens.space['2'],
+  background: tokens.color.bg.raised,
+  borderRadius: tokens.radius.default,
+  marginBottom: tokens.space['2'],
+})
+
+export const paragraphVersionButton = style({
+  cursor: 'pointer',
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  borderRadius: tokens.radius.sm,
+  fontSize: tokens.font.size.sm,
+  border: 'none',
+  background: 'transparent',
+  color: tokens.color.text.secondary,
+  ':hover': {
+    background: tokens.color.surface.hover,
+  },
+})
+
+export const paragraphVersionButtonActive = style({
+  background: tokens.color.accent.primary,
+  color: tokens.color.text.inverse,
+  ':hover': {
+    background: tokens.color.accent.primary,
+  },
+})
+
+export const paragraphBody = style({
+  whiteSpace: 'pre-wrap',
+  wordWrap: 'break-word',
+  lineHeight: tokens.font.lineHeight.relaxed,
+  color: tokens.color.text.primary,
+})
+
+export const paragraphNumber = style({
+  fontWeight: tokens.font.weight.semibold,
+  color: tokens.color.text.secondary,
+  fontSize: tokens.font.size.sm,
+  minWidth: '24px',
+})

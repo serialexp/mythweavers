@@ -31,6 +31,7 @@ import { useOllama } from './hooks/useOllama'
 import { useStoryGeneration } from './hooks/useStoryGeneration'
 import { authStore } from './stores/authStore'
 import { calendarStore } from './stores/calendarStore'
+import { languageStore } from './stores/languageStore'
 import { charactersStore } from './stores/charactersStore'
 import { contextItemsStore } from './stores/contextItemsStore'
 import { currentStoryStore } from './stores/currentStoryStore'
@@ -229,6 +230,14 @@ const App: Component = () => {
         calendarStore.loadFromExport(calendars)
       } else {
         calendarStore.clear()
+      }
+
+      // Load languages
+      const { languages } = exportData
+      if (languages && languages.length > 0) {
+        languageStore.loadFromExport(languages)
+      } else {
+        languageStore.clear()
       }
 
       // Load basic map metadata (details will be lazy-loaded when map is opened)

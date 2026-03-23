@@ -9,6 +9,25 @@ import { errorSchema } from '../../schemas/common.js'
 // SCHEMAS
 // ============================================================================
 
+const paragraphRevisionSummarySchema = z.strictObject({
+  id: z.string().meta({ example: 'clx1234567890' }),
+  paragraphId: z.string().meta({ example: 'clx1234567890' }),
+  body: z.string().meta({ example: 'The hero awakened...' }),
+  version: z.number().int().meta({ example: 1 }),
+  state: z
+    .enum(['AI', 'DRAFT', 'REVISE', 'FINAL', 'SDT'])
+    .nullable()
+    .meta({ example: 'AI', description: 'Paragraph state' }),
+  createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
+})
+
+const paragraphWithRevisionsSchema = z.strictObject({
+  id: z.string().meta({ example: 'clx1234567890' }),
+  sortOrder: z.number().int().meta({ example: 0 }),
+  currentParagraphRevisionId: z.string().nullable().meta({ example: 'clx1234567890' }),
+  revisions: z.array(paragraphRevisionSummarySchema).meta({ description: 'All revisions for this paragraph (ordered by version DESC)' }),
+})
+
 const messageRevisionSchema = z.strictObject({
   id: z.string().meta({ example: 'clx1234567890' }),
   messageId: z.string().meta({ example: 'clx1234567890' }),
@@ -25,8 +44,10 @@ const messageRevisionSchema = z.strictObject({
   think: z.string().nullable().meta({ example: 'The scene should establish...' }),
   showThink: z.boolean().meta({ example: false }),
   createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
-  // Combined paragraph content for display
-  content: z.string().meta({ example: 'The story content...', description: 'Combined text from all paragraphs' }),
+  // Combined paragraph content for display (latest state)
+  content: z.string().meta({ example: 'The story content...', description: 'Combined text from all paragraphs (latest revision)' }),
+  // Paragraph-level revision data
+  paragraphs: z.array(paragraphWithRevisionsSchema).meta({ description: 'Paragraphs with their revision history' }),
 })
 
 const listMessageRevisionsResponseSchema = z.strictObject({
@@ -116,23 +137,42 @@ const messageRevisionRoutes: FastifyPluginAsyncZod = async (fastify) => {
             orderBy: { sortOrder: 'asc' },
             include: {
               currentParagraphRevision: true,
+              paragraphRevisions: {
+                orderBy: { version: 'desc' },
+              },
             },
           },
         },
       })
 
-      // Transform revisions and combine paragraph content
+      // Transform revisions with paragraph-level revision data
       const transformedRevisions = revisions.map((r) => {
-        // Combine paragraph bodies into content
+        // Combined content from latest paragraph revisions
         const content = r.paragraphs
           .map((p) => p.currentParagraphRevision?.body ?? '')
           .filter((body) => body.length > 0)
           .join('\n\n')
 
-        const { paragraphs, ...revisionData } = r
+        // Paragraph-level data with all revisions
+        const paragraphs = r.paragraphs.map((p) => ({
+          id: p.id,
+          sortOrder: p.sortOrder,
+          currentParagraphRevisionId: p.currentParagraphRevisionId,
+          revisions: p.paragraphRevisions.map((pr) => ({
+            id: pr.id,
+            paragraphId: pr.paragraphId,
+            body: pr.body,
+            version: pr.version,
+            state: pr.state as 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT' | null,
+            createdAt: transformCreatedAt(pr).createdAt,
+          })),
+        }))
+
+        const { paragraphs: _paragraphs, ...revisionData } = r
         return {
           ...transformMessageRevision(transformCreatedAt(revisionData)),
           content,
+          paragraphs,
         }
       })
 
@@ -271,6 +311,7 @@ const messageRevisionRoutes: FastifyPluginAsyncZod = async (fastify) => {
         revision: {
           ...transformMessageRevision(transformCreatedAt(revision)),
           content: '', // New revision starts with no paragraphs
+          paragraphs: [], // Paragraphs are added separately via batch endpoint
         },
       })
     },

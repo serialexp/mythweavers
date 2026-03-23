@@ -180,6 +180,10 @@ const storySchema = z.strictObject({
     description: 'Default calendar ID',
     example: 'clx1234567890',
   }),
+  defaultLanguageId: z.string().nullable().meta({
+    description: 'Default/primary language ID',
+    example: 'clx1234567890',
+  }),
   branchChoices: z.any().nullable().meta({
     description: 'Branch choices JSON object',
   }),
@@ -561,6 +565,17 @@ const exportStoryResponseSchema = z.strictObject({
       storyId: z.string(),
       name: z.string(),
       config: z.any(),
+      isDefault: z.boolean(),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+    }),
+  ),
+  languages: z.array(
+    z.strictObject({
+      id: z.string(),
+      storyId: z.string(),
+      name: z.string(),
+      label: z.string(),
       isDefault: z.boolean(),
       createdAt: z.string(),
       updatedAt: z.string(),
@@ -987,6 +1002,12 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           orderBy: { createdAt: 'asc' },
         })
 
+        // Load languages
+        const languages = await prisma.language.findMany({
+          where: { storyId: id },
+          orderBy: { createdAt: 'asc' },
+        })
+
         // Check if story has default calendar
         const isDefault = (calendarId: string) => story.defaultCalendarId === calendarId
 
@@ -1111,6 +1132,10 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           calendars: calendars.map((cal) => ({
             ...formatDates(cal),
             isDefault: isDefault(cal.id),
+          })),
+          languages: languages.map((lang) => ({
+            ...formatDates(lang),
+            isDefault: lang.id === story.defaultLanguageId,
           })),
           maps: maps.map((m) => {
             const { _count, ...mapData } = m

@@ -257,6 +257,7 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
     characters,
     contextItems: [],
     calendars: [],
+    languages: [],
     maps: [],
     mediaAttachments: [],
     plotPointStates: [],
@@ -281,6 +282,7 @@ interface IdMaps {
   characters: Map<string, string>
   contextItems: Map<string, string>
   calendars: Map<string, string>
+  languages: Map<string, string>
   books: Map<string, string>
   arcs: Map<string, string>
   chapters: Map<string, string>
@@ -368,6 +370,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         characters,
         contextItems,
         calendars,
+        languages,
         maps,
         mediaAttachments,
         plotPointStates,
@@ -436,6 +439,11 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         }),
         // Calendars
         prisma.calendar.findMany({
+          where: { storyId },
+          orderBy: { createdAt: 'asc' },
+        }),
+        // Languages
+        prisma.language.findMany({
           where: { storyId },
           orderBy: { createdAt: 'asc' },
         }),
@@ -513,6 +521,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           format: story.format,
           defaultProtagonistId: story.defaultProtagonistId,
           defaultCalendarId: story.defaultCalendarId,
+          defaultLanguageId: story.defaultLanguageId,
           sortOrder: story.sortOrder,
           pages: story.pages,
           timelineStartTime: story.timelineStartTime,
@@ -676,6 +685,12 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           name: cal.name,
           config: cal.config,
           isDefault: cal.id === story.defaultCalendarId,
+        })),
+        languages: languages.map((lang) => ({
+          id: lang.id,
+          name: lang.name,
+          label: lang.label,
+          isDefault: lang.id === story.defaultLanguageId,
         })),
         maps: maps.map((map) => ({
           id: map.id,
@@ -967,6 +982,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         characters: new Map(),
         contextItems: new Map(),
         calendars: new Map(),
+        languages: new Map(),
         books: new Map(),
         arcs: new Map(),
         chapters: new Map(),
@@ -1059,6 +1075,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
             // These will be set after creating related entities
             defaultProtagonistId: null,
             defaultCalendarId: null,
+            defaultLanguageId: null,
           },
         })
 
@@ -1159,13 +1176,30 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           }
         }
 
-        // 6. Update story with defaultProtagonistId and defaultCalendarId
+        // 5b. Create languages
+        let defaultLanguageId: string | null = null
+        for (const langData of exportData.languages || []) {
+          const newLang = await tx.language.create({
+            data: {
+              storyId: story.id,
+              name: langData.name,
+              label: langData.label,
+            },
+          })
+          idMaps.languages.set(langData.id, newLang.id)
+          if (langData.isDefault) {
+            defaultLanguageId = newLang.id
+          }
+        }
+
+        // 6. Update story with defaultProtagonistId, defaultCalendarId, and defaultLanguageId
         const newProtagonistId = remapId(storyData.defaultProtagonistId, idMaps.characters)
         await tx.story.update({
           where: { id: story.id },
           data: {
             defaultProtagonistId: newProtagonistId,
             defaultCalendarId,
+            defaultLanguageId,
           },
         })
 

@@ -45,7 +45,7 @@ export type {
   EditorTreeNode,
 } from './SceneEditorProps'
 export type { ProseMirrorEditorProps } from './components/ProseMirrorEditor'
-export type { TranslationLanguage, InlineMenuConfig } from './prosemirror-plugins/inline-menu'
+export type { TranslationLanguage, InlineMenuConfig } from './solid-editor/InlineMenu'
 
 // CSS styles - exported for direct use if needed
 export * from './scene-editor.css'

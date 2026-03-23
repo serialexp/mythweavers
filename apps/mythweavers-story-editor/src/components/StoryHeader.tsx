@@ -6,6 +6,7 @@ import {
   BsBookHalf,
   BsBoxArrowRight,
   BsCalendar3,
+  BsTranslate,
   BsChevronDown,
   BsChevronUp,
   BsCodeSlash,
@@ -40,6 +41,7 @@ import { viewModeStore } from '../stores/viewModeStore'
 import { Character, Message } from '../types/core'
 import type { BranchConversionResult } from '../utils/claudeChatImport'
 import { CalendarManagement } from './CalendarManagement'
+import { LanguageManagement } from './LanguageManagement'
 import { Characters, type CharactersRef } from './Characters'
 import { ContextItems, type ContextItemsRef } from './ContextItems'
 import { EpisodeViewer } from './EpisodeViewer'
@@ -92,6 +94,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768)
   const [showTravelTimeCalculator, setShowTravelTimeCalculator] = createSignal(false)
   const [showCalendarManagement, setShowCalendarManagement] = createSignal(false)
+  const [showLanguageManagement, setShowLanguageManagement] = createSignal(false)
 
   // Refs for overlay panel actions
   let charactersRef: CharactersRef | undefined
@@ -304,6 +307,12 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               }
             >
               <DropdownItem
+                icon={<BsBook />}
+                onClick={() => navigate('/stories/list')}
+              >
+                Story List
+              </DropdownItem>
+              <DropdownItem
                 icon={<BsGear />}
                 onClick={() => {
                   const newSection = activeSection() === 'settings' ? null : 'settings'
@@ -317,15 +326,9 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               >
                 Story Settings
               </DropdownItem>
-              <DropdownItem
-                icon={<BsBook />}
-                onClick={() => navigate('/stories/list')}
-              >
-                Return to Story List
-              </DropdownItem>
               <Show when={messagesStore.hasStoryMessages}>
                 <DropdownItem icon={<BsSearch />} onClick={() => searchModalStore.show()}>
-                  Search Messages
+                  Search
                 </DropdownItem>
               </Show>
               <DropdownItem icon={<BsFilm />} onClick={() => episodeViewerStore.toggle()}>
@@ -341,7 +344,10 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               </Show>
               <Show when={currentStoryStore.storageMode === 'server'}>
                 <DropdownItem icon={<BsCalendar3 />} onClick={() => setShowCalendarManagement(true)}>
-                  Calendar Management
+                  Calendars
+                </DropdownItem>
+                <DropdownItem icon={<BsTranslate />} onClick={() => setShowLanguageManagement(true)}>
+                  Languages
                 </DropdownItem>
               </Show>
               <DropdownDivider />
@@ -507,10 +513,20 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
       <OverlayPanel
         show={showCalendarManagement()}
         onClose={() => setShowCalendarManagement(false)}
-        title="Calendar Management"
+        title="Calendars"
         position="left"
       >
         <CalendarManagement />
+      </OverlayPanel>
+
+      {/* Language Management */}
+      <OverlayPanel
+        show={showLanguageManagement()}
+        onClose={() => setShowLanguageManagement(false)}
+        title="Languages"
+        position="left"
+      >
+        <LanguageManagement />
       </OverlayPanel>
     </>
   )

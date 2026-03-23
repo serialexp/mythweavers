@@ -770,6 +770,7 @@ export class SaveService {
         const insertResult = await postMyStoriesByStoryIdCharacters({
           path: { storyId },
           body: {
+            id: operation.data.id,
             firstName: operation.data.firstName,
             lastName: operation.data.lastName || undefined,
             middleName: operation.data.middleName || undefined,

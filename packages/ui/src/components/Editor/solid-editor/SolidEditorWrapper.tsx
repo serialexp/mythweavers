@@ -1,5 +1,5 @@
 import type { Paragraph } from '@mythweavers/shared'
-import { EditorState, EditorView, type NodeViewMap, type Plugin, history, smartTypography } from '@writer/solid-editor'
+import { EditorState, EditorView, type NodeViewMap, type Plugin, history, smartTypography, baseKeymap, macKeymap } from '@writer/solid-editor'
 import { createEffect, createMemo, createSignal } from 'solid-js'
 
 import { editorContainer, sceneEditor } from '../scene-editor.css'
@@ -216,8 +216,6 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
     const currentState = state()
     if (!currentState) return
 
-    // Check for Enter key handling
-    // This is simplified - full implementation would intercept beforeinput
     const newState = currentState.apply(tr)
     handleStateChange(newState)
   }
@@ -258,6 +256,7 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
           editable={props.editable ?? true}
           autoFocus={props.editable ?? true}
           placeholder={props.editable !== false ? 'Start writing...' : 'Generating...'}
+          keymap={navigator.platform.includes('Mac') ? macKeymap : baseKeymap}
           debug={props.debug}
           onFocusChange={(focused) => {
             setIsFocused(focused)

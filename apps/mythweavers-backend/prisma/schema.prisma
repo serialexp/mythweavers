@@ -202,6 +202,10 @@ model Story {
   defaultCalendarId      String?
   defaultCalendar        Calendar?         @relation("DefaultCalendar", fields: [defaultCalendarId], references: [id], onDelete: SetNull)
 
+  // Language/Translation support
+  defaultLanguageId      String?
+  defaultLanguage        Language?         @relation("DefaultLanguage", fields: [defaultLanguageId], references: [id], onDelete: SetNull)
+
   // Branching support (from Story Project)
   branchChoices          Json?             // Record<branchMessageId, selectedOptionId>
 
@@ -228,6 +232,7 @@ model Story {
   characters             Character[]
   contextItems           ContextItem[]     // Replaces Location + PlotPoint
   calendars              Calendar[]        @relation("StoryCalendars")
+  languages              Language[]        @relation("StoryLanguages")
   maps                   Map[]
   mediaAttachments       MediaAttachment[]
   bookShelfStories       BookShelfStory[]
@@ -665,6 +670,24 @@ model Calendar {
   updatedAt DateTime @updatedAt
 
   defaultForStories Story[] @relation("DefaultCalendar")
+
+  @@index([storyId])
+}
+
+// ============================================================================
+// LANGUAGE/TRANSLATION SYSTEM
+// ============================================================================
+
+model Language {
+  id        String   @id @default(cuid())
+  storyId   String
+  story     Story    @relation("StoryLanguages", fields: [storyId], references: [id], onDelete: Cascade)
+  name      String   // Used in LLM prompts, e.g. "Scottish Gaelic"
+  label     String   // Display in UI, e.g. "Gaelic"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  defaultForStories Story[] @relation("DefaultLanguage")
 
   @@index([storyId])
 }

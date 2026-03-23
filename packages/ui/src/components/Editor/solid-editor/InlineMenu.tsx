@@ -3,11 +3,12 @@ import { type Accessor, For, type JSX, Show, createEffect, createSignal } from '
 import { Portal } from 'solid-js/web'
 import { useThemeClass } from '../../../theme/ThemeClassContext'
 import { Button } from '../../Button'
-import { inlineMenu as inlineMenuClass } from '../scene-editor.css'
+import { inlineMenu as inlineMenuClass, translationSubmenu as translationSubmenuClass } from '../scene-editor.css'
 
 export interface TranslationLanguage {
-  code: string // "en", "gd", "nl", etc.
-  name: string // "English", "Gaelic", "Dutch"
+  id: string
+  name: string // "Scottish Gaelic" (used in LLM prompts)
+  label: string // "Gaelic" (displayed in UI)
 }
 
 export interface InlineMenuConfig {
@@ -16,16 +17,22 @@ export interface InlineMenuConfig {
   enableItalic?: boolean
 
   // Translation features
-  translationLanguages?: TranslationLanguage[]
+  languages?: TranslationLanguage[]
+  primaryLanguageId?: string | null
 
-  // Callback for when translation is requested
-  onTranslationRequested?: (fromLang: string, toLang: string, selectedText: string) => void
+  // Callback that performs LLM translation and returns translated text
+  onTranslate?: (fromLang: string, toLang: string, selectedText: string) => Promise<string>
+
+  // Loading state (set true while LLM is translating)
+  isTranslating?: boolean
 }
 
 interface MenuPosition {
   top: number
   left: number
 }
+
+type SubmenuMode = null | 'translate-from-primary' | 'translate-from-pick' | 'translate-to' | 'add-translation'
 
 export interface InlineMenuProps {
   /** Accessor for the current editor state */
@@ -45,6 +52,8 @@ export interface InlineMenuProps {
 export function InlineMenu(props: InlineMenuProps): JSX.Element {
   const [position, setPosition] = createSignal<MenuPosition | null>(null)
   const [visible, setVisible] = createSignal(false)
+  const [submenuMode, setSubmenuMode] = createSignal<SubmenuMode>(null)
+  const [selectedFromLang, setSelectedFromLang] = createSignal<TranslationLanguage | null>(null)
 
   // Check if selection has a specific mark
   const hasMark = (markName: string): boolean => {
@@ -70,53 +79,86 @@ export function InlineMenu(props: InlineMenuProps): JSX.Element {
   // Toggle a mark on the selection
   const toggleMark = (markName: string) => {
     const state = props.state()
-    if (!state) {
-      console.log('[toggleMark] No state!')
-      return
-    }
+    if (!state) return
 
     const { from, to } = state.selection
-    if (from === to) {
-      console.log('[toggleMark] Selection collapsed, ignoring')
-      return
-    }
+    if (from === to) return
 
     const markType = state.schema.marks[markName]
-    if (!markType) {
-      console.log('[toggleMark] Mark type not found:', markName)
-      return
-    }
+    if (!markType) return
 
-    // Debug: log the selection and text
-    const selectedText = state.doc.textBetween(from, to, ' ')
     const hasMarkNow = hasMark(markName)
-    console.log('[toggleMark]', markName, { from, to, selectedText, hasMarkNow, action: hasMarkNow ? 'remove' : 'add' })
-
     const tr = state.tr()
     if (hasMarkNow) {
       tr.removeMark(from, to, markType)
     } else {
       tr.addMark(from, to, markType.create())
     }
+    props.dispatch(tr)
+  }
 
-    console.log(
-      '[toggleMark] Transaction steps:',
-      tr.steps.length,
-      'selection after:',
-      tr.selection?.from,
-      '-',
-      tr.selection?.to,
+  // Apply translation mark (add translation as hover)
+  const applyTranslationMark = (selFrom: number, selTo: number, fromLang: string, toLang: string, translatedText: string) => {
+    const state = props.state()
+    if (!state) return
+
+    const markType = state.schema.marks.translation
+    if (!markType) return
+
+    const tr = state.tr()
+    tr.addMark(
+      selFrom,
+      selTo,
+      markType.create({
+        title: translatedText,
+        from: fromLang,
+        to: toLang,
+      }),
     )
     props.dispatch(tr)
   }
 
-  // Get selected text
-  const getSelectedText = (): string => {
+  // Replace selected text with translated text
+  const replaceSelectedText = (selFrom: number, selTo: number, translatedText: string) => {
     const state = props.state()
-    if (!state) return ''
+    if (!state) return
 
-    const { from, to } = state.selection
-    return state.doc.textBetween(from, to, ' ')
+    const tr = state.tr()
+    tr.replaceWith(selFrom, selTo, state.schema.text(translatedText))
+    props.dispatch(tr)
+  }
+
+  // Handle translation action
+  const handleTranslate = async (fromLang: TranslationLanguage, toLang: TranslationLanguage, mode: 'replace' | 'mark') => {
+    const config = props.config
+    if (!config?.onTranslate) return
+
+    const state = props.state()
+    if (!state) return
+
+    // Capture selection range before the async call
+    const { from: selFrom, to: selTo } = state.selection
+    const selectedText = state.doc.textBetween(selFrom, selTo, ' ')
+    if (!selectedText) return
+
+    try {
+      const translated = await config.onTranslate(fromLang.name, toLang.name, selectedText)
+      if (!translated) return
+
+      if (mode === 'replace') {
+        replaceSelectedText(selFrom, selTo, translated)
+      } else {
+        applyTranslationMark(selFrom, selTo, fromLang.name, toLang.name, translated)
+      }
+
+    } finally {
+      resetSubmenu()
+    }
+  }
+
+  const resetSubmenu = () => {
+    setSubmenuMode(null)
+    setSelectedFromLang(null)
   }
 
   // Update menu position when selection changes
@@ -132,6 +174,7 @@ export function InlineMenu(props: InlineMenuProps): JSX.Element {
     // Only show for non-empty text selections
     if (from === to) {
       setVisible(false)
+      resetSubmenu()
       return
     }
 
@@ -166,8 +209,30 @@ export function InlineMenu(props: InlineMenuProps): JSX.Element {
   const hasTranslationMark = () => hasMark('translation')
   const themeClass = useThemeClass()
 
-  // Check if editor is focused (default to true if not provided for backwards compatibility)
+  // Check if editor is focused
   const editorFocused = () => props.isFocused?.() ?? true
+
+  // Derived: primary language
+  const primaryLanguage = (): TranslationLanguage | null => {
+    const langs = config().languages
+    const primaryId = config().primaryLanguageId
+    if (!langs || !primaryId) return null
+    return langs.find((l) => l.id === primaryId) ?? null
+  }
+
+  // Derived: non-primary languages
+  const nonPrimaryLanguages = (): TranslationLanguage[] => {
+    const langs = config().languages
+    const primaryId = config().primaryLanguageId
+    if (!langs) return []
+    if (!primaryId) return langs
+    return langs.filter((l) => l.id !== primaryId)
+  }
+
+  // Derived: has enough languages for translation
+  const hasLanguages = () => (config().languages?.length ?? 0) >= 2
+
+  const isTranslating = () => config().isTranslating ?? false
 
   return (
     <Show when={visible() && position() && editorFocused()}>
@@ -210,7 +275,7 @@ export function InlineMenu(props: InlineMenuProps): JSX.Element {
           </Show>
 
           {/* Translation buttons */}
-          <Show when={config().translationLanguages && config().translationLanguages!.length >= 2}>
+          <Show when={hasLanguages()}>
             <Show
               when={!hasTranslationMark()}
               fallback={
@@ -225,64 +290,149 @@ export function InlineMenu(props: InlineMenuProps): JSX.Element {
                 </Button>
               }
             >
-              <For each={getTranslationPairs(config().translationLanguages!)}>
-                {(pair) => (
+              {/* Loading state */}
+              <Show when={isTranslating()}>
+                <Button variant="ghost" size="sm" disabled>
+                  Translating...
+                </Button>
+              </Show>
+
+              <Show when={!isTranslating()}>
+                {/* No submenu open — show top-level action buttons */}
+                <Show when={submenuMode() === null}>
+                  {/* "Translate from [primary] to..." — only when primary is set */}
+                  <Show when={primaryLanguage()}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSelectedFromLang(primaryLanguage())
+                        setSubmenuMode('translate-from-primary')
+                      }}
+                    >
+                      {primaryLanguage()!.label} &rarr; ...
+                    </Button>
+                  </Show>
+
+                  {/* "Translate from..." — pick source language */}
                   <Button
                     variant="ghost"
                     size="sm"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      if (config().onTranslationRequested) {
-                        config().onTranslationRequested!(pair.from.code, pair.to.code, getSelectedText())
-                      } else {
-                        // Just add the mark without translation text
-                        const state = props.state()
-                        if (!state) return
-                        const { from, to } = state.selection
-                        const markType = state.schema.marks.translation
-                        if (markType) {
-                          const tr = state.tr()
-                          tr.addMark(
-                            from,
-                            to,
-                            markType.create({
-                              from: pair.from.code,
-                              to: pair.to.code,
-                            }),
-                          )
-                          props.dispatch(tr)
-                        }
-                      }
-                    }}
-                    title={`Translate from ${pair.from.name} to ${pair.to.name}`}
+                    onClick={() => setSubmenuMode('translate-from-pick')}
                   >
-                    {pair.from.name} → {pair.to.name}
+                    ... &rarr; ...
                   </Button>
-                )}
-              </For>
+
+                  {/* "Add translation in..." */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setSubmenuMode('add-translation')}
+                    title="Add translation annotation"
+                  >
+                    +T
+                  </Button>
+                </Show>
+
+                {/* Submenu: pick target for "translate from primary" */}
+                <Show when={submenuMode() === 'translate-from-primary'}>
+                  <div class={translationSubmenuClass}>
+                    <For each={nonPrimaryLanguages()}>
+                      {(lang) => (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleTranslate(primaryLanguage()!, lang, 'replace')}
+                        >
+                          &rarr; {lang.label}
+                        </Button>
+                      )}
+                    </For>
+                    <Button variant="ghost" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={resetSubmenu}>
+                      &times;
+                    </Button>
+                  </div>
+                </Show>
+
+                {/* Submenu: pick source language */}
+                <Show when={submenuMode() === 'translate-from-pick'}>
+                  <div class={translationSubmenuClass}>
+                    <For each={config().languages}>
+                      {(lang) => (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setSelectedFromLang(lang)
+                            setSubmenuMode('translate-to')
+                          }}
+                        >
+                          {lang.label}
+                        </Button>
+                      )}
+                    </For>
+                    <Button variant="ghost" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={resetSubmenu}>
+                      &times;
+                    </Button>
+                  </div>
+                </Show>
+
+                {/* Submenu: pick target language (after source was picked) */}
+                <Show when={submenuMode() === 'translate-to' && selectedFromLang()}>
+                  <div class={translationSubmenuClass}>
+                    <For each={config().languages?.filter((l) => l.id !== selectedFromLang()!.id)}>
+                      {(lang) => (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleTranslate(selectedFromLang()!, lang, 'replace')}
+                        >
+                          {selectedFromLang()!.label} &rarr; {lang.label}
+                        </Button>
+                      )}
+                    </For>
+                    <Button variant="ghost" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={resetSubmenu}>
+                      &times;
+                    </Button>
+                  </div>
+                </Show>
+
+                {/* Submenu: pick target for "add translation" */}
+                <Show when={submenuMode() === 'add-translation'}>
+                  <div class={translationSubmenuClass}>
+                    <For each={primaryLanguage() ? nonPrimaryLanguages() : config().languages}>
+                      {(lang) => (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            const fromLang = primaryLanguage() || config().languages![0]
+                            handleTranslate(fromLang, lang, 'mark')
+                          }}
+                        >
+                          +T {lang.label}
+                        </Button>
+                      )}
+                    </For>
+                    <Button variant="ghost" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={resetSubmenu}>
+                      &times;
+                    </Button>
+                  </div>
+                </Show>
+              </Show>
             </Show>
           </Show>
         </div>
       </Portal>
     </Show>
   )
-}
-
-/**
- * Generate all language pair combinations for translation
- */
-function getTranslationPairs(
-  languages: TranslationLanguage[],
-): Array<{ from: TranslationLanguage; to: TranslationLanguage }> {
-  const pairs: Array<{ from: TranslationLanguage; to: TranslationLanguage }> = []
-  for (let i = 0; i < languages.length; i++) {
-    for (let j = 0; j < languages.length; j++) {
-      if (i !== j) {
-        pairs.push({ from: languages[i], to: languages[j] })
-      }
-    }
-  }
-  return pairs
 }
 
 export default InlineMenu

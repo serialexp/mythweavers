@@ -932,11 +932,53 @@ Now write the summary of the above content in 3-4 paragraphs. Remember: capture 
     }
   }
 
+  const generateNodeTitle = async (content: string, nodeType: string): Promise<string> => {
+    const client = getClient()
+    let title = ''
+
+    try {
+      const prompt = `Based on this ${nodeType} content, generate a short, evocative title (2-5 words) that captures the essence of what happens. Only respond with the title, nothing else.
+
+Content:
+${content.substring(0, 3000)}
+
+Title:`
+
+      const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
+
+      const response = client.generate({
+        model: settingsStore.model,
+        messages,
+        stream: true,
+        max_tokens: 20,
+        metadata: { callType: 'node:title' },
+      })
+
+      for await (const part of response) {
+        if (part.response) {
+          title += part.response
+        }
+      }
+
+      title = title
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .replace(/^Title:?\s*/i, '')
+        .substring(0, 50)
+
+      return title || 'Untitled'
+    } catch (error) {
+      console.error('Error generating node title:', error)
+      return 'Untitled'
+    }
+  }
+
   return {
     generateResponse,
     generateSummaries,
     generateParagraphSummary,
     generateNodeSummary,
+    generateNodeTitle,
     generateStoryName,
     getClient,
     abortGeneration,

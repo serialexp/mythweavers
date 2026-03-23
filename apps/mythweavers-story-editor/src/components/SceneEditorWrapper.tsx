@@ -1,13 +1,16 @@
 import { paragraphsToText, type Paragraph, type ParagraphInventoryAction } from '@mythweavers/shared'
 import { SceneEditor } from '@mythweavers/ui'
-import type { EditorCharacter, EditorScene } from '@mythweavers/ui'
+import type { EditorCharacter, EditorScene, InlineMenuConfig } from '@mythweavers/ui'
 import { Component, Show, createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
+import { languageStore } from '../stores/languageStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { settingsStore } from '../stores/settingsStore'
 import { generateMessageId } from '../utils/id'
+import { LLMClientFactory } from '../utils/llm'
 import { ParagraphScriptModal } from './ParagraphScriptModal'
 
 interface SceneEditorWrapperProps {
@@ -266,6 +269,51 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     }
   }
 
+  // Translation state
+  const [isTranslating, setIsTranslating] = createSignal(false)
+
+  const handleTranslate = async (fromLang: string, toLang: string, selectedText: string): Promise<string> => {
+    setIsTranslating(true)
+    try {
+      const client = LLMClientFactory.getClient(settingsStore.provider)
+      let result = ''
+
+      const generator = client.generate({
+        model: settingsStore.model,
+        messages: [
+          { role: 'system', content: 'You are a translator. Return only the translated text, nothing else. Do not add quotes, explanations, or any other text.' },
+          { role: 'user', content: `Translate the following text from ${fromLang} to ${toLang}:\n\n${selectedText}` },
+        ],
+        stream: true,
+        metadata: { callType: 'translation' },
+      })
+
+      for await (const chunk of generator) {
+        if (chunk.response) {
+          result += chunk.response
+        }
+      }
+
+      return result.trim()
+    } catch (error) {
+      console.error('[SceneEditorWrapper] Translation failed:', error)
+      return ''
+    } finally {
+      setIsTranslating(false)
+    }
+  }
+
+  const inlineMenuConfig = createMemo((): InlineMenuConfig => ({
+    languages: languageStore.languages.map((l) => ({
+      id: l.id,
+      name: l.name,
+      label: l.label,
+    })),
+    primaryLanguageId: languageStore.defaultLanguageId,
+    onTranslate: handleTranslate,
+    isTranslating: isTranslating(),
+  }))
+
   return (
     <>
       <SceneEditor
@@ -282,6 +330,7 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
         onSelectedParagraphChange={handleSelectedParagraphChange}
         onParagraphEditScript={handleEditScript}
         onBlur={handleBlur}
+        inlineMenuConfig={inlineMenuConfig()}
       />
 
       <Show when={editingParagraph() && message()}>

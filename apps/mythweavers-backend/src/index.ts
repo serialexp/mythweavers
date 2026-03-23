@@ -50,7 +50,9 @@ import myPawnsRoutes from './routes/my/pawns.js'
 import myPlotPointStatesRoutes from './routes/my/plot-point-states.js'
 import myScenesRoutes from './routes/my/scenes.js'
 import myStoriesRoutes from './routes/my/stories.js'
+import myLanguagesRoutes from './routes/my/languages.js'
 import myStoryCalendarRoutes from './routes/my/story-calendar.js'
+import myStoryLanguageRoutes from './routes/my/story-language.js'
 import myStoryTagsRoutes from './routes/my/story-tags.js'
 import myExportPdfRoutes from './routes/my/export-pdf.js'
 import myExportStoryRoutes from './routes/my/export-story.js'
@@ -288,6 +290,8 @@ await server.register(myInventoryRoutes, { prefix: '/my' })
 await server.register(myStoryTagsRoutes, { prefix: '/my' })
 await server.register(myCalendarsRoutes, { prefix: '/my' })
 await server.register(myStoryCalendarRoutes, { prefix: '/my' })
+await server.register(myLanguagesRoutes, { prefix: '/my' })
+await server.register(myStoryLanguageRoutes, { prefix: '/my' })
 await server.register(myMapsRoutes, { prefix: '/my' })
 await server.register(myLandmarksRoutes, { prefix: '/my' })
 await server.register(myLandmarkStatesRoutes, { prefix: '/my' })

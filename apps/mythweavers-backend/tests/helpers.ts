@@ -35,7 +35,9 @@ import myPawnsRoutes from '../src/routes/my/pawns.js'
 import myPlotPointStatesRoutes from '../src/routes/my/plot-point-states.js'
 import myScenesRoutes from '../src/routes/my/scenes.js'
 import myStoriesRoutes from '../src/routes/my/stories.js'
+import myLanguagesRoutes from '../src/routes/my/languages.js'
 import myStoryCalendarRoutes from '../src/routes/my/story-calendar.js'
+import myStoryLanguageRoutes from '../src/routes/my/story-language.js'
 import myStoryTagsRoutes from '../src/routes/my/story-tags.js'
 import myExportStoryRoutes from '../src/routes/my/export-story.js'
 import publicStoriesRoutes from '../src/routes/stories/public.js'
@@ -141,6 +143,8 @@ async function buildAppInternal() {
   await app.register(myStoryTagsRoutes, { prefix: '/my' })
   await app.register(myCalendarsRoutes, { prefix: '/my' })
   await app.register(myStoryCalendarRoutes, { prefix: '/my' })
+  await app.register(myLanguagesRoutes, { prefix: '/my' })
+  await app.register(myStoryLanguageRoutes, { prefix: '/my' })
   await app.register(myMapsRoutes, { prefix: '/my' })
   await app.register(myLandmarksRoutes, { prefix: '/my' })
   await app.register(myLandmarkStatesRoutes, { prefix: '/my' })

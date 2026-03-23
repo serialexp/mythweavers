@@ -1,4 +1,5 @@
 import type { Paragraph } from '@mythweavers/shared'
+import type { InlineMenuConfig } from './solid-editor/InlineMenu'
 
 /**
  * Character data needed by the editor
@@ -100,4 +101,7 @@ export interface SceneEditorProps {
 
   /** Callback when editor loses focus */
   onBlur?: () => void
+
+  /** Inline menu configuration (formatting, translations) */
+  inlineMenuConfig?: InlineMenuConfig
 }

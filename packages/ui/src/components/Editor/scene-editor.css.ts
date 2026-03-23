@@ -331,6 +331,13 @@ globalStyle(`${inlineMenu} button.active`, {
   color: tokens.color.text.inverse,
 })
 
+// Translation submenu
+export const translationSubmenu = style({
+  display: 'flex',
+  gap: '2px',
+  flexWrap: 'wrap',
+})
+
 // Translation marks
 globalStyle('.translation-mark', {
   backgroundColor: tokens.color.semantic.warningSubtle,

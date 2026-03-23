@@ -907,6 +907,10 @@ export type PostMyStoriesData = {
          * LLM model name
          */
         model?: string;
+        /**
+         * Custom base URL for OpenAI-compatible APIs
+         */
+        openaiEndpoint?: string;
     };
     path?: never;
     query?: never;
@@ -1051,6 +1055,10 @@ export type PostMyStoriesResponses = {
              */
             model: string | null;
             /**
+             * Custom base URL for OpenAI-compatible APIs
+             */
+            openaiEndpoint: string | null;
+            /**
              * Cover background color
              */
             coverColor: string;
@@ -1086,6 +1094,10 @@ export type PostMyStoriesResponses = {
              * Default calendar ID
              */
             defaultCalendarId: string | null;
+            /**
+             * Default/primary language ID
+             */
+            defaultLanguageId: string | null;
             /**
              * Branch choices JSON object
              */
@@ -1337,6 +1349,10 @@ export type GetMyStoriesByIdResponses = {
              */
             model: string | null;
             /**
+             * Custom base URL for OpenAI-compatible APIs
+             */
+            openaiEndpoint: string | null;
+            /**
              * Cover background color
              */
             coverColor: string;
@@ -1372,6 +1388,10 @@ export type GetMyStoriesByIdResponses = {
              * Default calendar ID
              */
             defaultCalendarId: string | null;
+            /**
+             * Default/primary language ID
+             */
+            defaultLanguageId: string | null;
             /**
              * Branch choices JSON object
              */
@@ -1463,6 +1483,10 @@ export type PatchMyStoriesByIdData = {
          * LLM model name
          */
         model?: string | null;
+        /**
+         * Custom base URL for OpenAI-compatible APIs
+         */
+        openaiEndpoint?: string | null;
         coverColor?: string;
         coverTextColor?: string;
         coverFontFamily?: string;
@@ -1650,6 +1674,10 @@ export type PatchMyStoriesByIdResponses = {
              */
             model: string | null;
             /**
+             * Custom base URL for OpenAI-compatible APIs
+             */
+            openaiEndpoint: string | null;
+            /**
              * Cover background color
              */
             coverColor: string;
@@ -1685,6 +1713,10 @@ export type PatchMyStoriesByIdResponses = {
              * Default calendar ID
              */
             defaultCalendarId: string | null;
+            /**
+             * Default/primary language ID
+             */
+            defaultLanguageId: string | null;
             /**
              * Branch choices JSON object
              */
@@ -1869,6 +1901,10 @@ export type GetMyStoriesByIdExportResponses = {
              */
             model: string | null;
             /**
+             * Custom base URL for OpenAI-compatible APIs
+             */
+            openaiEndpoint: string | null;
+            /**
              * Cover background color
              */
             coverColor: string;
@@ -1904,6 +1940,10 @@ export type GetMyStoriesByIdExportResponses = {
              * Default calendar ID
              */
             defaultCalendarId: string | null;
+            /**
+             * Default/primary language ID
+             */
+            defaultLanguageId: string | null;
             /**
              * Branch choices JSON object
              */
@@ -2090,6 +2130,15 @@ export type GetMyStoriesByIdExportResponses = {
             storyId: string;
             name: string;
             config: unknown;
+            isDefault: boolean;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+        languages: Array<{
+            id: string;
+            storyId: string;
+            name: string;
+            label: string;
             isDefault: boolean;
             createdAt: string;
             updatedAt: string;
@@ -5644,6 +5693,10 @@ export type GetMyStoriesByStoryIdCharactersResponse = GetMyStoriesByStoryIdChara
 export type PostMyStoriesByStoryIdCharactersData = {
     body: {
         /**
+         * Client-generated ID (CUID2). If omitted, the server generates one.
+         */
+        id?: string;
+        /**
          * Character first name (required)
          */
         firstName: string;
@@ -7844,9 +7897,31 @@ export type GetMyMessagesByMessageIdRevisionsResponses = {
             showThink: boolean;
             createdAt: string;
             /**
-             * Combined text from all paragraphs
+             * Combined text from all paragraphs (latest revision)
              */
             content: string;
+            /**
+             * Paragraphs with their revision history
+             */
+            paragraphs: Array<{
+                id: string;
+                sortOrder: number;
+                currentParagraphRevisionId: string | null;
+                /**
+                 * All revisions for this paragraph (ordered by version DESC)
+                 */
+                revisions: Array<{
+                    id: string;
+                    paragraphId: string;
+                    body: string;
+                    version: number;
+                    /**
+                     * Paragraph state
+                     */
+                    state: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT' | null;
+                    createdAt: string;
+                }>;
+            }>;
         }>;
     };
 };
@@ -7953,9 +8028,31 @@ export type PostMyMessagesByIdRegenerateResponses = {
             showThink: boolean;
             createdAt: string;
             /**
-             * Combined text from all paragraphs
+             * Combined text from all paragraphs (latest revision)
              */
             content: string;
+            /**
+             * Paragraphs with their revision history
+             */
+            paragraphs: Array<{
+                id: string;
+                sortOrder: number;
+                currentParagraphRevisionId: string | null;
+                /**
+                 * All revisions for this paragraph (ordered by version DESC)
+                 */
+                revisions: Array<{
+                    id: string;
+                    paragraphId: string;
+                    body: string;
+                    version: number;
+                    /**
+                     * Paragraph state
+                     */
+                    state: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT' | null;
+                    createdAt: string;
+                }>;
+            }>;
         };
     };
 };
@@ -10272,6 +10369,649 @@ export type PutMyStoriesByStoryIdDefaultCalendarResponses = {
 };
 
 export type PutMyStoriesByStoryIdDefaultCalendarResponse = PutMyStoriesByStoryIdDefaultCalendarResponses[keyof PutMyStoriesByStoryIdDefaultCalendarResponses];
+
+export type GetMyStoriesByStoryIdLanguagesData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/languages';
+};
+
+export type GetMyStoriesByStoryIdLanguagesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdLanguagesError = GetMyStoriesByStoryIdLanguagesErrors[keyof GetMyStoriesByStoryIdLanguagesErrors];
+
+export type GetMyStoriesByStoryIdLanguagesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Story languages (sorted by creation date)
+         */
+        languages: Array<{
+            /**
+             * Language ID
+             */
+            id: string;
+            /**
+             * Language name for LLM prompts
+             */
+            name: string;
+            /**
+             * Display label in UI
+             */
+            label: string;
+            /**
+             * Is this the primary language for the story
+             */
+            isDefault: boolean;
+        }>;
+    };
+};
+
+export type GetMyStoriesByStoryIdLanguagesResponse = GetMyStoriesByStoryIdLanguagesResponses[keyof GetMyStoriesByStoryIdLanguagesResponses];
+
+export type PostMyStoriesByStoryIdLanguagesData = {
+    body: {
+        /**
+         * Language name for LLM prompts
+         */
+        name: string;
+        /**
+         * Display label in UI
+         */
+        label: string;
+        /**
+         * Set as default/primary language for story
+         */
+        setAsDefault?: boolean;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/languages';
+};
+
+export type PostMyStoriesByStoryIdLanguagesErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdLanguagesError = PostMyStoriesByStoryIdLanguagesErrors[keyof PostMyStoriesByStoryIdLanguagesErrors];
+
+export type PostMyStoriesByStoryIdLanguagesResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        success: true;
+        language: {
+            /**
+             * Language ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Language name for LLM prompts
+             */
+            name: string;
+            /**
+             * Display label in UI
+             */
+            label: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+    };
+};
+
+export type PostMyStoriesByStoryIdLanguagesResponse = PostMyStoriesByStoryIdLanguagesResponses[keyof PostMyStoriesByStoryIdLanguagesResponses];
+
+export type DeleteMyLanguagesByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Language ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/languages/{id}';
+};
+
+export type DeleteMyLanguagesByIdErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyLanguagesByIdError = DeleteMyLanguagesByIdErrors[keyof DeleteMyLanguagesByIdErrors];
+
+export type DeleteMyLanguagesByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyLanguagesByIdResponse = DeleteMyLanguagesByIdResponses[keyof DeleteMyLanguagesByIdResponses];
+
+export type GetMyLanguagesByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Language ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/languages/{id}';
+};
+
+export type GetMyLanguagesByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyLanguagesByIdError = GetMyLanguagesByIdErrors[keyof GetMyLanguagesByIdErrors];
+
+export type GetMyLanguagesByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        language: {
+            /**
+             * Language ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Language name for LLM prompts
+             */
+            name: string;
+            /**
+             * Display label in UI
+             */
+            label: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+    };
+};
+
+export type GetMyLanguagesByIdResponse = GetMyLanguagesByIdResponses[keyof GetMyLanguagesByIdResponses];
+
+export type PutMyLanguagesByIdData = {
+    body: {
+        /**
+         * Language name for LLM prompts
+         */
+        name?: string;
+        /**
+         * Display label in UI
+         */
+        label?: string;
+    };
+    path: {
+        /**
+         * Language ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/languages/{id}';
+};
+
+export type PutMyLanguagesByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PutMyLanguagesByIdError = PutMyLanguagesByIdErrors[keyof PutMyLanguagesByIdErrors];
+
+export type PutMyLanguagesByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        language: {
+            /**
+             * Language ID
+             */
+            id: string;
+            /**
+             * Story ID
+             */
+            storyId: string;
+            /**
+             * Language name for LLM prompts
+             */
+            name: string;
+            /**
+             * Display label in UI
+             */
+            label: string;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+    };
+};
+
+export type PutMyLanguagesByIdResponse = PutMyLanguagesByIdResponses[keyof PutMyLanguagesByIdResponses];
+
+export type PutMyStoriesByStoryIdDefaultLanguageData = {
+    body: {
+        /**
+         * Language ID to set as primary (null to clear)
+         */
+        languageId: string | null;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/default-language';
+};
+
+export type PutMyStoriesByStoryIdDefaultLanguageErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PutMyStoriesByStoryIdDefaultLanguageError = PutMyStoriesByStoryIdDefaultLanguageErrors[keyof PutMyStoriesByStoryIdDefaultLanguageErrors];
+
+export type PutMyStoriesByStoryIdDefaultLanguageResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PutMyStoriesByStoryIdDefaultLanguageResponse = PutMyStoriesByStoryIdDefaultLanguageResponses[keyof PutMyStoriesByStoryIdDefaultLanguageResponses];
 
 export type GetMyStoriesByStoryIdMapsData = {
     body?: never;

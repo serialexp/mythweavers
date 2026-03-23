@@ -1134,7 +1134,7 @@ export const Message: Component<MessageProps> = (props) => {
       </Show>
 
       <Show when={showVersionHistory()}>
-        <MessageVersionHistory messageId={props.message.id} onClose={() => setShowVersionHistory(false)} />
+        <MessageVersionHistory messageId={props.message.id} currentMessageRevisionId={props.message.currentMessageRevisionId} onClose={() => setShowVersionHistory(false)} />
       </Show>
 
       <Show when={uiStore.hasCutMessage() && !uiStore.isCut(props.message.id) && isLastMessage()}>

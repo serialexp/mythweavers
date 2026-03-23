@@ -94,6 +94,17 @@ function renderMark(mark: Mark, children: JSX.Element): JSX.Element {
       return <sub>{children}</sub>
     case 'superscript':
       return <sup>{children}</sup>
+    case 'translation':
+      return (
+        <abbr
+          class="translation-mark"
+          title={attrs.title as string}
+          data-from={attrs.from as string}
+          data-to={attrs.to as string}
+        >
+          {children}
+        </abbr>
+      )
     default:
       // Fallback: wrap in span with class
       return <span class={`mark-${mark.type.name}`}>{children}</span>

@@ -105,6 +105,7 @@ export function SceneEditor(props: SceneEditorProps) {
       onSuggestionReject={handleSuggestionReject}
       isProtagonistSet={!!props.scene.protagonistId}
       onBlur={props.onBlur}
+      inlineMenuConfig={props.inlineMenuConfig}
     />
   )
 }

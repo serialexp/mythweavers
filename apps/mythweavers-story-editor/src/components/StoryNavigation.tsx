@@ -180,8 +180,9 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   let dragPreviewEl: HTMLDivElement | null = null
   let editInputRef: HTMLInputElement | undefined
 
-  // Get the Ollama hook for summary generation
-  const { generateNodeSummary } = useOllama()
+  // Get the Ollama hook for summary and title generation
+  const { generateNodeSummary, generateNodeTitle } = useOllama()
+  const [isGeneratingTitle, setIsGeneratingTitle] = createSignal(false)
 
   // Get the reactive node directly from store hash map
   const node = () => nodeStore.nodes[props.treeNode.id]
@@ -812,6 +813,37 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     }
   }
 
+  const handleGenerateTitle = async (source: 'summary' | 'content') => {
+    const n = node()
+    if (!n) return
+
+    let text: string | undefined
+
+    if (source === 'summary') {
+      text = n.summary
+      if (!text) return
+    } else {
+      // Get content from messages in this node
+      const nodeMessages = messagesStore.messages.filter(
+        (msg) => msg.sceneId === props.treeNode.id && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
+      )
+      text = nodeMessages.map((msg) => msg.content).join('\n\n')
+      if (!text.trim()) return
+    }
+
+    setIsGeneratingTitle(true)
+    try {
+      const title = await generateNodeTitle(text, n.type)
+      if (title && title !== 'Untitled') {
+        nodeStore.updateNode(props.treeNode.id, { title })
+      }
+    } catch (error) {
+      console.error('Failed to generate title:', error)
+    } finally {
+      setIsGeneratingTitle(false)
+    }
+  }
+
   // Check if node can move up or down
   const canMoveUp = () => {
     const n = node()
@@ -1020,6 +1052,24 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             <DropdownItem icon={<BsPencil />} onClick={handleEdit}>
               Edit Title
             </DropdownItem>
+            <Show when={node()?.type === 'chapter' || node()?.type === 'scene'}>
+              <Show when={node()?.summary}>
+                <DropdownItem
+                  icon={<BsFileEarmarkTextFill />}
+                  onClick={() => handleGenerateTitle('summary')}
+                  disabled={isGeneratingTitle()}
+                >
+                  {isGeneratingTitle() ? 'Generating...' : 'Generate Title from Summary'}
+                </DropdownItem>
+              </Show>
+              <DropdownItem
+                icon={<BsFileText />}
+                onClick={() => handleGenerateTitle('content')}
+                disabled={isGeneratingTitle()}
+              >
+                {isGeneratingTitle() ? 'Generating...' : 'Generate Title from Content'}
+              </DropdownItem>
+            </Show>
             <DropdownItem icon={<BsFileEarmarkText />} onClick={handleCopyAsMarkdown}>
               Copy as Markdown
             </DropdownItem>
@@ -1251,6 +1301,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
         characters: exportData.characters,
         contextItems: exportData.contextItems,
         calendars: exportData.calendars,
+        languages: exportData.languages,
         maps: exportData.maps,
       }
 
