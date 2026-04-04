@@ -33,6 +33,10 @@ interface CharacterResult {
   proposedDescription: string | null
   proposedPlotPoints: PlotPointProposal[]
   proposedStateChanges: StateProposal[]
+  /** Tracks which plot point proposals are selected for acceptance (by index) */
+  acceptedPlotPointIndices: Set<number>
+  /** Tracks which state change proposals are selected for acceptance (by index) */
+  acceptedStateChangeIndices: Set<number>
   validationWarning?: string | null
   error: string | null
   accepted: boolean
@@ -46,6 +50,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
   const [results, setResults] = createSignal<CharacterResult[]>([])
   const [tokenEstimate, setTokenEstimate] = createSignal<TokenEstimateResult | null>(null)
   const [isEstimating, setIsEstimating] = createSignal(false)
+  const [requestPlotPoints, setRequestPlotPoints] = createSignal(false)
   const contextMessageId = useContextMessage()
 
   // Get marked nodes content using shared utility
@@ -236,6 +241,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
           instruction(),
           storyContent!,
           plotPointsStore.definitions,
+          { requestPlotPoints: requestPlotPoints() },
         )
 
         // Validate the new template (as a warning, not a blocking error)
@@ -257,6 +263,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
         }
 
         // Add result - always include the proposed description
+        // All plot points and state changes are pre-selected for acceptance
         setResults((prev) => [
           ...prev,
           {
@@ -266,6 +273,8 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
             proposedDescription: response.template,
             proposedPlotPoints: response.plotPoints,
             proposedStateChanges: response.stateChanges,
+            acceptedPlotPointIndices: new Set(response.plotPoints.map((_, i) => i)),
+            acceptedStateChangeIndices: new Set(response.stateChanges.map((_, i) => i)),
             validationWarning,
             error: null,
             accepted: false,
@@ -282,6 +291,8 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
             proposedDescription: null,
             proposedPlotPoints: [],
             proposedStateChanges: [],
+            acceptedPlotPointIndices: new Set<number>(),
+            acceptedStateChangeIndices: new Set<number>(),
             error: err instanceof Error ? err.message : 'Failed to generate description',
             accepted: false,
           },
@@ -336,13 +347,59 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
     }
   }
 
+  const togglePlotPointAcceptance = (characterId: string, plotPointIndex: number) => {
+    setResults((prev) =>
+      prev.map((r) => {
+        if (r.characterId !== characterId) return r
+        const next = new Set(r.acceptedPlotPointIndices)
+        if (next.has(plotPointIndex)) {
+          next.delete(plotPointIndex)
+          // Also uncheck any state changes that reference this plot point's key
+          const ppKey = r.proposedPlotPoints[plotPointIndex]?.key
+          if (ppKey) {
+            const nextSc = new Set(r.acceptedStateChangeIndices)
+            r.proposedStateChanges.forEach((sc, i) => {
+              if (sc.key === ppKey) nextSc.delete(i)
+            })
+            return { ...r, acceptedPlotPointIndices: next, acceptedStateChangeIndices: nextSc }
+          }
+        } else {
+          next.add(plotPointIndex)
+        }
+        return { ...r, acceptedPlotPointIndices: next }
+      }),
+    )
+  }
+
+  const toggleStateChangeAcceptance = (characterId: string, stateChangeIndex: number) => {
+    setResults((prev) =>
+      prev.map((r) => {
+        if (r.characterId !== characterId) return r
+        const next = new Set(r.acceptedStateChangeIndices)
+        if (next.has(stateChangeIndex)) {
+          next.delete(stateChangeIndex)
+        } else {
+          next.add(stateChangeIndex)
+        }
+        return { ...r, acceptedStateChangeIndices: next }
+      }),
+    )
+  }
+
   const handleAcceptResult = (characterId: string) => {
     const result = results().find((r) => r.characterId === characterId)
     if (!result || !result.proposedDescription) return
 
-    // Apply plot point proposals first (so template can reference them)
-    applyPlotPointProposals(result.proposedPlotPoints)
-    applyStateChangeProposals(result.proposedStateChanges)
+    // Only apply accepted plot point proposals
+    const acceptedPlotPoints = result.proposedPlotPoints.filter((_, i) =>
+      result.acceptedPlotPointIndices.has(i),
+    )
+    const acceptedStateChanges = result.proposedStateChanges.filter((_, i) =>
+      result.acceptedStateChangeIndices.has(i),
+    )
+
+    applyPlotPointProposals(acceptedPlotPoints)
+    applyStateChangeProposals(acceptedStateChanges)
 
     // Update character description
     charactersStore.updateCharacter(characterId, { description: result.proposedDescription })
@@ -356,27 +413,31 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
   const handleAcceptAll = () => {
     const pendingResults = results().filter((r) => !r.accepted && !r.error && r.proposedDescription)
 
-    // Collect all plot point proposals (dedup by key for new ones)
+    // Collect only individually accepted plot point proposals (dedup by key for new ones)
     const seenNewKeys = new Set<string>()
     const allPlotPointProposals: PlotPointProposal[] = []
     const allStateChanges: StateProposal[] = []
 
     for (const result of pendingResults) {
-      for (const pp of result.proposedPlotPoints) {
+      for (let i = 0; i < result.proposedPlotPoints.length; i++) {
+        if (!result.acceptedPlotPointIndices.has(i)) continue
+        const pp = result.proposedPlotPoints[i]
         if (pp.isNew) {
           if (!seenNewKeys.has(pp.key)) {
             seenNewKeys.add(pp.key)
             allPlotPointProposals.push(pp)
           }
         } else {
-          // Extensions can be duplicated (will merge options)
           allPlotPointProposals.push(pp)
         }
       }
-      allStateChanges.push(...result.proposedStateChanges)
+      for (let i = 0; i < result.proposedStateChanges.length; i++) {
+        if (!result.acceptedStateChangeIndices.has(i)) continue
+        allStateChanges.push(result.proposedStateChanges[i])
+      }
     }
 
-    // Apply all plot point proposals
+    // Apply only accepted plot point proposals
     applyPlotPointProposals(allPlotPointProposals)
     applyStateChangeProposals(allStateChanges)
 
@@ -393,6 +454,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
     setInstruction('')
     setResults([])
     setCurrentProcessingIndex(0)
+    setRequestPlotPoints(false)
     props.onClose()
   }
 
@@ -548,12 +610,36 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
           {/* Instruction Input */}
           <div class={styles.formSection}>
             <label class={styles.label}>Update Instructions</label>
+            <div class={styles.instructionHelp}>
+              Describe what aspects of the character description templates should change based on
+              the marked story content. The AI will update the EJS templates, focusing on
+              personality, behavior, relationships, and character development — not plot events.
+              Descriptions should stay concise: aim for two to three paragraphs at most.
+            </div>
             <textarea
               class={styles.textarea}
               value={instruction()}
               onInput={(e) => setInstruction(e.currentTarget.value)}
-              placeholder="e.g., 'Add details about their experience in the recent battle' or 'Update their emotional state based on recent events'"
+              placeholder="e.g., 'Update personality and emotional state based on the marked scenes' or 'Reflect how their relationship with X has changed' or 'Add behavioral patterns observed in recent events'"
             />
+          </div>
+
+          {/* Plot Points Toggle */}
+          <div class={styles.formSection}>
+            <label class={styles.toggleRow}>
+              <input
+                type="checkbox"
+                checked={requestPlotPoints()}
+                onChange={(e) => setRequestPlotPoints(e.currentTarget.checked)}
+              />
+              <span class={styles.toggleLabel}>Request new plot points</span>
+            </label>
+            <Show when={requestPlotPoints()}>
+              <div class={styles.instructionHelp}>
+                The AI may propose new plot point variables (enums) to track character state changes
+                across the story. You can accept or reject each individually.
+              </div>
+            </Show>
           </div>
         </Show>
 
@@ -659,24 +745,40 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
                         <div class={styles.proposalHeader}>Proposed Plot Points</div>
                         <div class={styles.proposalList}>
                           <For each={result.proposedPlotPoints}>
-                            {(pp) => (
-                              <div class={styles.proposalItem}>
-                                <div class={styles.proposalItemHeader}>
-                                  <code class={styles.proposalKey}>{pp.key}</code>
-                                  <span class={pp.isNew ? styles.proposalBadgeNew : styles.proposalBadgeExtend}>
-                                    {pp.isNew ? 'new' : 'extend'}
-                                  </span>
-                                </div>
-                                <div class={styles.proposalOptions}>
-                                  Options: {pp.options.join(', ')}
-                                </div>
-                                <Show when={pp.isNew && pp.default}>
-                                  <div class={styles.proposalDefault}>
-                                    Default: <code>{pp.default}</code>
+                            {(pp, ppIndex) => {
+                              const isChecked = () => result.acceptedPlotPointIndices.has(ppIndex())
+                              return (
+                                <div class={`${styles.proposalItem} ${!isChecked() ? styles.proposalItemUnchecked : ''}`}>
+                                  <div class={styles.proposalItemHeader}>
+                                    <Show when={!result.accepted}>
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked()}
+                                        onChange={() =>
+                                          togglePlotPointAcceptance(result.characterId, ppIndex())
+                                        }
+                                      />
+                                    </Show>
+                                    <code class={styles.proposalKey}>{pp.key}</code>
+                                    <span
+                                      class={
+                                        pp.isNew ? styles.proposalBadgeNew : styles.proposalBadgeExtend
+                                      }
+                                    >
+                                      {pp.isNew ? 'new' : 'extend'}
+                                    </span>
                                   </div>
-                                </Show>
-                              </div>
-                            )}
+                                  <div class={styles.proposalOptions}>
+                                    Options: {pp.options.join(', ')}
+                                  </div>
+                                  <Show when={pp.isNew && pp.default}>
+                                    <div class={styles.proposalDefault}>
+                                      Default: <code>{pp.default}</code>
+                                    </div>
+                                  </Show>
+                                </div>
+                              )
+                            }}
                           </For>
                         </div>
                       </div>
@@ -688,20 +790,44 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
                         <div class={styles.proposalHeader}>Proposed State Changes</div>
                         <div class={styles.proposalList}>
                           <For each={result.proposedStateChanges}>
-                            {(sc) => {
-                              // Find the message to show context
+                            {(sc, scIndex) => {
                               const message = messagesStore.messages.find((m) => m.id === sc.messageId)
                               const messagePreview = message?.content?.slice(0, 100) || 'Unknown message'
                               const isValidMessage = !!message
+                              const isChecked = () => result.acceptedStateChangeIndices.has(scIndex())
                               return (
-                                <div class={`${styles.proposalItem} ${!isValidMessage ? styles.proposalItemWarning : ''}`}>
+                                <div
+                                  class={`${styles.proposalItem} ${!isValidMessage ? styles.proposalItemWarning : ''} ${!isChecked() ? styles.proposalItemUnchecked : ''}`}
+                                >
                                   <div class={styles.proposalItemHeader}>
+                                    <Show when={!result.accepted}>
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked()}
+                                        onChange={() =>
+                                          toggleStateChangeAcceptance(result.characterId, scIndex())
+                                        }
+                                      />
+                                    </Show>
                                     <code class={styles.proposalKey}>{sc.key}</code>
                                     <span class={styles.proposalValue}>= {sc.value}</span>
                                   </div>
                                   <div class={styles.proposalMessageRef}>
-                                    <Show when={isValidMessage} fallback={<span class={styles.proposalWarning}>⚠ Message not found: {sc.messageId}</span>}>
-                                      <span>@ "{messagePreview.trim()}{message?.content && message.content.length > 100 ? '...' : ''}"</span>
+                                    <Show
+                                      when={isValidMessage}
+                                      fallback={
+                                        <span class={styles.proposalWarning}>
+                                          ⚠ Message not found: {sc.messageId}
+                                        </span>
+                                      }
+                                    >
+                                      <span>
+                                        @ "{messagePreview.trim()}
+                                        {message?.content && message.content.length > 100
+                                          ? '...'
+                                          : ''}
+                                        "
+                                      </span>
                                     </Show>
                                   </div>
                                 </div>

@@ -419,3 +419,26 @@ export const proposalWarning = style({
   color: '#f59e0b',
   fontStyle: 'normal',
 })
+
+export const proposalItemUnchecked = style({
+  opacity: 0.5,
+})
+
+export const instructionHelp = style({
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+  lineHeight: 1.5,
+})
+
+export const toggleRow = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  cursor: 'pointer',
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.primary,
+})
+
+export const toggleLabel = style({
+  fontWeight: tokens.font.weight.medium,
+})

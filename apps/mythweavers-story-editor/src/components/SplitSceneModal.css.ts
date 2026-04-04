@@ -175,3 +175,135 @@ export const splitIndicator = style({
 export const fullIndicator = style({
   color: tokens.color.text.secondary,
 })
+
+// Manual split styles
+
+export const manualSplitContainer = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0',
+})
+
+export const manualSplitDescription = style({
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.secondary,
+  marginBottom: tokens.space['3'],
+})
+
+export const messageItem = style({
+  display: 'flex',
+  gap: tokens.space['3'],
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  backgroundColor: tokens.color.bg.raised,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.default,
+  fontSize: tokens.font.size.sm,
+})
+
+export const messageNumber = style({
+  flexShrink: 0,
+  fontWeight: tokens.font.weight.semibold,
+  color: tokens.color.text.muted,
+  minWidth: '2rem',
+})
+
+export const messagePreview = style({
+  flex: 1,
+  color: tokens.color.text.primary,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+})
+
+export const messageWordCount = style({
+  flexShrink: 0,
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+})
+
+export const splitPointArea = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: `${tokens.space['1']} 0`,
+  cursor: 'pointer',
+  position: 'relative',
+  minHeight: '1.5rem',
+  selectors: {
+    '&:hover': {
+      backgroundColor: `${tokens.color.accent.primary}11`,
+    },
+  },
+})
+
+export const splitPointLine = style({
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: '50%',
+  height: '1px',
+  backgroundColor: tokens.color.border.default,
+})
+
+export const splitPointButton = style({
+  position: 'relative',
+  zIndex: 1,
+  fontSize: tokens.font.size.xs,
+  padding: `${tokens.space['0.5']} ${tokens.space['2']}`,
+  borderRadius: tokens.radius.full,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  backgroundColor: tokens.color.bg.base,
+  color: tokens.color.text.muted,
+  cursor: 'pointer',
+  transition: 'all 0.15s ease',
+  selectors: {
+    '&:hover': {
+      borderColor: tokens.color.accent.primary,
+      color: tokens.color.accent.primary,
+    },
+  },
+})
+
+export const splitPointButtonActive = style({
+  borderColor: tokens.color.accent.primary,
+  backgroundColor: `${tokens.color.accent.primary}22`,
+  color: tokens.color.accent.primary,
+  fontWeight: tokens.font.weight.medium,
+})
+
+export const splitPointChapter = style({
+  borderColor: '#f59e0b',
+  backgroundColor: 'rgba(245, 158, 11, 0.15)',
+  color: '#f59e0b',
+  fontWeight: tokens.font.weight.medium,
+})
+
+export const manualTitleInputRow = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  padding: `${tokens.space['1']} ${tokens.space['3']}`,
+})
+
+export const manualTitleLabel = style({
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+  flexShrink: 0,
+  fontWeight: tokens.font.weight.medium,
+})
+
+export const manualTitleInput = style({
+  flex: 1,
+  fontSize: tokens.font.size.sm,
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  borderRadius: tokens.radius.default,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  backgroundColor: tokens.color.bg.base,
+  color: tokens.color.text.primary,
+  outline: 'none',
+  selectors: {
+    '&:focus': {
+      borderColor: tokens.color.accent.primary,
+    },
+  },
+})

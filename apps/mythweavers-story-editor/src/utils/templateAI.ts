@@ -137,6 +137,7 @@ export const generateTemplateWithPlotPoints = async (
   changeRequest: string,
   storyContent: string,
   existingPlotPoints: PlotPointDefinition[],
+  options?: { requestPlotPoints?: boolean },
 ): Promise<TemplateWithPlotPointsResponse> => {
   const { provider, model } = settingsStore
 
@@ -153,6 +154,7 @@ export const generateTemplateWithPlotPoints = async (
       currentResolvedState,
       changeRequest,
       existingPlotPoints,
+      options?.requestPlotPoints ?? false,
     ),
   })
 
@@ -241,6 +243,7 @@ function createTemplateWithPlotPointsTaskDetails(
   currentResolvedState: Record<string, unknown>,
   changeRequest: string,
   existingPlotPoints: PlotPointDefinition[],
+  requestPlotPoints: boolean,
 ): string {
   const stateJson = JSON.stringify(currentResolvedState, null, 2)
 
@@ -279,37 +282,39 @@ INSTRUCTIONS:
    - Values, beliefs, and motivations
    - Relationships and how they interact with others
    - Character growth and development
-3. Do NOT include event descriptions or knowledge of events - those are provided as separate context
-4. If the change involves tracking story state (e.g., emotional states, relationship status), propose a plot point
-5. Plot points should be ENUMs with meaningful state options
-6. Only propose plot points that you actually USE in the template
-7. Reference message IDs from the story content when proposing state changes
+3. Keep the description concise: aim for two to three paragraphs at most
+4. Do NOT include event descriptions or knowledge of events - those are provided as separate context
+${requestPlotPoints ? `5. If the change involves tracking story state (e.g., emotional states, relationship status), propose a plot point
+6. Plot points should be ENUMs with meaningful state options
+7. Only propose plot points that you actually USE in the template
+8. Reference message IDs from the story content when proposing state changes` : `5. Do NOT propose new plot points or state changes - only update the template text
+6. You may reference existing plot points in the template using plotPoints.keyName`}
 
 OUTPUT FORMAT (strict JSON, no markdown):
 {
   "template": "The updated EJS template text",
-  "plotPoints": [
+  "plotPoints": [${requestPlotPoints ? `
     {
       "key": "characterKnowsSecret",
       "isNew": true,
       "options": ["unaware", "suspicious", "knows"],
       "default": "unaware"
-    }
+    }` : ''}
   ],
-  "stateChanges": [
+  "stateChanges": [${requestPlotPoints ? `
     {
       "messageId": "the_message_id_where_state_changes",
       "key": "characterKnowsSecret",
       "value": "knows"
-    }
+    }` : ''}
   ]
 }
 
 IMPORTANT:
 - Output ONLY valid JSON, no explanations
-- "plotPoints" and "stateChanges" can be empty arrays if not needed
-- For extending existing enums, set "isNew": false and only include NEW options
-- Use exact message IDs from [MSG:id] markers in story content
+- "plotPoints" and "stateChanges" can be empty arrays${requestPlotPoints ? '' : ' (must be empty since plot point creation is disabled)'}
+${requestPlotPoints ? `- For extending existing enums, set "isNew": false and only include NEW options
+- Use exact message IDs from [MSG:id] markers in story content` : '- Do NOT include any entries in plotPoints or stateChanges arrays'}
 
 OUTPUT JSON NOW:`
 }
