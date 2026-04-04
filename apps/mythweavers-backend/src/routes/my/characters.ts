@@ -123,6 +123,10 @@ const characterSchema = z.strictObject({
 
 // Create character request body
 const createCharacterBodySchema = z.strictObject({
+  id: z.string().max(128).optional().meta({
+    description: 'Client-generated ID (CUID2). If omitted, the server generates one.',
+    example: 'clx1234567890',
+  }),
   firstName: z.string().min(1).max(100).meta({
     description: 'Character first name (required)',
     example: 'John',
