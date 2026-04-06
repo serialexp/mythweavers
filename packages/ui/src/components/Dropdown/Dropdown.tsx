@@ -22,7 +22,12 @@ export interface DropdownProps {
 
 export const Dropdown: ParentComponent<DropdownProps> = (props) => {
   const [isOpen, setIsOpen] = createSignal(false)
-  const [menuPosition, setMenuPosition] = createSignal({ top: 0, left: 0, maxHeight: 0 })
+  const [menuPosition, setMenuPosition] = createSignal<{
+    top: number
+    left: number
+    maxHeight: number
+    visibility: 'hidden' | 'visible'
+  }>({ top: 0, left: 0, maxHeight: 0, visibility: 'hidden' })
   let containerRef: HTMLDivElement | undefined
   let triggerRef: HTMLDivElement | undefined
   let menuRef: HTMLDivElement | undefined
@@ -30,74 +35,67 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
   const close = () => setIsOpen(false)
   const toggle = () => setIsOpen((prev) => !prev)
 
-  // Update menu position when opened in portal mode
+  // Calculate and apply menu position based on actual DOM measurements
   const updatePosition = () => {
-    if (props.portal && triggerRef) {
-      // With display:contents, the wrapper has no box, so get the first child element
-      const triggerElement = triggerRef.firstElementChild as HTMLElement | null
-      const rect = triggerElement?.getBoundingClientRect() ?? triggerRef.getBoundingClientRect()
-      const menuWidth = menuRef?.offsetWidth ?? 180
-      const menuHeight = menuRef?.offsetHeight ?? 200
-      const padding = 8 // Padding from viewport edges
+    if (!props.portal || !triggerRef || !menuRef) return
 
-      let left = props.alignRight ? rect.right - menuWidth : rect.left
-      // Keep menu within viewport horizontally
-      if (left + menuWidth > window.innerWidth) {
-        left = window.innerWidth - menuWidth - padding
-      }
-      if (left < padding) {
-        left = padding
-      }
+    // With display:contents, the wrapper has no box, so get the first child element
+    const triggerElement = triggerRef.firstElementChild as HTMLElement | null
+    const rect = triggerElement?.getBoundingClientRect() ?? triggerRef.getBoundingClientRect()
+    const menuWidth = menuRef.offsetWidth || 180
+    const menuHeight = menuRef.scrollHeight || menuRef.offsetHeight || 200
+    const padding = 8 // Padding from viewport edges
+    const gap = 4 // Gap between trigger and menu
 
-      // Calculate available space above and below
-      const spaceBelow = window.innerHeight - rect.bottom - padding
-      const spaceAbove = rect.top - padding
-      const fitsBelow = spaceBelow >= menuHeight
-      const fitsAbove = spaceAbove >= menuHeight
-
-      console.log('[Dropdown] Auto-position debug:', {
-        menuHeight,
-        menuWidth,
-        triggerTop: rect.top,
-        triggerBottom: rect.bottom,
-        spaceAbove,
-        spaceBelow,
-        fitsAbove,
-        fitsBelow,
-        windowHeight: window.innerHeight,
-      })
-
-      let top: number
-      let maxHeight: number
-
-      // Prefer dropping up if there's significantly more space above
-      // This handles cases where menuHeight measurement is unreliable (e.g., menu not fully rendered yet)
-      const hasMoreSpaceAbove = spaceAbove > spaceBelow * 2
-
-      if ((fitsBelow && !hasMoreSpaceAbove) || (!fitsAbove && spaceBelow >= spaceAbove)) {
-        // Position below
-        console.log('[Dropdown] Positioning BELOW')
-        top = rect.bottom + 4
-        maxHeight = spaceBelow - 4 // Account for the 4px gap
-      } else {
-        // Position above
-        console.log('[Dropdown] Positioning ABOVE')
-        top = rect.top - Math.min(menuHeight, spaceAbove) - 4
-        maxHeight = spaceAbove - 4 // Account for the 4px gap
-      }
-
-      setMenuPosition({ top, left, maxHeight })
+    let left = props.alignRight ? rect.right - menuWidth : rect.left
+    // Keep menu within viewport horizontally
+    if (left + menuWidth > window.innerWidth) {
+      left = window.innerWidth - menuWidth - padding
     }
+    if (left < padding) {
+      left = padding
+    }
+
+    // Calculate available space above and below
+    const spaceBelow = window.innerHeight - rect.bottom - padding
+    const spaceAbove = rect.top - padding
+
+    let top: number
+    let maxHeight: number
+
+    // Simple logic: position where there's more space, and always constrain to fit
+    if (spaceAbove > spaceBelow) {
+      // Position above
+      const availableAbove = spaceAbove - gap
+      const actualHeight = Math.min(menuHeight, availableAbove)
+      top = rect.top - actualHeight - gap
+      maxHeight = availableAbove
+    } else {
+      // Position below
+      top = rect.bottom + gap
+      maxHeight = spaceBelow - gap
+    }
+
+    setMenuPosition({ top, left, maxHeight, visibility: 'visible' })
+  }
+
+  // Called when the menu div is mounted in the DOM via ref
+  const setMenuRef = (el: HTMLDivElement) => {
+    menuRef = el
+    // Menu is now in the DOM — measure and position it
+    // Use requestAnimationFrame to ensure the browser has laid it out
+    requestAnimationFrame(() => {
+      updatePosition()
+    })
   }
 
   // Close on click outside - only attach listener when open
   createEffect(() => {
     if (isOpen()) {
-      // Use requestAnimationFrame to wait for Portal to finish rendering
-      // before measuring the menu height for auto-positioning
-      requestAnimationFrame(() => {
-        updatePosition()
-      })
+      // Reset to hidden so menu renders invisibly for measurement
+      if (props.portal) {
+        setMenuPosition({ top: 0, left: 0, maxHeight: 0, visibility: 'hidden' })
+      }
 
       const handleClickOutside = (e: MouseEvent) => {
         const target = e.target as Node
@@ -132,7 +130,7 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
 
   const menuContent = () => (
     <div
-      ref={menuRef}
+      ref={setMenuRef}
       class={`${styles.menu} ${props.alignRight && !props.portal ? styles.menuRight : ''}`}
       role="menu"
       style={
@@ -143,6 +141,7 @@ export const Dropdown: ParentComponent<DropdownProps> = (props) => {
               left: `${menuPosition().left}px`,
               'max-height': `${menuPosition().maxHeight}px`,
               'overflow-y': 'auto',
+              visibility: menuPosition().visibility,
               'z-index': '1000', // above mobile navigation (900) and other overlays
             }
           : undefined
