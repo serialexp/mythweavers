@@ -85,12 +85,11 @@ export const useOllama = () => {
     let name = ''
 
     try {
-      const prompt = `Based on this story opening, generate a short, evocative title (2-5 words) that captures the essence of the story. Only respond with the title, nothing else.
+      const prompt = `Here is the opening of a story:
 
-Story opening:
 ${content.substring(0, 1000)}
 
-Title:`
+Based on the above, generate a short, evocative title (2-5 words) that captures the essence of the story. Only respond with the title, nothing else.`
 
       const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
@@ -937,12 +936,11 @@ Now write the summary of the above content in 3-4 paragraphs. Remember: capture 
     let title = ''
 
     try {
-      const prompt = `Based on this ${nodeType} content, generate a short, evocative title (2-5 words) that captures the essence of what happens. Only respond with the title, nothing else.
+      const prompt = `Here is the content of a ${nodeType}:
 
-Content:
 ${content.substring(0, 3000)}
 
-Title:`
+Based on the above, generate a short, evocative title (2-5 words) that captures the essence of what happens. Only respond with the title, nothing else.`
 
       const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
