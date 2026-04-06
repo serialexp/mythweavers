@@ -494,7 +494,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           onTabChange={(id) => {
             const tab = id as 'new' | 'load'
             setActiveTab(tab)
-            navigate(`/stories/${tab === 'new' ? 'new' : 'list'}`, { replace: true })
+            window.history.replaceState(null, '', `/stories/${tab === 'new' ? 'new' : 'list'}`)
           }}
           size="md"
           style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
