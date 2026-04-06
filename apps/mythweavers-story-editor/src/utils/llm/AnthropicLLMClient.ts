@@ -48,14 +48,26 @@ export class AnthropicLLMClient extends BaseLLMClient {
 
       // Pricing map for different models (prices per million tokens)
       const pricingMap: Record<string, ModelPricing> = {
-        // Claude Opus 4.1
-        'claude-opus-4-1-20250805': {
+        // Claude Opus 4.5+ ($5/MTok input)
+        'claude-opus-4-5': {
+          input: 5,
+          output: 25,
+          input_cache_write: 6.25,
+          input_cache_read: 0.5,
+        },
+        'claude-opus-4-6': {
+          input: 5,
+          output: 25,
+          input_cache_write: 6.25,
+          input_cache_read: 0.5,
+        },
+        'claude-opus-4-1': {
           input: 15,
           output: 75,
           input_cache_write: 18.75,
           input_cache_read: 1.5,
         },
-        // Claude Opus 4
+        // Claude Opus 4 ($15/MTok input)
         'claude-opus-4-20250514': {
           input: 15,
           output: 75,
@@ -81,6 +93,13 @@ export class AnthropicLLMClient extends BaseLLMClient {
           output: 15,
           input_cache_write: 3.75,
           input_cache_read: 0.3,
+        },
+        // Claude Haiku 4.5
+        'claude-haiku-4-5': {
+          input: 1,
+          output: 5,
+          input_cache_write: 1.25,
+          input_cache_read: 0.1,
         },
         // Claude Haiku 3.5
         'claude-3-5-haiku-20241022': {
@@ -130,10 +149,10 @@ export class AnthropicLLMClient extends BaseLLMClient {
           input_cache_read: 0.3,
         },
         'claude-opus-4': {
-          input: 15,
-          output: 75,
-          input_cache_write: 18.75,
-          input_cache_read: 1.5,
+          input: 5,
+          output: 25,
+          input_cache_write: 6.25,
+          input_cache_read: 0.5,
         },
         'claude-3-5-sonnet': {
           input: 3,
@@ -148,10 +167,10 @@ export class AnthropicLLMClient extends BaseLLMClient {
           input_cache_read: 0.08,
         },
         'claude-3-opus': {
-          input: 15,
-          output: 75,
-          input_cache_write: 18.75,
-          input_cache_read: 1.5,
+          input: 5,
+          output: 25,
+          input_cache_write: 6.25,
+          input_cache_read: 0.5,
         },
         'claude-3-haiku': {
           input: 0.25,
