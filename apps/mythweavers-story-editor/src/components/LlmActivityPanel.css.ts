@@ -3,6 +3,7 @@ import { tokens } from '@mythweavers/ui/tokens'
 
 export const container = style({
   height: '100%',
+  padding: tokens.space['4'],
 })
 
 export const header = style({

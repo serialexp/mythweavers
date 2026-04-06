@@ -178,7 +178,7 @@ export class AnthropicLLMClient extends BaseLLMClient {
 
         return {
           name: model.id,
-          context_length: model.max_tokens || 200000,
+          context_length: model.max_input_tokens || 200000,
           description: model.display_name || model.id,
           pricing: pricing,
         }
