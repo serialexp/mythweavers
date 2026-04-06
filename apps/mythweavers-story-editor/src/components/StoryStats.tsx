@@ -1,4 +1,5 @@
 import { Component, For, Show, createMemo } from 'solid-js'
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { llmActivityStore } from '../stores/llmActivityStore'
 import { messagesStore } from '../stores/messagesStore'
 import { settingsStore } from '../stores/settingsStore'
@@ -33,6 +34,9 @@ export const StoryStats: Component = () => {
     return messagesStore.getStats(charsPerToken, model, provider)
   })
 
+  const displayWordCount = useAnimatedNumber(() => stats().wordCount)
+  const displayTokenCount = useAnimatedNumber(() => stats().estimatedTokens)
+
   const isClaudeModel = createMemo(() => {
     const model = settingsStore.model
     const provider = settingsStore.provider
@@ -56,7 +60,7 @@ export const StoryStats: Component = () => {
     <Show when={messagesStore.hasStoryMessages}>
       <div class={styles.container}>
         <span>
-          {stats().wordCount} words • ~{stats().estimatedTokens} tokens
+          {displayWordCount()} words • ~{displayTokenCount()} tokens
           <Show when={isClaudeModel()}>
             <span class={styles.cachedNote} title="Anthropic models cache full content">
               &nbsp;(cached)

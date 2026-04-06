@@ -246,8 +246,7 @@ IMPORTANT:
 - Use natural paragraph breaks to structure your writing
 - Do not include chapter headers, separators, or section labels
 - Do not add author notes or commentary
-- If you need to reason about the story, use <think>your reasoning here</think> tags
-- Do NOT use any other tags (no </s>, <|im_end|>, etc.) - only <think> tags when needed
+- Do NOT use any other tags (no </s>, <|im_end|>, etc.)
 - When introducing new characters, select names from the <name-suggestions> element in the context
 
 PACING AND TONE GUIDELINES:
@@ -292,8 +291,7 @@ IMPORTANT:
 - Do not include chapter headers, separators, or section labels
 - Do not add author notes or commentary
 - Simply continue the story directly with proper paragraphs
-- If you need to reason about the story, use <think>your reasoning here</think> tags
-- Do NOT use any other tags (no </s>, <|im_end|>, etc.) - only <think> tags when needed
+- Do NOT use any other tags (no </s>, <|im_end|>, etc.)
 - When introducing new characters, select names from the <name-suggestions> element in the context
 
 PACING AND TONE GUIDELINES:

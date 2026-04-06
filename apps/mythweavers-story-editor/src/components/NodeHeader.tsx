@@ -17,6 +17,7 @@ import {
 } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { useOllama } from '../hooks/useOllama'
 import { calendarStore } from '../stores/calendarStore'
 import { charactersStore } from '../stores/charactersStore'
@@ -41,6 +42,7 @@ interface NodeHeaderProps {
 }
 
 export const NodeHeader: Component<NodeHeaderProps> = (props) => {
+  const displayWordCount = useAnimatedNumber(() => props.node.wordCount || 0)
   let headerRef: HTMLDivElement | undefined
   let dropdownRef: HTMLDivElement | undefined
   let dropdownButtonRef: HTMLButtonElement | undefined
@@ -535,7 +537,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
               {props.messageCount} {props.messageCount === 1 ? 'message' : 'messages'}
             </span>
             <Show when={props.node.wordCount}>
-              <span class={styles.metaItem}>{props.node.wordCount} words</span>
+              <span class={styles.metaItem}>{displayWordCount()} words</span>
             </Show>
             <Show when={props.node.storyTime !== undefined && props.node.storyTime !== null}>
               <span class={styles.metaItem} title={calendarStore.formatStoryTime(props.node.storyTime!)}>
