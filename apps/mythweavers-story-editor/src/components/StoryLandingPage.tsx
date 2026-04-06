@@ -52,7 +52,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
   const [serverAvailable, setServerAvailable] = createSignal(false)
   const [loading, setLoading] = createSignal(true)
   const [syncing, setSyncing] = createSignal<string | null>(null)
-  const [activeTab, setActiveTab] = createSignal<'new' | 'load'>(props.initialTab ?? 'new')
+  const [activeTab, setActiveTab] = createSignal<'new' | 'load'>(props.initialTab ?? 'load')
   const [localFingerprints, setLocalFingerprints] = createSignal<Map<string, string>>(new Map())
   const [showClaudeChatImport, setShowClaudeChatImport] = createSignal(false)
   const [importingMythWeavers, setImportingMythWeavers] = createSignal(false)
@@ -500,8 +500,8 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
         >
           <TabList style={{ 'flex-shrink': '0' }}>
-            <Tab id="new">New Story</Tab>
             <Tab id="load">Load Story ({combinedStories().length})</Tab>
+            <Tab id="new">New Story</Tab>
           </TabList>
 
           <TabPanel id="new" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>

@@ -873,12 +873,12 @@ const App: Component = () => {
         }}
       />
 
-      {/* Root route - redirects to /stories/new */}
+      {/* Root route - redirects to /stories/list */}
       <Route
         path="/"
         component={() => {
           const navigate = useNavigate()
-          onMount(() => navigate('/stories/new', { replace: true }))
+          onMount(() => navigate('/stories/list', { replace: true }))
           return <div class={styles.app}>Loading...</div>
         }}
       />

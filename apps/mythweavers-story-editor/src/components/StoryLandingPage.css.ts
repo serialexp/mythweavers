@@ -17,4 +17,9 @@ export const contentArea = style({
   padding: '2rem',
   overflow: 'hidden',
   minHeight: 0,
+  '@media': {
+    '(max-width: 768px)': {
+      padding: '0.5rem',
+    },
+  },
 })
