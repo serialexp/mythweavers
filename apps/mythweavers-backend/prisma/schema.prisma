@@ -60,6 +60,7 @@ enum Tense {
 enum LlmProtocol {
   ANTHROPIC
   OPENAI_COMPATIBLE
+  CLOUDFLARE
 }
 
 enum ParagraphState {

@@ -10,6 +10,7 @@ import {
 import { prisma } from '../../lib/prisma.js'
 import {
   AnthropicClient,
+  CloudflareClient,
   OpenAICompatibleClient,
   type LLMStreamEvent,
   type LLMMessage,
@@ -94,6 +95,11 @@ function createClient(config: UpstreamConfig) {
       })
     case 'openai-compatible':
       return new OpenAICompatibleClient({
+        apiKey: config.apiKey,
+        endpoint: config.endpoint,
+      })
+    case 'cloudflare':
+      return new CloudflareClient({
         apiKey: config.apiKey,
         endpoint: config.endpoint,
       })

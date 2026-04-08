@@ -10,7 +10,7 @@ import type { LlmProtocol } from '@prisma/client'
 import { prisma } from './prisma.js'
 
 /** The streaming protocol to use for an upstream provider. */
-export type StreamProtocol = 'anthropic' | 'openai-compatible'
+export type StreamProtocol = 'anthropic' | 'openai-compatible' | 'cloudflare'
 
 export interface UpstreamConfig {
   /** Provider slug (e.g. "anthropic", "moonshot") */
@@ -51,6 +51,8 @@ function mapProtocol(proto: LlmProtocol): StreamProtocol {
       return 'anthropic'
     case 'OPENAI_COMPATIBLE':
       return 'openai-compatible'
+    case 'CLOUDFLARE':
+      return 'cloudflare'
     default:
       return 'openai-compatible'
   }
