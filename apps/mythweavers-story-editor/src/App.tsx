@@ -50,6 +50,7 @@ import { ApiStory } from './types/api'
 import { Character, ContextItem, Message, Node } from './types/core'
 import type { BranchConversionResult } from './utils/claudeChatImport'
 import { importClaudeChat, importClaudeChatWithBranches } from './utils/claudeChatImporter'
+import { AdventurePage } from './pages/AdventurePage'
 import { storyManager } from './utils/storyManager'
 
 // Component to redirect to login
@@ -215,7 +216,6 @@ const App: Component = () => {
         story.timelineGranularity || 'hour',
         story.provider || 'ollama',
         story.model,
-        story.openaiEndpoint || '',
       )
 
       console.log('[loadServerStoryData] Setting last known updated at...')
@@ -549,7 +549,6 @@ const App: Component = () => {
         story.timelineGranularity,
         story.provider,
         story.model,
-        story.openaiEndpoint,
       )
 
       // Sync provider and model from story to settingsStore
@@ -1193,6 +1192,9 @@ const App: Component = () => {
           )
         }}
       />
+
+      {/* World Pulse Adventure - standalone CYOA with world trajectory */}
+      <Route path="/adventure" component={() => <AdventurePage />} />
 
       {/* Legacy app route - redirects to stories */}
       <Route

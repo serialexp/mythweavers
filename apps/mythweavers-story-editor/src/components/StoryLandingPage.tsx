@@ -445,6 +445,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
 
         <NavBarNav>
           <NavLink href="/">Stories</NavLink>
+          <NavLink href="/adventure">Adventure</NavLink>
         </NavBarNav>
 
         <NavBarActions>
