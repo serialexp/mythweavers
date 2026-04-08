@@ -549,7 +549,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const cfModels: any[] = body.result ?? []
         models = cfModels.map((m) => ({
           id: m.name,
-          name: m.description ?? m.name ?? null,
+          name: null, // Cloudflare has no short display name; the id (@cf/vendor/model) is descriptive enough
           owned_by: m.name?.split('/')[1] ?? null, // e.g. "@cf/meta/..." → "meta"
           created: m.created_at ? Math.floor(new Date(m.created_at).getTime() / 1000) : null,
           imported: existingIds.has(m.name),
