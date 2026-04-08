@@ -1,6 +1,7 @@
 // Core domain types
 
 import type { Paragraph } from '@mythweavers/shared'
+import type { NormalizedTokenUsage } from '@mythweavers/llm'
 import { ModelPricing } from './llm'
 
 // Branch option for story branching
@@ -12,13 +13,8 @@ export interface BranchOption {
   description?: string // Optional longer description
 }
 
-// Standardized token usage tracking
-export interface TokenUsage {
-  input_normal: number // Regular input tokens (not cached)
-  input_cache_read: number // Tokens read from cache
-  input_cache_write: number // Tokens written to cache
-  output_normal: number // Output/completion tokens
-}
+// Re-export NormalizedTokenUsage as TokenUsage for backward compatibility
+export type TokenUsage = NormalizedTokenUsage
 
 export interface Message {
   id: string

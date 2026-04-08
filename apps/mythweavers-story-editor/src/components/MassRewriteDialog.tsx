@@ -5,9 +5,9 @@ import { massRewriteDialogStore } from '../stores/massRewriteDialogStore'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
-import { settingsStore } from '../stores/settingsStore'
 import type { Message, Node } from '../types/core'
 import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { resolveModel } from '../utils/llm/resolveModel'
 import { buildDiffRewritePrompt, processLLMDiffResponse } from '../utils/unifiedDiff'
 import * as styles from './MassRewriteDialog.css'
 
@@ -203,8 +203,9 @@ export function MassRewriteDialog() {
     setCurrentProcessingIndex(0)
 
     try {
-      const modelInfo = modelsStore.availableModels.find((m) => m.name === settingsStore.model)
-      const client = LLMClientFactory.getClient(settingsStore.provider)
+      const resolved = resolveModel('rewrite:mass')
+      const modelInfo = modelsStore.availableModels.find((m) => m.name === resolved.model)
+      const client = LLMClientFactory.getClient(resolved.provider)
 
       // Build context from selected scenes
       const selectedContextIds = massRewriteDialogStore.selectedContextSceneIds
@@ -250,11 +251,10 @@ export function MassRewriteDialog() {
         const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
         const response = client.generate({
-          model: settingsStore.model,
+          model: resolved.model,
           messages,
-          stream: false,
           providerOptions:
-            settingsStore.provider === 'ollama'
+            resolved.provider === 'ollama'
               ? {
                   num_ctx: modelInfo?.context_length || 4096,
                 }
@@ -263,9 +263,9 @@ export function MassRewriteDialog() {
         })
 
         let llmResponse = ''
-        for await (const part of response) {
-          if (part.response) {
-            llmResponse += part.response
+        for await (const event of response) {
+          if (event.type === 'chunk') {
+            llmResponse += event.text
           }
         }
 

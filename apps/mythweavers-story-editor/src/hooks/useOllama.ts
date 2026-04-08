@@ -7,12 +7,14 @@ import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
 import { settingsStore } from '../stores/settingsStore'
 import type { Character, Node } from '../types/core'
-import { LLMClient, LLMMessage, convertToTokenUsage } from '../types/llm'
+import type { LLMMessage, TokenUsage } from '@mythweavers/llm'
+import { normalizeTokenUsage } from '@mythweavers/llm'
 import { generateAnalysis } from '../utils/analysisClient'
 import { generateNextStoryBeatInstructions, isStoryReadyForGeneration } from '../utils/autoGeneration'
 import { getCharacterDisplayName } from '../utils/character'
 import { evaluateCharacterTemplates, getTemplatedActiveCharacters } from '../utils/contextTemplating'
 import { LLMClientFactory } from '../utils/llm'
+import { resolveModel } from '../utils/llm/resolveModel'
 import {
   getParagraphSummarizationPrompt,
   getSentenceSummarizationPrompt,
@@ -23,22 +25,6 @@ import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 
 export const useOllama = () => {
   let currentAbortController: AbortController | null = null
-
-  // Cache clients to avoid recreating them on every call
-  let cachedClient: LLMClient | null = null
-  let cachedProvider: string | null = null
-
-  const getClient = (): LLMClient => {
-    // Return cached client if provider hasn't changed
-    if (cachedClient && cachedProvider === settingsStore.provider) {
-      return cachedClient
-    }
-
-    // Getting client for provider
-    cachedClient = LLMClientFactory.getClient(settingsStore.provider)
-    cachedProvider = settingsStore.provider
-    return cachedClient
-  }
 
   // Get the effective context size (minimum of user setting and model's actual context length)
   const getEffectiveContextSize = (): number => {
@@ -81,7 +67,8 @@ export const useOllama = () => {
   }
 
   const generateStoryName = async (content: string): Promise<string> => {
-    const client = getClient()
+    const resolved = resolveModel('story:title')
+    const client = LLMClientFactory.getClient(resolved.provider)
     let name = ''
 
     try {
@@ -94,16 +81,15 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
       const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
       const response = client.generate({
-        model: settingsStore.model,
+        model: resolved.model,
         messages,
-        stream: true,
         max_tokens: 20, // Small response expected
         metadata: { callType: 'story:title' },
       })
 
-      for await (const part of response) {
-        if (part.response) {
-          name += part.response
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          name += event.text
         }
       }
 
@@ -127,21 +113,21 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
     failureMessage: string,
     callType: string,
   ): Promise<string> => {
-    const client = getClient()
+    const resolved = resolveModel(callType)
+    const client = LLMClientFactory.getClient(resolved.provider)
     let result = ''
 
     try {
       const response = client.generate({
-        model: settingsStore.model,
+        model: resolved.model,
         messages,
-        stream: true,
-        providerOptions: settingsStore.provider === 'ollama' ? { num_ctx: getEffectiveContextSize() } : undefined,
+        providerOptions: resolved.provider === 'ollama' ? { num_ctx: getEffectiveContextSize() } : undefined,
         metadata: { callType },
       })
 
-      for await (const part of response) {
-        if (part.response) {
-          result += part.response
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          result += event.text
         }
       }
 
@@ -441,11 +427,13 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
     maxTokens?: number,
     isRegeneration = false,
   ) => {
-    const client = getClient()
+    const callType = shouldSummarize ? 'story:generate+summary' : 'story:generate'
+    const resolved = resolveModel(callType)
+    const client = LLMClientFactory.getClient(resolved.provider)
     let accumulatedContent = ''
     const startTime = Date.now()
     let tokenCount = 0
-    let accumulatedUsage: any = null
+    let accumulatedUsage: TokenUsage | undefined
 
     currentAbortController = new AbortController()
     const signal = currentAbortController.signal
@@ -456,21 +444,18 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
         typeof promptOrMessages === 'string' ? [{ role: 'user', content: promptOrMessages }] : promptOrMessages
 
       const response = client.generate({
-        model: settingsStore.model,
+        model: resolved.model,
         messages,
-        stream: true,
         max_tokens: maxTokens,
         thinking_budget: settingsStore.thinkingBudget > 0 ? settingsStore.thinkingBudget : undefined,
         providerOptions:
-          settingsStore.provider === 'ollama'
+          resolved.provider === 'ollama'
             ? {
                 num_ctx: getEffectiveContextSize(),
               }
             : undefined,
         signal,
-        metadata: {
-          callType: shouldSummarize ? 'story:generate+summary' : 'story:generate',
-        },
+        metadata: { callType },
       })
 
       // Track cache for story generation and queries (both use story context)
@@ -482,52 +467,59 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
         cacheStore.addCacheEntry(cacheId, cacheContent, messages.length - 1)
       }
 
-      let doneProcessed = false // Guard to prevent processing part.done multiple times
+      let doneProcessed = false // Guard to prevent processing done event multiple times
 
-      for await (const part of response) {
+      for await (const event of response) {
         if (signal.aborted) {
           throw new DOMException('Generation aborted', 'AbortError')
         }
 
-        if (part.response) {
-          accumulatedContent += part.response
+        if (event.type === 'chunk') {
+          accumulatedContent += event.text
           tokenCount++
           // Use NoSave variant during streaming - content is saved via saveParagraphs after generation
           messagesStore.updateMessageNoSave(assistantMessageId, { content: accumulatedContent })
         }
 
-        // Accumulate usage data from message_delta events
-        if (part.usage) {
+        // Accumulate usage data from usage events
+        if (event.type === 'usage') {
           if (!accumulatedUsage) {
-            accumulatedUsage = { ...part.usage }
+            accumulatedUsage = { ...event.usage }
           } else {
-            // Accumulate the token counts
-            accumulatedUsage.prompt_tokens = (accumulatedUsage.prompt_tokens || 0) + (part.usage.prompt_tokens || 0)
+            // Input tokens are reported as totals — take the max
+            accumulatedUsage.prompt_tokens = Math.max(accumulatedUsage.prompt_tokens ?? 0, event.usage.prompt_tokens ?? 0)
+            // Output tokens accumulate during streaming
             accumulatedUsage.completion_tokens =
-              (accumulatedUsage.completion_tokens || 0) + (part.usage.completion_tokens || 0)
-            accumulatedUsage.total_tokens = (accumulatedUsage.total_tokens || 0) + (part.usage.total_tokens || 0)
+              (accumulatedUsage.completion_tokens ?? 0) + (event.usage.completion_tokens ?? 0)
+            accumulatedUsage.total_tokens =
+              (accumulatedUsage.prompt_tokens ?? 0) + (accumulatedUsage.completion_tokens ?? 0)
 
-            // For cache tokens, take the latest values (they're not cumulative)
-            if (part.usage.cache_creation_input_tokens !== undefined) {
-              accumulatedUsage.cache_creation_input_tokens = part.usage.cache_creation_input_tokens
+            // For cache tokens, take the max (they're reported once)
+            if (event.usage.cache_creation_input_tokens !== undefined) {
+              accumulatedUsage.cache_creation_input_tokens = Math.max(
+                accumulatedUsage.cache_creation_input_tokens ?? 0,
+                event.usage.cache_creation_input_tokens,
+              )
             }
-            if (part.usage.cache_read_input_tokens !== undefined) {
-              accumulatedUsage.cache_read_input_tokens = part.usage.cache_read_input_tokens
+            if (event.usage.cache_read_input_tokens !== undefined) {
+              accumulatedUsage.cache_read_input_tokens = Math.max(
+                accumulatedUsage.cache_read_input_tokens ?? 0,
+                event.usage.cache_read_input_tokens,
+              )
             }
           }
         }
 
-        if (part.done && !doneProcessed) {
+        if (event.type === 'done' && !doneProcessed) {
           doneProcessed = true // Prevent processing multiple done events
           const endTime = Date.now()
           const duration = (endTime - startTime) / 1000
           const tokensPerSecond = tokenCount / duration
 
-          // Use accumulated usage data if available, fallback to part.usage
-          const usage = accumulatedUsage || part.usage
+          const usage = accumulatedUsage
 
           // Calculate characters per token ratio using standardized token usage
-          const tokenUsageForRatio = convertToTokenUsage(usage)
+          const tokenUsageForRatio = normalizeTokenUsage(usage)
 
           if (tokenUsageForRatio && tokenUsageForRatio.input_normal > 0) {
             // Get total character count of visible story messages (what was actually sent)
@@ -557,7 +549,7 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
                 content: `${cleanedContent}\n\n[Refining clichés...]`,
               })
 
-              const refinementResult = await refineClichés(cleanedContent, client, settingsStore.model)
+              const refinementResult = await refineClichés(cleanedContent)
 
               if (refinementResult.wasRefined) {
                 cleanedContent = refinementResult.refinedContent
@@ -613,27 +605,21 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
           }
 
           // Convert to standardized token usage
-          const tokenUsage = convertToTokenUsage(usage)
+          const tokenUsage = normalizeTokenUsage(usage)
 
           messagesStore.updateMessage(assistantMessageId, {
             content: cleanedContent,
             think: thinkContent,
             tokensPerSecond: Math.round(tokensPerSecond * 10) / 10,
             // Keep legacy fields for backward compatibility
-            totalTokens: usage?.completion_tokens || part.eval_count || tokenCount,
-            promptTokens: usage?.prompt_tokens || part.prompt_eval_count,
+            totalTokens: usage?.completion_tokens || tokenCount,
+            promptTokens: usage?.prompt_tokens,
             cacheCreationTokens: cacheWriteTokens || undefined,
             cacheReadTokens: cacheReadTokens || undefined,
             // Add new standardized token usage
             tokenUsage,
-            model: settingsStore.model,
+            model: resolved.model,
           })
-
-          // Check if we got an API error (like overloaded_error) and skip summarization
-          const hasApiError = 'error' in part && part.error
-          if (hasApiError) {
-            // API error detected, skipping summarization
-          }
 
           // Summary generation and auto story naming disabled
 
@@ -835,7 +821,8 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
     messageContents,
     viewpointCharacterId,
   }: GenerateNodeSummaryParams): Promise<string> => {
-    const client = getClient()
+    const resolved = resolveModel('summary:node')
+    const client = LLMClientFactory.getClient(resolved.provider)
 
     try {
       const nodeMessages = messagesStore.messages.filter(
@@ -899,11 +886,10 @@ Now write the summary of the above content in 3-4 paragraphs. Remember: capture 
         const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
         const response = client.generate({
-          model: settingsStore.model,
+          model: resolved.model,
           messages,
-          stream: true,
           providerOptions:
-            settingsStore.provider === 'ollama'
+            resolved.provider === 'ollama'
               ? {
                   num_ctx: getEffectiveContextSize(),
                 }
@@ -912,9 +898,9 @@ Now write the summary of the above content in 3-4 paragraphs. Remember: capture 
         })
 
         let chunkSummary = ''
-        for await (const part of response) {
-          if (part.response) {
-            chunkSummary += part.response
+        for await (const event of response) {
+          if (event.type === 'chunk') {
+            chunkSummary += event.text
           }
         }
 
@@ -932,7 +918,8 @@ Now write the summary of the above content in 3-4 paragraphs. Remember: capture 
   }
 
   const generateNodeTitle = async (content: string, nodeType: string): Promise<string> => {
-    const client = getClient()
+    const resolved = resolveModel('node:title')
+    const client = LLMClientFactory.getClient(resolved.provider)
     let title = ''
 
     try {
@@ -945,16 +932,15 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
       const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
       const response = client.generate({
-        model: settingsStore.model,
+        model: resolved.model,
         messages,
-        stream: true,
         max_tokens: 20,
         metadata: { callType: 'node:title' },
       })
 
-      for await (const part of response) {
-        if (part.response) {
-          title += part.response
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          title += event.text
         }
       }
 
@@ -978,7 +964,6 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
     generateNodeSummary,
     generateNodeTitle,
     generateStoryName,
-    getClient,
     abortGeneration,
     isGenerating,
     checkIfOllamaIsBusy,

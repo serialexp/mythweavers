@@ -9,8 +9,19 @@ export * from './api'
 // Store types
 export * from './store'
 
-// LLM types
-export * from './llm'
+// LLM types — exclude TokenUsage to avoid conflict with core.ts's re-export
+export type {
+  LLMStreamEvent,
+  NormalizedTokenUsage,
+  LLMMessage,
+  LLMGenerateOptions,
+  ModelPricing,
+  LLMModel,
+  LLMClient,
+  BuiltinProvider,
+  LLMProvider,
+} from './llm'
+export { normalizeTokenUsage } from './llm'
 
 // Utility types
 export * from './utils'

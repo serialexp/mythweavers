@@ -1,200 +1,66 @@
-# Current Task: OAuth Device Flow for Claude Artifacts
+# Current Task: Consolidate LLM Clients into Shared Package
 
-## Status: Implementation Complete, Needs Migration
-
-Claude artifacts need to authenticate with the MythWeavers API. Since they run on `claude.site`, they can't use session cookies. We implemented OAuth Device Authorization Flow (RFC 8628).
+## Status: DONE — migration complete, verified
 
 ## What Was Done
 
-### Database Schema
-Added two new models to `apps/mythweavers-backend/prisma/schema.prisma`:
+The `@mythweavers/llm` shared package has been created and all LLM streaming code migrated to use it.
 
-```prisma
-model AccessToken {
-  id        String    @id @default(cuid())
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String    @unique // mw_xxxxxxxxxxxx
-  name      String             // "Claude Artifact" or user-defined
-  lastUsed  DateTime?
-  expiresAt DateTime?          // null = never expires
-  createdAt DateTime  @default(now())
-}
+### New Package: `packages/llm/`
 
-model DeviceCode {
-  id         String   @id @default(cuid())
-  deviceCode String   @unique // Random string for polling
-  userCode   String   @unique // Human-friendly ABCD-1234
-  userId     Int?             // Set when user approves
-  expiresAt  DateTime         // Short-lived: 15 minutes
-  approved   Boolean  @default(false)
-  createdAt  DateTime @default(now())
-}
-```
+- `src/types.ts` — `LLMStreamEvent` discriminated union, `TokenUsage`, `NormalizedTokenUsage`, `LLMMessage`, `LLMGenerateOptions`, `ModelPricing`, `LLMModel`, `ConfigOrGetter`, `LLMClient` interface
+- `src/utils/sse-parser.ts` — shared SSE parser (extracted from 6+ copies)
+- `src/utils/ndjson-parser.ts` — shared NDJSON parser (for Ollama)
+- `src/clients/anthropic.ts` — `AnthropicClient` with prompt caching, pricing lookup
+- `src/clients/openai-compatible.ts` — `OpenAICompatibleClient` (replaces both OpenAI and OpenRouter clients)
+- `src/clients/ollama.ts` — `OllamaClient` using raw HTTP (no `ollama` SDK dependency)
+- `src/index.ts` — public API
 
-### Auth Middleware Update
-Updated `apps/mythweavers-backend/src/lib/auth.ts` to check Bearer tokens before session cookies:
-- Checks `Authorization: Bearer mw_xxx` header first
-- Falls back to session cookie if no Bearer token
-- Updates `lastUsed` timestamp on token use (fire-and-forget)
-- Automatically deletes expired tokens
+### Backend Changes
 
-### OAuth Routes
-Created `apps/mythweavers-backend/src/routes/oauth/index.ts`:
-- `POST /oauth/device` - Start device flow, returns `device_code`, `user_code`, `verification_uri`
-- `POST /oauth/token` - Poll for access token (returns `authorization_pending` until approved)
-- `POST /oauth/approve` - API endpoint to approve a device code (requires auth)
+- `apps/mythweavers-backend/src/routes/my/llm.ts` — replaced `streamAnthropic()` and `streamOpenAICompatible()` with shared client `generate()` generators. Billing, route wiring, and `writeSSE()` stay in place.
+- Added `@mythweavers/llm` dependency
 
-### Device Verification Page
-Created `apps/mythweavers-backend/src/routes/device/index.ts`:
-- `GET /device` - Beautiful HTML page with form to enter user code
-- `POST /device` - Form handler that approves the device code
-- Handles login redirect if user not authenticated
-- Shows success/error messages
+### Frontend Changes
 
-### Package Updates
-- Added `@fastify/formbody` to `package.json` for form handling
-- Registered routes in `src/index.ts`
+- `types/llm.ts` — now re-exports from `@mythweavers/llm` (no more local `LLMGenerateResponse`)
+- `types/core.ts` — `TokenUsage` is now `NormalizedTokenUsage` re-exported from shared
+- `utils/llm/LLMClientFactory.ts` — instantiates shared clients (`AnthropicClient`, `OpenAICompatibleClient`, `OllamaClient`, `ServerLLMClient`), `LoggedLLMClient` updated for `LLMStreamEvent`
+- `utils/llm/ServerLLMClient.ts` — rewritten to use shared `parseSSEStream`, yields `LLMStreamEvent`
+- `utils/analysisClient.ts` — rewritten to use `LLMClientFactory` and `resolveModel()`
+- All consumers migrated: `useOllama.ts`, `templateAI.ts`, `clicheRefinement.ts`, `splitScene.ts`, `SceneEditorWrapper.tsx`, `AdventurePage.tsx`, `MessageRewriter.tsx`, `SingleRewriteDialog.tsx`, `MassRewriteDialog.tsx`
+- `llmActivityStore.ts` — uses shared `TokenUsage` for rawUsage
+- `LlmActivityPanel.tsx` — updated cache display for new type shape
+- Added `@mythweavers/llm` dependency, removed `ollama` dependency
 
-## How It Works
+### Files Deleted
 
-1. **Artifact requests device code:**
-   ```javascript
-   const response = await fetch('https://api.mythweavers.io/oauth/device', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({})
-   })
-   const { device_code, user_code, verification_uri } = await response.json()
-   // Shows: "Go to https://api.mythweavers.io/device and enter code ABCD-1234"
-   ```
+- `utils/llm/AnthropicLLMClient.ts`
+- `utils/llm/OpenAILLMClient.ts`
+- `utils/llm/OpenRouterLLMClient.ts`
+- `utils/llm/OllamaLLMClient.ts`
+- `utils/llm/BaseLLMClient.ts`
+- `utils/ollamaClient.ts`
+- `utils/openrouterClient.ts`
 
-2. **User opens verification URL:**
-   - Goes to `https://api.mythweavers.io/device`
-   - Logs in if needed (redirects to editor login, then back)
-   - Enters the code (e.g., `ABCD-1234`)
-   - Clicks "Authorize Device"
+### Verification
 
-3. **Artifact polls for token:**
-   ```javascript
-   const tokenResponse = await fetch('https://api.mythweavers.io/oauth/token', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
-       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-       device_code: device_code
-     })
-   })
+- `@mythweavers/llm` — typecheck passes
+- `@mythweavers/backend` — `tsc` build passes
+- `@mythweavers/story-editor` — typecheck passes
+- Tests: same results as before (2 pass, 3 pre-existing SolidJS store failures)
 
-   // While pending: { error: 'authorization_pending' }
-   // When approved: { access_token: 'mw_xxx', token_type: 'Bearer', expires_in: 5184000 }
-   ```
+## Remaining Items (for future sessions)
 
-4. **Artifact uses token:**
-   ```javascript
-   const stories = await fetch('https://api.mythweavers.io/my/stories', {
-     headers: { 'Authorization': `Bearer ${access_token}` }
-   })
-   ```
+- The legacy `anthropicClient.ts` is still used by `templateAI.ts`, `copyPreviewStore.ts`, and `StoryNavigation.tsx` for Anthropic-specific token counting. Could be consolidated if needed.
+- The `analysisClient.refactored.ts.bak` and `useOllama.refactored.ts.bak` files are dead code that could be deleted.
+- Database migrations for the billing/admin system still need to be run (see bottom of this file for commands).
 
-## Token Configuration
-- **Device codes:** Expire in 15 minutes
-- **Access tokens:** Expire in 60 days
-- **Polling interval:** 5 seconds recommended
-
-## Required Actions
-
-### 1. Run pnpm install
-```bash
-pnpm install
-```
-
-### 2. Run Prisma Migration
+### To Activate Billing/Admin (migrations needed)
 ```bash
 cd apps/mythweavers-backend
-pnpm prisma migrate dev --name add_access_token_and_device_code
+pnpm prisma migrate dev --name add_llm_provider_registry
+pnpm prisma migrate dev --name add_user_balance_and_billing
+npx tsx prisma/seed-llm-providers.ts
+# Set ADMIN_EMAILS=your@email.com in .env.local
 ```
-
-### 3. Test the flow
-1. Start the backend: `pnpm dev:server`
-2. Visit `http://localhost:3201/device` to see the page
-3. Test the OAuth endpoints via the API docs at `http://localhost:3201/docs`
-
-## Future Enhancements
-
-### API Key Management UI
-The `AccessToken` model can also be used for manually-created API keys:
-- `expiresAt: null` = never expires
-- Add routes: `GET /my/api-keys`, `POST /my/api-keys`, `DELETE /my/api-keys/:id`
-- Add UI in the editor settings to manage tokens
-
-### Considerations
-- Could add `scope` field to AccessToken for fine-grained permissions
-- Could add rate limiting per token
-- Could add token rotation (refresh tokens) if needed
-
-## Adventure Storage API
-
-Added a simple JSON blob storage for artifact adventures:
-
-**Database:**
-```prisma
-model Adventure {
-  id        String   @id @default(cuid())
-  userId    Int
-  user      User     @relation(...)
-  name      String   @default("Untitled Adventure")
-  data      Json     // Full artifact state as JSON blob
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-```
-
-**API Endpoints:**
-- `GET /my/adventures` - List user's adventures (name, id, timestamps)
-- `GET /my/adventures/:id` - Get full adventure with data
-- `POST /my/adventures` - Create new adventure
-- `PUT /my/adventures/:id` - Update adventure
-- `DELETE /my/adventures/:id` - Delete adventure
-
-## Claude Writer Artifact Integration
-
-The `apps/claude-writer/claude-writer-artifact.jsx` has been updated to support MythWeavers authentication AND adventure syncing:
-
-**Auth Features:**
-- "Connect MythWeavers" button in the header
-- Device flow auth modal showing the user code
-- Auto-polling for token after user authorizes
-- Connection status indicator (green dot + username when connected)
-- Token persistence in localStorage
-- Disconnect functionality
-
-**Sync Features:**
-- Auto-save to MythWeavers when connected (2s debounce)
-- "My Adventures" button to browse saved adventures
-- Load any saved adventure from the cloud
-- Delete adventures from the cloud
-- Sync status indicator (Syncing.../Synced/Sync failed)
-- Current adventure highlighted in list
-
-**How it works:**
-1. User clicks "Connect MythWeavers"
-2. Modal shows: "Go to api.mythweavers.io/device and enter code ABCD-1234"
-3. User opens link, logs in, enters code
-4. Modal auto-detects authorization and closes
-5. Adventures auto-sync to MythWeavers as user plays
-6. User can browse and load previous adventures via "My Adventures" button
-
-## Files Changed
-
-New files:
-- `apps/mythweavers-backend/src/routes/oauth/index.ts` - OAuth device flow endpoints
-- `apps/mythweavers-backend/src/routes/device/index.ts` - Device verification HTML page
-- `apps/mythweavers-backend/src/routes/my/adventures.ts` - Adventure CRUD endpoints
-
-Modified files:
-- `apps/mythweavers-backend/prisma/schema.prisma` - Added AccessToken, DeviceCode, Adventure models
-- `apps/mythweavers-backend/src/lib/auth.ts` - Check Bearer tokens before session cookies
-- `apps/mythweavers-backend/src/index.ts` - Register new routes, add formbody
-- `apps/mythweavers-backend/package.json` - Added @fastify/formbody
-- `apps/claude-writer/claude-writer-artifact.jsx` - Full MythWeavers integration (auth + sync)

@@ -138,22 +138,24 @@ export const LlmActivityPanel: Component = () => {
                         )}
                       </Show>
 
-                      <Show when={entry.rawUsage?.cache_creation}>
-                        {(cache) => (
-                          <div>
-                            <div class={styles.sectionLabel}>Cache Breakdown</div>
-                            <Stack gap="xs">
-                              <For each={Object.entries(cache())}>
-                                {([ttl, value]) => (
-                                  <div class={styles.cacheRow}>
-                                    <span class={styles.cacheTtl}>{ttl}</span>
-                                    <span class={styles.cacheValue}>{value ?? 0}</span>
-                                  </div>
-                                )}
-                              </For>
-                            </Stack>
-                          </div>
-                        )}
+                      <Show when={entry.rawUsage?.cache_creation_input_tokens || entry.rawUsage?.cache_read_input_tokens}>
+                        <div>
+                          <div class={styles.sectionLabel}>Cache Tokens</div>
+                          <Stack gap="xs">
+                            <Show when={entry.rawUsage?.cache_creation_input_tokens}>
+                              <div class={styles.cacheRow}>
+                                <span class={styles.cacheTtl}>Created</span>
+                                <span class={styles.cacheValue}>{entry.rawUsage!.cache_creation_input_tokens}</span>
+                              </div>
+                            </Show>
+                            <Show when={entry.rawUsage?.cache_read_input_tokens}>
+                              <div class={styles.cacheRow}>
+                                <span class={styles.cacheTtl}>Read</span>
+                                <span class={styles.cacheValue}>{entry.rawUsage!.cache_read_input_tokens}</span>
+                              </div>
+                            </Show>
+                          </Stack>
+                        </div>
                       </Show>
 
                       <Show when={entry.error}>

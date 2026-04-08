@@ -1,5 +1,5 @@
-import { settingsStore } from '../../stores/settingsStore'
 import { LLMClientFactory } from './LLMClientFactory'
+import { resolveModel } from './resolveModel'
 import {
   type AggregatedMessageContent,
   type NodeContext,
@@ -24,26 +24,25 @@ export async function generateSceneSplit(
   nodeContext: NodeContext,
   options: GenerateSceneSplitOptions = {},
 ): Promise<ProposedStructure> {
-  const { provider, model } = settingsStore
+  const resolved = resolveModel('scene-split')
 
-  if (!model) {
+  if (!resolved.model) {
     throw new Error('No model selected')
   }
 
-  const client = LLMClientFactory.getClient(provider)
+  const client = LLMClientFactory.getClient(resolved.provider)
   const prompt = createSplitScenePrompt(aggregatedContent, nodeContext)
 
   let responseText = ''
 
   const response = client.generate({
-    model,
+    model: resolved.model,
     messages: [
       {
         role: 'user',
         content: prompt,
       },
     ],
-    stream: true,
     max_tokens: 16384,
     signal: options.signal,
     metadata: {
@@ -51,9 +50,9 @@ export async function generateSceneSplit(
     },
   })
 
-  for await (const chunk of response) {
-    if (chunk.response) {
-      responseText += chunk.response
+  for await (const event of response) {
+    if (event.type === 'chunk') {
+      responseText += event.text
       options.onProgress?.(responseText)
     }
   }

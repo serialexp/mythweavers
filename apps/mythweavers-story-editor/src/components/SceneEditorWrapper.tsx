@@ -8,9 +8,9 @@ import { currentStoryStore } from '../stores/currentStoryStore'
 import { languageStore } from '../stores/languageStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
-import { settingsStore } from '../stores/settingsStore'
 import { generateMessageId } from '../utils/id'
 import { LLMClientFactory } from '../utils/llm'
+import { resolveModel } from '../utils/llm/resolveModel'
 import { ParagraphScriptModal } from './ParagraphScriptModal'
 
 interface SceneEditorWrapperProps {
@@ -275,22 +275,22 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
   const handleTranslate = async (fromLang: string, toLang: string, selectedText: string): Promise<string> => {
     setIsTranslating(true)
     try {
-      const client = LLMClientFactory.getClient(settingsStore.provider)
+      const resolved = resolveModel('translation')
+      const client = LLMClientFactory.getClient(resolved.provider)
       let result = ''
 
       const generator = client.generate({
-        model: settingsStore.model,
+        model: resolved.model,
         messages: [
           { role: 'system', content: 'You are a translator. Return only the translated text, nothing else. Do not add quotes, explanations, or any other text.' },
           { role: 'user', content: `Translate the following text from ${fromLang} to ${toLang}:\n\n${selectedText}` },
         ],
-        stream: true,
         metadata: { callType: 'translation' },
       })
 
-      for await (const chunk of generator) {
-        if (chunk.response) {
-          result += chunk.response
+      for await (const event of generator) {
+        if (event.type === 'chunk') {
+          result += event.text
         }
       }
 

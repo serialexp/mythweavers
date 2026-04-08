@@ -1,4 +1,6 @@
-import type { LLMClient, LLMMessage } from '../types/llm'
+import type { LLMMessage } from '../types/llm'
+import { LLMClientFactory } from './llm/LLMClientFactory'
+import { resolveModel } from './llm/resolveModel'
 
 const CRITIQUE_PROMPT = `You are a critical writing assistant with a particular focus on identifying overused, cliché, or cringe-worthy writing. Analyze the provided story content and identify issues such as:
 
@@ -48,12 +50,13 @@ export interface ClicheRefinementResult {
  */
 export async function refineClichés(
   content: string,
-  client: LLMClient,
-  model: string,
   onProgress?: (stage: 'critique' | 'refine') => void,
 ): Promise<ClicheRefinementResult> {
   // Step 1: Critique the content
   onProgress?.('critique')
+
+  const critiqueResolved = resolveModel('cliche:critique')
+  const critiqueClient = LLMClientFactory.getClient(critiqueResolved.provider)
 
   const critiqueMessages: LLMMessage[] = [
     { role: 'user', content: CRITIQUE_PROMPT },
@@ -61,16 +64,15 @@ export async function refineClichés(
   ]
 
   let critique = ''
-  const critiqueResponse = client.generate({
-    model,
+  const critiqueResponse = critiqueClient.generate({
+    model: critiqueResolved.model,
     messages: critiqueMessages,
-    stream: true,
     metadata: { callType: 'cliche:critique' },
   })
 
-  for await (const part of critiqueResponse) {
-    if (part.response) {
-      critique += part.response
+  for await (const event of critiqueResponse) {
+    if (event.type === 'chunk') {
+      critique += event.text
     }
   }
 
@@ -88,21 +90,23 @@ export async function refineClichés(
   // Step 2: Refine the content based on critique
   onProgress?.('refine')
 
+  const refineResolved = resolveModel('cliche:refine')
+  const refineClient = LLMClientFactory.getClient(refineResolved.provider)
+
   const refinePrompt = REFINE_PROMPT.replace('{critique}', critique).replace('{content}', content)
 
   const refineMessages: LLMMessage[] = [{ role: 'user', content: refinePrompt }]
 
   let refinedContent = ''
-  const refineResponse = client.generate({
-    model,
+  const refineResponse = refineClient.generate({
+    model: refineResolved.model,
     messages: refineMessages,
-    stream: true,
     metadata: { callType: 'cliche:refine' },
   })
 
-  for await (const part of refineResponse) {
-    if (part.response) {
-      refinedContent += part.response
+  for await (const event of refineResponse) {
+    if (event.type === 'chunk') {
+      refinedContent += event.text
     }
   }
 

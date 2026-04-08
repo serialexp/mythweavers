@@ -1,15 +1,12 @@
 export { LLMClientFactory } from './LLMClientFactory'
-export { BaseLLMClient } from './BaseLLMClient'
-export { OllamaLLMClient } from './OllamaLLMClient'
-export { AnthropicLLMClient } from './AnthropicLLMClient'
-export { OpenRouterLLMClient } from './OpenRouterLLMClient'
+export { ServerLLMClient } from './ServerLLMClient'
 
-// Re-export types
+// Re-export types from the shared package
 export type {
   LLMClient,
   LLMProvider,
   LLMMessage,
   LLMModel,
   LLMGenerateOptions,
-  LLMGenerateResponse,
+  LLMStreamEvent,
 } from '../../types/llm'

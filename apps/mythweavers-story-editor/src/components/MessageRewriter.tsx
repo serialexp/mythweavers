@@ -4,9 +4,9 @@ import { BsCheck2, BsX } from 'solid-icons/bs'
 import { For, Show, createMemo, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
-import { settingsStore } from '../stores/settingsStore'
 import { Message } from '../types/core'
 import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { resolveModel } from '../utils/llm/resolveModel'
 import { buildDiffRewritePrompt, processLLMDiffResponse } from '../utils/unifiedDiff'
 import * as styles from './MessageRewriter.css'
 
@@ -86,8 +86,9 @@ export function MessageRewriter(props: MessageRewriterProps) {
     setResults([])
 
     try {
-      const modelInfo = modelsStore.availableModels.find((m) => m.name === settingsStore.model)
-      const client = LLMClientFactory.getClient(settingsStore.provider)
+      const resolved = resolveModel('rewrite:message')
+      const modelInfo = modelsStore.availableModels.find((m) => m.name === resolved.model)
+      const client = LLMClientFactory.getClient(resolved.provider)
 
       let processedCount = 0
 
@@ -104,11 +105,10 @@ export function MessageRewriter(props: MessageRewriterProps) {
           const llmMessages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
           const response = client.generate({
-            model: settingsStore.model,
+            model: resolved.model,
             messages: llmMessages,
-            stream: false,
             providerOptions:
-              settingsStore.provider === 'ollama'
+              resolved.provider === 'ollama'
                 ? {
                     num_ctx: modelInfo?.context_length || 4096,
                   }
@@ -117,9 +117,9 @@ export function MessageRewriter(props: MessageRewriterProps) {
           })
 
           let llmResponse = ''
-          for await (const part of response) {
-            if (part.response) {
-              llmResponse += part.response
+          for await (const event of response) {
+            if (event.type === 'chunk') {
+              llmResponse += event.text
             }
           }
 

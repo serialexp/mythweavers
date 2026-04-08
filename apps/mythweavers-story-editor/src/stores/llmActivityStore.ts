@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import type { TokenUsage } from '../types/core'
-import type { LLMGenerateResponse, LLMMessage } from '../types/llm'
+import type { LLMMessage, TokenUsage as RawTokenUsage } from '@mythweavers/llm'
 
 export interface LlmActivityEntry {
   id: string
@@ -12,7 +12,7 @@ export interface LlmActivityEntry {
   requestMessages: LLMMessage[]
   response: string
   usage?: TokenUsage
-  rawUsage?: LLMGenerateResponse['usage']
+  rawUsage?: RawTokenUsage
   error?: string
 }
 

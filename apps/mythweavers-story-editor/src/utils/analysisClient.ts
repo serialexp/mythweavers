@@ -1,66 +1,30 @@
-import { settingsStore } from '../stores/settingsStore'
-import { createOllamaClient } from './ollamaClient'
-import { createOpenRouterClient } from './openrouterClient'
+import { LLMClientFactory } from './llm/LLMClientFactory'
+import { resolveModel } from './llm/resolveModel'
 
 /**
- * Simple text generation for analysis tasks
- * Uses the same client infrastructure as story generation but optimized for analysis
+ * Simple text generation for analysis tasks.
+ * Uses the shared LLM client infrastructure.
  */
 export const generateAnalysis = async (prompt: string): Promise<string> => {
-  const { provider, model } = settingsStore
+  const resolved = resolveModel('analysis')
+  const client = LLMClientFactory.getClient(resolved.provider)
 
-  if (!model) {
+  if (!resolved.model) {
     throw new Error('No model selected')
   }
 
-  if (provider === 'ollama') {
-    const client = createOllamaClient()
-    return generateWithClient(client, prompt, model)
-  }
-  if (provider === 'openrouter') {
-    const client = createOpenRouterClient()
-    return generateWithClient(client, prompt, model)
-  }
-  throw new Error('Unknown provider')
-}
-
-/**
- * Generate text using the unified client infrastructure
- * Optimized settings for analysis tasks
- */
-interface AnalysisClient {
-  generate(options: {
-    model: string
-    prompt: string
-    stream: boolean
-    options: {
-      num_ctx: number
-      temperature: number
-      top_p: number
-      stop: string[]
-    }
-  }): AsyncIterable<{ response?: string }>
-}
-
-async function generateWithClient(client: AnalysisClient, prompt: string, model: string): Promise<string> {
   let result = ''
 
-  const response = await client.generate({
-    model,
-    prompt,
-    stream: true, // Use streaming for consistency
-    options: {
-      num_ctx: 4096, // Smaller context for analysis tasks
-      temperature: 0.3, // Lower temperature for more consistent analysis
-      top_p: 0.9,
-      stop: [], // Let it finish naturally
-    },
+  const response = client.generate({
+    model: resolved.model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.3,
+    metadata: { callType: 'analysis' },
   })
 
-  // Collect the streamed response
-  for await (const part of response) {
-    if (part.response) {
-      result += part.response
+  for await (const event of response) {
+    if (event.type === 'chunk') {
+      result += event.text
     }
   }
 

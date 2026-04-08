@@ -3,8 +3,6 @@ import { settingsStore } from '../stores/settingsStore'
 import type { PlotPointDefinition } from '../types/core'
 import { AnthropicClient, TokenEstimate } from './anthropicClient'
 import { LLMClientFactory } from './llm/LLMClientFactory'
-import { createOllamaClient } from './ollamaClient'
-import { createOpenRouterClient } from './openrouterClient'
 
 export type { TokenEstimate }
 
@@ -72,13 +70,12 @@ async function generateWithFactory(
   const generator = client.generate({
     model,
     messages,
-    stream: true,
     metadata: { callType },
   })
 
-  for await (const chunk of generator) {
-    if (chunk.response) {
-      result += chunk.response
+  for await (const event of generator) {
+    if (event.type === 'chunk') {
+      result += event.text
     }
   }
 
@@ -585,24 +582,11 @@ export const estimateContextItemTokens = async (
 
   let estimate: TokenEstimate
 
-  if (provider === 'anthropic') {
-    if (!anthropicApiKey) {
-      estimate = {
-        tokens: Math.ceil(prompt.length / 4),
-        isExact: false,
-        method: 'heuristic',
-      }
-    } else {
-      const client = new AnthropicClient(anthropicApiKey)
-      estimate = await client.estimateTokens([{ role: 'user', content: prompt }], model)
-    }
-  } else if (provider === 'ollama') {
-    const client = createOllamaClient()
-    estimate = client.estimateTokens([{ role: 'user', content: prompt }])
-  } else if (provider === 'openrouter') {
-    const client = createOpenRouterClient()
-    estimate = client.estimateTokens([{ role: 'user', content: prompt }])
+  if (provider === 'anthropic' && anthropicApiKey) {
+    const client = new AnthropicClient(anthropicApiKey)
+    estimate = await client.estimateTokens([{ role: 'user', content: prompt }], model)
   } else {
+    // Heuristic: ~4 chars per token
     estimate = {
       tokens: Math.ceil(prompt.length / 4),
       isExact: false,
@@ -648,26 +632,11 @@ export const estimateTemplateChangeTokens = async (
 
   let estimate: TokenEstimate
 
-  if (provider === 'anthropic') {
-    if (!anthropicApiKey) {
-      // Fallback to heuristic if no API key
-      estimate = {
-        tokens: Math.ceil(prompt.length / 4),
-        isExact: false,
-        method: 'heuristic',
-      }
-    } else {
-      const client = new AnthropicClient(anthropicApiKey)
-      estimate = await client.estimateTokens([{ role: 'user', content: prompt }], model)
-    }
-  } else if (provider === 'ollama') {
-    const client = createOllamaClient()
-    estimate = client.estimateTokens([{ role: 'user', content: prompt }])
-  } else if (provider === 'openrouter') {
-    const client = createOpenRouterClient()
-    estimate = client.estimateTokens([{ role: 'user', content: prompt }])
+  if (provider === 'anthropic' && anthropicApiKey) {
+    const client = new AnthropicClient(anthropicApiKey)
+    estimate = await client.estimateTokens([{ role: 'user', content: prompt }], model)
   } else {
-    // Fallback for unknown providers
+    // Heuristic: ~4 chars per token
     estimate = {
       tokens: Math.ceil(prompt.length / 4),
       isExact: false,
