@@ -20,10 +20,14 @@ export const getApiBaseUrl = (): string => {
     return import.meta.env.VITE_UNIFIED_API_URL
   }
 
-  // Default to current hostname with API port
+  // Default: infer API URL from current hostname
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname
     const protocol = window.location.protocol
+    // Reverse-proxy convention: write.example.com → api.example.com
+    if (hostname.startsWith('write.')) {
+      return `${protocol}//api.${hostname.slice('write.'.length)}`
+    }
     return `${protocol}//${hostname}:3201`
   }
 
