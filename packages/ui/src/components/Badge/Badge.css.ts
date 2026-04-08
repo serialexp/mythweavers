@@ -25,8 +25,8 @@ export const badge = recipe({
         color: tokens.color.text.inverse,
       },
       secondary: {
-        backgroundColor: tokens.color.surface.hover,
-        color: tokens.color.text.secondary,
+        backgroundColor: tokens.color.accent.secondarySubtle,
+        color: tokens.color.accent.secondary,
       },
       success: {
         backgroundColor: tokens.color.semantic.successSubtle,

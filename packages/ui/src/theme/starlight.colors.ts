@@ -38,6 +38,7 @@ export const starlightColors = {
     primaryHover: '#0a4a99',
     primaryActive: '#083d80',
     secondary: '#a5281b',
+    secondarySubtle: '#fce8e6',
     secondaryHover: '#8b1a1a',
     secondaryActive: '#721515',
   },

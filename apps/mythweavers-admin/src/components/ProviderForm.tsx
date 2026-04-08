@@ -6,7 +6,7 @@ interface ProviderFormProps {
     name?: string
     displayName?: string
     endpointUrl?: string
-    protocol?: "ANTHROPIC" | "OPENAI_COMPATIBLE"
+    protocol?: "ANTHROPIC" | "OPENAI_COMPATIBLE" | "CLOUDFLARE"
     envKeyName?: string
     sortOrder?: number
   }
@@ -16,7 +16,7 @@ interface ProviderFormProps {
     name: string
     displayName: string
     endpointUrl: string
-    protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE"
+    protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE" | "CLOUDFLARE"
     envKeyName: string
     sortOrder: number
   }) => Promise<void>
@@ -33,11 +33,19 @@ export function ProviderForm(props: ProviderFormProps) {
     props.initial?.endpointUrl ?? "",
   )
   const [protocol, setProtocol] = createSignal<
-    "ANTHROPIC" | "OPENAI_COMPATIBLE"
+    "ANTHROPIC" | "OPENAI_COMPATIBLE" | "CLOUDFLARE"
   >(props.initial?.protocol ?? "OPENAI_COMPATIBLE")
   const [envKeyName, setEnvKeyName] = createSignal(
     props.initial?.envKeyName ?? "",
   )
+  // Track whether the user has manually edited the env key field.
+  // If not, we auto-derive it from the slug.
+  const [envKeyTouched, setEnvKeyTouched] = createSignal(
+    !!(props.initial?.envKeyName),
+  )
+
+  const deriveEnvKey = (slug: string) =>
+    `LLM_PROVIDER_${slug.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_API_KEY`
   const [sortOrder, setSortOrder] = createSignal(
     props.initial?.sortOrder ?? 0,
   )
@@ -75,7 +83,13 @@ export function ProviderForm(props: ProviderFormProps) {
           >
             <Input
               value={name()}
-              onInput={(e) => setName(e.currentTarget.value)}
+              onInput={(e) => {
+                const slug = e.currentTarget.value
+                setName(slug)
+                if (!envKeyTouched()) {
+                  setEnvKeyName(slug ? deriveEnvKey(slug) : "")
+                }
+              }}
               placeholder="moonshot"
               required
             />
@@ -105,12 +119,13 @@ export function ProviderForm(props: ProviderFormProps) {
             value={protocol()}
             onChange={(e) =>
               setProtocol(
-                e.currentTarget.value as "ANTHROPIC" | "OPENAI_COMPATIBLE",
+                e.currentTarget.value as "ANTHROPIC" | "OPENAI_COMPATIBLE" | "CLOUDFLARE",
               )
             }
             options={[
               { value: "OPENAI_COMPATIBLE", label: "OpenAI Compatible" },
               { value: "ANTHROPIC", label: "Anthropic" },
+              { value: "CLOUDFLARE", label: "Cloudflare Workers AI" },
             ]}
           />
         </FormField>
@@ -122,7 +137,10 @@ export function ProviderForm(props: ProviderFormProps) {
         >
           <Input
             value={envKeyName()}
-            onInput={(e) => setEnvKeyName(e.currentTarget.value)}
+            onInput={(e) => {
+              setEnvKeyName(e.currentTarget.value)
+              setEnvKeyTouched(true)
+            }}
             placeholder="LLM_PROVIDER_MOONSHOT_API_KEY"
             required
           />

@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAdmin } from '../../lib/auth.js'
@@ -7,7 +8,7 @@ import { prisma } from '../../lib/prisma.js'
 
 const errorSchema = z.object({ error: z.string() })
 
-const protocolEnum = z.enum(['ANTHROPIC', 'OPENAI_COMPATIBLE'])
+const protocolEnum = z.enum(['ANTHROPIC', 'OPENAI_COMPATIBLE', 'CLOUDFLARE'])
 
 const providerSchema = z.object({
   id: z.string(),
@@ -555,6 +556,156 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       })
 
       return { models }
+    },
+  )
+
+  // =====================
+  // PRICING LOOKUP
+  // =====================
+
+  const pricingResultSchema = z.object({
+    modelId: z.string(),
+    costInput: z.number().nullable().meta({ description: 'Cost per million input tokens (what we pay)' }),
+    costOutput: z.number().nullable().meta({ description: 'Cost per million output tokens (what we pay)' }),
+    costCacheRead: z.number().nullable().meta({ description: 'Cost per million cached read tokens' }),
+    costCacheWrite: z.number().nullable().meta({ description: 'Cost per million cached write tokens' }),
+    contextLength: z.number().nullable().meta({ description: 'Context window size in tokens' }),
+    source: z.string().nullable().meta({ description: 'URL or description of where pricing was found' }),
+  })
+
+  /** Use Claude with web search to look up model pricing */
+  fastify.post(
+    '/llm/models/lookup-pricing',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        description:
+          'Use Claude with web search to look up current pricing for the given model IDs. Requires LLM_PROVIDER_ANTHROPIC_API_KEY to be set.',
+        tags: ['admin-llm'],
+        body: z.object({
+          modelIds: z.array(z.string().min(1)).min(1).max(20).meta({
+            description: 'Model IDs to look up pricing for',
+            example: ['claude-sonnet-4-5-20250929', 'gpt-4o'],
+          }),
+          providerName: z.string().optional().meta({
+            description: 'Provider name to help narrow the search',
+            example: 'Anthropic',
+          }),
+        }),
+        response: {
+          200: z.object({ results: z.array(pricingResultSchema) }),
+          401: errorSchema,
+          403: errorSchema,
+          502: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const apiKey = process.env.LLM_PROVIDER_ANTHROPIC_API_KEY
+      if (!apiKey) {
+        return reply.status(502).send({
+          error: 'LLM_PROVIDER_ANTHROPIC_API_KEY is not set — cannot call Claude for pricing lookup',
+        })
+      }
+
+      const { modelIds, providerName } = request.body
+
+      const client = new Anthropic({ apiKey })
+
+      const modelList = modelIds.map((id) => `- ${id}`).join('\n')
+      const providerHint = providerName ? ` from the provider "${providerName}"` : ''
+
+      const userPrompt = `Look up the current API pricing for these LLM models${providerHint}. I need the cost per million tokens for input and output, cache read and cache write costs if available, and the context window size.
+
+Models to look up:
+${modelList}
+
+After you've finished searching, return your findings as a JSON array with this exact schema for each model:
+{
+  "modelId": "the-model-id",
+  "costInput": <number or null — cost per million INPUT tokens in USD>,
+  "costOutput": <number or null — cost per million OUTPUT tokens in USD>,
+  "costCacheRead": <number or null — cost per million CACHE READ tokens in USD>,
+  "costCacheWrite": <number or null — cost per million CACHE WRITE tokens in USD>,
+  "contextLength": <number or null — context window in tokens>,
+  "source": "<URL where you found this information>"
+}
+
+Return ONLY the JSON array, no markdown fences, no explanation text before or after.`
+
+      // Run the agentic loop — server-side tools (web_search) may need
+      // multiple rounds. Continue on "pause_turn" (tool loop hit iteration
+      // limit) up to a reasonable cap.
+      const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }]
+      let response: Anthropic.Message
+      let continuations = 0
+      const MAX_CONTINUATIONS = 5
+
+      do {
+        response = await client.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 4096,
+          tools: [
+            { type: 'web_search_20250305' as const, name: 'web_search' as const },
+          ],
+          messages,
+        })
+
+        // Append the assistant response for potential continuation
+        messages.push({ role: 'assistant', content: response.content })
+        continuations++
+      } while (response.stop_reason === 'pause_turn' && continuations < MAX_CONTINUATIONS)
+
+      // Collect ALL text blocks from the final response — the JSON answer
+      // is typically in the last one, after intermediate reasoning.
+      const textBlocks = response.content.filter(
+        (b): b is Anthropic.TextBlock => b.type === 'text',
+      )
+
+      // Try parsing from last text block first, then fall back to earlier ones
+      let parsed: unknown = null
+      let parseError = ''
+
+      for (let i = textBlocks.length - 1; i >= 0; i--) {
+        const rawText = textBlocks[i].text
+        const jsonText = rawText
+          .replace(/^```(?:json)?\s*\n?/m, '')
+          .replace(/\n?```\s*$/m, '')
+          .trim()
+
+        // Try to extract a JSON array from the text (it might have prose around it)
+        const arrayMatch = jsonText.match(/\[[\s\S]*\]/)
+        const candidate = arrayMatch ? arrayMatch[0] : jsonText
+
+        try {
+          const result = JSON.parse(candidate)
+          if (Array.isArray(result)) {
+            parsed = result
+            break
+          }
+        } catch {
+          parseError = rawText.slice(0, 300)
+        }
+      }
+
+      if (!Array.isArray(parsed)) {
+        const allText = textBlocks.map((b) => b.text).join('\n---\n')
+        return reply.status(502).send({
+          error: `Failed to extract JSON array from Claude response (${textBlocks.length} text blocks, stop_reason: ${response.stop_reason}): ${parseError || allText.slice(0, 500)}`,
+        })
+      }
+
+      const results = parsed.map((item: Record<string, unknown>) => ({
+        modelId: String(item.modelId ?? ''),
+        costInput: typeof item.costInput === 'number' ? item.costInput : null,
+        costOutput: typeof item.costOutput === 'number' ? item.costOutput : null,
+        costCacheRead: typeof item.costCacheRead === 'number' ? item.costCacheRead : null,
+        costCacheWrite: typeof item.costCacheWrite === 'number' ? item.costCacheWrite : null,
+        contextLength: typeof item.contextLength === 'number' ? item.contextLength : null,
+        source: typeof item.source === 'string' ? item.source : null,
+      }))
+
+      return { results }
     },
   )
 }

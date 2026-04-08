@@ -1,6 +1,8 @@
 import {
   Alert,
   Button,
+  Card,
+  CardBody,
   Heading,
   ListDetailPanel,
   type ListDetailPanelRef,
@@ -179,30 +181,36 @@ export function ProvidersPage() {
                 </Stack>
 
                 <Stack direction="vertical" gap="xs">
-                  <Text size="sm" color="secondary">
-                    Env Key
-                  </Text>
+                  <Stack direction="horizontal" gap="sm" align="center">
+                    <Text size="sm" color="secondary">
+                      Env Key
+                    </Text>
+                    <StatusDot
+                      status={provider.keyConfigured ? "success" : "warning"}
+                      title={
+                        provider.keyConfigured
+                          ? "Key is set"
+                          : "Key is NOT set"
+                      }
+                    />
+                  </Stack>
                   <Text size="sm" as="code" style={{ "font-family": "monospace" }}>
                     {provider.envKeyName}
                   </Text>
-                  <StatusDot
-                    status={provider.keyConfigured ? "success" : "warning"}
-                    title={
-                      provider.keyConfigured
-                        ? "Key is set"
-                        : "Key is NOT set"
-                    }
-                  />
                 </Stack>
               </Stack>
             )}
             newItemTitle="Add Provider"
             renderNewForm={() => (
-              <ProviderForm
-                onSubmit={handleCreate}
-                onCancel={() => panelRef?.clearSelection()}
-                submitLabel="Create Provider"
-              />
+              <Card variant="outlined" padding="md">
+                <CardBody>
+                  <ProviderForm
+                    onSubmit={handleCreate}
+                    onCancel={() => panelRef?.clearSelection()}
+                    submitLabel="Create Provider"
+                  />
+                </CardBody>
+              </Card>
             )}
           />
         </Show>

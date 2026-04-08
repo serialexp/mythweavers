@@ -38,6 +38,7 @@ export const chronicleColors = {
     primaryHover: '#d9b23a',
     primaryActive: '#b8921e',
     secondary: '#8b4d6e',
+    secondarySubtle: '#2d1a24',
     secondaryHover: '#a05a80',
     secondaryActive: '#7a4260',
   },

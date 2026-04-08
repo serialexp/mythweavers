@@ -41,6 +41,14 @@ export const pricingLabel = style({
   color: tokens.color.text.secondary,
 })
 
+export const unsavedDot = style({
+  width: "6px",
+  height: "6px",
+  borderRadius: "50%",
+  backgroundColor: tokens.color.accent.primary,
+  flexShrink: 0,
+})
+
 export const discoverRow = style({
   display: "flex",
   alignItems: "center",

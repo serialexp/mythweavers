@@ -47,6 +47,7 @@ export const tokens = createThemeContract({
       primaryHover: null,
       primaryActive: null,
       secondary: null, // Secondary accent
+      secondarySubtle: null, // Subtle background for secondary accent
       secondaryHover: null,
       secondaryActive: null,
     },
