@@ -6,7 +6,9 @@ import {
   BsDownload,
   BsGear,
   BsKey,
+  BsLayers,
   BsLink45deg,
+  BsPlug,
   BsListTask,
   BsPencilSquare,
   BsTrash,
@@ -24,7 +26,9 @@ import type { BranchConversionResult } from '../utils/claudeChatImport'
 import { ClaudeChatImportModal } from './ClaudeChatImportModal'
 import { DeletedNodesModal } from './DeletedNodesModal'
 import { DeletedTurnsModal } from './DeletedTurnsModal'
-import { ModelSelector } from './ModelSelector'
+import { CategoryModelOverrides } from './CategoryModelOverrides'
+import { CustomProviders } from './CustomProviders'
+import { ProviderModelSelector } from './ProviderModelSelector'
 import * as styles from './Settings.css'
 import { StoryTimePicker } from './StoryTimePicker'
 
@@ -36,6 +40,8 @@ interface SettingsSection {
 
 const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'provider', name: 'Provider & Model', icon: <BsKey /> },
+  { id: 'model-overrides', name: 'Model Overrides', icon: <BsLayers /> },
+  { id: 'custom-providers', name: 'Custom Providers', icon: <BsPlug /> },
   { id: 'story', name: 'Story Settings', icon: <BsPencilSquare /> },
   { id: 'timeline', name: 'Timeline', icon: <BsClock /> },
   { id: 'operations', name: 'Bulk Operations', icon: <BsGear /> },
@@ -89,9 +95,6 @@ interface SettingsProps {
 
 export const Settings: Component<SettingsProps> = (props) => {
   const [showClaudeChatImportModal, setShowClaudeChatImportModal] = createSignal(false)
-  const [showOpenRouterKey, setShowOpenRouterKey] = createSignal(false)
-  const [showAnthropicKey, setShowAnthropicKey] = createSignal(false)
-  const [showOpenAIKey, setShowOpenAIKey] = createSignal(false)
   const [showDeletedTurnsModal, setShowDeletedTurnsModal] = createSignal(false)
   const [showDeletedNodesModal, setShowDeletedNodesModal] = createSignal(false)
 
@@ -128,105 +131,7 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   const renderProviderSection = () => (
     <div class={styles.section}>
-      <div class={styles.settingRow}>
-        <label class={styles.label}>Provider</label>
-        <select value={props.provider} onChange={(e) => props.setProvider(e.target.value)} class={styles.select}>
-          <option value="ollama">Ollama</option>
-          <option value="openrouter">OpenRouter</option>
-          <option value="anthropic">Anthropic</option>
-          <option value="openai">OpenAI</option>
-        </select>
-      </div>
-
-      <Show when={props.provider === 'openrouter'}>
-        <div class={styles.settingRow}>
-          <label class={styles.label}>OpenRouter API Key</label>
-          <div class={styles.inputRow}>
-            <input
-              type={showOpenRouterKey() ? 'text' : 'password'}
-              value={props.openrouterApiKey}
-              onChange={(e) => props.setOpenrouterApiKey(e.target.value)}
-              class={styles.input}
-              placeholder="sk-or-..."
-            />
-            <button
-              onClick={() => setShowOpenRouterKey(!showOpenRouterKey())}
-              class={styles.showKeyButton}
-              title={showOpenRouterKey() ? 'Hide API key' : 'Show API key'}
-            >
-              {showOpenRouterKey() ? 'Hide' : 'Show'}
-            </button>
-          </div>
-        </div>
-      </Show>
-
-      <Show when={props.provider === 'anthropic'}>
-        <div class={styles.settingRow}>
-          <label class={styles.label}>Anthropic API Key</label>
-          <div class={styles.inputRow}>
-            <input
-              type={showAnthropicKey() ? 'text' : 'password'}
-              value={props.anthropicApiKey}
-              onChange={(e) => props.setAnthropicApiKey(e.target.value)}
-              class={styles.input}
-              placeholder="sk-ant-..."
-            />
-            <button
-              onClick={() => setShowAnthropicKey(!showAnthropicKey())}
-              class={styles.showKeyButton}
-              title={showAnthropicKey() ? 'Hide API key' : 'Show API key'}
-            >
-              {showAnthropicKey() ? 'Hide' : 'Show'}
-            </button>
-          </div>
-        </div>
-      </Show>
-
-      <Show when={props.provider === 'openai'}>
-        <div class={styles.settingRow}>
-          <label class={styles.label}>OpenAI API Key</label>
-          <div class={styles.inputRow}>
-            <input
-              type={showOpenAIKey() ? 'text' : 'password'}
-              value={props.openaiApiKey}
-              onChange={(e) => props.setOpenaiApiKey(e.target.value)}
-              class={styles.input}
-              placeholder="sk-..."
-            />
-            <button
-              onClick={() => setShowOpenAIKey(!showOpenAIKey())}
-              class={styles.showKeyButton}
-              title={showOpenAIKey() ? 'Hide API key' : 'Show API key'}
-            >
-              {showOpenAIKey() ? 'Hide' : 'Show'}
-            </button>
-          </div>
-        </div>
-        <div class={styles.settingRow}>
-          <label class={styles.label}>Custom Endpoint</label>
-          <input
-            type="text"
-            value={currentStoryStore.openaiEndpoint}
-            onChange={(e) => currentStoryStore.setOpenaiEndpoint(e.target.value)}
-            class={styles.input}
-            placeholder="https://api.openai.com (default)"
-          />
-          <span class={styles.infoText}>
-            Override the base URL for OpenAI-compatible APIs (e.g. LM Studio, vLLM, etc.)
-          </span>
-        </div>
-      </Show>
-
-      <div class={styles.settingRow}>
-        <label class={styles.label}>Model</label>
-        <ModelSelector
-          model={props.model}
-          setModel={props.setModel}
-          availableModels={props.availableModels}
-          isLoadingModels={props.isLoadingModels}
-          onRefreshModels={props.onRefreshModels}
-        />
-      </div>
+      <ProviderModelSelector />
 
       <div class={styles.settingRow}>
         <label class={styles.label}>Context Size</label>
@@ -549,6 +454,10 @@ export const Settings: Component<SettingsProps> = (props) => {
     switch (sectionId) {
       case 'provider':
         return renderProviderSection()
+      case 'model-overrides':
+        return <CategoryModelOverrides />
+      case 'custom-providers':
+        return <CustomProviders />
       case 'story':
         return renderStorySection()
       case 'timeline':

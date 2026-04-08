@@ -77,9 +77,6 @@ export const currentStoryStore = {
   get model() {
     return storyState.story?.model
   },
-  get openaiEndpoint() {
-    return storyState.story?.openaiEndpoint || ''
-  },
   get paragraphsPerTurn() {
     return storyState.story?.paragraphsPerTurn ?? 3
   },
@@ -170,13 +167,6 @@ export const currentStoryStore = {
     setStoryState('story', 'model', model)
     // Save through saveService (handles local vs server)
     saveService.saveStorySettings(storyState.story.id, { model })
-  },
-
-  setOpenaiEndpoint: (endpoint: string) => {
-    if (!storyState.story) return
-    setStoryState('story', 'openaiEndpoint', endpoint)
-    // Save through saveService (handles local vs server)
-    saveService.saveStorySettings(storyState.story.id, { openaiEndpoint: endpoint })
   },
 
   setParagraphsPerTurn: (paragraphs: number) => {
@@ -272,7 +262,6 @@ export const currentStoryStore = {
     timelineGranularity?: 'hour' | 'day',
     provider?: string,
     model?: string | null,
-    openaiEndpoint?: string,
   ) => {
     setStoryState('story', {
       id,
@@ -292,7 +281,6 @@ export const currentStoryStore = {
       timelineGranularity: timelineGranularity || 'hour',
       provider: provider,
       model: model,
-      openaiEndpoint: openaiEndpoint || '',
     })
 
     // Connect WebSocket for real-time sync (only if server exists)

@@ -335,7 +335,6 @@ interface StorySettingsOperation extends SaveOperationBase {
     timelineGranularity: 'hour' | 'day'
     provider: string
     model: string | null
-    openaiEndpoint: string
     plotPointDefaults: unknown[]
   }>
 }
@@ -1291,7 +1290,6 @@ export class SaveService {
           timelineGranularity: operation.data.timelineGranularity,
           provider: operation.data.provider,
           model: operation.data.model,
-          openaiEndpoint: operation.data.openaiEndpoint,
           globalScript: operation.data.globalScript,
           selectedNodeId: operation.data.selectedNodeId,
           branchChoices: operation.data.branchChoices,
@@ -1659,7 +1657,6 @@ export class SaveService {
       timelineGranularity: 'hour' | 'day'
       provider: string
       model: string | null
-      openaiEndpoint: string
     }>,
   ) {
     // Generate a unique ID for this settings update

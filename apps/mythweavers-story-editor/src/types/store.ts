@@ -22,9 +22,8 @@ export interface CurrentStory {
   timelineEndTime?: number | null
   timelineGranularity?: 'hour' | 'day'
   // LLM settings
-  provider?: string // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
+  provider?: string // 'ollama' | 'openrouter' | 'anthropic' | 'openai' | 'server' | 'custom:*'
   model?: string | null // Model name for the selected provider
-  openaiEndpoint?: string // Custom base URL for OpenAI-compatible APIs
 }
 
 export interface CacheEntry {
@@ -91,9 +90,8 @@ export interface SavedStory {
   timelineEndTime?: number | null
   timelineGranularity?: 'hour' | 'day'
   // LLM settings
-  provider?: string // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
-  model?: string | null // Model name for the selected provider
-  openaiEndpoint?: string // Custom base URL for OpenAI-compatible APIs
+  provider?: string
+  model?: string | null
 }
 
 export interface StoryMetadata {

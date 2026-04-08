@@ -1,6 +1,36 @@
 import { createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { DEFAULT_CHARS_PER_TOKEN, DEFAULT_CONTEXT_SIZE } from '../constants'
+import type { CategoryOverrides } from '../utils/llm/resolveModel'
+
+export interface CustomProvider {
+  /** Unique ID, e.g. "moonshot" — used as the provider key everywhere */
+  id: string
+  /** Display name, e.g. "Moonshot AI" */
+  name: string
+  /** Base URL, e.g. "https://api.moonshot.cn" */
+  endpoint: string
+  /** API key for this provider */
+  apiKey: string
+}
+
+const getInitialCustomProviders = (): CustomProvider[] => {
+  try {
+    const saved = localStorage.getItem('story-custom-providers')
+    return saved ? JSON.parse(saved) : []
+  } catch {
+    return []
+  }
+}
+
+const getInitialCategoryOverrides = (): CategoryOverrides => {
+  try {
+    const saved = localStorage.getItem('story-category-overrides')
+    return saved ? JSON.parse(saved) : {}
+  } catch {
+    return {}
+  }
+}
 
 // Initialize values from localStorage
 const getInitialContextSize = (): number => {
@@ -31,6 +61,8 @@ const [settingsState, setSettingsState] = createStore({
   refineClichés: localStorage.getItem('story-refine-cliches') === 'true',
   includeNameSuggestions: localStorage.getItem('story-include-name-suggestions') !== 'false', // Default to true
   maxTokens: Number.parseInt(localStorage.getItem('story-max-tokens') || '4096'),
+  categoryOverrides: getInitialCategoryOverrides(),
+  customProviders: getInitialCustomProviders(),
 })
 
 // Auto-save effects
@@ -101,6 +133,14 @@ createEffect(() => {
   localStorage.setItem('story-max-tokens', settingsState.maxTokens.toString())
 })
 
+createEffect(() => {
+  localStorage.setItem('story-category-overrides', JSON.stringify(settingsState.categoryOverrides))
+})
+
+createEffect(() => {
+  localStorage.setItem('story-custom-providers', JSON.stringify(settingsState.customProviders))
+})
+
 export const settingsStore = {
   // Getters
   get model() {
@@ -154,6 +194,12 @@ export const settingsStore = {
   get maxTokens() {
     return settingsState.maxTokens
   },
+  get categoryOverrides() {
+    return settingsState.categoryOverrides
+  },
+  get customProviders() {
+    return settingsState.customProviders
+  },
 
   // Actions
   setModel: (model: string) => {
@@ -196,6 +242,36 @@ export const settingsStore = {
   setRefineClichés: (enabled: boolean) => setSettingsState('refineClichés', enabled),
   setIncludeNameSuggestions: (enabled: boolean) => setSettingsState('includeNameSuggestions', enabled),
   setMaxTokens: (tokens: number) => setSettingsState('maxTokens', tokens),
+  addCustomProvider: (provider: CustomProvider) => {
+    setSettingsState('customProviders', (prev) => [...prev.filter((p) => p.id !== provider.id), provider])
+    // Clear cached client so it picks up new config
+    import('../utils/llm/LLMClientFactory').then(({ LLMClientFactory }) => {
+      LLMClientFactory.clearClientCache(`custom:${provider.id}`)
+    })
+  },
+  updateCustomProvider: (id: string, updates: Partial<Omit<CustomProvider, 'id'>>) => {
+    setSettingsState('customProviders', (p) => p.id === id, updates as any)
+  },
+  removeCustomProvider: (id: string) => {
+    setSettingsState('customProviders', (prev) => prev.filter((p) => p.id !== id))
+    // Clear the LLMClientFactory cache for this provider
+    import('../utils/llm/LLMClientFactory').then(({ LLMClientFactory }) => {
+      LLMClientFactory.clearClientCache(`custom:${id}`)
+    })
+  },
+  getCustomProvider: (id: string): CustomProvider | undefined => {
+    return settingsState.customProviders.find((p) => p.id === id)
+  },
+  setCategoryOverride: (category: string, override: { provider: string; model: string } | null) => {
+    if (override) {
+      setSettingsState('categoryOverrides', category as keyof CategoryOverrides, override as any)
+    } else {
+      // Remove the override — create a new object without the key
+      const current = { ...settingsState.categoryOverrides }
+      delete current[category as keyof CategoryOverrides]
+      setSettingsState('categoryOverrides', current)
+    }
+  },
 
   // Sync provider and model from story (called when loading a story)
   syncFromStory: (provider?: string, model?: string | null) => {
