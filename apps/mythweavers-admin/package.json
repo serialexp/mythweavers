@@ -1,0 +1,26 @@
+{
+  "name": "@mythweavers/admin",
+  "version": "1.0.0",
+  "description": "MythWeavers admin dashboard",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "generate:client": "openapi-ts -i http://localhost:3201/docs/openapi.json -o src/api-client"
+  },
+  "dependencies": {
+    "@mythweavers/ui": "workspace:^",
+    "@solidjs/router": "^0.15.3",
+    "@vanilla-extract/css": "^1.17.1",
+    "solid-js": "^1.9.9"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.88.0",
+    "@vanilla-extract/vite-plugin": "^4.0.20",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1",
+    "vite-plugin-solid": "^2.11.10"
+  }
+}
