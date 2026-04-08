@@ -4,8 +4,11 @@ import { tokens } from '../../theme/tokens.css'
 export const container = style({
   display: 'flex',
   height: '100%',
+  minHeight: '400px',
   overflow: 'hidden',
   background: tokens.color.bg.base,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.default,
 })
 
 // Desktop: fixed width sidebar, always visible

@@ -19,7 +19,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 3203,
-    allowedHosts: ['localhost', '127.0.0.1', '0.0.0.0', 'home.serial-experiments.com'],
+    allowedHosts: ['localhost', '127.0.0.1', '0.0.0.0', 'home.serial-experiments.com', 'write.mythweavers.home.serial-experiments.com'],
     proxy: {
       '/ollama/api': {
         target: 'http://localhost:11434',
