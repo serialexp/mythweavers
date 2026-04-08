@@ -77,7 +77,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 - **Schema**: `/apps/server/prisma/schema.prisma`
 - **Structure**: Story → Books → Arcs → Chapters → Scenes → Paragraphs
 - **Key Models**: User, Story, Character, Location, PlotPoint, File
-- **Migrations**: Run `pnpm prisma migrate dev` in server directory
+- **Migrations**: NEVER manually write migration SQL files. Prisma must generate them via `pnpm prisma migrate dev` for proper tracking. If you cannot run this (no database connection, or the migration is destructive/interactive), update the schema and leave a note in CURRENT_TASK.md asking Bart to create/run the migration.
 - **Client Generation**: `pnpm prisma generate` after schema changes
 
 ### Authentication
