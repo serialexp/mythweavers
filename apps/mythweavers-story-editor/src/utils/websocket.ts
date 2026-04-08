@@ -1,5 +1,6 @@
 import { Socket, io } from 'socket.io-client'
 import { createSignal } from 'solid-js'
+import { getApiBaseUrl } from '../client/config'
 import { errorStore } from '../stores/errorStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -35,8 +36,8 @@ export const websocketManager = {
 
     // Connecting to server
 
-    // Connect to the backend WebSocket server
-    socket = io('http://localhost:3001', {
+    // Connect to the backend WebSocket server (same host as the API)
+    socket = io(getApiBaseUrl(), {
       reconnection: false, // We'll handle reconnection manually
       transports: ['websocket'],
     })
