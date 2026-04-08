@@ -502,21 +502,25 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
         })
       }
 
-      // Build request based on protocol
-      const headers: Record<string, string> =
-        provider.protocol === 'ANTHROPIC'
-          ? {
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
-            }
-          : {
-              Authorization: `Bearer ${apiKey}`,
-            }
+      // Build request URL and headers based on protocol
+      let url: string
+      const headers: Record<string, string> = {}
 
-      let url = `${provider.endpointUrl}/v1/models`
-      // Anthropic requires a limit param
-      if (provider.protocol === 'ANTHROPIC') {
-        url += '?limit=100'
+      switch (provider.protocol) {
+        case 'ANTHROPIC':
+          url = `${provider.endpointUrl}/v1/models?limit=100`
+          headers['x-api-key'] = apiKey
+          headers['anthropic-version'] = '2023-06-01'
+          break
+        case 'CLOUDFLARE':
+          // Cloudflare endpoint already includes /accounts/<id>/ai
+          url = `${provider.endpointUrl}/models/search?task=Text+Generation`
+          headers['Authorization'] = `Bearer ${apiKey}`
+          break
+        default: // OPENAI_COMPATIBLE
+          url = `${provider.endpointUrl}/v1/models`
+          headers['Authorization'] = `Bearer ${apiKey}`
+          break
       }
 
       let res: Response
@@ -535,19 +539,32 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
         })
       }
 
-      const body = (await res.json()) as {
-        data?: Array<{ id: string; name?: string; owned_by?: string; created?: number; created_at?: string; display_name?: string }>
-      }
-      const rawModels = body.data ?? []
+      const body = await res.json() as any
       const existingIds = new Set(provider.models.map((m) => m.modelId))
 
-      const models = rawModels.map((m) => ({
-        id: m.id,
-        name: m.display_name ?? m.name ?? null,
-        owned_by: m.owned_by ?? null,
-        created: m.created ?? (m.created_at ? Math.floor(new Date(m.created_at).getTime() / 1000) : null),
-        imported: existingIds.has(m.id),
-      }))
+      let models: Array<{ id: string; name: string | null; owned_by: string | null; created: number | null; imported: boolean }>
+
+      if (provider.protocol === 'CLOUDFLARE') {
+        // Cloudflare: { success: true, result: [{ name: "@cf/meta/llama-3-8b-instruct", description: "...", ... }] }
+        const cfModels: any[] = body.result ?? []
+        models = cfModels.map((m) => ({
+          id: m.name,
+          name: m.description ?? m.name ?? null,
+          owned_by: m.name?.split('/')[1] ?? null, // e.g. "@cf/meta/..." → "meta"
+          created: m.created_at ? Math.floor(new Date(m.created_at).getTime() / 1000) : null,
+          imported: existingIds.has(m.name),
+        }))
+      } else {
+        // OpenAI / Anthropic: { data: [{ id: "gpt-4o", name?: "...", ... }] }
+        const rawModels: any[] = body.data ?? []
+        models = rawModels.map((m) => ({
+          id: m.id,
+          name: m.display_name ?? m.name ?? null,
+          owned_by: m.owned_by ?? null,
+          created: m.created ?? (m.created_at ? Math.floor(new Date(m.created_at).getTime() / 1000) : null),
+          imported: existingIds.has(m.id),
+        }))
+      }
 
       // Sort: non-imported first, then alphabetically
       models.sort((a, b) => {
