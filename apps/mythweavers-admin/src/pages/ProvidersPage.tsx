@@ -51,10 +51,11 @@ export function ProvidersPage() {
   const handleToggleEnabled = async (provider: Provider) => {
     try {
       setError("")
-      await putAdminLlmProvidersById({
+      const res = await putAdminLlmProvidersById({
         path: { id: provider.id },
         body: { enabled: !provider.enabled },
       })
+      if (res.error) throw new Error((res.error as any)?.error ?? "Failed to toggle provider")
       refetch()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle provider")
@@ -66,7 +67,8 @@ export function ProvidersPage() {
     if (!provider) return
     try {
       setError("")
-      await deleteAdminLlmProvidersById({ path: { id: provider.id } })
+      const res = await deleteAdminLlmProvidersById({ path: { id: provider.id } })
+      if (res.error) throw new Error((res.error as any)?.error ?? "Failed to delete provider")
       setConfirmDelete(null)
       panelRef?.clearSelection()
       refetch()
@@ -79,11 +81,14 @@ export function ProvidersPage() {
     name: string
     displayName: string
     endpointUrl: string
-    protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE"
+    protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE" | "CLOUDFLARE"
     envKeyName: string
     sortOrder: number
   }) => {
-    await postAdminLlmProviders({ body: data })
+    const res = await postAdminLlmProviders({ body: data })
+    if (res.error) {
+      throw new Error((res.error as any)?.error ?? "Failed to create provider")
+    }
     panelRef?.clearSelection()
     refetch()
   }
