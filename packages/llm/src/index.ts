@@ -21,6 +21,7 @@ export {
   type OpenAICompatibleClientConfig,
 } from "./clients/openai-compatible"
 export { OllamaClient, type OllamaClientConfig } from "./clients/ollama"
+export { CloudflareClient } from "./clients/cloudflare"
 
 // ---- Parsers (useful for ServerLLMClient and backend writeSSE) ----
 export { parseSSEStream } from "./utils/sse-parser"

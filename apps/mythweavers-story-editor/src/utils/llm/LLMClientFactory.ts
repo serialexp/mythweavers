@@ -1,5 +1,6 @@
 import {
   AnthropicClient,
+  CloudflareClient,
   OllamaClient,
   OpenAICompatibleClient,
   type LLMClient,
@@ -113,7 +114,7 @@ export class LLMClientFactory {
     }
 
     // Validate built-in provider
-    if (!['ollama', 'anthropic', 'openrouter', 'openai', 'server'].includes(provider)) {
+    if (!['ollama', 'anthropic', 'openrouter', 'openai', 'cloudflare', 'server'].includes(provider)) {
       console.warn(`Unknown provider "${provider}", defaulting to ollama`)
       return LLMClientFactory.getClient('ollama')
     }
@@ -153,6 +154,12 @@ export class LLMClientFactory {
       case 'openai':
         client = new OpenAICompatibleClient({
           apiKey: () => settingsStore.openaiApiKey,
+        })
+        break
+      case 'cloudflare':
+        client = new CloudflareClient({
+          apiKey: () => settingsStore.cloudflareApiKey,
+          endpoint: settingsStore.cloudflareEndpoint,
         })
         break
       case 'server':

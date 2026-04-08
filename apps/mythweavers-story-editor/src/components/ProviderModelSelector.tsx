@@ -1,4 +1,4 @@
-import { Component, For, createEffect, createSignal, on } from 'solid-js'
+import { Component, For, Show, createEffect, createSignal, on } from 'solid-js'
 import { settingsStore } from '../stores/settingsStore'
 import { modelsStore } from '../stores/modelsStore'
 import { ModelSelector } from './ModelSelector'
@@ -19,12 +19,13 @@ interface ProviderModelSelectorProps {
   autoFetchModels?: boolean
 }
 
-type KeyTabId = 'openrouter' | 'anthropic' | 'openai'
+type KeyTabId = 'openrouter' | 'anthropic' | 'openai' | 'cloudflare'
 
 const KEY_TABS: { id: KeyTabId; label: string; placeholder: string }[] = [
   { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-...' },
   { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-...' },
   { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
+  { id: 'cloudflare', label: 'Cloudflare', placeholder: 'cfut_...' },
 ]
 
 export const ProviderModelSelector: Component<ProviderModelSelectorProps> = (props) => {
@@ -48,6 +49,7 @@ export const ProviderModelSelector: Component<ProviderModelSelectorProps> = (pro
       case 'openrouter': return settingsStore.openrouterApiKey
       case 'anthropic': return settingsStore.anthropicApiKey
       case 'openai': return settingsStore.openaiApiKey
+      case 'cloudflare': return settingsStore.cloudflareApiKey
     }
   }
 
@@ -56,10 +58,14 @@ export const ProviderModelSelector: Component<ProviderModelSelectorProps> = (pro
       case 'openrouter': settingsStore.setOpenrouterApiKey(value); break
       case 'anthropic': settingsStore.setAnthropicApiKey(value); break
       case 'openai': settingsStore.setOpenaiApiKey(value); break
+      case 'cloudflare': settingsStore.setCloudflareApiKey(value); break
     }
   }
 
-  const isConfigured = (tab: KeyTabId): boolean => !!getKeyValue(tab)
+  const isConfigured = (tab: KeyTabId): boolean => {
+    if (tab === 'cloudflare') return !!getKeyValue(tab) && !!settingsStore.cloudflareEndpoint
+    return !!getKeyValue(tab)
+  }
 
   const handleTabClick = (tab: KeyTabId) => {
     if (activeKeyTab() === tab) return
@@ -91,6 +97,7 @@ export const ProviderModelSelector: Component<ProviderModelSelectorProps> = (pro
           <option value="openrouter">OpenRouter</option>
           <option value="anthropic">Anthropic</option>
           <option value="openai">OpenAI</option>
+          <option value="cloudflare">Cloudflare Workers AI</option>
           <option value="server">Server</option>
           <For each={settingsStore.customProviders}>
             {(p) => <option value={`custom:${p.id}`}>{p.name}</option>}
@@ -130,6 +137,18 @@ export const ProviderModelSelector: Component<ProviderModelSelectorProps> = (pro
               {showKey() ? 'Hide' : 'Show'}
             </button>
           </div>
+
+          {/* Cloudflare needs the endpoint URL with account ID baked in */}
+          <Show when={activeKeyTab() === 'cloudflare'}>
+            <input
+              type="text"
+              value={settingsStore.cloudflareEndpoint}
+              onChange={(e) => settingsStore.setCloudflareEndpoint(e.target.value)}
+              class={styles.input}
+              placeholder="https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai"
+              style={{ 'margin-top': '0.5rem' }}
+            />
+          </Show>
         </div>
       </div>
 

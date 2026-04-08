@@ -13,5 +13,5 @@ export type {
 export { normalizeTokenUsage } from '@mythweavers/llm'
 
 /** Built-in provider IDs. Custom providers use "custom:{id}" format. */
-export type BuiltinProvider = 'ollama' | 'openrouter' | 'anthropic' | 'openai' | 'server'
+export type BuiltinProvider = 'ollama' | 'openrouter' | 'anthropic' | 'openai' | 'cloudflare' | 'server'
 export type LLMProvider = BuiltinProvider | `custom:${string}`

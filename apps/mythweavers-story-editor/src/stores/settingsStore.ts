@@ -53,6 +53,8 @@ const [settingsState, setSettingsState] = createStore({
   openrouterApiKey: localStorage.getItem('story-openrouter-api-key') || '',
   anthropicApiKey: localStorage.getItem('story-anthropic-api-key') || '',
   openaiApiKey: localStorage.getItem('story-openai-api-key') || '',
+  cloudflareApiKey: localStorage.getItem('story-cloudflare-api-key') || '',
+  cloudflareEndpoint: localStorage.getItem('story-cloudflare-endpoint') || '',
   person: localStorage.getItem('story-person') || 'third',
   tense: localStorage.getItem('story-tense') || 'past',
   autoGenerate: localStorage.getItem('story-auto-generate') === 'true',
@@ -99,6 +101,14 @@ createEffect(() => {
 
 createEffect(() => {
   localStorage.setItem('story-openai-api-key', settingsState.openaiApiKey)
+})
+
+createEffect(() => {
+  localStorage.setItem('story-cloudflare-api-key', settingsState.cloudflareApiKey)
+})
+
+createEffect(() => {
+  localStorage.setItem('story-cloudflare-endpoint', settingsState.cloudflareEndpoint)
 })
 
 createEffect(() => {
@@ -170,6 +180,12 @@ export const settingsStore = {
   get openaiApiKey() {
     return settingsState.openaiApiKey
   },
+  get cloudflareApiKey() {
+    return settingsState.cloudflareApiKey
+  },
+  get cloudflareEndpoint() {
+    return settingsState.cloudflareEndpoint
+  },
   get person() {
     return settingsState.person
   },
@@ -233,6 +249,8 @@ export const settingsStore = {
   setOpenrouterApiKey: (key: string) => setSettingsState('openrouterApiKey', key),
   setAnthropicApiKey: (key: string) => setSettingsState('anthropicApiKey', key),
   setOpenaiApiKey: (key: string) => setSettingsState('openaiApiKey', key),
+  setCloudflareApiKey: (key: string) => setSettingsState('cloudflareApiKey', key),
+  setCloudflareEndpoint: (endpoint: string) => setSettingsState('cloudflareEndpoint', endpoint),
   setPerson: (person: string) => setSettingsState('person', person),
   setTense: (tense: string) => setSettingsState('tense', tense),
   setAutoGenerate: (enabled: boolean) => setSettingsState('autoGenerate', enabled),
