@@ -107,6 +107,19 @@ export async function requireAuth(request: FastifyRequest, _reply: FastifyReply)
   request.user = user
 }
 
+/**
+ * Admin middleware that requires an authenticated admin user.
+ * Throws 401 if not authenticated, 403 if not admin.
+ */
+export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  await requireAuth(request, reply)
+  if (request.user?.role !== 'admin') {
+    const error = new Error('Admin access required') as Error & { statusCode?: number }
+    error.statusCode = 403
+    throw error
+  }
+}
+
 // Type augmentation for custom request properties
 declare module 'fastify' {
   interface FastifyRequest {
@@ -117,6 +130,7 @@ declare module 'fastify' {
       passwordHash: string
       role: string
       avatarUrl: string | null
+      balance: import('@prisma/client').Prisma.Decimal
       createdAt: Date
       updatedAt: Date
     }

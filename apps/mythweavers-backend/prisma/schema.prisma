@@ -57,6 +57,11 @@ enum Tense {
   PRESENT
 }
 
+enum LlmProtocol {
+  ANTHROPIC
+  OPENAI_COMPATIBLE
+}
+
 enum ParagraphState {
   AI
   DRAFT
@@ -76,6 +81,7 @@ model User {
   passwordHash      String             // scrypt hash with salt (format: "salt:hash")
   role              String             @default("user")
   avatarUrl         String?
+  balance           Decimal            @default(0) @db.Decimal(12, 6)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -88,6 +94,8 @@ model User {
   accessTokens      AccessToken[]
   adventures        Adventure[]
   storyReadStatuses StoryReadStatus[]
+  balanceLedger     BalanceLedger[]
+  llmUsageLogs      LlmUsageLog[]
 
   @@index([email])
   @@index([username])
@@ -888,4 +896,124 @@ model MediaSceneLink {
   @@unique([mediaAttachmentId, sceneId])
   @@index([mediaAttachmentId])
   @@index([sceneId])
+}
+
+// ============================================================================
+// LLM PROVIDER REGISTRY
+// ============================================================================
+
+model LlmProvider {
+  id          String      @id @default(cuid())
+  name        String      @unique // Slug used in code, e.g. "anthropic", "openai", "moonshot"
+  displayName String               // Human-readable, e.g. "Anthropic", "OpenAI"
+  endpointUrl String               // Base URL, e.g. "https://api.anthropic.com"
+  protocol    LlmProtocol          // Streaming protocol: ANTHROPIC or OPENAI_COMPATIBLE
+  envKeyName  String               // Which env var holds the API key, e.g. "LLM_ANTHROPIC_API_KEY"
+  enabled     Boolean     @default(true)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  models LlmModel[]
+}
+
+model LlmModel {
+  id          String      @id @default(cuid())
+  modelId     String               // Actual model ID sent to the API, e.g. "claude-sonnet-4-20250514"
+  displayName String?              // Optional human-friendly name
+  providerId  String
+  provider    LlmProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  enabled     Boolean     @default(true)
+  contextLength Int?               // Max context window in tokens
+
+  // Cost to us (per million tokens)
+  costInput      Float   @default(0)
+  costOutput     Float   @default(0)
+  costCacheRead  Float?
+  costCacheWrite Float?
+
+  // Price charged to users (per million tokens)
+  priceInput      Float   @default(0)
+  priceOutput     Float   @default(0)
+  priceCacheRead  Float?
+  priceCacheWrite Float?
+
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([providerId, modelId])
+  @@index([enabled])
+}
+
+// ============================================================================
+// BILLING
+// ============================================================================
+
+/// Every mutation to a user's balance is recorded here.
+/// The User.balance field is a denormalized cache; the ledger is the source of truth.
+model BalanceLedger {
+  id             String        @id @default(cuid())
+  userId         Int
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Positive = credit, negative = debit
+  amount         Decimal       @db.Decimal(12, 6)
+  /// Running balance after this entry
+  balanceAfter   Decimal       @db.Decimal(12, 6)
+
+  type           LedgerEntryType
+  description    String        // e.g. "LLM usage: claude-sonnet-4", "Admin credit: top-up"
+
+  /// If this debit was caused by an LLM call, link to the detailed usage log
+  llmUsageLogId  String?       @unique
+  llmUsageLog    LlmUsageLog?  @relation(fields: [llmUsageLogId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime      @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+enum LedgerEntryType {
+  CREDIT      // Admin adds balance
+  LLM_USAGE   // Debit from an LLM call
+  ADJUSTMENT  // Manual admin correction
+}
+
+/// Detailed record of each server-side LLM proxy call.
+model LlmUsageLog {
+  id                     String   @id @default(cuid())
+  userId                 Int
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modelId                String   // The model ID string (e.g. "claude-sonnet-4-20250514")
+  providerName           String   // Provider slug, denormalized for historical queries
+
+  // Token counts
+  promptTokens           Int      @default(0)
+  completionTokens       Int      @default(0)
+  cacheCreationTokens    Int      @default(0)
+  cacheReadTokens        Int      @default(0)
+
+  // Prices at time of usage (snapshot, per million tokens)
+  priceInput             Float    @default(0)
+  priceOutput            Float    @default(0)
+  priceCacheRead         Float?
+  priceCacheWrite        Float?
+
+  // Calculated cost charged to user
+  cost                   Decimal  @db.Decimal(12, 6)
+
+  durationMs             Int?     // Stream duration
+  aborted                Boolean  @default(false) // Client disconnected mid-stream
+
+  createdAt              DateTime @default(now())
+
+  // Reverse relation to ledger
+  balanceLedger          BalanceLedger?
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

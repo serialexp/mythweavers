@@ -40,6 +40,9 @@ import myStoryCalendarRoutes from '../src/routes/my/story-calendar.js'
 import myStoryLanguageRoutes from '../src/routes/my/story-language.js'
 import myStoryTagsRoutes from '../src/routes/my/story-tags.js'
 import myExportStoryRoutes from '../src/routes/my/export-story.js'
+import myLlmRoutes from '../src/routes/my/llm.js'
+import adminLlmRoutes from '../src/routes/admin/llm.js'
+import adminUsersRoutes from '../src/routes/admin/users.js'
 import publicStoriesRoutes from '../src/routes/stories/public.js'
 import publicTagRoutes from '../src/routes/tags/public.js'
 
@@ -153,6 +156,9 @@ async function buildAppInternal() {
   await app.register(myPathSegmentsRoutes, { prefix: '/my' })
   await app.register(myPlotPointStatesRoutes, { prefix: '/my' })
   await app.register(myExportStoryRoutes, { prefix: '/my' })
+  await app.register(myLlmRoutes, { prefix: '/my' })
+  await app.register(adminLlmRoutes, { prefix: '/admin' })
+  await app.register(adminUsersRoutes, { prefix: '/admin' })
   await app.register(publicStoriesRoutes, { prefix: '/stories' })
   await app.register(publicTagRoutes, { prefix: '' })
   await app.register(calendarPresetsRoutes, { prefix: '/calendars' })

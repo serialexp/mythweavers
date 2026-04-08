@@ -56,6 +56,10 @@ import myStoryLanguageRoutes from './routes/my/story-language.js'
 import myStoryTagsRoutes from './routes/my/story-tags.js'
 import myExportPdfRoutes from './routes/my/export-pdf.js'
 import myExportStoryRoutes from './routes/my/export-story.js'
+import myLlmRoutes from './routes/my/llm.js'
+import { prisma } from './lib/prisma.js'
+import adminLlmRoutes from './routes/admin/llm.js'
+import adminUsersRoutes from './routes/admin/users.js'
 import publicStoriesRoutes from './routes/stories/public.js'
 import publicTagRoutes from './routes/tags/public.js'
 
@@ -301,9 +305,24 @@ await server.register(myPathSegmentsRoutes, { prefix: '/my' })
 await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
 await server.register(myExportPdfRoutes, { prefix: '/my' })
 await server.register(myExportStoryRoutes, { prefix: '/my' })
+await server.register(myLlmRoutes, { prefix: '/my' })
+await server.register(adminLlmRoutes, { prefix: '/admin' })
+await server.register(adminUsersRoutes, { prefix: '/admin' })
 await server.register(publicStoriesRoutes, { prefix: '/stories' })
 await server.register(publicTagRoutes, { prefix: '' })
 await server.register(calendarPresetsRoutes, { prefix: '/calendars' })
+
+// Bootstrap admin accounts from env var (comma-separated emails)
+const adminEmails = process.env.ADMIN_EMAILS?.split(',').map((e) => e.trim()).filter(Boolean)
+if (adminEmails?.length) {
+  const result = await prisma.user.updateMany({
+    where: { email: { in: adminEmails }, role: { not: 'admin' } },
+    data: { role: 'admin' },
+  })
+  if (result.count > 0) {
+    server.log.info(`Promoted ${result.count} user(s) to admin via ADMIN_EMAILS`)
+  }
+}
 
 // Start server
 try {
