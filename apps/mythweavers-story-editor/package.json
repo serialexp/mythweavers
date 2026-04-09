@@ -32,7 +32,6 @@
   "license": "ISC",
   "dependencies": {
     "@aeolun/dijkstra-calculator": "^1.4.3",
-    "@stripe/stripe-js": "^7.0.0",
     "@codemirror/autocomplete": "^6.19.0",
     "@codemirror/commands": "^6.9.0",
     "@codemirror/lang-html": "^6.4.11",
@@ -48,6 +47,7 @@
     "@mythweavers/ui": "workspace:^",
     "@paralleldrive/cuid2": "^2.2.2",
     "@solidjs/router": "^0.15.3",
+    "@stripe/stripe-js": "^7.0.0",
     "@vanilla-extract/css": "^1.17.1",
     "d3-delaunay": "^6.0.4",
     "diff": "^8.0.2",
@@ -57,7 +57,7 @@
     "pixi-filters": "^6.1.4",
     "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.14.0",
-"solid-dnd-directive": "^0.2.0",
+    "solid-dnd-directive": "^0.2.0",
     "solid-icons": "^1.1.0",
     "solid-js": "^1.9.9"
   },

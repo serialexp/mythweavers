@@ -26,9 +26,6 @@ COPY packages/llm ./packages/llm
 WORKDIR /app/apps/shared
 RUN pnpm build
 
-WORKDIR /app/packages/llm
-RUN pnpm build
-
 # Generate Prisma client
 WORKDIR /app/apps/mythweavers-backend
 RUN pnpm prisma:generate

@@ -13,6 +13,7 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/shared/package.json ./apps/shared/
 COPY apps/mythweavers-story-editor/package.json ./apps/mythweavers-story-editor/
 COPY packages/ui/package.json ./packages/ui/
+COPY packages/llm/package.json ./packages/llm/
 COPY packages/solid-editor/package.json ./packages/solid-editor/
 COPY packages/image-cropper/package.json ./packages/image-cropper/
 COPY packages/histoire-plugin-solid/package.json ./packages/histoire-plugin-solid/
@@ -24,6 +25,7 @@ RUN pnpm install --frozen-lockfile
 COPY apps/shared ./apps/shared
 COPY apps/mythweavers-story-editor ./apps/mythweavers-story-editor
 COPY packages/ui ./packages/ui
+COPY packages/llm ./packages/llm
 COPY packages/solid-editor ./packages/solid-editor
 COPY packages/image-cropper ./packages/image-cropper
 COPY packages/histoire-plugin-solid ./packages/histoire-plugin-solid
