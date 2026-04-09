@@ -40,6 +40,9 @@ import myStoryCalendarRoutes from '../src/routes/my/story-calendar.js'
 import myStoryLanguageRoutes from '../src/routes/my/story-language.js'
 import myStoryTagsRoutes from '../src/routes/my/story-tags.js'
 import myExportStoryRoutes from '../src/routes/my/export-story.js'
+import myBalanceRoutes from '../src/routes/my/balance.js'
+import myPreferencesRoutes from '../src/routes/my/preferences.js'
+import myUsageRoutes from '../src/routes/my/usage.js'
 import myLlmRoutes from '../src/routes/my/llm.js'
 import adminLlmRoutes from '../src/routes/admin/llm.js'
 import adminUsersRoutes from '../src/routes/admin/users.js'
@@ -156,6 +159,9 @@ async function buildAppInternal() {
   await app.register(myPathSegmentsRoutes, { prefix: '/my' })
   await app.register(myPlotPointStatesRoutes, { prefix: '/my' })
   await app.register(myExportStoryRoutes, { prefix: '/my' })
+  await app.register(myBalanceRoutes, { prefix: '/my' })
+  await app.register(myPreferencesRoutes, { prefix: '/my' })
+  await app.register(myUsageRoutes, { prefix: '/my' })
   await app.register(myLlmRoutes, { prefix: '/my' })
   await app.register(adminLlmRoutes, { prefix: '/admin' })
   await app.register(adminUsersRoutes, { prefix: '/admin' })

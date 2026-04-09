@@ -83,6 +83,8 @@ model User {
   role              String             @default("user")
   avatarUrl         String?
   balance           Decimal            @default(0) @db.Decimal(12, 6)
+  /// User preferences stored as JSON (AI settings, provider keys, custom providers, etc.)
+  preferences       Json?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -979,6 +981,7 @@ model BalanceLedger {
 
 enum LedgerEntryType {
   CREDIT      // Admin adds balance
+  TOPUP       // Stripe checkout top-up
   LLM_USAGE   // Debit from an LLM call
   ADJUSTMENT  // Manual admin correction
 }

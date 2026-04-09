@@ -172,8 +172,18 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.status(403).send({ error: 'Insufficient balance' })
       }
 
-      // Set up SSE response
+      // Set up SSE response.
+      // We must hijack the reply so Fastify doesn't try to send its own
+      // response after we've already written to the raw socket. We also
+      // merge in Fastify's headers (including CORS from @fastify/cors)
+      // because writeHead() on the raw response bypasses Fastify's
+      // header pipeline.
+      reply.hijack()
       const raw = reply.raw
+      // Apply Fastify's headers (CORS etc.) to the raw response first
+      for (const [key, value] of Object.entries(reply.getHeaders())) {
+        if (value !== undefined) raw.setHeader(key, value)
+      }
       raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

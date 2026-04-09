@@ -61,6 +61,7 @@ services:
       - PORT=3201
       - HOST=0.0.0.0
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mythweavers}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mythweavers}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-}
       - REDIS_URL=redis://redis:6379
       - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET is required}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
@@ -86,7 +87,15 @@ services:
       caddy: ${BACKEND_DOMAIN:-api.mythweavers.localhost}
       caddy.reverse_proxy: "{{upstreams 3201}}"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3201/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3201/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -110,7 +119,15 @@ services:
       caddy: ${EDITOR_DOMAIN:-editor.mythweavers.localhost}
       caddy.reverse_proxy: "{{upstreams 80}}"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -136,7 +153,15 @@ services:
       caddy: ${READER_DOMAIN:-reader.mythweavers.localhost}
       caddy.reverse_proxy: "{{upstreams 3202}}"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3202"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3202",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

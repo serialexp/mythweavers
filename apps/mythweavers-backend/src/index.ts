@@ -7,6 +7,7 @@ import formbody from '@fastify/formbody'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import swagger from '@fastify/swagger'
+import websocket from '@fastify/websocket'
 import scalar from '@scalar/fastify-api-reference'
 import Fastify, { type FastifyError } from 'fastify'
 import {
@@ -56,7 +57,12 @@ import myStoryLanguageRoutes from './routes/my/story-language.js'
 import myStoryTagsRoutes from './routes/my/story-tags.js'
 import myExportPdfRoutes from './routes/my/export-pdf.js'
 import myExportStoryRoutes from './routes/my/export-story.js'
+import myBalanceRoutes from './routes/my/balance.js'
+import myPreferencesRoutes from './routes/my/preferences.js'
+import myUsageRoutes from './routes/my/usage.js'
 import myLlmRoutes from './routes/my/llm.js'
+import stripeWebhookRoutes from './routes/webhooks/stripe.js'
+import wsRoutes from './routes/ws.js'
 import { prisma } from './lib/prisma.js'
 import adminLlmRoutes from './routes/admin/llm.js'
 import adminUsersRoutes from './routes/admin/users.js'
@@ -121,6 +127,9 @@ await server.register(multipart, {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
 })
+
+// WebSocket support (for real-time sync)
+await server.register(websocket)
 
 // Static file serving for uploaded files
 // TODO: In production, use Cloudflare R2 or S3-compatible storage instead
@@ -305,7 +314,12 @@ await server.register(myPathSegmentsRoutes, { prefix: '/my' })
 await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
 await server.register(myExportPdfRoutes, { prefix: '/my' })
 await server.register(myExportStoryRoutes, { prefix: '/my' })
+await server.register(myBalanceRoutes, { prefix: '/my' })
+await server.register(myPreferencesRoutes, { prefix: '/my' })
+await server.register(myUsageRoutes, { prefix: '/my' })
 await server.register(myLlmRoutes, { prefix: '/my' })
+await server.register(stripeWebhookRoutes, { prefix: '/webhooks' })
+await server.register(wsRoutes)
 await server.register(adminLlmRoutes, { prefix: '/admin' })
 await server.register(adminUsersRoutes, { prefix: '/admin' })
 await server.register(publicStoriesRoutes, { prefix: '/stories' })

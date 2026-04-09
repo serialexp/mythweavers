@@ -4,6 +4,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { authConfig, getCookieOptions } from '../../lib/config.js'
 import { prisma } from '../../lib/prisma.js'
+import { preferencesSchema, type UserPreferences } from '../my/preferences.js'
 
 const scryptAsync = promisify(scrypt)
 
@@ -52,6 +53,7 @@ const errorSchema = z.strictObject({
 const sessionResponseSchema = z.strictObject({
   authenticated: z.boolean().meta({ example: true }),
   user: userResponseSchema.optional(),
+  preferences: preferencesSchema.optional(),
 })
 
 const logoutResponseSchema = z.strictObject({
@@ -309,6 +311,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
             email: session.user.email,
             username: session.user.username,
           },
+          preferences: (session.user.preferences as UserPreferences) ?? {},
         }
       } catch (error) {
         fastify.log.error({ error }, 'Session check failed')
