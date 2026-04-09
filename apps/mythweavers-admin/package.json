@@ -18,9 +18,9 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.88.0",
-    "@vanilla-extract/vite-plugin": "^4.0.20",
+    "@vanilla-extract/vite-plugin": "^5.2.2",
     "typescript": "^5.9.3",
-    "vite": "^6.4.1",
-    "vite-plugin-solid": "^2.11.10"
+    "vite": "^8.0.7",
+    "vite-plugin-solid": "^2.11.12"
   }
 }

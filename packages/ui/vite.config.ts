@@ -13,7 +13,7 @@ export default defineConfig({
       },
       formats: ['es'],
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['solid-js', 'solid-js/web', 'solid-js/store'],
     },
     cssCodeSplit: false,

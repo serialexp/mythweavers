@@ -1,1 +1,1 @@
-import{defineSetupSolid as d}from"./helpers.js";export{d as defineSetupSolid};
+import{defineSetupSolid as e}from"./helpers.js";export{e as defineSetupSolid};

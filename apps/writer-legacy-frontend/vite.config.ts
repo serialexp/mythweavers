@@ -1,9 +1,15 @@
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 import wasm from 'vite-plugin-wasm'
 
 export default defineConfig({
   plugins: [solid(), wasm()],
+  resolve: {
+    alias: {
+      '@writer/shared': resolve(__dirname, '../shared/src'),
+    },
+  },
   // prevent vite from obscuring rust errors
   clearScreen: false,
   // Tauri expects a fixed port, fail if that port is not available
@@ -29,7 +35,7 @@ export default defineConfig({
     // Tauri uses Chromium on Windows and WebKit on macOS and Linux
     target: process.env.TAURI_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
     // don't minify for debug builds
-    minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
+    minify: !process.env.TAURI_DEBUG ? 'oxc' : false,
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
   },

@@ -17,7 +17,7 @@
       "lodash": ">=4.17.21",
       "node-forge": ">=1.3.2",
       "glob": ">=11.1.0",
-      "vite": ">=6.3.6",
+      "vite": ">=8.0.0",
       "jws": ">=4.0.1",
       "@modelcontextprotocol/sdk": ">=1.24.0",
       "@trpc/server": ">=11.1.1",
@@ -29,7 +29,7 @@
     }
   },
   "scripts": {
-    "dev": "pnpm build:shared && concurrently -n backend,reader,editor,admin,histoire -c blue,green,magenta,cyan,yellow \"pnpm --filter @mythweavers/backend dev\" \"pnpm --filter @mythweavers/reading-frontend-astro dev\" \"pnpm --filter @mythweavers/story-editor dev\" \"pnpm --filter @mythweavers/admin dev\" \"pnpm --filter @mythweavers/ui story\"",
+    "dev": "pnpm build:shared && concurrently --kill-others-on-fail -n backend,reader,editor,admin,stripe -c blue,green,magenta,cyan,red \"pnpm --filter @mythweavers/backend dev\" \"pnpm --filter @mythweavers/reading-frontend-astro dev\" \"pnpm --filter @mythweavers/story-editor dev\" \"pnpm --filter @mythweavers/admin dev\" \"stripe listen --forward-to http://localhost:3201/webhooks/stripe\"",
     "dev:reader": "pnpm build:shared && pnpm --filter @mythweavers/reading-frontend-astro dev",
     "dev:backend": "pnpm --filter @mythweavers/backend dev",
     "dev:editor": "pnpm build:shared && pnpm --filter @mythweavers/story-editor dev",

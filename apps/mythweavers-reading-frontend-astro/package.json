@@ -18,7 +18,7 @@
     "solid-js": "^1.9.5"
   },
   "devDependencies": {
-    "@vanilla-extract/vite-plugin": "^4.0.20",
+    "@vanilla-extract/vite-plugin": "^5.2.2",
     "typescript": "^5.7.0"
   },
   "engines": {

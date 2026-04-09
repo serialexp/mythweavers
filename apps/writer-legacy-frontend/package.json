@@ -1,6 +1,7 @@
 {
   "name": "@writer/legacy-frontend",
   "version": "1.0.1",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -76,8 +77,8 @@
     "use-debounce": "^10.0.5",
     "use-resize-observer": "^9.1.0",
     "uuidv7": "^1.0.2",
-    "vite": "^5.4.19",
-    "vite-plugin-solid": "^2.11.7",
+    "vite": "^8.0.7",
+    "vite-plugin-solid": "^2.11.12",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -86,7 +87,7 @@
     "@types/diff": "^8.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/markdown-it": "^14.1.2",
-    "@vitejs/plugin-react": "^4.6.0",
+    "@vitejs/plugin-react": "^6.0.1",
     "@writer/legacy-backend": "workspace:*",
     "dotenv": "^16.6.1",
     "esbuild": "^0.25.12",
@@ -95,7 +96,7 @@
     "tar": "^7.4.3",
     "typescript": "^5.8.3",
     "unzipper": "^0.12.3",
-    "vite-plugin-wasm": "^3.5.0",
+    "vite-plugin-wasm": "^3.6.0",
     "vitest": "^2.1.9"
   }
 }

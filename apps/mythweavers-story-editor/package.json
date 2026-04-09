@@ -2,6 +2,7 @@
   "name": "@mythweavers/story-editor",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
@@ -31,6 +32,7 @@
   "license": "ISC",
   "dependencies": {
     "@aeolun/dijkstra-calculator": "^1.4.3",
+    "@stripe/stripe-js": "^7.0.0",
     "@codemirror/autocomplete": "^6.19.0",
     "@codemirror/commands": "^6.9.0",
     "@codemirror/lang-html": "^6.4.11",
@@ -55,8 +57,7 @@
     "pixi-filters": "^6.1.4",
     "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.14.0",
-    "socket.io-client": "^4.8.1",
-    "solid-dnd-directive": "^0.2.0",
+"solid-dnd-directive": "^0.2.0",
     "solid-icons": "^1.1.0",
     "solid-js": "^1.9.9"
   },
@@ -66,14 +67,14 @@
     "@types/diff": "^8.0.0",
     "@types/ejs": "^3.1.5",
     "@types/node": "^20.19.23",
-    "@vanilla-extract/vite-plugin": "^4.0.20",
+    "@vanilla-extract/vite-plugin": "^5.2.2",
     "@vitest/ui": "^3.2.4",
     "concurrently": "^8.2.2",
     "happy-dom": "^18.0.1",
-    "rollup-plugin-visualizer": "^6.0.5",
+    "rollup-plugin-visualizer": "^7.0.1",
     "typescript": "^5.9.3",
-    "vite": "^6.4.1",
-    "vite-plugin-solid": "^2.11.10",
+    "vite": "^8.0.7",
+    "vite-plugin-solid": "^2.11.12",
     "vitest": "^3.2.4"
   }
 }

@@ -1,1 +1,1 @@
-function r(e,c){let t=!1;return t||c(e),{stop:()=>{t=!0}}}export{r as syncState};
+function e(e,t){let n=!1;return n||t(e),{stop:()=>{n=!0}}}export{e as syncState};

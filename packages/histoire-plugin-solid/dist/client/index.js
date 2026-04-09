@@ -1,1 +1,1 @@
-import r from"./mount.js";import t from"./render.js";const u=r,c=t;function S(o){return o.source??""}export{u as MountStory,c as RenderStory,S as generateSourceCode};
+import e from"./mount.js";import t from"./render.js";var n=e,r=t;function i(e){return e.source??``}export{n as MountStory,r as RenderStory,i as generateSourceCode};

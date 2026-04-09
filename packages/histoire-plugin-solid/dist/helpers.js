@@ -1,1 +1,1 @@
-function n(e){return e}export{n as defineSetupSolid};
+function e(e){return e}export{e as defineSetupSolid};

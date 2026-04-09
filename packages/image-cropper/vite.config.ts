@@ -10,7 +10,7 @@ export default defineConfig({
       entry: resolve(__dirname, 'src/index.ts'),
       formats: ['es'],
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['solid-js', 'solid-js/web', 'solid-js/store'],
     },
     cssCodeSplit: false,
