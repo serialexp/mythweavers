@@ -1,66 +1,48 @@
-# Current Task: Consolidate LLM Clients into Shared Package
+# Current Task: Persist AI Settings on Backend User Entity (with encrypted secrets)
 
-## Status: DONE — migration complete, verified
+## Status: Code complete — needs migration
 
-## What Was Done
-
-The `@mythweavers/llm` shared package has been created and all LLM streaming code migrated to use it.
-
-### New Package: `packages/llm/`
-
-- `src/types.ts` — `LLMStreamEvent` discriminated union, `TokenUsage`, `NormalizedTokenUsage`, `LLMMessage`, `LLMGenerateOptions`, `ModelPricing`, `LLMModel`, `ConfigOrGetter`, `LLMClient` interface
-- `src/utils/sse-parser.ts` — shared SSE parser (extracted from 6+ copies)
-- `src/utils/ndjson-parser.ts` — shared NDJSON parser (for Ollama)
-- `src/clients/anthropic.ts` — `AnthropicClient` with prompt caching, pricing lookup
-- `src/clients/openai-compatible.ts` — `OpenAICompatibleClient` (replaces both OpenAI and OpenRouter clients)
-- `src/clients/ollama.ts` — `OllamaClient` using raw HTTP (no `ollama` SDK dependency)
-- `src/index.ts` — public API
-
-### Backend Changes
-
-- `apps/mythweavers-backend/src/routes/my/llm.ts` — replaced `streamAnthropic()` and `streamOpenAICompatible()` with shared client `generate()` generators. Billing, route wiring, and `writeSSE()` stay in place.
-- Added `@mythweavers/llm` dependency
-
-### Frontend Changes
-
-- `types/llm.ts` — now re-exports from `@mythweavers/llm` (no more local `LLMGenerateResponse`)
-- `types/core.ts` — `TokenUsage` is now `NormalizedTokenUsage` re-exported from shared
-- `utils/llm/LLMClientFactory.ts` — instantiates shared clients (`AnthropicClient`, `OpenAICompatibleClient`, `OllamaClient`, `ServerLLMClient`), `LoggedLLMClient` updated for `LLMStreamEvent`
-- `utils/llm/ServerLLMClient.ts` — rewritten to use shared `parseSSEStream`, yields `LLMStreamEvent`
-- `utils/analysisClient.ts` — rewritten to use `LLMClientFactory` and `resolveModel()`
-- All consumers migrated: `useOllama.ts`, `templateAI.ts`, `clicheRefinement.ts`, `splitScene.ts`, `SceneEditorWrapper.tsx`, `AdventurePage.tsx`, `MessageRewriter.tsx`, `SingleRewriteDialog.tsx`, `MassRewriteDialog.tsx`
-- `llmActivityStore.ts` — uses shared `TokenUsage` for rawUsage
-- `LlmActivityPanel.tsx` — updated cache display for new type shape
-- Added `@mythweavers/llm` dependency, removed `ollama` dependency
-
-### Files Deleted
-
-- `utils/llm/AnthropicLLMClient.ts`
-- `utils/llm/OpenAILLMClient.ts`
-- `utils/llm/OpenRouterLLMClient.ts`
-- `utils/llm/OllamaLLMClient.ts`
-- `utils/llm/BaseLLMClient.ts`
-- `utils/ollamaClient.ts`
-- `utils/openrouterClient.ts`
-
-### Verification
-
-- `@mythweavers/llm` — typecheck passes
-- `@mythweavers/backend` — `tsc` build passes
-- `@mythweavers/story-editor` — typecheck passes
-- Tests: same results as before (2 pass, 3 pre-existing SolidJS store failures)
-
-## Remaining Items (for future sessions)
-
-- The legacy `anthropicClient.ts` is still used by `templateAI.ts`, `copyPreviewStore.ts`, and `StoryNavigation.tsx` for Anthropic-specific token counting. Could be consolidated if needed.
-- The `analysisClient.refactored.ts.bak` and `useOllama.refactored.ts.bak` files are dead code that could be deleted.
-- Database migrations for the billing/admin system still need to be run (see bottom of this file for commands).
-
-### To Activate Billing/Admin (migrations needed)
+### Bart needs to run:
 ```bash
 cd apps/mythweavers-backend
-pnpm prisma migrate dev --name add_llm_provider_registry
-pnpm prisma migrate dev --name add_user_balance_and_billing
-npx tsx prisma/seed-llm-providers.ts
-# Set ADMIN_EMAILS=your@email.com in .env.local
+pnpm prisma migrate dev --name add_user_preferences
 ```
+
+## What was done
+
+### Prisma Schema
+- Added `preferences Json?` to User model
+
+### Backend
+- `GET /my/preferences` + `PUT /my/preferences` — user preferences CRUD
+- Session response includes `preferences` field
+- `preferencesSchema` includes `encryptedSecrets` (salt + iv + ciphertext)
+
+### Frontend — Encryption (`src/lib/crypto.ts`)
+- Web Crypto API: PBKDF2 (600k iterations, SHA-256) for key derivation
+- AES-GCM-256 for encryption/decryption
+- All secrets bundled into one encrypted blob before backend sync
+- Server never sees plaintext API keys
+
+### Frontend — Settings sync (`settingsStore.ts`)
+- Non-secret keys synced in plaintext: provider, model, maxTokens, thinkingBudget, contextSize, cloudflareEndpoint, categoryOverrides
+- Custom providers synced WITHOUT apiKey (stripped before sending)
+- Secret keys encrypted into `encryptedSecrets` blob: openrouterApiKey, anthropicApiKey, openaiApiKey, cloudflareApiKey, custom provider API keys
+- `loadFromBackend()` handles encrypted secrets, legacy plaintext, and missing keys
+- `needsDecryption` signal triggers the unlock dialog
+
+### Frontend — UI
+- `PasswordForEncryptionDialog.tsx` — dual-mode modal (decrypt/encrypt)
+- `App.tsx` — shows decrypt dialog when backend has encrypted secrets but device doesn't have keys
+- `ProviderModelSelector.tsx` (ApiKeys) — shows "Encrypt & Sync Keys" banner when authenticated with keys but no encryption key in memory
+
+### Flow
+1. User sets API keys → saved to localStorage immediately
+2. If authenticated + has encryption key → encrypt + sync to backend
+3. If authenticated + no encryption key → show "Encrypt & Sync Keys" prompt
+4. On new device → session loads encrypted blob → show "Unlock API Keys" dialog
+5. User enters password → PBKDF2 derives key → AES-GCM decrypts → keys populated
+
+### Note on duplication
+- SETTING_KNOBS and SETTING_GEN_PROMPT are duplicated in NewAdventureForm.tsx and AdventurePage.tsx
+- Candidate for extraction to shared module
