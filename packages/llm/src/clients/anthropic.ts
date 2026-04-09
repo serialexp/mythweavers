@@ -276,13 +276,19 @@ export class AnthropicClient implements LLMClient {
       : {}
 
     const formatted = formatMessages(options.messages)
-    const systemMessage = formatted.find((m) => m.role === "system")
+    // Consolidate all system messages into a single `system` field.
+    // Anthropic's API doesn't allow role:"system" in the messages array;
+    // the system prompt must be passed via the top-level `system` parameter
+    // as an array of content blocks.
+    const systemBlocks = formatted
+      .filter((m) => m.role === "system")
+      .flatMap((m) => m.content)
     const nonSystemMessages = formatted.filter((m) => m.role !== "system")
 
     const requestBody: Record<string, unknown> = {
       model: options.model,
       messages: nonSystemMessages,
-      system: systemMessage?.content,
+      ...(systemBlocks.length > 0 ? { system: systemBlocks } : {}),
       max_tokens: options.max_tokens || 4096,
       temperature: options.temperature ?? 1,
       stream: true,

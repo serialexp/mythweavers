@@ -7,34 +7,7 @@ import type {
   ModelPricing,
 } from "../types"
 import { resolve } from "../types"
-import { parseSSEStream } from "../utils/sse-parser"
-
-/**
- * Cloudflare Workers AI SSE format:
- *   data: {"response":"token","p":"..."}
- *   data: {"response":"","usage":{"prompt_tokens":N,"completion_tokens":N,"total_tokens":N,...}}
- *   data: [DONE]
- */
-function parseStreamChunk(parsed: any): LLMStreamEvent[] {
-  const events: LLMStreamEvent[] = []
-
-  if (parsed.usage) {
-    events.push({
-      type: "usage",
-      usage: {
-        prompt_tokens: parsed.usage.prompt_tokens,
-        completion_tokens: parsed.usage.completion_tokens,
-        total_tokens: parsed.usage.total_tokens,
-      },
-    })
-  }
-
-  if (parsed.response) {
-    events.push({ type: "chunk", text: parsed.response })
-  }
-
-  return events
-}
+import { OpenAICompatibleClient } from "./openai-compatible"
 
 // ---- Model list helpers ----
 
@@ -82,11 +55,14 @@ function isDeprecated(
  * - `endpoint` — full base URL including the account ID, e.g.
  *   `https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai`
  *
- * Generate URL:  `{endpoint}/run/{model}`
- * Models URL:    `{endpoint}/models/search?task=Text+Generation`
+ * Generation is delegated to an OpenAI-compatible client using Cloudflare's
+ * `/v1/chat/completions` endpoint, which all current models support.
+ *
+ * Model listing uses the Cloudflare-specific `/models/search` API.
  */
 export class CloudflareClient implements LLMClient {
   private config: LLMClientConfig
+  private openaiClient: OpenAICompatibleClient
 
   constructor(config: LLMClientConfig) {
     if (!config.endpoint) {
@@ -96,6 +72,16 @@ export class CloudflareClient implements LLMClient {
       )
     }
     this.config = config
+
+    // Cloudflare exposes an OpenAI-compatible endpoint at {base}/v1
+    // The OpenAICompatibleClient will append /v1/chat/completions itself,
+    // so we pass {base} as the endpoint.
+    this.openaiClient = new OpenAICompatibleClient({
+      apiKey: config.apiKey,
+      endpoint: this.getBaseUrl(),
+      extraHeaders: config.extraHeaders,
+      unfiltered: true,
+    })
   }
 
   private getBaseUrl(): string {
@@ -141,65 +127,6 @@ export class CloudflareClient implements LLMClient {
   async *generate(
     options: LLMGenerateOptions,
   ): AsyncGenerator<LLMStreamEvent> {
-    const apiKey = resolve(this.config.apiKey)
-    if (!apiKey) throw new Error("Cloudflare API key not configured")
-
-    const extra = this.config.extraHeaders
-      ? resolve(this.config.extraHeaders)
-      : {}
-
-    const requestBody: Record<string, unknown> = {
-      messages: options.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
-      stream: true,
-    }
-
-    if (options.max_tokens) requestBody.max_tokens = options.max_tokens
-    if (options.temperature !== undefined)
-      requestBody.temperature = options.temperature
-
-    const response = await fetch(
-      `${this.getBaseUrl()}/run/${options.model}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          ...extra,
-        },
-        body: JSON.stringify(requestBody),
-        signal: options.signal,
-      },
-    )
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      yield {
-        type: "error",
-        error: `Cloudflare AI error: ${response.status} ${errorText}`,
-      }
-      yield { type: "done" }
-      return
-    }
-
-    if (!response.body) {
-      yield { type: "error", error: "No response body from Cloudflare" }
-      yield { type: "done" }
-      return
-    }
-
-    let sawDone = false
-    for await (const raw of parseSSEStream(response.body)) {
-      for (const event of parseStreamChunk(raw)) {
-        if (event.type === "done") sawDone = true
-        yield event
-      }
-    }
-
-    if (!sawDone) {
-      yield { type: "done" }
-    }
+    yield* this.openaiClient.generate(options)
   }
 }
