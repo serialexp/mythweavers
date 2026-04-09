@@ -49,7 +49,7 @@ export const iconButton = recipe({
         selectors: {
           '&:hover:not(:disabled)': {
             color: tokens.color.text.primary,
-            backgroundColor: tokens.color.surface.hover,
+            backgroundColor: tokens.color.surface.default,
           },
           '&:active:not(:disabled)': {
             backgroundColor: tokens.color.surface.active,

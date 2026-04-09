@@ -10,6 +10,7 @@ export * from './LinkButton'
 export * from './Modal'
 export * from './Select'
 export * from './Dropdown'
+export * from './Fieldset'
 export * from './FormField'
 export * from './Tabs'
 export * from './Text'
@@ -18,6 +19,8 @@ export * from './Badge'
 export * from './Toast'
 export * from './StatusIndicator'
 export * from './Textarea'
+
+export * from './ActionRow'
 
 // Layout components
 export * from './NavBar'
