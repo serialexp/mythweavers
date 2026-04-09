@@ -50,7 +50,9 @@ import { ApiStory } from './types/api'
 import { Character, ContextItem, Message, Node } from './types/core'
 import type { BranchConversionResult } from './utils/claudeChatImport'
 import { importClaudeChat, importClaudeChatWithBranches } from './utils/claudeChatImporter'
+import { PasswordForEncryptionDialog } from './components/PasswordForEncryptionDialog'
 import { AdventurePage } from './pages/AdventurePage'
+import UsagePage from './pages/UsagePage'
 import { storyManager } from './utils/storyManager'
 
 // Component to redirect to login
@@ -822,6 +824,14 @@ const App: Component = () => {
 
   return (
     <>
+      {/* Decrypt API keys dialog — shown when backend has encrypted secrets but this device doesn't have them */}
+      <Show when={authStore.isAuthenticated && !authStore.isOfflineMode && settingsStore.needsDecryption()}>
+        <PasswordForEncryptionDialog
+          mode="decrypt"
+          onClose={() => { /* needsDecryption will be false after successful decrypt, or user skipped */ }}
+        />
+      </Show>
+
       {/* Auth loading indicator */}
       <Show when={authStore.isLoading}>
         <div class={styles.authLoadingOverlay}>
@@ -884,7 +894,7 @@ const App: Component = () => {
 
       {/* Story selection routes with tab segments */}
       <Route
-        path="/stories/list"
+        path={["/stories/list", "/stories/new", "/stories"]}
         component={() => {
           const navigate = useNavigate()
           return (
@@ -892,25 +902,6 @@ const App: Component = () => {
               <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
                 <StoryLandingPage
                   initialTab="load"
-                  onSelectStory={(storyId: string) => {
-                    navigate(`/story/${storyId}`)
-                  }}
-                />
-              </Show>
-            </Show>
-          )
-        }}
-      />
-
-      <Route
-        path={["/stories/new", "/stories"]}
-        component={() => {
-          const navigate = useNavigate()
-          return (
-            <Show when={!authStore.isLoading} fallback={<div class={styles.app}>Loading...</div>}>
-              <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
-                <StoryLandingPage
-                  initialTab="new"
                   onSelectStory={(storyId: string) => {
                     navigate(`/story/${storyId}`)
                   }}
@@ -1193,8 +1184,25 @@ const App: Component = () => {
         }}
       />
 
+      {/* Usage history - balance ledger and LLM generation costs */}
+      <Route path="/usage" component={() => <UsagePage />} />
+
       {/* World Pulse Adventure - standalone CYOA with world trajectory */}
-      <Route path="/adventure" component={() => <AdventurePage />} />
+      <Route path="/adventure/:id" component={() => <AdventurePage />} />
+      <Route
+        path="/adventure"
+        component={() => {
+          const navigate = useNavigate()
+          onMount(() => {
+            if (authStore.isOfflineMode) {
+              navigate('/adventure/local', { replace: true })
+            } else {
+              navigate('/adventure/new', { replace: true })
+            }
+          })
+          return <div class={styles.app}>Loading...</div>
+        }}
+      />
 
       {/* Legacy app route - redirects to stories */}
       <Route

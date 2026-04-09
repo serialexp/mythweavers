@@ -1,6 +1,16 @@
-import { createEffect } from 'solid-js'
+import { createEffect, createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { DEFAULT_CHARS_PER_TOKEN, DEFAULT_CONTEXT_SIZE } from '../constants'
+import { putMyPreferences } from '../client/config'
+import {
+  type EncryptedSecrets,
+  type SecretKeys,
+  deriveKey as cryptoDeriveKey,
+  encryptSecrets,
+  decryptSecrets,
+  extractSalt,
+  generateSalt,
+} from '../lib/crypto'
 import type { CategoryOverrides } from '../utils/llm/resolveModel'
 
 export interface CustomProvider {
@@ -151,6 +161,132 @@ createEffect(() => {
   localStorage.setItem('story-custom-providers', JSON.stringify(settingsState.customProviders))
 })
 
+// --- Backend sync ---
+
+/** Non-secret keys synced to the backend in plaintext. */
+const SYNCED_KEYS = [
+  'provider', 'model', 'maxTokens', 'thinkingBudget', 'contextSize',
+  'cloudflareEndpoint',
+  'categoryOverrides',
+] as const
+
+/** Secret keys that are encrypted before syncing to the backend. */
+const SECRET_KEYS: (keyof SecretKeys)[] = [
+  'openrouterApiKey', 'anthropicApiKey', 'openaiApiKey', 'cloudflareApiKey',
+]
+
+/** Whether we've loaded preferences from the backend (prevents saving defaults back on boot). */
+let backendLoaded = false
+/** Whether a backend save is in flight. */
+let syncInFlight = false
+/** Queued state to save after the current save completes. */
+let syncQueued = false
+let syncTimer: ReturnType<typeof setTimeout> | undefined
+
+// --- Encryption state (session-only, never persisted) ---
+let _encryptionKey: CryptoKey | null = null
+let _encryptionSalt: Uint8Array | null = null
+/** Cached encrypted blob from backend, used when we need to decrypt later. */
+let _pendingEncryptedSecrets: EncryptedSecrets | null = null
+
+const [needsDecryption, setNeedsDecryption] = createSignal(false)
+
+function collectSecretKeys(): SecretKeys {
+  const secrets: SecretKeys = {}
+  if (settingsState.openrouterApiKey) secrets.openrouterApiKey = settingsState.openrouterApiKey
+  if (settingsState.anthropicApiKey) secrets.anthropicApiKey = settingsState.anthropicApiKey
+  if (settingsState.openaiApiKey) secrets.openaiApiKey = settingsState.openaiApiKey
+  if (settingsState.cloudflareApiKey) secrets.cloudflareApiKey = settingsState.cloudflareApiKey
+
+  // Collect custom provider keys
+  const cpKeys: Record<string, string> = {}
+  for (const p of settingsState.customProviders) {
+    if (p.apiKey) cpKeys[p.id] = p.apiKey
+  }
+  if (Object.keys(cpKeys).length > 0) secrets.customProviderKeys = cpKeys
+
+  return secrets
+}
+
+function hasAnySecretKeys(): boolean {
+  return !!(
+    settingsState.openrouterApiKey ||
+    settingsState.anthropicApiKey ||
+    settingsState.openaiApiKey ||
+    settingsState.cloudflareApiKey ||
+    settingsState.customProviders.some((p) => p.apiKey)
+  )
+}
+
+async function buildSyncPayload() {
+  const payload: Record<string, unknown> = {}
+  for (const key of SYNCED_KEYS) {
+    payload[key] = settingsState[key]
+  }
+
+  // Sync custom providers without API keys (those go in the encrypted blob)
+  payload.customProviders = settingsState.customProviders.map(({ apiKey: _, ...rest }) => rest)
+
+  // Encrypt secrets if we have the key
+  if (_encryptionKey && _encryptionSalt) {
+    const secrets = collectSecretKeys()
+    if (Object.keys(secrets).length > 0) {
+      try {
+        payload.encryptedSecrets = await encryptSecrets(_encryptionKey, _encryptionSalt, secrets)
+      } catch (err) {
+        console.warn('[settingsStore] Failed to encrypt secrets:', err)
+      }
+    }
+  }
+
+  return payload
+}
+
+async function doBackendSync() {
+  if (syncInFlight) {
+    syncQueued = true
+    return
+  }
+  syncInFlight = true
+  try {
+    const payload = await buildSyncPayload()
+    await putMyPreferences({ body: payload as any })
+  } catch (err) {
+    console.warn('[settingsStore] Backend sync failed:', err)
+  } finally {
+    syncInFlight = false
+    if (syncQueued) {
+      syncQueued = false
+      doBackendSync()
+    }
+  }
+}
+
+function scheduleSyncToBackend() {
+  if (!backendLoaded) return
+  clearTimeout(syncTimer)
+  syncTimer = setTimeout(doBackendSync, 500)
+}
+
+// Watch all synced keys and schedule a backend save when they change.
+for (const key of SYNCED_KEYS) {
+  createEffect(() => {
+    void settingsState[key]
+    scheduleSyncToBackend()
+  })
+}
+// Also watch secret keys and custom providers — these trigger encryption + sync
+for (const key of SECRET_KEYS) {
+  createEffect(() => {
+    void settingsState[key as keyof typeof settingsState]
+    scheduleSyncToBackend()
+  })
+}
+createEffect(() => {
+  void settingsState.customProviders
+  scheduleSyncToBackend()
+})
+
 export const settingsStore = {
   // Getters
   get model() {
@@ -299,5 +435,122 @@ export const settingsStore = {
     if (model !== undefined) {
       setSettingsState('model', model || '')
     }
+  },
+
+  /**
+   * Load preferences from the backend (called on session restore).
+   * Only applies values that actually exist in the backend payload —
+   * anything not set on the server falls back to the localStorage value.
+   */
+  loadFromBackend: (prefs: Record<string, unknown>) => {
+    // Non-secret fields
+    if (prefs.provider != null) setSettingsState('provider', prefs.provider as string)
+    if (prefs.model != null) setSettingsState('model', prefs.model as string)
+    if (prefs.maxTokens != null) setSettingsState('maxTokens', prefs.maxTokens as number)
+    if (prefs.thinkingBudget != null) setSettingsState('thinkingBudget', prefs.thinkingBudget as number)
+    if (prefs.contextSize != null) setSettingsState('contextSize', prefs.contextSize as number)
+    if (prefs.cloudflareEndpoint != null) setSettingsState('cloudflareEndpoint', prefs.cloudflareEndpoint as string)
+    if (prefs.categoryOverrides != null) setSettingsState('categoryOverrides', prefs.categoryOverrides as CategoryOverrides)
+
+    // Custom providers (without API keys — those are in the encrypted blob)
+    if (prefs.customProviders != null) {
+      const backendProviders = prefs.customProviders as Array<Omit<CustomProvider, 'apiKey'> & { apiKey?: string }>
+      // Merge with localStorage custom providers to preserve API keys
+      const localProviders = settingsState.customProviders
+      const merged = backendProviders.map((bp) => {
+        const local = localProviders.find((lp) => lp.id === bp.id)
+        return { ...bp, apiKey: local?.apiKey ?? bp.apiKey ?? '' }
+      })
+      setSettingsState('customProviders', merged as CustomProvider[])
+    }
+
+    // Handle encrypted secrets
+    const encrypted = prefs.encryptedSecrets as EncryptedSecrets | undefined
+    if (encrypted?.salt && encrypted?.iv && encrypted?.ciphertext) {
+      _pendingEncryptedSecrets = encrypted
+      _encryptionSalt = extractSalt(encrypted)
+
+      // Check if localStorage already has keys — if so, no decryption needed
+      if (hasAnySecretKeys()) {
+        // Local keys exist, use those. Don't prompt for decryption.
+      } else {
+        // No local keys and backend has encrypted secrets → need decryption
+        setNeedsDecryption(true)
+      }
+    }
+
+    // Legacy: handle plaintext API keys from old preferences format
+    // (will be cleared on first encrypted sync)
+    if (!encrypted) {
+      if (prefs.openrouterApiKey != null) setSettingsState('openrouterApiKey', prefs.openrouterApiKey as string)
+      if (prefs.anthropicApiKey != null) setSettingsState('anthropicApiKey', prefs.anthropicApiKey as string)
+      if (prefs.openaiApiKey != null) setSettingsState('openaiApiKey', prefs.openaiApiKey as string)
+      if (prefs.cloudflareApiKey != null) setSettingsState('cloudflareApiKey', prefs.cloudflareApiKey as string)
+    }
+
+    // Mark that we've loaded from backend — now changes will sync back
+    backendLoaded = true
+  },
+
+  // --- Encryption ---
+
+  /** Whether the backend has encrypted secrets that need the user's password to decrypt. */
+  needsDecryption,
+
+  /** Whether we currently have an encryption key in memory. */
+  hasEncryptionKey: () => _encryptionKey !== null,
+
+  /** Get the encryption salt (if one exists from the backend). */
+  getEncryptionSalt: () => _encryptionSalt,
+
+  /**
+   * Set the encryption key (derived from user password).
+   * If there are pending encrypted secrets from the backend, decrypts them immediately.
+   * Throws if the password is wrong (AES-GCM authentication failure).
+   */
+  setEncryptionKey: async (key: CryptoKey) => {
+    _encryptionKey = key
+
+    // If we have pending encrypted secrets, try to decrypt them
+    if (_pendingEncryptedSecrets) {
+      const secrets = await decryptSecrets(key, _pendingEncryptedSecrets)
+      // Apply decrypted keys to the store
+      if (secrets.openrouterApiKey) setSettingsState('openrouterApiKey', secrets.openrouterApiKey)
+      if (secrets.anthropicApiKey) setSettingsState('anthropicApiKey', secrets.anthropicApiKey)
+      if (secrets.openaiApiKey) setSettingsState('openaiApiKey', secrets.openaiApiKey)
+      if (secrets.cloudflareApiKey) setSettingsState('cloudflareApiKey', secrets.cloudflareApiKey)
+
+      // Merge custom provider keys
+      if (secrets.customProviderKeys) {
+        setSettingsState('customProviders', (providers) =>
+          providers.map((p) => ({
+            ...p,
+            apiKey: secrets.customProviderKeys?.[p.id] ?? p.apiKey,
+          })),
+        )
+      }
+
+      _pendingEncryptedSecrets = null
+      setNeedsDecryption(false)
+    }
+  },
+
+  /**
+   * Derive an encryption key from a password (uses the stored salt or generates a new one).
+   * Returns the derived CryptoKey. Does NOT store it — call setEncryptionKey after.
+   */
+  deriveKey: async (password: string): Promise<CryptoKey> => {
+    if (!_encryptionSalt) {
+      _encryptionSalt = generateSalt()
+    }
+    return cryptoDeriveKey(password, _encryptionSalt)
+  },
+
+  /**
+   * Force re-encryption and sync to backend.
+   * Call after setEncryptionKey when the user provides their password for the first time.
+   */
+  encryptAndSync: () => {
+    scheduleSyncToBackend()
   },
 }

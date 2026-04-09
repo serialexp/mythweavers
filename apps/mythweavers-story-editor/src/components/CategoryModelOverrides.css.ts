@@ -63,6 +63,10 @@ export const currentModel = style({
   whiteSpace: 'nowrap',
 })
 
+export const currentModelLabel = style({
+  color: tokens.color.text.muted,
+})
+
 export const overrideBadge = style({
   fontSize: '0.625rem',
   fontWeight: 600,

@@ -4,21 +4,23 @@
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.stripe.com;
       worker-src 'self' blob:;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: http: https://api.mythweavers.io;
       font-src 'self';
+      frame-src https://js.stripe.com;
       connect-src 'self'
         https://api.mythweavers.io
         wss://api.mythweavers.io
         https://api.anthropic.com
         https://api.openai.com
         https://openrouter.ai
+        https://api.stripe.com
         http:
         ws:
         wss:;
-    " />
+" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />

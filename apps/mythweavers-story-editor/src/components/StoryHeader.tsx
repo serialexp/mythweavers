@@ -6,6 +6,7 @@ import {
   BsBookHalf,
   BsBoxArrowRight,
   BsCalendar3,
+  BsChatDots,
   BsTranslate,
   BsChevronDown,
   BsChevronUp,
@@ -53,6 +54,8 @@ import { SaveIndicator } from './SaveIndicator'
 import { Settings } from './Settings'
 import { StoryNavigation } from './StoryNavigation'
 import { StoryStats } from './StoryStats'
+import { QuickLlmDialog } from './QuickLlmDialog'
+import { quickLlmStore } from '../stores/quickLlmStore'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
 
 interface StoryHeaderProps {
@@ -337,6 +340,9 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               <DropdownItem icon={<BsCpu />} onClick={() => llmActivityStore.show()}>
                 LLM Activity
               </DropdownItem>
+              <DropdownItem icon={<BsChatDots />} onClick={() => quickLlmStore.show()}>
+                Quick LLM
+              </DropdownItem>
               <Show when={mapsStore.maps.length > 0}>
                 <DropdownItem icon={<BsArrowsMove />} onClick={() => setShowTravelTimeCalculator(true)}>
                   Travel Time Calculator
@@ -495,6 +501,15 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
         position="right"
       >
         <LlmActivityPanel />
+      </OverlayPanel>
+
+      <OverlayPanel
+        show={quickLlmStore.isOpen}
+        onClose={() => quickLlmStore.hide()}
+        title="Quick LLM"
+        position="right"
+      >
+        <QuickLlmDialog />
       </OverlayPanel>
 
       {/* Only show modal version when not in docked mode */}

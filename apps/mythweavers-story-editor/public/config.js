@@ -12,11 +12,13 @@ window.RUNTIME_CONFIG = {
     (() => {
       const hostname = window.location.hostname
       const protocol = window.location.protocol
-      // Reverse-proxy convention: write.example.com → api.example.com
       if (hostname.startsWith("write.")) {
         return `${protocol}//api.${hostname.slice("write.".length)}`
       }
-      // Fallback: same hostname on the backend port
       return `${protocol}//${hostname}:3201`
     })(),
+
+  // Stripe publishable key — set via STRIPE_PUBLISHABLE_KEY env var in Docker,
+  // or VITE_STRIPE_PUBLISHABLE_KEY at build time for local dev.
+  STRIPE_PUBLISHABLE_KEY: "",
 }

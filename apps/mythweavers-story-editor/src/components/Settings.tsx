@@ -20,6 +20,7 @@ import { currentStoryStore } from '../stores/currentStoryStore'
 import { globalOperationStore } from '../stores/globalOperationStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { modelsStore } from '../stores/modelsStore'
 import { settingsStore } from '../stores/settingsStore'
 import type { Message, Model } from '../types/core'
 import type { BranchConversionResult } from '../utils/claudeChatImport'
@@ -28,7 +29,8 @@ import { DeletedNodesModal } from './DeletedNodesModal'
 import { DeletedTurnsModal } from './DeletedTurnsModal'
 import { CategoryModelOverrides } from './CategoryModelOverrides'
 import { CustomProviders } from './CustomProviders'
-import { ProviderModelSelector } from './ProviderModelSelector'
+import { ModelSelector } from './ModelSelector'
+import { ProviderSelector, ApiKeys } from './ProviderModelSelector'
 import * as styles from './Settings.css'
 import { StoryTimePicker } from './StoryTimePicker'
 
@@ -39,8 +41,8 @@ interface SettingsSection {
 }
 
 const SETTINGS_SECTIONS: SettingsSection[] = [
-  { id: 'provider', name: 'Provider & Model', icon: <BsKey /> },
-  { id: 'model-overrides', name: 'Model Overrides', icon: <BsLayers /> },
+  { id: 'api-keys', name: 'API Keys', icon: <BsKey /> },
+  { id: 'models', name: 'Models', icon: <BsLayers /> },
   { id: 'custom-providers', name: 'Custom Providers', icon: <BsPlug /> },
   { id: 'story', name: 'Story Settings', icon: <BsPencilSquare /> },
   { id: 'timeline', name: 'Timeline', icon: <BsClock /> },
@@ -102,7 +104,7 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   // Auto-select first section on mount
   onMount(() => {
-    panelRef?.select('provider')
+    panelRef?.select('api-keys')
   })
 
   const needsMigrationCount = createMemo(() => messagesStore.getNeedsMigrationCount())
@@ -129,9 +131,22 @@ export const Settings: Component<SettingsProps> = (props) => {
     }
   }
 
-  const renderProviderSection = () => (
+  const renderModelsSection = () => (
     <div class={styles.section}>
-      <ProviderModelSelector />
+      <ProviderSelector />
+
+      <div class={styles.settingRow}>
+        <label class={styles.label}>Default Model</label>
+        <ModelSelector
+          model={settingsStore.model}
+          setModel={settingsStore.setModel}
+          availableModels={modelsStore.availableModels}
+          isLoadingModels={modelsStore.isLoadingModels}
+          onRefreshModels={() => modelsStore.fetchModels()}
+        />
+      </div>
+
+      <CategoryModelOverrides />
 
       <div class={styles.settingRow}>
         <label class={styles.label}>Context Size</label>
@@ -452,10 +467,10 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
-      case 'provider':
-        return renderProviderSection()
-      case 'model-overrides':
-        return <CategoryModelOverrides />
+      case 'models':
+        return renderModelsSection()
+      case 'api-keys':
+        return <ApiKeys />
       case 'custom-providers':
         return <CustomProviders />
       case 'story':

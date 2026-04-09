@@ -1,4 +1,4 @@
-import { Badge, Card, CardBody, IconButton, Input, Spinner } from '@mythweavers/ui'
+import { ActionRow, Badge, IconButton, Input, Spinner } from '@mythweavers/ui'
 import { BsCloudFill, BsDownload, BsExclamationTriangle, BsFilePdf, BsHddFill, BsPencil, BsServer, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -106,26 +106,13 @@ export const StoryList: Component<StoryListProps> = (props) => {
     <div class={styles.container}>
       <For each={props.stories}>
         {(story) => (
-          <Card
-            interactive
-            variant={story.isCurrentStory ? 'elevated' : 'outlined'}
-            onClick={async () => {
-              if (!editingId() && loadingId() !== story.id) {
-                setLoadingId(story.id)
-                try {
-                  await props.onLoadStory(story.id, story.type)
-                } catch (error) {
-                  console.error('Failed to load story:', error)
-                  setLoadingId(null)
-                }
-              }
-            }}
-            class={story.isCurrentStory ? styles.currentStoryBorder : undefined}
+          <div
             style={{
               position: 'relative',
-              cursor: loadingId() === story.id ? 'wait' : 'pointer',
-              opacity: loadingId() === story.id ? '0.7' : '1',
+              cursor: loadingId() === story.id ? 'wait' : undefined,
+              opacity: loadingId() === story.id ? '0.7' : undefined,
             }}
+            class={story.isCurrentStory ? styles.currentStoryBorder : undefined}
           >
             {/* Loading Overlay */}
             <Show when={loadingId() === story.id}>
@@ -135,50 +122,56 @@ export const StoryList: Component<StoryListProps> = (props) => {
               </div>
             </Show>
 
-            <CardBody padding="md">
-              {/* Header Row */}
-              <div class={styles.headerRow}>
+            <ActionRow
+              title={
                 <Show
-                  when={editingId() === story.id}
+                  when={editingId() !== story.id}
                   fallback={
-                    <div
-                      class={styles.storyName}
-                      onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}
-                    >
-                      {story.type === 'server' ? (
-                        <BsCloudFill class={styles.storyTypeIcon} title="Server story" />
-                      ) : (
-                        <BsHddFill class={styles.storyTypeIcon} title="Local story" />
-                      )}
-                      <span>{story.name}</span>
-                      {story.hasLocalDifferences && (
-                        <BsExclamationTriangle class={styles.warningIcon} title="Local version differs from server" />
-                      )}
-                      {story.isCurrentStory && (
-                        <Badge variant="success" size="sm">
-                          Current
-                        </Badge>
-                      )}
-                    </div>
+                    <Input
+                      type="text"
+                      value={editingName()}
+                      onInput={(e) => setEditingName(e.currentTarget.value)}
+                      data-edit-input
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveRename()
+                        if (e.key === 'Escape') cancelEdit()
+                      }}
+                      onBlur={saveRename}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ flex: '1' }}
+                    />
                   }
                 >
-                  <Input
-                    type="text"
-                    value={editingName()}
-                    onInput={(e) => setEditingName(e.currentTarget.value)}
-                    data-edit-input
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveRename()
-                      if (e.key === 'Escape') cancelEdit()
-                    }}
-                    onBlur={saveRename}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ flex: '1' }}
-                  />
+                  <div
+                    class={styles.storyName}
+                    onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}
+                  >
+                    {story.type === 'server' ? (
+                      <BsCloudFill class={styles.storyTypeIcon} title="Server story" />
+                    ) : (
+                      <BsHddFill class={styles.storyTypeIcon} title="Local story" />
+                    )}
+                    <span>{story.name}</span>
+                    {story.hasLocalDifferences && (
+                      <BsExclamationTriangle class={styles.warningIcon} title="Local version differs from server" />
+                    )}
+                    {story.isCurrentStory && (
+                      <Badge variant="success" size="sm">
+                        Current
+                      </Badge>
+                    )}
+                  </div>
                 </Show>
-
-                {/* Action Buttons */}
-                <div class={styles.actionButtons} onClick={(e) => e.stopPropagation()}>
+              }
+              description={
+                <>
+                  <span>{story.messageCount} messages</span>
+                  <span>{story.characterCount} characters</span>
+                  <span>{formatDate(story.savedAt)}</span>
+                </>
+              }
+              actions={
+                <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: '0.25rem' }}>
                   <Show when={props.editingEnabled && editingId() !== story.id}>
                     <IconButton
                       aria-label="Rename story"
@@ -255,16 +248,20 @@ export const StoryList: Component<StoryListProps> = (props) => {
                     </IconButton>
                   </Show>
                 </div>
-              </div>
-
-              {/* Meta Row */}
-              <div class={styles.metaRow}>
-                <span>{story.messageCount} messages</span>
-                <span>{story.characterCount} characters</span>
-                <span class={styles.metaDate}>{formatDate(story.savedAt)}</span>
-              </div>
-            </CardBody>
-          </Card>
+              }
+              onClick={async () => {
+                if (!editingId() && loadingId() !== story.id) {
+                  setLoadingId(story.id)
+                  try {
+                    await props.onLoadStory(story.id, story.type)
+                  } catch (error) {
+                    console.error('Failed to load story:', error)
+                    setLoadingId(null)
+                  }
+                }
+              }}
+            />
+          </div>
         )}
       </For>
     </div>

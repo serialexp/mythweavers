@@ -8,7 +8,8 @@ if [ -n "$BACKEND_URL" ]; then
 // Runtime configuration for the frontend
 // This file is generated at container startup
 window.RUNTIME_CONFIG = {
-  BACKEND_URL: '${BACKEND_URL}'
+  BACKEND_URL: '${BACKEND_URL}',
+  STRIPE_PUBLISHABLE_KEY: '${STRIPE_PUBLISHABLE_KEY:-}'
 };
 EOF
 else

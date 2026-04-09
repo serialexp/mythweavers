@@ -34,7 +34,7 @@ export const table = style({
 
 export const tableHeader = style({
   display: 'grid',
-  gridTemplateColumns: '1fr 80px 80px 120px 60px',
+  gridTemplateColumns: '1fr 80px 80px 60px',
   gap: tokens.space['2'],
   padding: `${tokens.space['2']} ${tokens.space['3']}`,
   backgroundColor: tokens.color.bg.base,
@@ -51,7 +51,7 @@ export const tableBody = style({
 
 export const tableRow = style({
   display: 'grid',
-  gridTemplateColumns: '1fr 80px 80px 120px 60px',
+  gridTemplateColumns: '1fr 80px 80px 60px',
   gap: tokens.space['2'],
   padding: `${tokens.space['2']} ${tokens.space['3']}`,
   borderBottom: `1px solid ${tokens.color.border.subtle}`,
@@ -84,12 +84,6 @@ export const colPrice = style({
   fontFamily: tokens.font.family.mono,
 })
 
-export const colComparison = style({
-  textAlign: 'right',
-  color: tokens.color.text.muted,
-  fontSize: tokens.font.size.xs,
-})
-
 export const colContext = style({
   textAlign: 'right',
   fontFamily: tokens.font.family.mono,
@@ -101,20 +95,3 @@ export const loadingMessage = style({
   color: tokens.color.text.muted,
 })
 
-// Mobile responsive styles
-export const mobileComparison = style({
-  display: 'none',
-  '@media': {
-    '(max-width: 768px)': {
-      display: 'block',
-    },
-  },
-})
-
-export const desktopComparison = style({
-  '@media': {
-    '(max-width: 768px)': {
-      display: 'none',
-    },
-  },
-})

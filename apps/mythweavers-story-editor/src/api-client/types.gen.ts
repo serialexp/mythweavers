@@ -196,6 +196,41 @@ export type GetAuthSessionResponses = {
             email: string;
             username: string;
         };
+        preferences?: {
+            provider?: string;
+            model?: string;
+            maxTokens?: number;
+            thinkingBudget?: number;
+            contextSize?: number;
+            openrouterApiKey?: string;
+            anthropicApiKey?: string;
+            openaiApiKey?: string;
+            cloudflareApiKey?: string;
+            cloudflareEndpoint?: string;
+            customProviders?: Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }>;
+            categoryOverrides?: {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            };
+            [key: string]: unknown | string | number | Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }> | {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            } | undefined;
+        };
     };
 };
 
@@ -15439,6 +15474,1590 @@ export type PostMyStoriesImportZipResponses = {
 };
 
 export type PostMyStoriesImportZipResponse = PostMyStoriesImportZipResponses[keyof PostMyStoriesImportZipResponses];
+
+export type GetMyBalanceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/balance';
+};
+
+export type GetMyBalanceErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyBalanceError = GetMyBalanceErrors[keyof GetMyBalanceErrors];
+
+export type GetMyBalanceResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * User balance as string (Decimal)
+         */
+        balance: string;
+    };
+};
+
+export type GetMyBalanceResponse = GetMyBalanceResponses[keyof GetMyBalanceResponses];
+
+export type PostMyBalanceTopupData = {
+    body: {
+        /**
+         * Amount in USD to top up
+         */
+        amount: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/balance/topup';
+};
+
+export type PostMyBalanceTopupErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    503: {
+        error: string;
+    };
+};
+
+export type PostMyBalanceTopupError = PostMyBalanceTopupErrors[keyof PostMyBalanceTopupErrors];
+
+export type PostMyBalanceTopupResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Stripe PaymentIntent client secret for the Payment Element
+         */
+        clientSecret: string;
+    };
+};
+
+export type PostMyBalanceTopupResponse = PostMyBalanceTopupResponses[keyof PostMyBalanceTopupResponses];
+
+export type GetMyPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/preferences';
+};
+
+export type GetMyPreferencesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyPreferencesError = GetMyPreferencesErrors[keyof GetMyPreferencesErrors];
+
+export type GetMyPreferencesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        preferences: {
+            provider?: string;
+            model?: string;
+            maxTokens?: number;
+            thinkingBudget?: number;
+            contextSize?: number;
+            openrouterApiKey?: string;
+            anthropicApiKey?: string;
+            openaiApiKey?: string;
+            cloudflareApiKey?: string;
+            cloudflareEndpoint?: string;
+            customProviders?: Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }>;
+            categoryOverrides?: {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            };
+            [key: string]: unknown | string | number | Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }> | {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            } | undefined;
+        };
+    };
+};
+
+export type GetMyPreferencesResponse = GetMyPreferencesResponses[keyof GetMyPreferencesResponses];
+
+export type PutMyPreferencesData = {
+    body: {
+        provider?: string;
+        model?: string;
+        maxTokens?: number;
+        thinkingBudget?: number;
+        contextSize?: number;
+        openrouterApiKey?: string;
+        anthropicApiKey?: string;
+        openaiApiKey?: string;
+        cloudflareApiKey?: string;
+        cloudflareEndpoint?: string;
+        customProviders?: Array<{
+            id: string;
+            name: string;
+            endpoint: string;
+            apiKey: string;
+        }>;
+        categoryOverrides?: {
+            [key: string]: {
+                provider: string;
+                model: string;
+            };
+        };
+        [key: string]: unknown | string | number | Array<{
+            id: string;
+            name: string;
+            endpoint: string;
+            apiKey: string;
+        }> | {
+            [key: string]: {
+                provider: string;
+                model: string;
+            };
+        } | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/preferences';
+};
+
+export type PutMyPreferencesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type PutMyPreferencesError = PutMyPreferencesErrors[keyof PutMyPreferencesErrors];
+
+export type PutMyPreferencesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        preferences: {
+            provider?: string;
+            model?: string;
+            maxTokens?: number;
+            thinkingBudget?: number;
+            contextSize?: number;
+            openrouterApiKey?: string;
+            anthropicApiKey?: string;
+            openaiApiKey?: string;
+            cloudflareApiKey?: string;
+            cloudflareEndpoint?: string;
+            customProviders?: Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }>;
+            categoryOverrides?: {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            };
+            [key: string]: unknown | string | number | Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }> | {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            } | undefined;
+        };
+    };
+};
+
+export type PutMyPreferencesResponse = PutMyPreferencesResponses[keyof PutMyPreferencesResponses];
+
+export type GetMyBalanceUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+        type?: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'ADJUSTMENT';
+        /**
+         * ISO 8601 lower bound for createdAt
+         */
+        since?: string;
+    };
+    url: '/my/balance/usage';
+};
+
+export type GetMyBalanceUsageErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyBalanceUsageError = GetMyBalanceUsageErrors[keyof GetMyBalanceUsageErrors];
+
+export type GetMyBalanceUsageResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        entries: Array<{
+            id: string;
+            type: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'ADJUSTMENT';
+            /**
+             * Signed amount as Decimal string
+             */
+            amount: string;
+            /**
+             * Running balance after this entry
+             */
+            balanceAfter: string;
+            description: string;
+            /**
+             * ISO 8601 timestamp
+             */
+            createdAt: string;
+            llmUsage: {
+                modelId: string;
+                providerName: string;
+                promptTokens: number;
+                completionTokens: number;
+                cacheCreationTokens: number;
+                cacheReadTokens: number;
+                /**
+                 * Cost as Decimal string
+                 */
+                cost: string;
+                durationMs: number | null;
+                aborted: boolean;
+            } | null;
+        }>;
+        pagination: {
+            page: number;
+            pageSize: number;
+            total: number;
+            totalPages: number;
+        };
+        summary: {
+            /**
+             * Total LLM spending as Decimal string
+             */
+            totalSpent: string;
+            /**
+             * Total top-ups as Decimal string
+             */
+            totalTopUps: string;
+            /**
+             * Number of LLM generations
+             */
+            generationCount: number;
+        };
+    };
+};
+
+export type GetMyBalanceUsageResponse = GetMyBalanceUsageResponses[keyof GetMyBalanceUsageResponses];
+
+export type GetMyBalanceUsageModelBreakdownData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * ISO 8601 lower bound for createdAt
+         */
+        since?: string;
+    };
+    url: '/my/balance/usage/model-breakdown';
+};
+
+export type GetMyBalanceUsageModelBreakdownErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyBalanceUsageModelBreakdownError = GetMyBalanceUsageModelBreakdownErrors[keyof GetMyBalanceUsageModelBreakdownErrors];
+
+export type GetMyBalanceUsageModelBreakdownResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        models: Array<{
+            modelId: string;
+            /**
+             * Cost of regular (non-cache) input tokens
+             */
+            inputCost: number;
+            /**
+             * Cost of output/completion tokens
+             */
+            outputCost: number;
+            /**
+             * Cost of cache-read tokens
+             */
+            cacheReadCost: number;
+            /**
+             * Cost of cache-write tokens
+             */
+            cacheWriteCost: number;
+            /**
+             * Sum of all cost components
+             */
+            totalCost: number;
+            /**
+             * Number of generations for this model
+             */
+            generationCount: number;
+        }>;
+        /**
+         * Sum of all model costs
+         */
+        grandTotal: number;
+    };
+};
+
+export type GetMyBalanceUsageModelBreakdownResponse = GetMyBalanceUsageModelBreakdownResponses[keyof GetMyBalanceUsageModelBreakdownResponses];
+
+export type GetMyLlmModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/llm/models';
+};
+
+export type GetMyLlmModelsErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyLlmModelsError = GetMyLlmModelsErrors[keyof GetMyLlmModelsErrors];
+
+export type GetMyLlmModelsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        models: Array<{
+            name: string;
+            displayName: string | null;
+            provider: string;
+            contextLength: number | null;
+            pricing: {
+                input: number;
+                output: number;
+                input_cache_read: number | null;
+                input_cache_write: number | null;
+            };
+        }>;
+    };
+};
+
+export type GetMyLlmModelsResponse = GetMyLlmModelsResponses[keyof GetMyLlmModelsResponses];
+
+export type PostMyLlmGenerateData = {
+    body: {
+        /**
+         * Model name from the server allowed list
+         */
+        model: string;
+        messages: Array<{
+            role: 'system' | 'user' | 'assistant';
+            content: string;
+            cache_control?: {
+                type: 'ephemeral';
+                ttl?: '5m' | '1h' | number;
+            };
+        }>;
+        temperature?: number;
+        max_tokens?: number;
+        thinking_budget?: number;
+        metadata?: {
+            [key: string]: unknown;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/my/llm/generate';
+};
+
+export type PostMyLlmGenerateErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+};
+
+export type PostMyLlmGenerateError = PostMyLlmGenerateErrors[keyof PostMyLlmGenerateErrors];
+
+export type PostWebhooksStripeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/webhooks/stripe';
+};
+
+export type PostWebhooksStripeErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    503: {
+        error: string;
+    };
+};
+
+export type PostWebhooksStripeError = PostWebhooksStripeErrors[keyof PostWebhooksStripeErrors];
+
+export type PostWebhooksStripeResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        received: true;
+    };
+};
+
+export type PostWebhooksStripeResponse = PostWebhooksStripeResponses[keyof PostWebhooksStripeResponses];
+
+export type GetAdminLlmProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/providers';
+};
+
+export type GetAdminLlmProvidersErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersError = GetAdminLlmProvidersErrors[keyof GetAdminLlmProvidersErrors];
+
+export type GetAdminLlmProvidersResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        providers: Array<{
+            id: string;
+            name: string;
+            displayName: string;
+            endpointUrl: string;
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
+            envKeyName: string;
+            enabled: boolean;
+            sortOrder: number;
+            /**
+             * Whether the env var for the API key is set
+             */
+            keyConfigured: boolean;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetAdminLlmProvidersResponse = GetAdminLlmProvidersResponses[keyof GetAdminLlmProvidersResponses];
+
+export type PostAdminLlmProvidersData = {
+    body: {
+        /**
+         * Unique slug, e.g. "moonshot"
+         */
+        name: string;
+        /**
+         * Human-readable name
+         */
+        displayName: string;
+        /**
+         * Base API URL
+         */
+        endpointUrl: string;
+        /**
+         * Streaming protocol
+         */
+        protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
+        /**
+         * Env var name for API key
+         */
+        envKeyName: string;
+        enabled?: boolean;
+        sortOrder?: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/llm/providers';
+};
+
+export type PostAdminLlmProvidersErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    409: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmProvidersError = PostAdminLlmProvidersErrors[keyof PostAdminLlmProvidersErrors];
+
+export type PostAdminLlmProvidersResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        provider: {
+            id: string;
+            name: string;
+            displayName: string;
+            endpointUrl: string;
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
+            envKeyName: string;
+            enabled: boolean;
+            sortOrder: number;
+            /**
+             * Whether the env var for the API key is set
+             */
+            keyConfigured: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type PostAdminLlmProvidersResponse = PostAdminLlmProvidersResponses[keyof PostAdminLlmProvidersResponses];
+
+export type DeleteAdminLlmProvidersByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{id}';
+};
+
+export type DeleteAdminLlmProvidersByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type DeleteAdminLlmProvidersByIdError = DeleteAdminLlmProvidersByIdErrors[keyof DeleteAdminLlmProvidersByIdErrors];
+
+export type DeleteAdminLlmProvidersByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteAdminLlmProvidersByIdResponse = DeleteAdminLlmProvidersByIdResponses[keyof DeleteAdminLlmProvidersByIdResponses];
+
+export type GetAdminLlmProvidersByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{id}';
+};
+
+export type GetAdminLlmProvidersByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersByIdError = GetAdminLlmProvidersByIdErrors[keyof GetAdminLlmProvidersByIdErrors];
+
+export type GetAdminLlmProvidersByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        provider: {
+            id: string;
+            name: string;
+            displayName: string;
+            endpointUrl: string;
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
+            envKeyName: string;
+            enabled: boolean;
+            sortOrder: number;
+            /**
+             * Whether the env var for the API key is set
+             */
+            keyConfigured: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+        models: Array<{
+            id: string;
+            modelId: string;
+            displayName: string | null;
+            providerId: string;
+            enabled: boolean;
+            contextLength: number | null;
+            costInput: number;
+            costOutput: number;
+            costCacheRead: number | null;
+            costCacheWrite: number | null;
+            priceInput: number;
+            priceOutput: number;
+            priceCacheRead: number | null;
+            priceCacheWrite: number | null;
+            sortOrder: number;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetAdminLlmProvidersByIdResponse = GetAdminLlmProvidersByIdResponses[keyof GetAdminLlmProvidersByIdResponses];
+
+export type PutAdminLlmProvidersByIdData = {
+    body: {
+        displayName?: string;
+        endpointUrl?: string;
+        protocol?: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
+        envKeyName?: string;
+        enabled?: boolean;
+        sortOrder?: number;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{id}';
+};
+
+export type PutAdminLlmProvidersByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type PutAdminLlmProvidersByIdError = PutAdminLlmProvidersByIdErrors[keyof PutAdminLlmProvidersByIdErrors];
+
+export type PutAdminLlmProvidersByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        provider: {
+            id: string;
+            name: string;
+            displayName: string;
+            endpointUrl: string;
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
+            envKeyName: string;
+            enabled: boolean;
+            sortOrder: number;
+            /**
+             * Whether the env var for the API key is set
+             */
+            keyConfigured: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type PutAdminLlmProvidersByIdResponse = PutAdminLlmProvidersByIdResponses[keyof PutAdminLlmProvidersByIdResponses];
+
+export type GetAdminLlmProvidersByProviderIdModelsData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/models';
+};
+
+export type GetAdminLlmProvidersByProviderIdModelsErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdModelsError = GetAdminLlmProvidersByProviderIdModelsErrors[keyof GetAdminLlmProvidersByProviderIdModelsErrors];
+
+export type GetAdminLlmProvidersByProviderIdModelsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        models: Array<{
+            id: string;
+            modelId: string;
+            displayName: string | null;
+            providerId: string;
+            enabled: boolean;
+            contextLength: number | null;
+            costInput: number;
+            costOutput: number;
+            costCacheRead: number | null;
+            costCacheWrite: number | null;
+            priceInput: number;
+            priceOutput: number;
+            priceCacheRead: number | null;
+            priceCacheWrite: number | null;
+            sortOrder: number;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdModelsResponse = GetAdminLlmProvidersByProviderIdModelsResponses[keyof GetAdminLlmProvidersByProviderIdModelsResponses];
+
+export type PostAdminLlmProvidersByProviderIdModelsData = {
+    body: {
+        /**
+         * Model ID sent to the API
+         */
+        modelId: string;
+        displayName?: string;
+        enabled?: boolean;
+        contextLength?: number;
+        costInput?: number;
+        costOutput?: number;
+        costCacheRead?: number | null;
+        costCacheWrite?: number | null;
+        priceInput?: number;
+        priceOutput?: number;
+        priceCacheRead?: number | null;
+        priceCacheWrite?: number | null;
+        sortOrder?: number;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/models';
+};
+
+export type PostAdminLlmProvidersByProviderIdModelsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    409: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdModelsError = PostAdminLlmProvidersByProviderIdModelsErrors[keyof PostAdminLlmProvidersByProviderIdModelsErrors];
+
+export type PostAdminLlmProvidersByProviderIdModelsResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        model: {
+            id: string;
+            modelId: string;
+            displayName: string | null;
+            providerId: string;
+            enabled: boolean;
+            contextLength: number | null;
+            costInput: number;
+            costOutput: number;
+            costCacheRead: number | null;
+            costCacheWrite: number | null;
+            priceInput: number;
+            priceOutput: number;
+            priceCacheRead: number | null;
+            priceCacheWrite: number | null;
+            sortOrder: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdModelsResponse = PostAdminLlmProvidersByProviderIdModelsResponses[keyof PostAdminLlmProvidersByProviderIdModelsResponses];
+
+export type DeleteAdminLlmModelsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type DeleteAdminLlmModelsByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type DeleteAdminLlmModelsByIdError = DeleteAdminLlmModelsByIdErrors[keyof DeleteAdminLlmModelsByIdErrors];
+
+export type DeleteAdminLlmModelsByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteAdminLlmModelsByIdResponse = DeleteAdminLlmModelsByIdResponses[keyof DeleteAdminLlmModelsByIdResponses];
+
+export type GetAdminLlmModelsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type GetAdminLlmModelsByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmModelsByIdError = GetAdminLlmModelsByIdErrors[keyof GetAdminLlmModelsByIdErrors];
+
+export type GetAdminLlmModelsByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        model: {
+            id: string;
+            modelId: string;
+            displayName: string | null;
+            providerId: string;
+            enabled: boolean;
+            contextLength: number | null;
+            costInput: number;
+            costOutput: number;
+            costCacheRead: number | null;
+            costCacheWrite: number | null;
+            priceInput: number;
+            priceOutput: number;
+            priceCacheRead: number | null;
+            priceCacheWrite: number | null;
+            sortOrder: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type GetAdminLlmModelsByIdResponse = GetAdminLlmModelsByIdResponses[keyof GetAdminLlmModelsByIdResponses];
+
+export type PutAdminLlmModelsByIdData = {
+    body: {
+        /**
+         * Model ID sent to the API
+         */
+        modelId?: string;
+        displayName?: string;
+        enabled?: boolean;
+        contextLength?: number;
+        costInput?: number;
+        costOutput?: number;
+        costCacheRead?: number | null;
+        costCacheWrite?: number | null;
+        priceInput?: number;
+        priceOutput?: number;
+        priceCacheRead?: number | null;
+        priceCacheWrite?: number | null;
+        sortOrder?: number;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type PutAdminLlmModelsByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type PutAdminLlmModelsByIdError = PutAdminLlmModelsByIdErrors[keyof PutAdminLlmModelsByIdErrors];
+
+export type PutAdminLlmModelsByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        model: {
+            id: string;
+            modelId: string;
+            displayName: string | null;
+            providerId: string;
+            enabled: boolean;
+            contextLength: number | null;
+            costInput: number;
+            costOutput: number;
+            costCacheRead: number | null;
+            costCacheWrite: number | null;
+            priceInput: number;
+            priceOutput: number;
+            priceCacheRead: number | null;
+            priceCacheWrite: number | null;
+            sortOrder: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type PutAdminLlmModelsByIdResponse = PutAdminLlmModelsByIdResponses[keyof PutAdminLlmModelsByIdResponses];
+
+export type GetAdminLlmProvidersByProviderIdDiscoverData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/discover';
+};
+
+export type GetAdminLlmProvidersByProviderIdDiscoverErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    502: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdDiscoverError = GetAdminLlmProvidersByProviderIdDiscoverErrors[keyof GetAdminLlmProvidersByProviderIdDiscoverErrors];
+
+export type GetAdminLlmProvidersByProviderIdDiscoverResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        models: Array<{
+            /**
+             * Model ID from the provider
+             */
+            id: string;
+            /**
+             * Display name if available
+             */
+            name: string | null;
+            /**
+             * Creator/owner of the model
+             */
+            owned_by: string | null;
+            /**
+             * Unix timestamp of creation
+             */
+            created: number | null;
+            /**
+             * Whether this model is already in our database
+             */
+            imported: boolean;
+        }>;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdDiscoverResponse = GetAdminLlmProvidersByProviderIdDiscoverResponses[keyof GetAdminLlmProvidersByProviderIdDiscoverResponses];
+
+export type PostAdminLlmModelsLookupPricingData = {
+    body: {
+        /**
+         * Model IDs to look up pricing for
+         */
+        modelIds: Array<string>;
+        /**
+         * Provider name to help narrow the search
+         */
+        providerName?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/llm/models/lookup-pricing';
+};
+
+export type PostAdminLlmModelsLookupPricingErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    502: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmModelsLookupPricingError = PostAdminLlmModelsLookupPricingErrors[keyof PostAdminLlmModelsLookupPricingErrors];
+
+export type PostAdminLlmModelsLookupPricingResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        results: Array<{
+            modelId: string;
+            /**
+             * Cost per million input tokens (what we pay)
+             */
+            costInput: number | null;
+            /**
+             * Cost per million output tokens (what we pay)
+             */
+            costOutput: number | null;
+            /**
+             * Cost per million cached read tokens
+             */
+            costCacheRead: number | null;
+            /**
+             * Cost per million cached write tokens
+             */
+            costCacheWrite: number | null;
+            /**
+             * Context window size in tokens
+             */
+            contextLength: number | null;
+            /**
+             * URL or description of where pricing was found
+             */
+            source: string | null;
+        }>;
+    };
+};
+
+export type PostAdminLlmModelsLookupPricingResponse = PostAdminLlmModelsLookupPricingResponses[keyof PostAdminLlmModelsLookupPricingResponses];
+
+export type GetAdminUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Page number
+         */
+        page?: number;
+        /**
+         * Items per page
+         */
+        pageSize?: number;
+        /**
+         * Search by username or email
+         */
+        search?: string;
+    };
+    url: '/admin/users';
+};
+
+export type GetAdminUsersErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+};
+
+export type GetAdminUsersError = GetAdminUsersErrors[keyof GetAdminUsersErrors];
+
+export type GetAdminUsersResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        users: Array<{
+            id: number;
+            email: string;
+            username: string;
+            role: string;
+            avatarUrl: string | null;
+            /**
+             * User balance as string (Decimal)
+             */
+            balance: string;
+            createdAt: string;
+            updatedAt: string;
+            _count: {
+                ownedStories: number;
+                sessions: number;
+            };
+        }>;
+        pagination: {
+            page: number;
+            pageSize: number;
+            total: number;
+            totalPages: number;
+        };
+    };
+};
+
+export type GetAdminUsersResponse = GetAdminUsersResponses[keyof GetAdminUsersResponses];
+
+export type GetAdminUsersByIdData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/users/{id}';
+};
+
+export type GetAdminUsersByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminUsersByIdError = GetAdminUsersByIdErrors[keyof GetAdminUsersByIdErrors];
+
+export type GetAdminUsersByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        user: {
+            id: number;
+            email: string;
+            username: string;
+            role: string;
+            avatarUrl: string | null;
+            /**
+             * User balance as string (Decimal)
+             */
+            balance: string;
+            createdAt: string;
+            updatedAt: string;
+            _count: {
+                ownedStories: number;
+                sessions: number;
+            };
+        };
+    };
+};
+
+export type GetAdminUsersByIdResponse = GetAdminUsersByIdResponses[keyof GetAdminUsersByIdResponses];
+
+export type PutAdminUsersByIdData = {
+    body: {
+        /**
+         * User role
+         */
+        role?: 'user' | 'admin';
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/users/{id}';
+};
+
+export type PutAdminUsersByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type PutAdminUsersByIdError = PutAdminUsersByIdErrors[keyof PutAdminUsersByIdErrors];
+
+export type PutAdminUsersByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        user: {
+            id: number;
+            email: string;
+            username: string;
+            role: string;
+            avatarUrl: string | null;
+            /**
+             * User balance as string (Decimal)
+             */
+            balance: string;
+            createdAt: string;
+            updatedAt: string;
+            _count: {
+                ownedStories: number;
+                sessions: number;
+            };
+        };
+    };
+};
+
+export type PutAdminUsersByIdResponse = PutAdminUsersByIdResponses[keyof PutAdminUsersByIdResponses];
+
+export type PostAdminUsersByIdBalanceData = {
+    body: {
+        /**
+         * Amount to adjust (positive = credit, negative = debit)
+         */
+        amount: number;
+        /**
+         * Reason for the adjustment
+         */
+        description: string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/users/{id}/balance';
+};
+
+export type PostAdminUsersByIdBalanceErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type PostAdminUsersByIdBalanceError = PostAdminUsersByIdBalanceErrors[keyof PostAdminUsersByIdBalanceErrors];
+
+export type PostAdminUsersByIdBalanceResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        user: {
+            id: number;
+            email: string;
+            username: string;
+            role: string;
+            avatarUrl: string | null;
+            /**
+             * User balance as string (Decimal)
+             */
+            balance: string;
+            createdAt: string;
+            updatedAt: string;
+            _count: {
+                ownedStories: number;
+                sessions: number;
+            };
+        };
+        ledgerEntry: {
+            id: string;
+            amount: string;
+            balanceAfter: string;
+            type: string;
+            description: string;
+            createdAt: string;
+        };
+    };
+};
+
+export type PostAdminUsersByIdBalanceResponse = PostAdminUsersByIdBalanceResponses[keyof PostAdminUsersByIdBalanceResponses];
 
 export type GetStoriesData = {
     body?: never;

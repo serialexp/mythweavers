@@ -7,14 +7,14 @@ import {
   type GenerationCategory,
 } from '../utils/llm/resolveModel'
 import { ModelSelector } from './ModelSelector'
-import * as styles from './CategoryModelOverrides.css'
+import * as overrideStyles from './CategoryModelOverrides.css'
 
 const BUILTIN_PROVIDERS: { value: LLMProvider; label: string }[] = [
   { value: 'ollama', label: 'Ollama' },
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
-  { value: 'server', label: 'Server' },
+  { value: 'server', label: 'Mythweavers' },
 ]
 
 function getAllProviders(): { value: LLMProvider; label: string }[] {
@@ -93,22 +93,24 @@ export const CategoryModelOverrides: Component = () => {
     setEditingCategory(null)
   }
 
+  const getEffectiveProvider = (category: GenerationCategory) => {
+    const override = settingsStore.categoryOverrides[category]
+    return override?.provider ?? settingsStore.provider
+  }
+
   const getEffectiveModel = (category: GenerationCategory) => {
     const override = settingsStore.categoryOverrides[category]
-    if (override?.model) {
-      return `${override.model} (${override.provider})`
-    }
-    return `${settingsStore.model || 'none'} (${settingsStore.provider})`
+    return override?.model ?? settingsStore.model ?? 'none'
   }
 
   return (
-    <div class={styles.section}>
-      <p class={styles.description}>
-        Override the model used for specific types of generation. If not set,
-        the default provider and model are used.
+    <div class={overrideStyles.section}>
+      <p class={overrideStyles.description}>
+        Override the provider and model used for specific types of generation.
+        If not set, the defaults above are used.
       </p>
 
-      <div class={styles.categoryList}>
+      <div class={overrideStyles.categoryList}>
         <For each={CATEGORY_ORDER}>
           {(category) => {
             const meta = () => GENERATION_CATEGORIES[category]
@@ -116,30 +118,35 @@ export const CategoryModelOverrides: Component = () => {
             const isEditing = () => editingCategory() === category
 
             return (
-              <div class={styles.categoryCard}>
-                <div class={styles.categoryHeader}>
-                  <div class={styles.categoryInfo}>
-                    <div class={styles.categoryLabel}>
+              <div class={overrideStyles.categoryCard}>
+                <div class={overrideStyles.categoryHeader}>
+                  <div class={overrideStyles.categoryInfo}>
+                    <div class={overrideStyles.categoryLabel}>
                       {meta().label}
                       <Show when={override()}>
                         {' '}
-                        <span class={styles.overrideBadge}>override</span>
+                        <span class={overrideStyles.overrideBadge}>override</span>
                       </Show>
                     </div>
-                    <div class={styles.categoryDescription}>{meta().description}</div>
-                    <div class={styles.currentModel}>{getEffectiveModel(category)}</div>
+                    <div class={overrideStyles.categoryDescription}>{meta().description}</div>
+                    <div class={overrideStyles.currentModel}>
+                      <span class={overrideStyles.currentModelLabel}>Provider:</span> {getEffectiveProvider(category)}
+                    </div>
+                    <div class={overrideStyles.currentModel}>
+                      <span class={overrideStyles.currentModelLabel}>Model:</span> {getEffectiveModel(category)}
+                    </div>
                   </div>
-                  <div class={styles.actions}>
+                  <div class={overrideStyles.actions}>
                     <Show when={!isEditing()}>
                       <button
-                        class={styles.actionButton}
+                        class={overrideStyles.actionButton}
                         onClick={() => startEditing(category)}
                       >
                         {override() ? 'Edit' : 'Override'}
                       </button>
                       <Show when={override()}>
                         <button
-                          class={styles.clearButton}
+                          class={overrideStyles.clearButton}
                           onClick={() => handleClear(category)}
                         >
                           Clear
@@ -150,11 +157,11 @@ export const CategoryModelOverrides: Component = () => {
                 </div>
 
                 <Show when={isEditing()}>
-                  <div class={styles.overrideForm}>
-                    <div class={styles.formRow}>
-                      <label class={styles.formLabel}>Provider</label>
+                  <div class={overrideStyles.overrideForm}>
+                    <div class={overrideStyles.formRow}>
+                      <label class={overrideStyles.formLabel}>Provider</label>
                       <select
-                        class={styles.select}
+                        class={overrideStyles.select}
                         value={editProvider()}
                         onChange={(e) =>
                           handleProviderChange(e.target.value as LLMProvider)
@@ -167,15 +174,15 @@ export const CategoryModelOverrides: Component = () => {
                         </For>
                       </select>
                       <Show when={!hasApiKey(editProvider())}>
-                        <span class={styles.warningText}>
+                        <span class={overrideStyles.warningText}>
                           No API key configured for {editProvider()}. Add it in
-                          Provider &amp; Model settings.
+                          API Keys settings.
                         </span>
                       </Show>
                     </div>
 
-                    <div class={styles.formRow}>
-                      <label class={styles.formLabel}>Model</label>
+                    <div class={overrideStyles.formRow}>
+                      <label class={overrideStyles.formLabel}>Model</label>
                       <ModelSelector
                         model={editModel()}
                         setModel={setEditModel}
@@ -187,16 +194,16 @@ export const CategoryModelOverrides: Component = () => {
                       />
                     </div>
 
-                    <div class={styles.actions}>
+                    <div class={overrideStyles.actions}>
                       <button
-                        class={styles.actionButton}
+                        class={overrideStyles.actionButton}
                         onClick={() => handleSave(category)}
                         disabled={!editModel()}
                       >
                         Save
                       </button>
                       <button
-                        class={styles.actionButton}
+                        class={overrideStyles.actionButton}
                         onClick={() => setEditingCategory(null)}
                       >
                         Cancel

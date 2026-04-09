@@ -9,6 +9,14 @@ export const pageWrapper = style({
   backgroundColor: tokens.color.bg.base,
 })
 
+export const brandText = style({
+  '@media': {
+    '(max-width: 640px)': {
+      display: 'none',
+    },
+  },
+})
+
 export const contentArea = style({
   flex: 1,
   display: 'flex',

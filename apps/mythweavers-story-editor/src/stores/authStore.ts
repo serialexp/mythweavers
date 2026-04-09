@@ -1,5 +1,6 @@
 import { createStore } from 'solid-js/store'
 import { getAuthSession, postAuthLogout } from '../client/config'
+import { settingsStore } from './settingsStore'
 
 interface User {
   id: number
@@ -106,9 +107,14 @@ export const authStore = {
       const result = await getAuthSession()
       const authenticated = result.data?.authenticated ?? false
       const user = result.data?.user ?? null
+      const preferences = result.data?.preferences
 
       if (authenticated) {
         localStorage.removeItem('offlineMode')
+        // Load preferences from backend into settings store
+        if (preferences) {
+          settingsStore.loadFromBackend(preferences)
+        }
       }
       setAuthState({
         user: authenticated ? user : null,

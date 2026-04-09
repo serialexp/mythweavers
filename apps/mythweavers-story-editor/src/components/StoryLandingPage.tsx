@@ -3,14 +3,12 @@ import {
   Card,
   CardBody,
   Dropdown,
-  DropdownDivider,
   DropdownItem,
   IconButton,
+  Modal,
   NavBar,
   NavBarActions,
   NavBarBrand,
-  NavBarNav,
-  NavLink,
   Spinner,
   Tab,
   TabList,
@@ -22,7 +20,7 @@ import {
 import { useNavigate } from '@solidjs/router'
 import { Component, Show, createMemo, createSignal, onMount } from 'solid-js'
 import { authStore } from '../stores/authStore'
-import { getApiBaseUrl, getCalendarsPresets, postMyStories, postMyStoriesByStoryIdCalendars } from '../client/config'
+import { getApiBaseUrl, getCalendarsPresets, getMyAdventures, postMyStories, postMyStoriesByStoryIdCalendars } from '../client/config'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -35,6 +33,9 @@ import { importClaudeChat, importClaudeChatWithBranches } from '../utils/claudeC
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
 import { StoryMetadata, storyManager } from '../utils/storyManager'
 import type { Message } from '../types/core'
+import { BsGear, BsPersonCircle } from 'solid-icons/bs'
+import { AdventureList } from './AdventureList'
+import { AISettingsPanel } from './AISettingsPanel'
 import { ClaudeChatImportModal } from './ClaudeChatImportModal'
 import { NewStoryForm } from './NewStoryForm'
 import { StoryList, StoryListItem } from './StoryList'
@@ -42,7 +43,7 @@ import * as styles from './StoryLandingPage.css'
 
 interface StoryLandingPageProps {
   onSelectStory: (storyId: string) => void
-  initialTab?: 'new' | 'load'
+  initialTab?: 'load' | 'adventures'
 }
 
 export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
@@ -52,10 +53,15 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
   const [serverAvailable, setServerAvailable] = createSignal(false)
   const [loading, setLoading] = createSignal(true)
   const [syncing, setSyncing] = createSignal<string | null>(null)
-  const [activeTab, setActiveTab] = createSignal<'new' | 'load'>(props.initialTab ?? 'load')
+  const [activeTab, setActiveTab] = createSignal<'load' | 'adventures'>(
+    props.initialTab === 'adventures' ? 'adventures' : 'load',
+  )
   const [localFingerprints, setLocalFingerprints] = createSignal<Map<string, string>>(new Map())
   const [showClaudeChatImport, setShowClaudeChatImport] = createSignal(false)
+  const [showNewStory, setShowNewStory] = createSignal(false)
+  const [showAISettings, setShowAISettings] = createSignal(false)
   const [importingMythWeavers, setImportingMythWeavers] = createSignal(false)
+  const [adventureCount, setAdventureCount] = createSignal<number | null>(null)
 
   // Combined stories list
   const combinedStories = createMemo((): StoryListItem[] => {
@@ -161,8 +167,15 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     setLoading(false)
   }
 
-  // Load stories on mount
-  onMount(loadStories)
+  // Load stories and adventure count on mount
+  onMount(() => {
+    loadStories()
+    getMyAdventures().then(({ data }) => {
+      setAdventureCount(data?.adventures?.length ?? 0)
+    }).catch(() => {
+      // Silently fail — count just won't show
+    })
+  })
 
   const handleLoadStory = async (storyId: string, _type: 'local' | 'server') => {
     // Simply navigate to the story route
@@ -440,15 +453,26 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
       <NavBar variant="elevated" style={{ 'flex-shrink': '0' }}>
         <NavBarBrand href="/">
           <img src="/mythweavers.png" alt="MythWeavers" style={{ height: '32px', 'margin-right': '8px' }} />
-          MythWeavers
+          <span class={styles.brandText}>MythWeavers</span>
         </NavBarBrand>
 
-        <NavBarNav>
-          <NavLink href="/">Stories</NavLink>
-          <NavLink href="/adventure">Adventure</NavLink>
-        </NavBarNav>
-
         <NavBarActions>
+          <IconButton
+            variant="ghost"
+            onClick={toggleTheme}
+            aria-label={isDark() ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark() ? '☀️' : '🌙'}
+          </IconButton>
+
+          <IconButton
+            variant="ghost"
+            onClick={() => setShowAISettings(true)}
+            aria-label="AI Settings"
+          >
+            <BsGear />
+          </IconButton>
+
           <Show
             when={authStore.user && !authStore.isOfflineMode}
             fallback={
@@ -459,22 +483,16 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
               </Show>
             }
           >
-            <Dropdown alignRight trigger={<Button variant="ghost">{authStore.user?.username || 'User'}</Button>}>
-              <DropdownItem onClick={() => navigate('/settings')}>Settings</DropdownItem>
-              <DropdownDivider />
+            <Dropdown alignRight trigger={
+              <IconButton variant="ghost" aria-label={authStore.user?.username || 'User'}>
+                <BsPersonCircle size={20} />
+              </IconButton>
+            }>
               <DropdownItem danger onClick={handleLogout}>
                 Logout
               </DropdownItem>
             </Dropdown>
           </Show>
-
-          <IconButton
-            variant="ghost"
-            onClick={toggleTheme}
-            aria-label={isDark() ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDark() ? '☀️' : '🌙'}
-          </IconButton>
         </NavBarActions>
       </NavBar>
 
@@ -493,44 +511,35 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         <Tabs
           activeTab={activeTab()}
           onTabChange={(id) => {
-            const tab = id as 'new' | 'load'
+            const tab = id as 'load' | 'adventures'
             setActiveTab(tab)
-            window.history.replaceState(null, '', `/stories/${tab === 'new' ? 'new' : 'list'}`)
           }}
           size="md"
           style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
         >
           <TabList style={{ 'flex-shrink': '0' }}>
-            <Tab id="load">Load Story ({combinedStories().length})</Tab>
-            <Tab id="new">New Story</Tab>
+            <Tab id="load">Stories ({combinedStories().length})</Tab>
+            <Tab id="adventures">Adventures{adventureCount() != null ? ` (${adventureCount()})` : ''}</Tab>
           </TabList>
-
-          <TabPanel id="new" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
-            <CardBody>
-              <NewStoryForm serverAvailable={serverAvailable()} onCreateStory={handleCreateStory} />
-
-              <div style={{ 'margin-top': '2rem', 'padding-top': '1.5rem', 'border-top': '1px solid var(--color-border-default)' }}>
-                <Text size="sm" color="secondary" style={{ 'margin-bottom': '0.75rem' }}>
-                  Or import from external source:
-                </Text>
-                <div style={{ display: 'flex', gap: '0.5rem', 'flex-wrap': 'wrap' }}>
-                  <Button variant="secondary" onClick={() => setShowClaudeChatImport(true)}>
-                    Import Claude Chat
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleImportMythWeavers}
-                    disabled={!serverAvailable() || importingMythWeavers()}
-                  >
-                    {importingMythWeavers() ? 'Importing...' : 'Import MythWeavers Export'}
-                  </Button>
-                </div>
-              </div>
-            </CardBody>
-          </TabPanel>
 
           <TabPanel id="load" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
             <CardBody>
+              <div style={{ display: 'flex', gap: '0.5rem', 'margin-bottom': '1rem' }}>
+                <Button variant="primary" onClick={() => setShowNewStory(true)}>
+                  New Story
+                </Button>
+                <Button variant="secondary" onClick={() => setShowClaudeChatImport(true)}>
+                  Import Claude Chat
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleImportMythWeavers}
+                  disabled={!serverAvailable() || importingMythWeavers()}
+                >
+                  {importingMythWeavers() ? 'Importing...' : 'Import MythWeavers'}
+                </Button>
+              </div>
+
               <Show
                 when={!loading()}
                 fallback={
@@ -576,9 +585,37 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
               </Show>
             </CardBody>
           </TabPanel>
+
+          <TabPanel id="adventures" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
+            <CardBody>
+              <AdventureList onCountChange={setAdventureCount} />
+            </CardBody>
+          </TabPanel>
         </Tabs>
       </Card>
       </div>
+
+      <Modal
+        open={showNewStory()}
+        onClose={() => setShowNewStory(false)}
+        title="New Story"
+        size="md"
+      >
+        <NewStoryForm
+          serverAvailable={serverAvailable()}
+          onCreateStory={(name, storageMode, calendarPresetId) => {
+            setShowNewStory(false)
+            handleCreateStory(name, storageMode, calendarPresetId)
+          }}
+          onCancel={() => setShowNewStory(false)}
+          submitText="Create Story"
+        />
+      </Modal>
+
+      <AISettingsPanel
+        show={showAISettings()}
+        onClose={() => setShowAISettings(false)}
+      />
 
       <ClaudeChatImportModal
         show={showClaudeChatImport()}

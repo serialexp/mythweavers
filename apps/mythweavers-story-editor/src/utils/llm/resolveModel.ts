@@ -57,7 +57,9 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   // Meta
   'story:title': 'meta',
   'node:title': 'meta',
-  'adventure-setting': 'meta',
+  'adventure-setting': 'writing',
+  'adventure-title': 'meta',
+  utility: 'meta',
 }
 
 export interface CategoryOverride {

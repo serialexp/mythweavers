@@ -24,20 +24,10 @@ export const loadingOverlay = style({
   color: tokens.color.text.primary,
 })
 
-export const headerRow = style({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '0.5rem',
-})
-
 export const storyName = style({
   display: 'flex',
   alignItems: 'center',
   gap: '0.5rem',
-  fontWeight: 500,
-  fontSize: '1.1rem',
-  color: tokens.color.text.primary,
 })
 
 export const storyTypeIcon = style({
@@ -52,23 +42,7 @@ export const warningIcon = style({
   color: tokens.color.semantic.warning,
 })
 
-export const actionButtons = style({
-  display: 'flex',
-  gap: '0.25rem',
-})
-
-export const metaRow = style({
-  display: 'flex',
-  gap: '1rem',
-  fontSize: '0.9rem',
-  color: tokens.color.text.secondary,
-  flexWrap: 'wrap',
-})
-
-export const metaDate = style({
-  marginLeft: 'auto',
-})
-
 export const currentStoryBorder = style({
-  borderColor: tokens.color.accent.primary,
+  borderRadius: tokens.radius.sm,
+  outline: `2px solid ${tokens.color.accent.primary}`,
 })
