@@ -12,6 +12,7 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 # Copy all package.json files needed for install
 COPY apps/shared/package.json ./apps/shared/
 COPY apps/mythweavers-backend/package.json ./apps/mythweavers-backend/
+COPY packages/llm/package.json ./packages/llm/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -19,9 +20,13 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY apps/shared ./apps/shared
 COPY apps/mythweavers-backend ./apps/mythweavers-backend
+COPY packages/llm ./packages/llm
 
-# Build shared package
+# Build shared packages
 WORKDIR /app/apps/shared
+RUN pnpm build
+
+WORKDIR /app/packages/llm
 RUN pnpm build
 
 # Generate Prisma client
@@ -47,6 +52,7 @@ COPY --from=builder /app/apps/mythweavers-backend/src ./apps/mythweavers-backend
 COPY --from=builder /app/apps/mythweavers-backend/prisma ./apps/mythweavers-backend/prisma
 COPY --from=builder /app/apps/mythweavers-backend/package.json ./apps/mythweavers-backend/
 COPY --from=builder /app/apps/shared ./apps/shared
+COPY --from=builder /app/packages/llm ./packages/llm
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
 

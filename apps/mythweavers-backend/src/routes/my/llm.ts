@@ -80,6 +80,10 @@ function writeSSE(raw: import('node:http').ServerResponse, event: LLMStreamEvent
     case 'error':
       payload = { type: 'error', error: event.error }
       break
+    default: {
+      const _exhaustive: never = event
+      return
+    }
   }
   raw.write(`data: ${JSON.stringify(payload)}\n\n`)
 }
