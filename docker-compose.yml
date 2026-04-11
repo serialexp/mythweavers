@@ -166,6 +166,37 @@ services:
       timeout: 10s
       retries: 3
 
+  # Admin Frontend
+  admin:
+    image: ${REGISTRY:-serialexp}/mythweavers-admin:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/mythweavers-admin/Dockerfile
+    container_name: mythweavers-admin
+    environment:
+      - BACKEND_URL=${BACKEND_URL:-https://${BACKEND_DOMAIN:-api.mythweavers.localhost}}
+    networks:
+      - mythweavers
+    depends_on:
+      - backend
+    restart: unless-stopped
+    labels:
+      caddy: ${ADMIN_DOMAIN:-admin.mythweavers.localhost}
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
   mythweavers:
     name: mythweavers
