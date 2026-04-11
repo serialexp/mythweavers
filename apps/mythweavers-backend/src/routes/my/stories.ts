@@ -137,12 +137,15 @@ const storySchema = z.strictObject({
     example: 'anthropic',
   }),
   model: z.string().nullable().meta({
-    description: 'LLM model',
+    description: 'LLM model (legacy — prefer aiOverrides)',
     example: 'claude-sonnet-4',
   }),
   openaiEndpoint: z.string().nullable().meta({
     description: 'Custom base URL for OpenAI-compatible APIs',
     example: 'https://api.openai.com',
+  }),
+  aiOverrides: z.any().nullable().meta({
+    description: 'Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }',
   }),
   coverColor: z.string().meta({
     description: 'Cover background color',
@@ -337,6 +340,9 @@ const updateStoryBodySchema = z.strictObject({
   }),
   branchChoices: z.any().nullable().optional().meta({
     description: 'Branch choices JSON object',
+  }),
+  aiOverrides: z.any().nullable().optional().meta({
+    description: 'Story-level AI settings overrides (JSON). Null fields inherit from global user preferences.',
   }),
 })
 

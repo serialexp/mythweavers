@@ -228,6 +228,11 @@ model Story {
   model                  String?
   openaiEndpoint         String?           // Custom base URL for OpenAI-compatible APIs
 
+  // Story-level AI settings overrides (JSON blob)
+  // Nullable fields within: null/missing = inherit from global user preferences
+  // Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+  aiOverrides            Json?
+
   // Script support
   globalScript           String?           @db.Text // JavaScript function for initializing story data and defining reusable functions
   plotPointDefaults      Json?             // Array of { key: string, type: 'string' | 'number', default: string | number }
