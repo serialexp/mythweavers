@@ -33,3 +33,6 @@ export * from './calendars/types.js'
 export { CalendarEngine } from './calendars/engine.js'
 export * from './calendars/presets.js'
 export * from './calendars/subdivision-presets.js'
+
+// Unified diff utilities
+export * from './lib/unifiedDiff.js'
