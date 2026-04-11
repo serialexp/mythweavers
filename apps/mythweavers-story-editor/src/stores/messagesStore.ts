@@ -174,6 +174,10 @@ saveService.setCallbacks({
       }
     })
   },
+  onLastKnownUpdatedAtChange: (timestamp) => {
+    currentStoryStore.setLastKnownUpdatedAt(timestamp)
+  },
+  getStorageMode: () => currentStoryStore.storageMode ?? null,
 })
 
 // Set trigger full save function for saveService (only used for local stories)

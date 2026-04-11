@@ -45,7 +45,6 @@ import {
   deleteMyMessagesByMessageIdPlotPointStatesByKey,
   getApiBaseUrl,
 } from '../client/config'
-import { currentStoryStore } from '../stores/currentStoryStore'
 import { VersionConflictError } from '../types/api'
 import {
   Character,
@@ -335,6 +334,14 @@ interface StorySettingsOperation extends SaveOperationBase {
     timelineGranularity: 'hour' | 'day'
     provider: string
     model: string | null
+    aiOverrides: {
+      provider?: string | null
+      model?: string | null
+      maxTokens?: number | null
+      thinkingBudget?: number | null
+      contextSize?: number | null
+      categoryOverrides?: Record<string, unknown> | null
+    } | null
     plotPointDefaults: unknown[]
   }>
 }
@@ -402,6 +409,8 @@ export class SaveService {
   private onError?: (error: Error) => void
   private onOperationFailed?: (operation: SaveOperation, error: Error) => void
   private onMessageCreated?: (messageId: string, data: { currentMessageRevisionId: string }) => void
+  private onLastKnownUpdatedAtChange?: (timestamp: string) => void
+  private getStorageMode?: () => 'local' | 'server' | null
 
   // Set callbacks for UI updates
   setCallbacks(callbacks: {
@@ -411,6 +420,8 @@ export class SaveService {
     onError?: (error: Error) => void
     onOperationFailed?: (operation: SaveOperation, error: Error) => void
     onMessageCreated?: (messageId: string, data: { currentMessageRevisionId: string }) => void
+    onLastKnownUpdatedAtChange?: (timestamp: string) => void
+    getStorageMode?: () => 'local' | 'server' | null
   }) {
     this.onSaveStatusChange = callbacks.onSaveStatusChange
     this.onQueueLengthChange = callbacks.onQueueLengthChange
@@ -418,6 +429,8 @@ export class SaveService {
     this.onError = callbacks.onError
     this.onOperationFailed = callbacks.onOperationFailed
     this.onMessageCreated = callbacks.onMessageCreated
+    this.onLastKnownUpdatedAtChange = callbacks.onLastKnownUpdatedAtChange
+    this.getStorageMode = callbacks.getStorageMode
   }
 
   private onQueueLengthChange?: (length: number) => void
@@ -425,8 +438,8 @@ export class SaveService {
   // Update last known timestamp (internal use only)
   private updateLastKnownTimestamp(timestamp: string) {
     this.state.lastKnownUpdatedAt = timestamp
-    // Update in currentStoryStore directly
-    currentStoryStore.setLastKnownUpdatedAt(timestamp)
+    // Notify via callback so currentStoryStore can update
+    this.onLastKnownUpdatedAtChange?.(timestamp)
   }
 
   // Trigger full save function (to be set by messagesStore)
@@ -439,7 +452,7 @@ export class SaveService {
   // Queue a save operation
   async queueSave(operation: Omit<SaveOperation, 'id' | 'timestamp'>): Promise<void> {
     // Check if this is a local story - if so, trigger a full save instead
-    if (currentStoryStore.storageMode === 'local') {
+    if (this.getStorageMode?.() === 'local') {
       // For local stories, any save triggers a full save
       // Local story detected, triggering full save
       this.triggerFullSave()
@@ -1290,6 +1303,7 @@ export class SaveService {
           timelineGranularity: operation.data.timelineGranularity,
           provider: operation.data.provider,
           model: operation.data.model,
+          aiOverrides: operation.data.aiOverrides,
           globalScript: operation.data.globalScript,
           selectedNodeId: operation.data.selectedNodeId,
           branchChoices: operation.data.branchChoices,
@@ -1657,6 +1671,14 @@ export class SaveService {
       timelineGranularity: 'hour' | 'day'
       provider: string
       model: string | null
+      aiOverrides: {
+        provider?: string | null
+        model?: string | null
+        maxTokens?: number | null
+        thinkingBudget?: number | null
+        contextSize?: number | null
+        categoryOverrides?: Record<string, unknown> | null
+      } | null
     }>,
   ) {
     // Generate a unique ID for this settings update
