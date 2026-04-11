@@ -32,6 +32,34 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Early error handler — catches module initialization errors that occur
+      // before main.tsx's error handlers are registered.
+      (function() {
+        function showFatalError(title, message, stack) {
+          var el = document.createElement('div');
+          el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);color:#ff6b6b;padding:24px;font-family:monospace;font-size:14px;overflow:auto;z-index:999999;';
+          el.innerHTML = '<h1 style="color:#ff6b6b;margin-bottom:16px">\u26A0\uFE0F ' + title + '</h1>'
+            + '<div style="background:#1a1a1a;padding:15px;border-radius:5px;margin-bottom:15px"><strong>Message:</strong> ' + message + '</div>'
+            + (stack ? '<details style="margin-bottom:15px"><summary style="cursor:pointer;color:#ffa94d;margin-bottom:8px">Stack Trace</summary><div style="background:#1a1a1a;padding:15px;border-radius:5px"><pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;color:#ffa94d">' + stack + '</pre></div></details>' : '')
+            + '<div style="margin-top:16px;display:flex;gap:10px">'
+            + '<button onclick="location.reload()" style="padding:10px 20px;background:#ff6b6b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:14px">Reload Page</button>'
+            + '<button onclick="this.parentElement.parentElement.remove()" style="padding:10px 20px;background:#868e96;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:14px">Dismiss</button>'
+            + '</div>';
+          document.body.appendChild(el);
+        }
+        window.addEventListener('error', function(e) {
+          if (e.message === 'Script error.' && !e.error) return;
+          showFatalError('Application Error', e.message || 'Unknown error', e.error && e.error.stack);
+          e.preventDefault();
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e.reason;
+          showFatalError('Unhandled Promise Rejection', (reason && reason.message) || String(reason), reason && reason.stack);
+          e.preventDefault();
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

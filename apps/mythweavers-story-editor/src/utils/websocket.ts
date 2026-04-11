@@ -1,9 +1,16 @@
 import { createSignal } from 'solid-js'
 import { getApiBaseUrl } from '../client/config'
 import { errorStore } from '../stores/errorStore'
-import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import type { Message, Node } from '../types/core'
+
+// Lazy import to break circular dependency:
+// messagesStore → currentStoryStore → websocket → messagesStore
+// Resolved eagerly after module graph settles (before any WS handler fires).
+let _messagesStore: typeof import('../stores/messagesStore').messagesStore | undefined
+import('../stores/messagesStore').then((mod) => {
+  _messagesStore = mod.messagesStore
+})
 
 let socket: WebSocket | null = null
 let currentStoryId: string | null = null
@@ -146,15 +153,15 @@ export const websocketManager = {
       sceneId: data.message.sceneId,
     }
 
-    const currentMessage = messagesStore.messages.find((m) => m.id === message.id)
-    if (currentMessage && messagesStore.isLoading) {
+    const currentMessage = _messagesStore?.messages.find((m) => m.id === message.id)
+    if (currentMessage && _messagesStore?.isLoading) {
       errorStore.addError(`Message ${message.id} was updated from MCP but local edit takes priority`)
       return
     }
 
-    messagesStore.updateMessageNoSave(message.id, message)
+    _messagesStore?.updateMessageNoSave(message.id, message)
     if (message.paragraphs) {
-      messagesStore.bumpContentVersion(message.id)
+      _messagesStore?.bumpContentVersion(message.id)
     }
   },
 
@@ -167,12 +174,12 @@ export const websocketManager = {
       sceneId: data.message.sceneId,
     }
 
-    messagesStore.insertMessageNoSave(data.afterMessageId, message)
+    _messagesStore?.insertMessageNoSave(data.afterMessageId, message)
   },
 
   handleMessageDeleted(data: { storyId: string; messageId: string }) {
     if (data.storyId !== currentStoryId) return
-    messagesStore.deleteMessageNoSave(data.messageId)
+    _messagesStore?.deleteMessageNoSave(data.messageId)
   },
 
   handleNodeCreated(data: { storyId: string; node: unknown }) {
@@ -193,6 +200,6 @@ export const websocketManager = {
   handleStoryReloaded(data: { storyId: string }) {
     if (data.storyId !== currentStoryId) return
     errorStore.addError('Story has been significantly modified from MCP. Reloading...')
-    messagesStore.reloadDataForStory(data.storyId)
+    _messagesStore?.reloadDataForStory(data.storyId)
   },
 }

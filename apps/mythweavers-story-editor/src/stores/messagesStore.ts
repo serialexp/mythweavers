@@ -252,7 +252,7 @@ const nodeIdsWithBranches = createMemo(() => {
 const activePath = createMemo(() => {
   const messages = messagesState.messages
   const nodes = nodeStore.nodesArray
-  const branchChoices = currentStoryStore.branchChoices || {}
+  const branchChoices = currentStoryStore?.branchChoices || {}
 
   console.log('[activePath] Memo running:', {
     messageCount: messages.length,
