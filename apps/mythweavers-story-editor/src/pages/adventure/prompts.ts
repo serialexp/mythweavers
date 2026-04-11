@@ -1,5 +1,6 @@
 import type { LLMMessage } from '../../types/llm'
 import type { AdventureTurn } from '../../hooks/useAdventurePersistence'
+import { formatWithLineNumbers } from '@mythweavers/shared'
 
 // --- Setting generation knobs ---
 
@@ -101,6 +102,7 @@ RULES:
 - Each bullet: one NPC action/intent or one environmental change. Max one sentence.
 - NPCs FOLLOW THROUGH on established plans unless the player specifically prevented it this turn. A player doing something unrelated does NOT cancel NPC actions.
 - Frame NPC actions as things that ARE happening or WILL happen, not vague possibilities. The only caveat is direct player interference.
+- At least one bullet should describe something the protagonist could plausibly notice, encounter, or react to from their current situation. Give the player something to work with.
 - NO references to the protagonist, "you", "the player", or how events affect them
 - NO dramatic framing — just state what's happening, plainly
 - Only mention NPCs and elements already established in the story
@@ -147,33 +149,72 @@ GUIDELINES:
 - If the story started grounded, keep it grounded. Match the tone and scope of the setting.
 - Your previous notes are a STARTING POINT. Advance things that should advance, hold things that are waiting, resolve things that have concluded.
 - Not every NPC needs a hidden agenda, but the world should feel like it has momentum beyond the player's immediate view.
+- You are FREE to rewrite, replace, or discard any mystery or upcoming event if a better direction emerges from the story. These notes serve the narrative — they are not commitments. If the player's actions or the story's natural flow suggest something more interesting, follow that instead.
+- However, do NOT complicate things that are already complex. If a mystery or event is already layered and interesting, let it play out rather than piling more on top.
 
 Structure your notes using these NUMBERED sections. Maintain the numbering so you can track what's active:
 
-## BACKGROUND
-A short paragraph describing the current state of the world/setting around the protagonist. What does daily life look like here? What's the general atmosphere? What tensions or dynamics exist in this place? Update this each turn to reflect changes. This grounds the narrative agent in a living world.
+## PROTAGONIST
+A brief description of the protagonist as established so far — appearance, personality traits, skills, relationships, and any important facts about them. This is NOT a recap of the current situation (the narrative already covers that). This is a reference sheet so the narrative agent maintains consistency about WHO the protagonist is across turns. Only update when new traits or facts about the protagonist are revealed.
 
 ## MYSTERIES (up to 3)
 Significant unanswered questions, hidden truths, or things the player doesn't yet know. Number them 1-3. Each mystery should have a one-line summary and a brief note on the underlying truth or direction.
+- These should be LONG-TERM threads — things that take multiple turns to uncover, not something the player can resolve next turn.
 - When a mystery is RESOLVED (player discovered the truth, or it became irrelevant), remove it.
 - When a slot is empty and the world naturally produces a new question, fill it — but only if it emerges from existing elements, not invented from thin air.
 - It's fine to have 1 or 2 mysteries. Don't force all 3 slots full.
 
 ## UPCOMING EVENTS (up to 2)
-Things that are going to happen in the near future, independent of the player. Number them 1-2. Each should describe what will happen, roughly when, and what might trigger or prevent it.
-- These give the world momentum. They might be NPC plans, environmental changes, approaching deadlines, or consequences of past actions.
+Things that are going to happen in the MEDIUM TO LONG TERM, independent of the player. Number them 1-2. Each should describe what will happen, roughly when, and what might trigger or prevent it.
+- Think in terms of days, weeks, or story arcs — not the next few minutes. Immediate consequences have their own section below.
+- These give the world long-range momentum. They might be NPC plans that take time to execute, environmental shifts that build gradually, approaching deadlines, or slow-burn consequences of past actions.
 - When an event FIRES (it happened) or is PREVENTED, remove it and optionally replace it.
 - At least one slot should usually be filled. If both are empty, think about what's brewing.
 
 ## IMMEDIATE CONSEQUENCES
-What will the player's most recent action cause in the near term? Brief notes only.
+What will the player's most recent action cause in the near term? Brief notes only. This is the ONLY section for what happens next — mysteries and upcoming events should look further ahead.
 
 Aim for 150-300 words total. Respond with ONLY your director notes, no other text.`
+
+export const DIRECTOR_DIFF_INSTRUCTION = `YOUR ROLE THIS TURN: Update your director notes using a unified diff.
+
+You are the world's hidden engine. Below are your CURRENT director notes with line numbers. Based on what just happened in the story, output a unified diff to update them.
+
+REMINDERS:
+- MYSTERIES should be LONG-TERM threads (multiple turns to uncover). Don't resolve or replace them hastily.
+- UPCOMING EVENTS should be MEDIUM TO LONG TERM (days, weeks, story arcs). Immediate effects go in IMMEDIATE CONSEQUENCES only.
+- You are FREE to rewrite, replace, or discard any mystery or event if the story naturally goes in a better direction — but don't complicate things that are already complex.
+- Prefer deepening existing elements over inventing new ones.
+
+DIFF FORMAT:
+@@ -<old_line>,<old_count> +<new_line>,<new_count> @@
+ context line (prefix with space)
+-line to remove (prefix with minus)
++line to add (prefix with plus)
+
+Rules:
+- Line numbers are 1-indexed
+- Include 1-2 context lines before/after changes
+- You can have multiple @@ hunks for different sections
+- If nothing needs to change this turn, output exactly: NO_CHANGES
+
+CRITICAL: Return ONLY the unified diff (or NO_CHANGES). No preamble, no explanation, no markdown code blocks.`
 
 // --- Prompt construction helpers ---
 
 function formatMomentumContext(trajectory: string, action: string): string {
   return `[WORLD MOMENTUM — things happening independently in the world: ${trajectory}]\n\nMy action: ${action}`
+}
+
+/** Append the user directive as the final user message if present. */
+function appendDirective(messages: LLMMessage[], directive?: string): void {
+  const trimmed = directive?.trim()
+  if (trimmed) {
+    messages.push({
+      role: 'user',
+      content: `[AUTHOR DIRECTIVE — follow these instructions for this and all subsequent turns]\n${trimmed}`,
+    })
+  }
 }
 
 /**
@@ -233,15 +274,9 @@ export function buildNarrativeMessages(
 
   const isOpeningTurn = turns.length === 0 && playerAction === null
 
-  // Role-specific instruction + core directive + user directive
-  const userDirective = turnDirective?.trim()
-  const directivePart = userDirective
-    ? `\n\n${CORE_DIRECTIVE}\n\n${userDirective}`
-    : `\n\n${CORE_DIRECTIVE}`
-
   messages.push({
     role: 'system',
-    content: NARRATIVE_INSTRUCTION + directivePart,
+    content: `${NARRATIVE_INSTRUCTION}\n\n${CORE_DIRECTIVE}`,
   })
 
   // Final user message
@@ -262,6 +297,8 @@ ${settingDescription}`,
     })
   }
 
+  appendDirective(messages, turnDirective)
+
   return messages
 }
 
@@ -269,6 +306,8 @@ export function buildTrajectoryMessages(
   turns: AdventureTurn[],
   latestNarrative: string,
   playerAction: string | null,
+  currentDirectorNotes?: string,
+  options?: { rejectedTrajectory?: string; directive?: string },
 ): LLMMessage[] {
   // Shared history + the just-completed turn's narrative
   const messages = buildSharedHistory(turns)
@@ -284,55 +323,88 @@ export function buildTrajectoryMessages(
   messages.push({
     role: 'assistant',
     content: latestNarrative,
-    // Cache breakpoint: the director call shares the same prefix up to here,
-    // so caching this avoids a redundant cache write when the director runs next.
     cache_control: { type: 'ephemeral', ttl: '1h' },
   })
 
-  // Trajectory-specific instruction with director notes
-  const latestDirectorNotes = [...turns]
-    .reverse()
-    .find((t) => t.directorNotes)?.directorNotes
+  // Use fresh director notes from this turn if available, fall back to previous turns
+  const directorNotes = currentDirectorNotes
+    ?? [...turns].reverse().find((t) => t.directorNotes)?.directorNotes
 
-  const directorSection = latestDirectorNotes
-    ? `\n\n<director_notes context="use these to inform the trajectory — what's REALLY happening behind the scenes">\n${latestDirectorNotes}\n</director_notes>`
+  const directorSection = directorNotes
+    ? `\n\n<director_notes context="use these to inform the trajectory — what's REALLY happening behind the scenes">\n${directorNotes}\n</director_notes>`
+    : ''
+
+  // Show the last turn's trajectory so the model knows what already happened
+  // and can advance or move on rather than repeating
+  const lastTurnTrajectory = turns.length > 0
+    ? turns[turns.length - 1]?.worldTrajectory
+    : undefined
+
+  const previousSection = lastTurnTrajectory
+    ? `\n\nLAST TURN'S WORLD MOMENTUM (for reference — advance these, resolve them, or move on to new developments; do NOT repeat them):\n"${lastTurnTrajectory}"`
+    : ''
+
+  const rejectionSection = options?.rejectedTrajectory
+    ? `\n\nYour PREVIOUS attempt at world momentum was rejected:\n"${options.rejectedTrajectory}"\n\nGenerate DIFFERENT momentum — focus on other NPCs, other events, or different aspects of the world. Do not repeat or rephrase the rejected output.`
     : ''
 
   messages.push({
-    role: 'system',
-    content: TRAJECTORY_INSTRUCTION + directorSection,
+    role: 'user',
+    content: `${TRAJECTORY_INSTRUCTION}${directorSection}${previousSection}${rejectionSection}\n\nWhat happens next in the world if the player does nothing?`,
   })
 
-  messages.push({
-    role: 'user',
-    content: 'What happens next in the world if the player does nothing?',
-  })
+  appendDirective(messages, options?.directive)
 
   return messages
 }
 
-export function buildDirectorMessages(turns: AdventureTurn[]): LLMMessage[] {
+export function buildDirectorMessages(
+  turns: AdventureTurn[],
+  currentTurn?: { playerAction: string | null; narrative: string },
+  turnDirective?: string,
+): LLMMessage[] {
   const messages = buildSharedHistory(turns)
 
-  // Director-specific instruction with previous notes
+  // Append the current (not-yet-finalized) turn so the director sees it
+  if (currentTurn) {
+    if (currentTurn.playerAction !== null) {
+      const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null
+      const userContent = lastTurn?.worldTrajectory
+        ? formatMomentumContext(lastTurn.worldTrajectory, currentTurn.playerAction)
+        : currentTurn.playerAction
+      messages.push({ role: 'user', content: userContent })
+    }
+    messages.push({ role: 'assistant', content: currentTurn.narrative })
+  }
+
+  // Director-specific instruction — use diff mode when we have previous notes
   const lastDirectorNotes = [...turns]
     .reverse()
     .find((t) => t.directorNotes)?.directorNotes
 
-  const previousNotesSection = lastDirectorNotes
-    ? `\n\nYOUR PREVIOUS DIRECTOR NOTES:\n${lastDirectorNotes}`
-    : ''
+  if (lastDirectorNotes) {
+    // Diff mode: send current notes with line numbers, ask for a unified diff
+    const numberedNotes = formatWithLineNumbers(lastDirectorNotes)
 
-  messages.push({
-    role: 'system',
-    content: DIRECTOR_INSTRUCTION + previousNotesSection,
-  })
+    messages.push({
+      role: 'user',
+      content: `${DIRECTOR_DIFF_INSTRUCTION}\n\nCURRENT DIRECTOR NOTES:\n${numberedNotes}`,
+    })
+  } else {
+    // First turn: generate full notes from scratch
+    messages.push({
+      role: 'system',
+      content: DIRECTOR_INSTRUCTION,
+    })
 
-  messages.push({
-    role: 'user',
-    content:
-      'Based on the story so far, provide your updated director notes using the structured format (BACKGROUND, MYSTERIES 1-3, UPCOMING EVENTS 1-2, IMMEDIATE CONSEQUENCES). Advance, resolve, or replace items as appropriate.',
-  })
+    messages.push({
+      role: 'user',
+      content:
+        'Based on the story so far, provide your initial director notes using the structured format (PROTAGONIST, MYSTERIES 1-3, UPCOMING EVENTS 1-2, IMMEDIATE CONSEQUENCES).',
+    })
+  }
+
+  appendDirective(messages, turnDirective)
 
   return messages
 }

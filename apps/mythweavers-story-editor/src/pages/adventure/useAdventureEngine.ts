@@ -1,7 +1,7 @@
 import { createContext, createEffect, onCleanup, onMount, useContext } from 'solid-js'
 import type { AdventurePersistence } from '../../hooks/useAdventurePersistence'
 import type { LLMMessage } from '../../types/llm'
-import { settingsStore } from '../../stores/settingsStore'
+import { effectiveSettings } from '../../stores/effectiveSettingsStore'
 import { adventureStore } from '../../stores/adventureStore'
 import { LLMClientFactory } from '../../utils/llm/LLMClientFactory'
 import { resolveModel } from '../../utils/llm/resolveModel'
@@ -15,6 +15,7 @@ import {
   cleanNarrative,
   parseTrajectory,
 } from './prompts'
+import { processLLMDiffResponse } from '@mythweavers/shared'
 
 // --- Engine interface & context ---
 
@@ -25,6 +26,7 @@ export interface AdventureEngine {
   handleAbort: () => void
   handleRetry: () => void
   handleRegenerate: () => void
+  handleRegenerateDirector: () => void
   handleRewindTo: (turnIndex: number) => void
   handleReset: () => void
   handleGenerateSetting: () => Promise<void>
@@ -126,11 +128,11 @@ export function createAdventureEngine(
       const narrativeResponse = narrativeClient.generate({
         model: narrativeResolved.model,
         messages: narrativeMessages,
-        max_tokens: settingsStore.maxTokens,
-        thinking_budget: settingsStore.thinkingBudget
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
           ? Math.min(
-              settingsStore.thinkingBudget,
-              Math.floor(settingsStore.maxTokens / 2),
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
             )
           : undefined,
         signal: abortController.signal,
@@ -151,7 +153,14 @@ export function createAdventureEngine(
 
       const narrative = cleanNarrative(accumulated)
 
-      // --- Step 2: Generate world trajectory (silent, not streamed) ---
+      // --- Step 2: Run director agent (silent) ---
+      adventureStore.setStreamingContent(
+        `${narrative}\n\n⏳ Updating the world...`,
+      )
+
+      const directorNotes = await runDirector({ playerAction, narrative })
+
+      // --- Step 3: Generate world trajectory using fresh director notes ---
       adventureStore.setStreamingContent(
         `${narrative}\n\n⏳ Reading the world...`,
       )
@@ -160,6 +169,8 @@ export function createAdventureEngine(
         adventureStore.turns,
         narrative,
         playerAction,
+        directorNotes,
+        { directive: adventureStore.directive },
       )
 
       const trajectoryResolved = resolveModel('adventure-trajectory')
@@ -171,11 +182,11 @@ export function createAdventureEngine(
       const trajectoryResponse = trajectoryClient.generate({
         model: trajectoryResolved.model,
         messages: trajectoryMessages,
-        max_tokens: settingsStore.maxTokens,
-        thinking_budget: settingsStore.thinkingBudget
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
           ? Math.min(
-              settingsStore.thinkingBudget,
-              Math.floor(settingsStore.maxTokens / 2),
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
             )
           : undefined,
         signal: abortController.signal,
@@ -197,13 +208,9 @@ export function createAdventureEngine(
         narrative,
         worldTrajectory,
         ...(dead ? { dead: true } : {}),
+        ...(directorNotes ? { directorNotes } : {}),
       })
       persist()
-
-      // Fire director agent in the background (skip if dead — no future turns)
-      if (!dead) {
-        runDirector()
-      }
 
       // Focus input for next action
       if (!dead) {
@@ -242,25 +249,27 @@ export function createAdventureEngine(
 
   // --- Director agent (background) ---
 
-  async function runDirector() {
-    if (adventureStore.isDirectorRunning) return
+  async function runDirector(
+    currentTurn?: { playerAction: string | null; narrative: string },
+  ): Promise<string | undefined> {
+    if (adventureStore.isDirectorRunning) return undefined
 
     adventureStore.setIsDirectorRunning(true)
 
     try {
       const directorResolved = resolveModel('adventure-director')
       const client = LLMClientFactory.getClient(directorResolved.provider)
-      const messages = buildDirectorMessages(adventureStore.turns)
+      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive)
 
       let accumulated = ''
       const response = client.generate({
         model: directorResolved.model,
         messages,
-        max_tokens: settingsStore.maxTokens,
-        thinking_budget: settingsStore.thinkingBudget
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
           ? Math.min(
-              settingsStore.thinkingBudget,
-              Math.floor(settingsStore.maxTokens / 2),
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
             )
           : undefined,
         metadata: { callType: 'adventure-director' },
@@ -272,18 +281,29 @@ export function createAdventureEngine(
         }
       }
 
-      // Clean up thinking tags and attach to the latest turn
-      const directorNotes = accumulated
+      // Clean up thinking tags
+      const rawResponse = accumulated
         .replace(/<think>[\s\S]*?<\/think>/g, '')
         .trim()
 
-      if (directorNotes) {
-        adventureStore.updateLastTurn({ directorNotes })
-        persist()
+      if (!rawResponse) return undefined
+
+      // Check if we have previous notes — if so, the response is a diff
+      const previousNotes = [...adventureStore.turns]
+        .reverse()
+        .find((t) => t.directorNotes)?.directorNotes
+
+      if (previousNotes) {
+        const result = processLLMDiffResponse(previousNotes, rawResponse)
+        return result.resultContent || undefined
       }
+
+      // First turn: response is the full notes
+      return rawResponse
     } catch (err) {
       // Director failures are silent — they don't affect the player experience
       console.warn('Director agent error:', err)
+      return undefined
     } finally {
       adventureStore.setIsDirectorRunning(false)
     }
@@ -292,7 +312,7 @@ export function createAdventureEngine(
   // --- Handlers ---
 
   async function handleStart() {
-    if (!settingsStore.model || !settingsStore.provider) {
+    if (!effectiveSettings.model || !effectiveSettings.provider) {
       adventureStore.setError(
         'Please configure your AI provider and model first.',
       )
@@ -362,6 +382,95 @@ export function createAdventureEngine(
     generate(action)
   }
 
+  async function handleRegenerateDirector() {
+    if (adventureStore.isGenerating || adventureStore.isDirectorRunning) return
+    if (adventureStore.turns.length === 0) return
+
+    const turns = adventureStore.turns
+    const lastTurn = turns[turns.length - 1]
+
+    // Build a view of turns *without* the last turn's director notes,
+    // so runDirector uses the previous turn's notes as the starting point
+    // (same as if we were generating this turn fresh).
+    const turnsWithoutLastDirector = turns.map((t, i) =>
+      i === turns.length - 1 ? { ...t, directorNotes: undefined } : t,
+    )
+
+    // Temporarily swap turns so runDirector/buildDirectorMessages sees the right state
+    const originalTurns = [...turns]
+    adventureStore.setTurns(turnsWithoutLastDirector)
+
+    try {
+      adventureStore.setIsGenerating(true)
+
+      // Step 1: Regenerate director notes
+      const directorNotes = await runDirector({
+        playerAction: lastTurn.playerAction,
+        narrative: lastTurn.narrative,
+      })
+
+      // Restore turns and apply new director notes
+      adventureStore.setTurns(originalTurns)
+      if (directorNotes) {
+        adventureStore.updateLastTurn({ directorNotes })
+      }
+
+      // Step 2: Regenerate trajectory using fresh director notes,
+      // passing the old trajectory as rejected so the model produces something different
+      const trajectoryMessages = buildTrajectoryMessages(
+        // All turns except the last (buildTrajectoryMessages adds current turn itself)
+        turns.slice(0, -1),
+        lastTurn.narrative,
+        lastTurn.playerAction,
+        directorNotes,
+        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive },
+      )
+
+      const trajectoryResolved = resolveModel('adventure-trajectory')
+      const trajectoryClient = LLMClientFactory.getClient(
+        trajectoryResolved.provider,
+      )
+
+      let trajectoryAccumulated = ''
+      const trajectoryResponse = trajectoryClient.generate({
+        model: trajectoryResolved.model,
+        messages: trajectoryMessages,
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
+          ? Math.min(
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
+            )
+          : undefined,
+        metadata: { callType: 'adventure-trajectory' },
+      })
+
+      for await (const event of trajectoryResponse) {
+        if (event.type === 'chunk') {
+          trajectoryAccumulated += event.text
+        }
+      }
+
+      const { trajectory: worldTrajectory, dead } =
+        parseTrajectory(trajectoryAccumulated)
+
+      adventureStore.updateLastTurn({
+        worldTrajectory,
+        ...(dead ? { dead: true } : { dead: undefined }),
+      })
+      persist()
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to regenerate director'
+      adventureStore.setError(message)
+      console.error('Director regeneration error:', err)
+      // Restore original turns on error
+      adventureStore.setTurns(originalTurns)
+    } finally {
+      adventureStore.setIsGenerating(false)
+    }
+  }
+
   function handleRewindTo(turnIndex: number) {
     if (adventureStore.isGenerating) return
     adventureStore.rewindTo(turnIndex)
@@ -379,7 +488,7 @@ export function createAdventureEngine(
   }
 
   async function handleGenerateSetting() {
-    if (!settingsStore.model || !settingsStore.provider) {
+    if (!effectiveSettings.model || !effectiveSettings.provider) {
       adventureStore.setError(
         'Please configure your AI provider and model first.',
       )
@@ -417,11 +526,11 @@ export function createAdventureEngine(
       const response = client.generate({
         model: settingResolved.model,
         messages,
-        max_tokens: settingsStore.maxTokens,
-        thinking_budget: settingsStore.thinkingBudget
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
           ? Math.min(
-              settingsStore.thinkingBudget,
-              Math.floor(settingsStore.maxTokens / 2),
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
             )
           : undefined,
         metadata: { callType: 'adventure-setting' },
@@ -505,6 +614,7 @@ export function createAdventureEngine(
     handleAbort,
     handleRetry,
     handleRegenerate,
+    handleRegenerateDirector,
     handleRewindTo,
     handleReset,
     handleGenerateSetting,

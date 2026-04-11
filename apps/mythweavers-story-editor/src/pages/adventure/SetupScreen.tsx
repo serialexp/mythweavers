@@ -1,7 +1,7 @@
 import { type Component, For, Show } from 'solid-js'
 import { Button, Text } from '@mythweavers/ui'
 import { ProviderModelSelector } from '../../components/ProviderModelSelector'
-import { settingsStore } from '../../stores/settingsStore'
+import { effectiveSettings } from '../../stores/effectiveSettingsStore'
 import { adventureStore } from '../../stores/adventureStore'
 import { useEngine } from './useAdventureEngine'
 import { SETTING_KNOBS } from './prompts'
@@ -51,7 +51,7 @@ export const SetupScreen: Component = () => {
               variant="secondary"
               size="sm"
               onClick={engine.handleGenerateSetting}
-              disabled={!settingsStore.model || adventureStore.isGeneratingSetting}
+              disabled={!effectiveSettings.model || adventureStore.isGeneratingSetting}
             >
               {adventureStore.isGeneratingSetting
                 ? 'Generating...'
@@ -170,7 +170,7 @@ export const SetupScreen: Component = () => {
           variant="primary"
           onClick={engine.handleStart}
           disabled={
-            !adventureStore.settingInput.trim() || !settingsStore.model
+            !adventureStore.settingInput.trim() || !effectiveSettings.model
           }
           style={{ width: '100%', 'margin-top': '0.5rem' }}
         >

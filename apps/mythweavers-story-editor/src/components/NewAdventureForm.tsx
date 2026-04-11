@@ -1,6 +1,6 @@
 import { Component, For, Show, createSignal } from 'solid-js'
 import { Button } from '@mythweavers/ui'
-import { settingsStore } from '../stores/settingsStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
 import type { LLMMessage } from '../types/llm'
@@ -93,7 +93,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
   }
 
   async function handleGenerateSetting() {
-    if (!settingsStore.model || !settingsStore.provider) {
+    if (!effectiveSettings.model || !effectiveSettings.provider) {
       setError('Please configure your AI provider and model first.')
       return
     }
@@ -136,9 +136,9 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
       const response = client.generate({
         model: settingResolved.model,
         messages,
-        max_tokens: settingsStore.maxTokens,
-        thinking_budget: settingsStore.thinkingBudget
-          ? Math.min(settingsStore.thinkingBudget, Math.floor(settingsStore.maxTokens / 2))
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
+          ? Math.min(effectiveSettings.thinkingBudget, Math.floor(effectiveSettings.maxTokens / 2))
           : undefined,
         metadata: { callType: 'adventure-setting' },
       })
@@ -205,7 +205,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
             variant="secondary"
             size="sm"
             onClick={handleGenerateSetting}
-            disabled={!settingsStore.model || isGeneratingSetting()}
+            disabled={!effectiveSettings.model || isGeneratingSetting()}
           >
             {isGeneratingSetting()
               ? 'Generating...'
@@ -299,7 +299,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
         <Button
           variant="primary"
           onClick={handleStart}
-          disabled={!settingInput().trim() || !settingsStore.model}
+          disabled={!settingInput().trim() || !effectiveSettings.model}
           style={{ flex: '1' }}
         >
           Begin Adventure

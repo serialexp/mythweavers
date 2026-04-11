@@ -5,7 +5,7 @@ import { BsPencil, BsTrash } from 'solid-icons/bs'
 import { deleteMyAdventuresById, getMyAdventures, postMyAdventures, putMyAdventuresById } from '../client/config'
 import { NewAdventureForm, type NewAdventureResult } from './NewAdventureForm'
 import type { PersistedState } from '../hooks/useAdventurePersistence'
-import { settingsStore } from '../stores/settingsStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
 import type { LLMMessage } from '../types/llm'
@@ -159,7 +159,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
 
     // Generate a title via LLM, fall back to truncated setting text
     let name: string
-    if (settingsStore.model && settingsStore.provider) {
+    if (effectiveSettings.model && effectiveSettings.provider) {
       try {
         name = await generateAdventureTitle(settingDescription)
       } catch (err) {

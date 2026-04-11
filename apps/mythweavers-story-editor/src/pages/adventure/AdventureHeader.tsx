@@ -1,6 +1,6 @@
 import { type Component, Show } from 'solid-js'
 import { Button } from '@mythweavers/ui'
-import { settingsStore } from '../../stores/settingsStore'
+import { effectiveSettings } from '../../stores/effectiveSettingsStore'
 import { adventureStore } from '../../stores/adventureStore'
 import { useEngine } from './useAdventureEngine'
 import * as styles from '../AdventurePage.css'
@@ -11,19 +11,19 @@ const HeaderActions: Component = () => {
   const engine = useEngine()
 
   const effectiveThinking = () =>
-    settingsStore.thinkingBudget
+    effectiveSettings.thinkingBudget
       ? Math.min(
-          settingsStore.thinkingBudget,
-          Math.floor(settingsStore.maxTokens / 2),
+          effectiveSettings.thinkingBudget,
+          Math.floor(effectiveSettings.maxTokens / 2),
         )
       : 0
 
   return (
     <>
       <span class={styles.modelInfo}>
-        {settingsStore.provider} / {settingsStore.model}
+        {effectiveSettings.provider} / {effectiveSettings.model}
         {' · '}
-        {settingsStore.maxTokens} tokens
+        {effectiveSettings.maxTokens} tokens
         <Show when={effectiveThinking() > 0}>
           {' · '}
           {effectiveThinking()} thinking
@@ -116,7 +116,22 @@ export const AdventureHeader: Component<{
             .find((t) => t.directorNotes)
           return (
             <div class={styles.headerDirectivePanel}>
-              <label class={styles.formLabel}>🎬 Director Notes</label>
+              <div style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'space-between' }}>
+                <label class={styles.formLabel}>🎬 Director Notes</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={engine.handleRegenerateDirector}
+                  disabled={
+                    adventureStore.isGenerating ||
+                    adventureStore.isDirectorRunning ||
+                    adventureStore.turns.length === 0
+                  }
+                  title="Regenerate director notes and world momentum for the last turn"
+                >
+                  ↻ Regenerate
+                </Button>
+              </div>
               <Show
                 when={latest?.directorNotes}
                 fallback={

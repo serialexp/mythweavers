@@ -254,6 +254,11 @@ export const adventureStore = {
     setState('turns', state.turns.length, turn)
   },
 
+  /** Replace the entire turns array. */
+  setTurns(turns: AdventureTurn[]) {
+    setState('turns', reconcile([...turns]))
+  },
+
   /** Update the last turn (e.g. to attach director notes). */
   updateLastTurn(updates: Partial<AdventureTurn>) {
     const idx = state.turns.length - 1
