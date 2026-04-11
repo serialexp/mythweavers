@@ -7,7 +7,7 @@ variable "TAG" {
 }
 
 group "default" {
-  targets = ["backend", "story-editor", "reader"]
+  targets = ["backend", "story-editor", "reader", "admin"]
 }
 
 target "backend" {
@@ -30,6 +30,14 @@ target "reader" {
   context = "."
   dockerfile = "apps/mythweavers-reading-frontend-astro/Dockerfile"
   tags = ["${REGISTRY}/mythweavers-reader:${TAG}"]
+  output = ["type=registry"]
+  platforms = ["linux/amd64", "linux/arm64"]
+}
+
+target "admin" {
+  context = "."
+  dockerfile = "apps/mythweavers-admin/Dockerfile"
+  tags = ["${REGISTRY}/mythweavers-admin:${TAG}"]
   output = ["type=registry"]
   platforms = ["linux/amd64", "linux/arm64"]
 }
