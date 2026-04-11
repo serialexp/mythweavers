@@ -1,48 +1,61 @@
-# Current Task: Persist AI Settings on Backend User Entity (with encrypted secrets)
+# Current Task: Global vs Story-Level AI Settings
 
-## Status: Code complete — needs migration
+## Status: Implementation Complete — Needs Prisma Migration
 
-### Bart needs to run:
+## What Was Done
+
+Separated global user preferences from story-level AI settings to fix a bug where model overrides set on one browser wouldn't appear on another (because `syncFromStory()` was overwriting global preferences with story-specific values, which then got synced back to the server).
+
+### Architecture (3-layer settings)
+
+1. **Global preferences** (`settingsStore`) - user's defaults, synced to `User.preferences` on backend. Never mutated by story loading.
+2. **Story overrides** (`currentStoryStore.aiOverrides`) - per-story overrides stored in `Story.aiOverrides` JSON column. `null` = inherit global.
+3. **Effective settings** (`effectiveSettings`) - computed merge: `storyOverride ?? globalDefault`. All consumers read from here.
+
+### Key Changes
+
+**New files:**
+- `src/stores/effectiveSettingsStore.ts` - Read-only reactive getters + inline setters that write to story or global depending on context
+- `src/components/AISettingsPanel.css.ts` - Styles for global/story toggle
+
+**Backend:**
+- Added `aiOverrides Json?` column to Story model in Prisma schema
+- Added `aiOverrides` to story response schema, update body schema, and export schema
+
+**Frontend stores:**
+- Removed `syncFromStory()` from `settingsStore` (root cause of the original bug)
+- Removed cross-store syncing from `setModel`/`setProvider` on `settingsStore`
+- Added `aiOverrides`, `loadAIOverrides`, `setAIOverride`, `clearAllAIOverrides` to `currentStoryStore`
+- Added `aiOverrides` to `CurrentStory` and `SavedStory` types
+- Added `aiOverrides` to save payload and save service
+
+**All generation consumers switched from settingsStore to effectiveSettings:**
+- resolveModel, useStoryGeneration, useOllama, useAdventureEngine, AdventureHeader, SetupScreen, QuickLlmDialog, NewAdventureForm, AdventureList, copyPreviewStore, StoryStats, StoryNavigation, StoryHeader, LandmarkDetail, App.tsx, modelsStore, TokenSelector, MessageRegenerateButton, StoryInput
+
+**UI:**
+- AI Settings panel shows Global/Story toggle when a story is loaded
+- Models section supports story-level overrides for: provider, model, maxTokens, thinkingBudget
+- CategoryModelOverrides supports story-level overrides
+- Inline controls (token selector, thinking toggle, provider/model) write to story override when in a story
+- ProviderSelector accepts optional provider/setProvider props
+
+## What Bart Needs To Do
+
+### 1. Run Prisma Migration
 ```bash
 cd apps/mythweavers-backend
-pnpm prisma migrate dev --name add_user_preferences
+pnpm prisma migrate dev --name add_story_ai_overrides
 ```
 
-## What was done
+### 2. Regenerate API Client
+After the backend picks up the schema change:
+```bash
+cd apps/mythweavers-story-editor
+pnpm generate:client
+```
 
-### Prisma Schema
-- Added `preferences Json?` to User model
-
-### Backend
-- `GET /my/preferences` + `PUT /my/preferences` — user preferences CRUD
-- Session response includes `preferences` field
-- `preferencesSchema` includes `encryptedSecrets` (salt + iv + ciphertext)
-
-### Frontend — Encryption (`src/lib/crypto.ts`)
-- Web Crypto API: PBKDF2 (600k iterations, SHA-256) for key derivation
-- AES-GCM-256 for encryption/decryption
-- All secrets bundled into one encrypted blob before backend sync
-- Server never sees plaintext API keys
-
-### Frontend — Settings sync (`settingsStore.ts`)
-- Non-secret keys synced in plaintext: provider, model, maxTokens, thinkingBudget, contextSize, cloudflareEndpoint, categoryOverrides
-- Custom providers synced WITHOUT apiKey (stripped before sending)
-- Secret keys encrypted into `encryptedSecrets` blob: openrouterApiKey, anthropicApiKey, openaiApiKey, cloudflareApiKey, custom provider API keys
-- `loadFromBackend()` handles encrypted secrets, legacy plaintext, and missing keys
-- `needsDecryption` signal triggers the unlock dialog
-
-### Frontend — UI
-- `PasswordForEncryptionDialog.tsx` — dual-mode modal (decrypt/encrypt)
-- `App.tsx` — shows decrypt dialog when backend has encrypted secrets but device doesn't have keys
-- `ProviderModelSelector.tsx` (ApiKeys) — shows "Encrypt & Sync Keys" banner when authenticated with keys but no encryption key in memory
-
-### Flow
-1. User sets API keys → saved to localStorage immediately
-2. If authenticated + has encryption key → encrypt + sync to backend
-3. If authenticated + no encryption key → show "Encrypt & Sync Keys" prompt
-4. On new device → session loads encrypted blob → show "Unlock API Keys" dialog
-5. User enters password → PBKDF2 derives key → AES-GCM decrypts → keys populated
-
-### Note on duplication
-- SETTING_KNOBS and SETTING_GEN_PROMPT are duplicated in NewAdventureForm.tsx and AdventurePage.tsx
-- Candidate for extraction to shared module
+### 3. Test
+- Load a story, change model → verify global prefs are untouched
+- Open AI Settings → toggle Global/Story → verify both scopes work
+- Inline controls (token selector, thinking toggle) should set story overrides
+- Second browser should show correct global preferences
