@@ -1,8 +1,9 @@
-import { createStore } from 'solid-js/store'
+import { createStore, reconcile } from 'solid-js/store'
 import { saveService } from '../services/saveService'
 import { CurrentStory } from '../types/store'
 import { generateMessageId } from '../utils/id'
 import { websocketManager } from '../utils/websocket'
+import type { StoryAIOverrides } from './effectiveSettingsStore'
 
 // Initialize from URL hash only
 const getInitialStory = (): CurrentStory | null => {
@@ -79,6 +80,9 @@ export const currentStoryStore = {
   },
   get paragraphsPerTurn() {
     return storyState.story?.paragraphsPerTurn ?? 3
+  },
+  get aiOverrides(): StoryAIOverrides | null {
+    return storyState.story?.aiOverrides ?? null
   },
 
   // Actions
@@ -176,6 +180,35 @@ export const currentStoryStore = {
     saveService.saveStorySettings(storyState.story.id, { paragraphsPerTurn: paragraphs })
   },
 
+  /** Load AI overrides from a story (called during story load). */
+  loadAIOverrides: (overrides: StoryAIOverrides | null) => {
+    if (!storyState.story) return
+    setStoryState('story', 'aiOverrides', overrides ? { ...overrides } : null)
+  },
+
+  /** Set a single AI override for the current story. Pass null to clear. */
+  setAIOverride: <K extends keyof StoryAIOverrides>(key: K, value: StoryAIOverrides[K] | null) => {
+    if (!storyState.story) return
+    const current = storyState.story.aiOverrides ?? {}
+    const updated: StoryAIOverrides = { ...current }
+    if (value === null || value === undefined) {
+      delete updated[key]
+    } else {
+      updated[key] = value
+    }
+    // Use reconcile to properly replace the entire object (SolidJS gotcha)
+    setStoryState('story', 'aiOverrides', reconcile(updated))
+    // Persist
+    saveService.saveStorySettings(storyState.story.id, { aiOverrides: Object.keys(updated).length > 0 ? updated : null })
+  },
+
+  /** Clear all AI overrides for the current story. */
+  clearAllAIOverrides: () => {
+    if (!storyState.story) return
+    setStoryState('story', 'aiOverrides', null)
+    saveService.saveStorySettings(storyState.story.id, { aiOverrides: null })
+  },
+
   setBranchChoice: (branchMessageId: string, optionId: string | null) => {
     if (!storyState.story) return
 
@@ -233,6 +266,7 @@ export const currentStoryStore = {
       timelineGranularity: 'hour',
       provider: provider || 'ollama',
       model: model || null,
+      aiOverrides: null,
     })
 
     // Connect WebSocket for real-time sync (only if server exists)
@@ -281,6 +315,7 @@ export const currentStoryStore = {
       timelineGranularity: timelineGranularity || 'hour',
       provider: provider,
       model: model,
+      aiOverrides: null, // Loaded separately via loadAIOverrides()
     })
 
     // Connect WebSocket for real-time sync (only if server exists)

@@ -1,6 +1,8 @@
 import { Component, For, Show, createSignal } from 'solid-js'
 import { modelsStore } from '../stores/modelsStore'
 import { settingsStore } from '../stores/settingsStore'
+import { currentStoryStore } from '../stores/currentStoryStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import type { LLMProvider } from '../types/llm'
 import {
   GENERATION_CATEGORIES,
@@ -49,7 +51,13 @@ function hasApiKey(provider: LLMProvider): boolean {
 
 const CATEGORY_ORDER: GenerationCategory[] = ['writing', 'analysis', 'rewriting', 'meta']
 
-export const CategoryModelOverrides: Component = () => {
+interface CategoryModelOverridesProps {
+  scope?: 'global' | 'story'
+}
+
+export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (props) => {
+  const isStoryScope = () => props.scope === 'story' && currentStoryStore.isInitialized
+
   // Track which category is being edited (null = none)
   const [editingCategory, setEditingCategory] = createSignal<GenerationCategory | null>(null)
 
@@ -57,19 +65,28 @@ export const CategoryModelOverrides: Component = () => {
   const [editProvider, setEditProvider] = createSignal<LLMProvider>('anthropic')
   const [editModel, setEditModel] = createSignal<string>('')
 
+  // Get the overrides for the current scope
+  const getOverrides = () => {
+    if (isStoryScope()) {
+      return currentStoryStore.aiOverrides?.categoryOverrides ?? {}
+    }
+    return settingsStore.categoryOverrides
+  }
+
   const startEditing = (category: GenerationCategory) => {
-    const existing = settingsStore.categoryOverrides[category]
+    const overrides = getOverrides()
+    const existing = overrides[category]
     if (existing) {
       setEditProvider(existing.provider)
       setEditModel(existing.model)
     } else {
-      setEditProvider(settingsStore.provider as LLMProvider)
-      setEditModel(settingsStore.model)
+      setEditProvider(effectiveSettings.provider as LLMProvider)
+      setEditModel(effectiveSettings.model)
     }
     setEditingCategory(category)
 
     // Ensure models are loaded for the selected provider
-    const provider = existing?.provider ?? (settingsStore.provider as LLMProvider)
+    const provider = existing?.provider ?? (effectiveSettings.provider as LLMProvider)
     modelsStore.fetchModelsForProvider(provider)
   }
 
@@ -83,38 +100,68 @@ export const CategoryModelOverrides: Component = () => {
     const provider = editProvider()
     const model = editModel()
     if (provider && model) {
-      settingsStore.setCategoryOverride(category, { provider, model })
+      if (isStoryScope()) {
+        // Update the story's category overrides
+        const current = currentStoryStore.aiOverrides?.categoryOverrides ?? {}
+        const updated = { ...current, [category]: { provider, model } }
+        currentStoryStore.setAIOverride('categoryOverrides', updated)
+      } else {
+        settingsStore.setCategoryOverride(category, { provider, model })
+      }
     }
     setEditingCategory(null)
   }
 
   const handleClear = (category: GenerationCategory) => {
-    settingsStore.setCategoryOverride(category, null)
+    if (isStoryScope()) {
+      const current = currentStoryStore.aiOverrides?.categoryOverrides ?? {}
+      const updated = { ...current }
+      delete updated[category]
+      if (Object.keys(updated).length === 0) {
+        currentStoryStore.setAIOverride('categoryOverrides', null)
+      } else {
+        currentStoryStore.setAIOverride('categoryOverrides', updated)
+      }
+    } else {
+      settingsStore.setCategoryOverride(category, null)
+    }
     setEditingCategory(null)
   }
 
   const getEffectiveProvider = (category: GenerationCategory) => {
-    const override = settingsStore.categoryOverrides[category]
-    return override?.provider ?? settingsStore.provider
+    const overrides = getOverrides()
+    const override = overrides[category]
+    return override?.provider ?? effectiveSettings.provider
   }
 
   const getEffectiveModel = (category: GenerationCategory) => {
-    const override = settingsStore.categoryOverrides[category]
-    return override?.model ?? settingsStore.model ?? 'none'
+    const overrides = getOverrides()
+    const override = overrides[category]
+    return override?.model ?? effectiveSettings.model ?? 'none'
+  }
+
+  // For story scope: check if the override is inherited from global
+  const isInheritedFromGlobal = (category: GenerationCategory) => {
+    if (!isStoryScope()) return false
+    const storyOverrides = currentStoryStore.aiOverrides?.categoryOverrides
+    if (!storyOverrides) return true
+    return !storyOverrides[category]
   }
 
   return (
     <div class={overrideStyles.section}>
       <p class={overrideStyles.description}>
         Override the provider and model used for specific types of generation.
-        If not set, the defaults above are used.
+        {isStoryScope()
+          ? ' These overrides apply only to this story.'
+          : ' If not set, the defaults above are used.'}
       </p>
 
       <div class={overrideStyles.categoryList}>
         <For each={CATEGORY_ORDER}>
           {(category) => {
             const meta = () => GENERATION_CATEGORIES[category]
-            const override = () => settingsStore.categoryOverrides[category]
+            const override = () => getOverrides()[category]
             const isEditing = () => editingCategory() === category
 
             return (
@@ -126,6 +173,10 @@ export const CategoryModelOverrides: Component = () => {
                       <Show when={override()}>
                         {' '}
                         <span class={overrideStyles.overrideBadge}>override</span>
+                      </Show>
+                      <Show when={isStoryScope() && isInheritedFromGlobal(category) && settingsStore.categoryOverrides[category]}>
+                        {' '}
+                        <span class={overrideStyles.overrideBadge} style={{ opacity: 0.5 }}>global</span>
                       </Show>
                     </div>
                     <div class={overrideStyles.categoryDescription}>{meta().description}</div>

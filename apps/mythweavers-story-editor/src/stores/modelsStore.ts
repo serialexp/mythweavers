@@ -3,6 +3,7 @@ import { Model } from '../types/core'
 import { LLMModel, LLMProvider } from '../types/llm'
 import { LLMClientFactory } from '../utils/llm'
 import { settingsStore } from './settingsStore'
+import { effectiveSettings } from './effectiveSettingsStore'
 
 const [modelsState, setModelsState] = createStore({
   availableModels: [] as Model[],
@@ -93,8 +94,9 @@ export const modelsStore = {
   fetchModels: async () => {
     setModelsState('isLoadingModels', true)
     try {
-      console.log('Fetching models for provider:', settingsStore.provider)
-      const client = LLMClientFactory.getClient(settingsStore.provider)
+      const currentProvider = effectiveSettings.provider
+      console.log('Fetching models for provider:', currentProvider)
+      const client = LLMClientFactory.getClient(currentProvider)
       console.log('Got client:', client)
       const response = await client.list()
       console.log('Model response:', response)
@@ -104,16 +106,19 @@ export const modelsStore = {
       setModelsState('availableModels', models)
 
       // Also cache in modelsByProvider
-      const provider = settingsStore.provider as LLMProvider
+      const provider = currentProvider as LLMProvider
       setModelsState('modelsByProvider', provider, models)
 
       // Restore saved model selection if it exists in the available models
-      const savedModel = localStorage.getItem('story-model')
-      if (savedModel && models.some((model) => model.name === savedModel)) {
-        settingsStore.setModel(savedModel)
-      } else if (models.length > 0 && !settingsStore.model) {
-        // If no saved model or saved model not found, select the first available model
-        settingsStore.setModel(models[0].name)
+      // Only auto-set the global default when no story override is active
+      if (!effectiveSettings.hasStoryLoaded || !effectiveSettings.hasOverride('provider')) {
+        const savedModel = localStorage.getItem('story-model')
+        if (savedModel && models.some((model) => model.name === savedModel)) {
+          settingsStore.setModel(savedModel)
+        } else if (models.length > 0 && !settingsStore.model) {
+          // If no saved model or saved model not found, select the first available model
+          settingsStore.setModel(models[0].name)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch models:', error)

@@ -46,6 +46,7 @@ import { nodeStore } from './stores/nodeStore'
 import { rewriteDialogStore } from './stores/rewriteDialogStore'
 import { serverStore } from './stores/serverStore'
 import { settingsStore } from './stores/settingsStore'
+import { effectiveSettings } from './stores/effectiveSettingsStore'
 import { ApiStory } from './types/api'
 import { Character, ContextItem, Message, Node } from './types/core'
 import type { BranchConversionResult } from './utils/claudeChatImport'
@@ -118,10 +119,10 @@ const App: Component = () => {
 
   // Effective context size based on model and provider
   const effectiveContextSize = createMemo(() => {
-    const selectedModel = modelsStore.availableModels.find((m) => m.name === settingsStore.model)
+    const selectedModel = modelsStore.availableModels.find((m) => m.name === effectiveSettings.model)
 
     // For Anthropic and OpenRouter, always use the model's full context length
-    if (settingsStore.provider === 'anthropic' || settingsStore.provider === 'openrouter') {
+    if (effectiveSettings.provider === 'anthropic' || effectiveSettings.provider === 'openrouter') {
       if (selectedModel?.context_length) {
         return selectedModel.context_length
       }
@@ -129,9 +130,9 @@ const App: Component = () => {
 
     // For Ollama, use the minimum of user setting and model's context length
     if (selectedModel?.context_length) {
-      return Math.min(settingsStore.contextSize, selectedModel.context_length)
+      return Math.min(effectiveSettings.contextSize, selectedModel.context_length)
     }
-    return settingsStore.contextSize
+    return effectiveSettings.contextSize
   })
 
   // Initialize messagesStore effects for localStorage persistence
@@ -171,10 +172,10 @@ const App: Component = () => {
   // Only fetch if server is available
   createEffect(() => {
     // Access provider to make this effect reactive to provider changes
-    settingsStore.provider
+    effectiveSettings.provider
 
     // Only fetch models if server is available or if using a non-server provider
-    if (serverStore.isAvailable || settingsStore.provider !== 'ollama') {
+    if (serverStore.isAvailable || effectiveSettings.provider !== 'ollama') {
       modelsStore.fetchModels()
     }
   })
@@ -223,9 +224,18 @@ const App: Component = () => {
       console.log('[loadServerStoryData] Setting last known updated at...')
       currentStoryStore.setLastKnownUpdatedAt(story.updatedAt)
 
-      // Sync provider and model from story to settingsStore
-      console.log('[loadServerStoryData] Syncing provider and model...')
-      settingsStore.syncFromStory(story.provider, story.model)
+      // Load story-level AI overrides (provider/model from story become overrides)
+      console.log('[loadServerStoryData] Loading AI overrides...')
+      const aiOverrides = story.aiOverrides ?? null
+      // Migrate legacy: if story has provider/model but no aiOverrides, treat them as overrides
+      if (!aiOverrides && (story.provider && story.provider !== 'ollama' || story.model)) {
+        currentStoryStore.loadAIOverrides({
+          provider: story.provider !== 'ollama' ? story.provider : null,
+          model: story.model || null,
+        })
+      } else {
+        currentStoryStore.loadAIOverrides(aiOverrides as any)
+      }
 
       // Load calendars
       if (calendars && calendars.length > 0) {
@@ -553,8 +563,17 @@ const App: Component = () => {
         story.model,
       )
 
-      // Sync provider and model from story to settingsStore
-      settingsStore.syncFromStory(story.provider, story.model)
+      // Load story-level AI overrides
+      const localAiOverrides = (story as any).aiOverrides ?? null
+      // Migrate legacy: if story has provider/model but no aiOverrides, treat them as overrides
+      if (!localAiOverrides && (story.provider && story.provider !== 'ollama' || story.model)) {
+        currentStoryStore.loadAIOverrides({
+          provider: story.provider !== 'ollama' ? story.provider : null,
+          model: story.model || null,
+        })
+      } else {
+        currentStoryStore.loadAIOverrides(localAiOverrides)
+      }
 
       // Initialize plot points for local stories (definitions only, no API states)
       // Local stories may have plotPointDefaults if they were synced from server
@@ -609,7 +628,7 @@ const App: Component = () => {
 
   // Periodically check if Ollama is busy
   createEffect(() => {
-    if (settingsStore.provider === 'ollama') {
+    if (effectiveSettings.provider === 'ollama') {
       let checkInterval: NodeJS.Timeout
       const checkBusy = async () => {
         const isBusy = await checkIfOllamaIsBusy()
@@ -1059,8 +1078,8 @@ const App: Component = () => {
                                 isLoading={messagesStore.isLoading}
                                 hasStoryMessages={messagesStore.hasStoryMessages}
                                 isGenerating={isGenerating() || ollamaExternallyBusy()}
-                                model={settingsStore.model}
-                                provider={settingsStore.provider as 'ollama' | 'openrouter' | 'anthropic'}
+                                model={effectiveSettings.model}
+                                provider={effectiveSettings.provider as 'ollama' | 'openrouter' | 'anthropic'}
                               />
                             </Show>
 

@@ -2,6 +2,7 @@ import { Component, For, Show, createMemo } from 'solid-js'
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { llmActivityStore } from '../stores/llmActivityStore'
 import { messagesStore } from '../stores/messagesStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
 import { GlobalScriptEditor } from './GlobalScriptEditor'
 import * as styles from './StoryStats.css'
@@ -28,8 +29,8 @@ function getCacheColor(ratio: number): string {
 
 export const StoryStats: Component = () => {
   const stats = createMemo(() => {
-    const model = settingsStore.model
-    const provider = settingsStore.provider as 'ollama' | 'openrouter' | 'anthropic' | 'openai' | undefined
+    const model = effectiveSettings.model
+    const provider = effectiveSettings.provider as 'ollama' | 'openrouter' | 'anthropic' | 'openai' | undefined
     const charsPerToken = settingsStore.charsPerToken
     return messagesStore.getStats(charsPerToken, model, provider)
   })
@@ -38,8 +39,8 @@ export const StoryStats: Component = () => {
   const displayTokenCount = useAnimatedNumber(() => stats().estimatedTokens)
 
   const isClaudeModel = createMemo(() => {
-    const model = settingsStore.model
-    const provider = settingsStore.provider
+    const model = effectiveSettings.model
+    const provider = effectiveSettings.provider
     return provider === 'anthropic' || model?.toLowerCase().includes('claude')
   })
 

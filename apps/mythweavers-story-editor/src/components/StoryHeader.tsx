@@ -37,6 +37,7 @@ import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { navigationStore } from '../stores/navigationStore'
 import { searchModalStore } from '../stores/searchModalStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
 import { viewModeStore } from '../stores/viewModeStore'
 import { Character, Message } from '../types/core'
@@ -395,10 +396,10 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           showSettings={true}
           storySetting={currentStoryStore.storySetting}
           setStorySetting={currentStoryStore.setStorySetting}
-          contextSize={settingsStore.contextSize}
-          setContextSize={settingsStore.setContextSize}
-          model={settingsStore.model}
-          setModel={settingsStore.setModel}
+          contextSize={effectiveSettings.contextSize}
+          setContextSize={effectiveSettings.setContextSize}
+          model={effectiveSettings.model}
+          setModel={effectiveSettings.setModel}
           availableModels={modelsStore.availableModels}
           isLoadingModels={modelsStore.isLoadingModels}
           onRefreshModels={() => modelsStore.fetchModels()}
@@ -412,8 +413,8 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           serverAvailable={props.serverAvailable}
           isLoading={messagesStore.isLoading}
           isGenerating={props.isGenerating}
-          provider={settingsStore.provider}
-          setProvider={settingsStore.setProvider}
+          provider={effectiveSettings.provider}
+          setProvider={effectiveSettings.setProvider}
           openrouterApiKey={settingsStore.openrouterApiKey}
           setOpenrouterApiKey={settingsStore.setOpenrouterApiKey}
           anthropicApiKey={settingsStore.anthropicApiKey}

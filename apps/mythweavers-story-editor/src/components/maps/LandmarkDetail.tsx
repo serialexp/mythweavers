@@ -4,7 +4,7 @@ import { Accessor, Component, For, Show, createMemo } from 'solid-js'
 import { landmarkStatesStore } from '../../stores/landmarkStatesStore'
 import { mapEditorStore } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
-import { settingsStore } from '../../stores/settingsStore'
+import { effectiveSettings } from '../../stores/effectiveSettingsStore'
 import { DEFAULT_PROPERTY_SCHEMA, Landmark } from '../../types/core'
 import { EJSCodeEditor } from '../EJSCodeEditor'
 import { EJSRenderer } from '../EJSRenderer'
@@ -259,7 +259,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
               placeholder="Landmark name"
             />
 
-            <Show when={settingsStore.provider === 'anthropic' && mapEditorStore.editName.trim()}>
+            <Show when={effectiveSettings.provider === 'anthropic' && mapEditorStore.editName.trim()}>
               <button
                 type="button"
                 class={styles.fetchInfoButton}

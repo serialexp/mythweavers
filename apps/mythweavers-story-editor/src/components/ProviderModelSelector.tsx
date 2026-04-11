@@ -23,6 +23,10 @@ interface ProviderSelectorProps {
    * Defaults to false.
    */
   autoFetchModels?: boolean
+  /** Override: current provider value. Defaults to settingsStore.provider. */
+  provider?: string
+  /** Override: setter for provider. Defaults to settingsStore.setProvider. */
+  setProvider?: (provider: string) => void
 }
 
 /** Check whether a given provider value has credentials configured. */
@@ -49,11 +53,14 @@ const isProviderAvailable = (value: string): boolean => {
 }
 
 export const ProviderSelector: Component<ProviderSelectorProps> = (props) => {
+  const currentProvider = () => props.provider ?? settingsStore.provider
+  const setCurrentProvider = (v: string) => (props.setProvider ?? settingsStore.setProvider)(v)
+
   // Auto-fetch models when provider changes (if enabled)
   if (props.autoFetchModels) {
     createEffect(
       on(
-        () => settingsStore.provider,
+        currentProvider,
         () => {
           modelsStore.fetchModels()
         },
@@ -64,10 +71,10 @@ export const ProviderSelector: Component<ProviderSelectorProps> = (props) => {
   return (
     <div class={styles.section}>
       <div class={styles.settingRow}>
-        <label class={styles.label}>Default Provider</label>
+        <label class={styles.label}>Provider</label>
         <select
-          value={settingsStore.provider}
-          onChange={(e) => settingsStore.setProvider(e.target.value)}
+          value={currentProvider()}
+          onChange={(e) => setCurrentProvider(e.target.value)}
           class={styles.select}
         >
           <option value="ollama" disabled={!isProviderAvailable('ollama')}>Ollama</option>

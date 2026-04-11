@@ -1,6 +1,6 @@
 import { Button } from '@mythweavers/ui'
 import { Component, For, Show, createSignal } from 'solid-js'
-import { settingsStore } from '../stores/settingsStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
 import type { LLMMessage } from '../types/llm'
@@ -34,7 +34,7 @@ export const QuickLlmDialog: Component = () => {
     const text = input().trim()
     if (!text || isGenerating()) return
 
-    if (!settingsStore.model || !settingsStore.provider) {
+    if (!effectiveSettings.model || !effectiveSettings.provider) {
       return
     }
 
@@ -69,11 +69,11 @@ export const QuickLlmDialog: Component = () => {
       const response = client.generate({
         model: resolved.model,
         messages: llmMessages,
-        max_tokens: settingsStore.maxTokens,
-        thinking_budget: settingsStore.thinkingBudget
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
           ? Math.min(
-              settingsStore.thinkingBudget,
-              Math.floor(settingsStore.maxTokens / 2),
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
             )
           : undefined,
         metadata: { callType: 'utility' },
@@ -212,18 +212,18 @@ export const QuickLlmDialog: Component = () => {
           }}
           onKeyDown={handleKeyDown}
           placeholder={
-            settingsStore.model
+            effectiveSettings.model
               ? 'Ask something... (Enter to send, Shift+Enter for newline)'
               : 'Configure an AI provider first'
           }
-          disabled={!settingsStore.model || isGenerating()}
+          disabled={!effectiveSettings.model || isGenerating()}
           rows={1}
         />
         <Button
           variant="primary"
           size="sm"
           onClick={handleSend}
-          disabled={!input().trim() || !settingsStore.model || isGenerating()}
+          disabled={!input().trim() || !effectiveSettings.model || isGenerating()}
         >
           Send
         </Button>

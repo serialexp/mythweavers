@@ -7,7 +7,7 @@ import { modelsStore } from '../stores/modelsStore'
 import { Message } from '../types/core'
 import { LLMClientFactory, type LLMMessage } from '../utils/llm'
 import { resolveModel } from '../utils/llm/resolveModel'
-import { buildDiffRewritePrompt, processLLMDiffResponse } from '../utils/unifiedDiff'
+import { buildDiffRewritePrompt, processLLMDiffResponse } from '@mythweavers/shared'
 import * as styles from './MessageRewriter.css'
 
 interface RewriteResult {

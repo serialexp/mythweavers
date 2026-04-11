@@ -35,6 +35,7 @@ import { modelsStore } from '../stores/modelsStore'
 import { navigationStore } from '../stores/navigationStore'
 import { TreeNode, nodeStore } from '../stores/nodeStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
 import { statsStore } from '../stores/statsStore'
 import { Node, NodeType } from '../types/core'
@@ -1358,8 +1359,8 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
 
     return {
       fingerprint: nodeFingerprints.join('|'),
-      provider: settingsStore.provider,
-      model: settingsStore.model,
+      provider: effectiveSettings.provider,
+      model: effectiveSettings.model,
       fullContentNodes,
       summaryNodes,
     }
@@ -1446,7 +1447,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
     const { tokens, isExact, isLoading } = tokenResult
 
     // Get model context limit
-    const model = settingsStore.model
+    const model = effectiveSettings.model
     const modelInfo = modelsStore.availableModels.find((m: { name: string }) => m.name === model)
     const contextLimit = modelInfo?.context_length || 4096
 

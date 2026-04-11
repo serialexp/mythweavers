@@ -4,6 +4,7 @@ import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
 import { viewModeStore } from '../stores/viewModeStore'
 import * as styles from './StoryInput.css'
@@ -51,7 +52,7 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
   }
 
   const currentThinkingLabel = () => {
-    const option = THINKING_OPTIONS.find((o) => o.value === settingsStore.thinkingBudget)
+    const option = THINKING_OPTIONS.find((o) => o.value === effectiveSettings.thinkingBudget)
     return option?.label ?? 'Off'
   }
 
@@ -153,11 +154,11 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
                 <For each={[...THINKING_OPTIONS]}>
                   {(option) => (
                     <ToggleButton
-                      active={settingsStore.thinkingBudget === option.value}
+                      active={effectiveSettings.thinkingBudget === option.value}
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        settingsStore.setThinkingBudget(option.value)
+                        effectiveSettings.setThinkingBudget(option.value)
                         setThinkingExpanded(false)
                       }}
                       title={option.value === 0 ? 'No extended thinking' : `Thinking budget: ${option.value} tokens`}

@@ -356,13 +356,6 @@ export const settingsStore = {
   // Actions
   setModel: (model: string) => {
     setSettingsState('model', model)
-
-    // Sync with current story if one is loaded
-    import('./currentStoryStore').then(({ currentStoryStore }) => {
-      if (currentStoryStore.isInitialized) {
-        currentStoryStore.setModel(model)
-      }
-    })
   },
   setStorySetting: (setting: string) => setSettingsState('storySetting', setting),
   setContextSize: (size: number) => setSettingsState('contextSize', size),
@@ -373,14 +366,6 @@ export const settingsStore = {
     setSettingsState('provider', provider)
     // Clear model selection when switching providers since models are provider-specific
     setSettingsState('model', '')
-
-    // Sync with current story if one is loaded
-    import('./currentStoryStore').then(({ currentStoryStore }) => {
-      if (currentStoryStore.isInitialized) {
-        currentStoryStore.setProvider(provider)
-        currentStoryStore.setModel(null)
-      }
-    })
   },
   setOpenrouterApiKey: (key: string) => setSettingsState('openrouterApiKey', key),
   setAnthropicApiKey: (key: string) => setSettingsState('anthropicApiKey', key),
@@ -424,16 +409,6 @@ export const settingsStore = {
       const current = { ...settingsState.categoryOverrides }
       delete current[category as keyof CategoryOverrides]
       setSettingsState('categoryOverrides', current)
-    }
-  },
-
-  // Sync provider and model from story (called when loading a story)
-  syncFromStory: (provider?: string, model?: string | null) => {
-    if (provider) {
-      setSettingsState('provider', provider)
-    }
-    if (model !== undefined) {
-      setSettingsState('model', model || '')
     }
   },
 

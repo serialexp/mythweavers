@@ -9,7 +9,7 @@ import { singleRewriteDialogStore } from '../stores/singleRewriteDialogStore'
 import type { Node } from '../types/core'
 import { LLMClientFactory, type LLMMessage } from '../utils/llm'
 import { resolveModel } from '../utils/llm/resolveModel'
-import { buildDiffRewritePrompt, processLLMDiffResponse } from '../utils/unifiedDiff'
+import { buildDiffRewritePrompt, processLLMDiffResponse } from '@mythweavers/shared'
 import * as styles from './SingleRewriteDialog.css'
 
 interface RewriteResult {

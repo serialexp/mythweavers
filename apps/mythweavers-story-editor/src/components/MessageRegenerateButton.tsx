@@ -2,7 +2,7 @@ import { Button, ButtonGroup, Dropdown, DropdownItem } from '@mythweavers/ui'
 import { BsChevronDown } from 'solid-icons/bs'
 import { Component, For } from 'solid-js'
 import { JSX } from 'solid-js'
-import { settingsStore } from '../stores/settingsStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import * as styles from './MessageStyles.css'
 
 interface MessageRegenerateButtonProps {
@@ -22,8 +22,8 @@ const TOKEN_OPTIONS = [
 
 export const MessageRegenerateButton: Component<MessageRegenerateButtonProps> = (props) => {
   const handleSelect = (tokens: number) => {
-    if (tokens <= settingsStore.thinkingBudget) return
-    settingsStore.setMaxTokens(tokens)
+    if (tokens <= effectiveSettings.thinkingBudget) return
+    effectiveSettings.setMaxTokens(tokens)
     props.onRegenerate(tokens)
   }
 
@@ -32,12 +32,12 @@ export const MessageRegenerateButton: Component<MessageRegenerateButtonProps> = 
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => props.onRegenerate(settingsStore.maxTokens)}
+        onClick={() => props.onRegenerate(effectiveSettings.maxTokens)}
         disabled={props.disabled}
-        title={`${props.title} (${settingsStore.maxTokens} tokens)`}
+        title={`${props.title} (${effectiveSettings.maxTokens} tokens)`}
       >
         {props.icon}
-        <span class={styles.regenerateTokenBadge}>{settingsStore.maxTokens}</span>
+        <span class={styles.regenerateTokenBadge}>{effectiveSettings.maxTokens}</span>
       </Button>
       <Dropdown
         alignRight
@@ -56,10 +56,10 @@ export const MessageRegenerateButton: Component<MessageRegenerateButtonProps> = 
       >
         <For each={TOKEN_OPTIONS}>
           {(option) => {
-            const disabled = () => option.value <= settingsStore.thinkingBudget
+            const disabled = () => option.value <= effectiveSettings.thinkingBudget
             return (
               <DropdownItem
-                active={settingsStore.maxTokens === option.value}
+                active={effectiveSettings.maxTokens === option.value}
                 onClick={() => handleSelect(option.value)}
                 disabled={disabled()}
               >

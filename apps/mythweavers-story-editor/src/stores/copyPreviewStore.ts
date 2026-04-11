@@ -1,6 +1,6 @@
 import { createStore } from 'solid-js/store'
 import { createAnthropicClient } from '../utils/anthropicClient'
-import { settingsStore } from './settingsStore'
+import { effectiveSettings } from './effectiveSettingsStore'
 
 interface CopyPreviewState {
   isOpen: boolean
@@ -49,7 +49,7 @@ export const copyPreviewStore = {
       return false
     }
 
-    const provider = settingsStore.provider
+    const provider = effectiveSettings.provider
     if (provider !== 'anthropic') {
       try {
         await copyTextToClipboard(trimmed)
@@ -69,7 +69,7 @@ export const copyPreviewStore = {
     })
 
     try {
-      const model = settingsStore.model
+      const model = effectiveSettings.model
       if (!model) {
         throw new Error('Please select a Claude model before copying.')
       }

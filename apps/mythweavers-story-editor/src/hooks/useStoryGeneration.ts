@@ -3,6 +3,7 @@ import { contextItemsStore } from '../stores/contextItemsStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
 import { Message, Node } from '../types/core'
 import { generateAnalysis } from '../utils/analysisClient'
@@ -133,8 +134,8 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         nodes: nodeStore.nodesArray,
         branchChoices: currentStoryStore.branchChoices,
         targetMessageId,
-        model: settingsStore.model,
-        provider: settingsStore.provider as 'ollama' | 'openrouter' | 'anthropic',
+        model: effectiveSettings.model,
+        provider: effectiveSettings.provider as 'ollama' | 'openrouter' | 'anthropic',
         forceMissingSummaries,
       })
 
@@ -150,7 +151,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
 
   const handleAutoOrManualSubmit = async (isQuery = false, maxTokens?: number) => {
     // Check if model is selected before proceeding
-    if (!settingsStore.model) {
+    if (!effectiveSettings.model) {
       const { errorStore } = await import('../stores/errorStore')
       errorStore.addError('Please select a model before generating content', 'error')
       return
@@ -180,7 +181,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     if (!inputText || messagesStore.isLoading) return
 
     // Check if model is selected
-    if (!settingsStore.model) {
+    if (!effectiveSettings.model) {
       const { errorStore } = await import('../stores/errorStore')
       errorStore.addError('Please select a model before generating content', 'error')
       return
@@ -200,7 +201,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         timestamp: new Date(),
         order: 0, // Will be set properly by insertMessage/addMessage
         isQuery: true,
-        model: settingsStore.model,
+        model: effectiveSettings.model,
         sceneId: selectedNodeId || messagesStore.getCurrentNodeId() || undefined,
       }
 
@@ -257,7 +258,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           messages: messagesForContext,
           contextType: 'query',
           characterContext: characterContext + contextItemsContext + storyDateContext + randomNamesContext,
-          model: settingsStore.model,
+          model: effectiveSettings.model,
           nodes: nodeStore.nodesArray,
           branchChoices: currentStoryStore.branchChoices,
           targetMessageId: assistantMessageId,
@@ -284,7 +285,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         timestamp: new Date(),
         order: 0, // Will be set properly by insertMessage/addMessage
         isQuery: false,
-        model: settingsStore.model,
+        model: effectiveSettings.model,
         sceneId: selectedNodeId || messagesStore.getCurrentNodeId() || undefined,
       }
       // If a node is selected, insert at the end of that node
@@ -572,7 +573,7 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         messages: allMessages,
         contextType: 'query',
         characterContext: characterContext + contextItemsContext + storyDateContext + randomNamesContext,
-        model: settingsStore.model,
+        model: effectiveSettings.model,
         nodes: nodeStore.nodesArray,
         branchChoices: currentStoryStore.branchChoices,
         targetMessageId: messageId,

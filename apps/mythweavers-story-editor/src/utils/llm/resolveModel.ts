@@ -1,4 +1,4 @@
-import { settingsStore } from '../../stores/settingsStore'
+import { effectiveSettings } from '../../stores/effectiveSettingsStore'
 import type { LLMProvider } from '../../types/llm'
 
 /**
@@ -79,13 +79,17 @@ export interface ResolvedModel {
 /**
  * Resolve which provider+model to use for a given callType.
  *
- * Looks up the callType's category, checks for an override, and falls back
- * to the default provider+model from settingsStore.
+ * Resolution order:
+ * 1. Category override (story-level if set, else global)
+ * 2. Default provider+model (story-level if set, else global)
+ *
+ * All reads go through effectiveSettings, which automatically
+ * merges story overrides with global defaults.
  */
 export function resolveModel(callType: string): ResolvedModel {
   const category = CALL_TYPE_CATEGORY[callType] ?? null
   if (category) {
-    const override = settingsStore.categoryOverrides[category]
+    const override = effectiveSettings.categoryOverrides[category]
     if (override?.provider && override?.model) {
       return {
         provider: override.provider,
@@ -97,8 +101,8 @@ export function resolveModel(callType: string): ResolvedModel {
   }
 
   return {
-    provider: settingsStore.provider as LLMProvider,
-    model: settingsStore.model,
+    provider: effectiveSettings.provider as LLMProvider,
+    model: effectiveSettings.model,
     category,
     isOverride: false,
   }

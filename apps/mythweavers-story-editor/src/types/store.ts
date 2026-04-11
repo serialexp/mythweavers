@@ -1,6 +1,7 @@
 // Store-related types
 
 import { Character, ContextItem, Message, Node } from './core'
+import type { StoryAIOverrides } from '../stores/effectiveSettingsStore'
 
 export interface CurrentStory {
   id: string
@@ -21,9 +22,11 @@ export interface CurrentStory {
   timelineStartTime?: number | null
   timelineEndTime?: number | null
   timelineGranularity?: 'hour' | 'day'
-  // LLM settings
+  // LLM settings (legacy — kept for backward compat on story load)
   provider?: string // 'ollama' | 'openrouter' | 'anthropic' | 'openai' | 'server' | 'custom:*'
   model?: string | null // Model name for the selected provider
+  // Story-level AI overrides (null = inherit from global user preferences)
+  aiOverrides?: StoryAIOverrides | null
 }
 
 export interface CacheEntry {
@@ -89,9 +92,11 @@ export interface SavedStory {
   timelineStartTime?: number | null
   timelineEndTime?: number | null
   timelineGranularity?: 'hour' | 'day'
-  // LLM settings
+  // LLM settings (legacy)
   provider?: string
   model?: string | null
+  // Story-level AI overrides
+  aiOverrides?: StoryAIOverrides | null
 }
 
 export interface StoryMetadata {

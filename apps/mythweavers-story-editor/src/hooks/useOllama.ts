@@ -5,6 +5,7 @@ import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
 import type { Character, Node } from '../types/core'
 import type { LLMMessage, TokenUsage } from '@mythweavers/llm'
@@ -28,11 +29,11 @@ export const useOllama = () => {
 
   // Get the effective context size (minimum of user setting and model's actual context length)
   const getEffectiveContextSize = (): number => {
-    const selectedModel = modelsStore.availableModels.find((m: any) => m.name === settingsStore.model)
+    const selectedModel = modelsStore.availableModels.find((m: any) => m.name === effectiveSettings.model)
     if (selectedModel?.context_length) {
-      return Math.min(settingsStore.contextSize, selectedModel.context_length)
+      return Math.min(effectiveSettings.contextSize, selectedModel.context_length)
     }
-    return settingsStore.contextSize
+    return effectiveSettings.contextSize
   }
 
   // Ping cache is no longer needed with 1-hour TTL
@@ -447,7 +448,7 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
         model: resolved.model,
         messages,
         max_tokens: maxTokens,
-        thinking_budget: settingsStore.thinkingBudget > 0 ? settingsStore.thinkingBudget : undefined,
+        thinking_budget: effectiveSettings.thinkingBudget > 0 ? effectiveSettings.thinkingBudget : undefined,
         providerOptions:
           resolved.provider === 'ollama'
             ? {
@@ -572,7 +573,7 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
           let inputBasePrice = 0.000003 // Default fallback price (per token)
           let outputBasePrice = 0.000015 // Default fallback price (per token)
 
-          const currentModel = modelsStore.availableModels.find((m) => m.name === settingsStore.model)
+          const currentModel = modelsStore.availableModels.find((m) => m.name === effectiveSettings.model)
           if (currentModel?.pricing) {
             // All providers now store prices as numbers per million tokens
             inputBasePrice = currentModel.pricing.input / 1_000_000
@@ -734,7 +735,7 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
 
   const checkIfOllamaIsBusy = async (): Promise<boolean> => {
     // This is Ollama-specific, so we only check for Ollama provider
-    if (settingsStore.provider !== 'ollama') {
+    if (effectiveSettings.provider !== 'ollama') {
       return false
     }
 

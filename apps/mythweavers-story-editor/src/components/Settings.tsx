@@ -133,13 +133,13 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   const renderModelsSection = () => (
     <div class={styles.section}>
-      <ProviderSelector />
+      <ProviderSelector provider={props.provider} setProvider={props.setProvider} />
 
       <div class={styles.settingRow}>
-        <label class={styles.label}>Default Model</label>
+        <label class={styles.label}>Model</label>
         <ModelSelector
-          model={settingsStore.model}
-          setModel={settingsStore.setModel}
+          model={props.model}
+          setModel={props.setModel}
           availableModels={modelsStore.availableModels}
           isLoadingModels={modelsStore.isLoadingModels}
           onRefreshModels={() => modelsStore.fetchModels()}

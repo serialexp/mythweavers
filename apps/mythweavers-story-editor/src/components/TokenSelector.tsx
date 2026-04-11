@@ -1,6 +1,6 @@
 import { DropdownItem, SplitButton } from '@mythweavers/ui'
 import { Component, For, createEffect } from 'solid-js'
-import { settingsStore } from '../stores/settingsStore'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
 
 interface TokenSelectorProps {
   onSubmit: (maxTokens: number) => void
@@ -20,24 +20,24 @@ const TOKEN_OPTIONS = [
 export const TokenSelector: Component<TokenSelectorProps> = (props) => {
   // Auto-adjust maxTokens if current selection is impossible due to thinking budget
   createEffect(() => {
-    const thinkingBudget = settingsStore.thinkingBudget
-    const currentMax = settingsStore.maxTokens
+    const thinkingBudget = effectiveSettings.thinkingBudget
+    const currentMax = effectiveSettings.maxTokens
 
     // Need at least some tokens for response (thinking budget + minimum response)
     if (currentMax <= thinkingBudget) {
       // Find the lowest valid option
       const lowestValid = TOKEN_OPTIONS.find((opt) => opt.value > thinkingBudget)
       if (lowestValid) {
-        settingsStore.setMaxTokens(lowestValid.value)
+        effectiveSettings.setMaxTokens(lowestValid.value)
       }
     }
   })
 
-  const isOptionDisabled = (value: number) => value <= settingsStore.thinkingBudget
+  const isOptionDisabled = (value: number) => value <= effectiveSettings.thinkingBudget
 
   const handleSelect = (tokens: number) => {
     if (isOptionDisabled(tokens)) return
-    settingsStore.setMaxTokens(tokens)
+    effectiveSettings.setMaxTokens(tokens)
     props.onSubmit(tokens)
   }
 
@@ -45,7 +45,7 @@ export const TokenSelector: Component<TokenSelectorProps> = (props) => {
     if (props.isAnalyzing) return 'Analyzing...'
     if (props.isLoading) return 'Generating...'
 
-    const responseBudget = settingsStore.maxTokens - settingsStore.thinkingBudget
+    const responseBudget = effectiveSettings.maxTokens - effectiveSettings.thinkingBudget
 
     return (
       <div style={{ display: 'flex', 'flex-direction': 'column', 'align-items': 'flex-start' }}>
@@ -59,17 +59,17 @@ export const TokenSelector: Component<TokenSelectorProps> = (props) => {
     <SplitButton
       label={getButtonLabel()}
       size="sm"
-      onClick={() => props.onSubmit(settingsStore.maxTokens)}
+      onClick={() => props.onSubmit(effectiveSettings.maxTokens)}
       disabled={props.disabled}
       alignRight
     >
       <For each={TOKEN_OPTIONS}>
         {(option) => {
-          const disabled = () => option.value <= settingsStore.thinkingBudget
+          const disabled = () => option.value <= effectiveSettings.thinkingBudget
           return (
             <DropdownItem
               onClick={() => handleSelect(option.value)}
-              active={settingsStore.maxTokens === option.value}
+              active={effectiveSettings.maxTokens === option.value}
               disabled={disabled()}
             >
               <span style={{ display: 'flex', 'flex-direction': 'column' }}>

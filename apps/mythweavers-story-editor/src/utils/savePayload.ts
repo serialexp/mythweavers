@@ -36,6 +36,7 @@ export function createSavePayload(overrides?: Partial<{ name: string }>) {
     // selectedChapterId removed - now handled through selectedNodeId
     selectedNodeId: nodeStore.selectedNodeId, // Include selected node
     lastKnownUpdatedAt: currentStoryStore.lastKnownUpdatedAt,
+    aiOverrides: currentStoryStore.aiOverrides, // Story-level AI setting overrides
     ...overrides,
   }
 }
