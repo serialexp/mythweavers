@@ -15563,7 +15563,7 @@ export type GetAdminLlmProvidersResponses = {
             name: string;
             displayName: string;
             endpointUrl: string;
-            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE';
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
             envKeyName: string;
             enabled: boolean;
             sortOrder: number;
@@ -15596,7 +15596,7 @@ export type PostAdminLlmProvidersData = {
         /**
          * Streaming protocol
          */
-        protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE';
+        protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
         /**
          * Env var name for API key
          */
@@ -15648,7 +15648,7 @@ export type PostAdminLlmProvidersResponses = {
             name: string;
             displayName: string;
             endpointUrl: string;
-            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE';
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
             envKeyName: string;
             enabled: boolean;
             sortOrder: number;
@@ -15749,7 +15749,7 @@ export type GetAdminLlmProvidersByIdResponses = {
             name: string;
             displayName: string;
             endpointUrl: string;
-            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE';
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
             envKeyName: string;
             enabled: boolean;
             sortOrder: number;
@@ -15788,7 +15788,7 @@ export type PutAdminLlmProvidersByIdData = {
     body: {
         displayName?: string;
         endpointUrl?: string;
-        protocol?: 'ANTHROPIC' | 'OPENAI_COMPATIBLE';
+        protocol?: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
         envKeyName?: string;
         enabled?: boolean;
         sortOrder?: number;
@@ -15833,7 +15833,7 @@ export type PutAdminLlmProvidersByIdResponses = {
             name: string;
             displayName: string;
             endpointUrl: string;
-            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE';
+            protocol: 'ANTHROPIC' | 'OPENAI_COMPATIBLE' | 'CLOUDFLARE';
             envKeyName: string;
             enabled: boolean;
             sortOrder: number;

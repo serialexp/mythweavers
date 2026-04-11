@@ -40,7 +40,7 @@ type Provider = {
   name: string
   displayName: string
   endpointUrl: string
-  protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE"
+  protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE" | "CLOUDFLARE"
   envKeyName: string
   enabled: boolean
   sortOrder: number
@@ -354,7 +354,7 @@ export function ProviderDetailPage() {
     name: string
     displayName: string
     endpointUrl: string
-    protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE"
+    protocol: "ANTHROPIC" | "OPENAI_COMPATIBLE" | "CLOUDFLARE"
     envKeyName: string
     sortOrder: number
   }) => {
