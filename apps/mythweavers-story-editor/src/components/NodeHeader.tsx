@@ -283,7 +283,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
     e.stopPropagation()
     setShowDropdown(false)
     try {
-      await nodeStore.generateNodeSummary(props.node.id, generateNodeSummary)
+      await nodeStore.generateNodeSummary(props.node.id, messagesStore.messages, generateNodeSummary)
     } catch (error) {
       console.error('Failed to generate summary:', error)
       alert(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`)

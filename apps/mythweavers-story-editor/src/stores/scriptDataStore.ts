@@ -8,6 +8,7 @@ import { getMessagesInStoryOrder } from '../utils/nodeTraversal'
 import { builtInFunctions, executeScript } from '../utils/scriptEngine'
 import { calendarStore } from './calendarStore'
 import { charactersStore } from './charactersStore'
+import { on as onStoreEvent } from './storeEvents'
 import { contextItemsStore } from './contextItemsStore'
 import { currentStoryStore } from './currentStoryStore'
 import { messagesStore } from './messagesStore'
@@ -747,3 +748,8 @@ export const scriptDataStore = {
     setStore('isDirty', true)
   },
 }
+
+// Listen for character changes to trigger script re-evaluation
+onStoreEvent('characters:changed', () => {
+  scriptDataStore.refresh()
+})

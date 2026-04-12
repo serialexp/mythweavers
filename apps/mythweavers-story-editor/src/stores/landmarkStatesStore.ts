@@ -5,6 +5,7 @@ import {
   getMyStoriesByStoryIdLandmarkStatesAtByStoryTime,
 } from '../client/config'
 import { saveService } from '../services/saveService'
+import { on } from './storeEvents'
 
 // Extract LandmarkState type from SDK response
 export type LandmarkState = {
@@ -220,3 +221,16 @@ export const landmarkStatesStore = {
     })
   },
 }
+
+// Subscribe to story lifecycle events
+on('story:loaded', ({ storyId, storageMode }) => {
+  if (storageMode === 'server') {
+    landmarkStatesStore.loadStates(storyId)
+  } else {
+    landmarkStatesStore.clearStates()
+  }
+})
+
+on('story:cleared', () => {
+  landmarkStatesStore.clearStates()
+})

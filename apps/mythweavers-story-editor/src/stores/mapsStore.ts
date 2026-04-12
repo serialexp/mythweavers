@@ -15,6 +15,7 @@ import { generateMessageId } from '../utils/id'
 import { storage } from '../utils/storage'
 import { currentStoryStore } from './currentStoryStore'
 import { errorStore } from './errorStore'
+import { on } from './storeEvents'
 
 // Track if maps have been loaded
 let mapsLoaded = false
@@ -630,3 +631,12 @@ export const mapsStore = {
     }
   },
 }
+
+// Subscribe to story lifecycle events
+on('story:new', () => {
+  mapsStore.clearMaps()
+})
+
+on('story:loaded', ({ storyId, storageMode }) => {
+  mapsStore.initializeMaps(storageMode === 'server' ? storyId : undefined)
+})

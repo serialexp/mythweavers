@@ -4,6 +4,7 @@ import { CurrentStory } from '../types/store'
 import { generateMessageId } from '../utils/id'
 import { websocketManager } from '../utils/websocket'
 import type { StoryAIOverrides } from './effectiveSettingsStore'
+import { emit } from './storeEvents'
 
 // Initialize from URL hash only
 const getInitialStory = (): CurrentStory | null => {
@@ -274,10 +275,7 @@ export const currentStoryStore = {
       websocketManager.connect(id)
     }
 
-    // Clear maps for new story
-    import('../stores/mapsStore').then(({ mapsStore }) => {
-      mapsStore.clearMaps()
-    })
+    emit('story:new', { storyId: id })
   },
 
   // Load existing story with optional story-specific settings
@@ -323,23 +321,7 @@ export const currentStoryStore = {
       websocketManager.connect(id)
     }
 
-    // Initialize maps for this story
-    import('../stores/mapsStore').then(({ mapsStore }) => {
-      mapsStore.initializeMaps(storageMode === 'server' ? id : undefined)
-    })
-
-    // Initialize landmark states for this story
-    if (id) {
-      import('../stores/landmarkStatesStore').then(({ landmarkStatesStore }) => {
-        if (storageMode === 'server') {
-          landmarkStatesStore.loadStates(id)
-        } else {
-          // For local mode, states are loaded from localStorage as part of the full story
-          // Just clear any existing states from a previous story
-          landmarkStatesStore.clearStates()
-        }
-      })
-    }
+    emit('story:loaded', { storyId: id, storageMode })
   },
 
   // Clear the current story
@@ -348,9 +330,6 @@ export const currentStoryStore = {
     websocketManager.disconnect()
     setStoryState('story', null)
 
-    // Clear landmark states
-    import('../stores/landmarkStatesStore').then(({ landmarkStatesStore }) => {
-      landmarkStatesStore.clearStates()
-    })
+    emit('story:cleared')
   },
 }

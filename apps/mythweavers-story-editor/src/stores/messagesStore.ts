@@ -9,11 +9,14 @@ import { generateMessageId } from '../utils/id'
 import { calculateActivePath } from '../utils/nodeTraversal'
 import { createSavePayload } from '../utils/savePayload'
 import { storage } from '../utils/storage'
+import { storyManager } from '../utils/storyManager'
 import { getStoryStats } from '../utils/storyUtils'
 import { currentStoryStore } from './currentStoryStore'
 import { errorStore } from './errorStore'
+import { mapsStore } from './mapsStore'
 import { nodeStore } from './nodeStore'
 import { settingsStore } from './settingsStore'
+import { on } from './storeEvents'
 
 // Load saved input from localStorage
 const savedInput = localStorage.getItem('story-input') || ''
@@ -39,10 +42,6 @@ const [messagesState, setMessagesState] = createStore({
 
 // Full save function that saves the entire story (for local storage or manual saves)
 const saveFullStory = async () => {
-  // Import dependencies dynamically to avoid circular imports
-  const { currentStoryStore } = await import('./currentStoryStore')
-  const { storyManager } = await import('../utils/storyManager')
-
   // Don't save if no story is initialized
   if (!currentStoryStore.isInitialized) {
     // No story initialized, skipping auto-save
@@ -73,7 +72,6 @@ const saveFullStory = async () => {
       // Server stories are loaded with their server ID as the story ID
       try {
         // Save maps first (including any pending landmark changes)
-        const { mapsStore } = await import('./mapsStore')
         await mapsStore.saveAllMaps()
 
         const response = await apiClient.updateStory(currentStoryStore.id, {
@@ -157,22 +155,16 @@ saveService.setCallbacks({
       error.message,
     )
 
-    // Import mapsStore dynamically to avoid circular dependency
-    import('../stores/mapsStore').then(({ mapsStore }) => {
-      if (operation.type === 'hyperlane-insert') {
-        // Roll back hyperlane creation
-        mapsStore.deleteHyperlane(operation.data.mapId, operation.entityId)
-        console.log(`Rolled back failed hyperlane creation: ${operation.entityId}`)
-      } else if (operation.type === 'landmark-insert') {
-        // Roll back landmark creation (junctions)
-        mapsStore.deleteLandmark(operation.data.mapId, operation.entityId)
-        console.log(`Rolled back failed landmark creation: ${operation.entityId}`)
-      } else if (operation.type === 'fleet-insert') {
-        // Roll back fleet creation
-        mapsStore.deleteFleet(operation.data.mapId, operation.entityId)
-        console.log(`Rolled back failed fleet creation: ${operation.entityId}`)
-      }
-    })
+    if (operation.type === 'hyperlane-insert') {
+      mapsStore.deleteHyperlane(operation.data.mapId, operation.entityId)
+      console.log(`Rolled back failed hyperlane creation: ${operation.entityId}`)
+    } else if (operation.type === 'landmark-insert') {
+      mapsStore.deleteLandmark(operation.data.mapId, operation.entityId)
+      console.log(`Rolled back failed landmark creation: ${operation.entityId}`)
+    } else if (operation.type === 'fleet-insert') {
+      mapsStore.deleteFleet(operation.data.mapId, operation.entityId)
+      console.log(`Rolled back failed fleet creation: ${operation.entityId}`)
+    }
   },
   onLastKnownUpdatedAtChange: (timestamp) => {
     currentStoryStore.setLastKnownUpdatedAt(timestamp)
@@ -182,6 +174,53 @@ saveService.setCallbacks({
 
 // Set trigger full save function for saveService (only used for local stories)
 saveService.setTriggerFullSave(() => saveFullStory())
+
+// Forward reference for the exported store — allows event subscriptions
+// (defined here) to call methods on the store object (defined below).
+// biome-ignore lint/style/useConst: assigned after store definition
+let messagesStoreApi: typeof import('./messagesStore').messagesStore
+
+// Subscribe to WebSocket events via the event bus.
+// These subscriptions register callbacks (safe at module init — not invoked until runtime).
+on('ws:message-updated', ({ storyId, message: rawMessage }) => {
+  if (storyId !== currentStoryStore.id) return
+  const message: Message = {
+    ...rawMessage,
+    timestamp: new Date(rawMessage.timestamp),
+    sceneId: rawMessage.sceneId,
+  }
+  const existing = messagesState.messages.find((m) => m.id === message.id)
+  if (existing && messagesState.isLoading) {
+    errorStore.addError(`Message ${message.id} was updated from MCP but local edit takes priority`)
+    return
+  }
+  // Forward to the exported store methods (defined below, but captured by closure at call time)
+  messagesStoreApi.updateMessageNoSave(message.id, message)
+  if (message.paragraphs) {
+    messagesStoreApi.bumpContentVersion(message.id)
+  }
+})
+
+on('ws:message-created', ({ storyId, message: rawMessage, afterMessageId }) => {
+  if (storyId !== currentStoryStore.id) return
+  const message: Message = {
+    ...rawMessage,
+    timestamp: new Date(rawMessage.timestamp),
+    sceneId: rawMessage.sceneId,
+  }
+  messagesStoreApi.insertMessageNoSave(afterMessageId, message)
+})
+
+on('ws:message-deleted', ({ storyId, messageId }) => {
+  if (storyId !== currentStoryStore.id) return
+  messagesStoreApi.deleteMessageNoSave(messageId)
+})
+
+on('ws:story-reloaded', ({ storyId }) => {
+  if (storyId !== currentStoryStore.id) return
+  errorStore.addError('Story has been significantly modified from MCP. Reloading...')
+  messagesStoreApi.reloadDataForStory(storyId)
+})
 
 // Helper function to trigger save through saveService
 const triggerMessageSave = (
@@ -288,9 +327,6 @@ const initializeEffects = () => {
 // Function to reload data when story changes
 const reloadDataForStory = async (storyId: string) => {
   try {
-    // Import dependencies dynamically to avoid circular dependency
-    const { storyManager } = await import('../utils/storyManager')
-
     // Clear current data but preserve saved input
     setMessagesState('messages', [])
     // Don't clear input if we have saved input in localStorage
@@ -329,7 +365,6 @@ const reloadDataForStory = async (storyId: string) => {
       })
 
       // Load maps for this story
-      const { mapsStore } = await import('./mapsStore')
       await mapsStore.initializeMaps(story.storageMode === 'server' ? storyId : undefined)
     }
   } catch (error) {
@@ -421,9 +456,6 @@ export const messagesStore = {
   },
 
   getCurrentNodeId: () => {
-    // Import here to avoid circular dependency
-    const { nodeStore } = require('./nodeStore')
-
     // First check if there's a selected node
     const selectedNodeId = nodeStore.selectedNodeId
     if (selectedNodeId) {
@@ -791,8 +823,7 @@ export const messagesStore = {
   },
 
   clearMessages: async () => {
-    // Import currentStoryStore dynamically to avoid circular dependency
-    const { currentStoryStore } = await import('./currentStoryStore')
+
     const storyId = currentStoryStore.id
 
     setMessagesState('messages', [])
@@ -1283,8 +1314,7 @@ export const messagesStore = {
 
   // Force save after conflict
   forceSave: async () => {
-    // Import dependencies dynamically to avoid circular imports
-    const { currentStoryStore } = await import('./currentStoryStore')
+
 
     // Don't save if we're already saving or loading
     if (messagesState.isSaving || messagesState.isLoading) return
@@ -1368,7 +1398,6 @@ export const messagesStore = {
     setMessagesState('messages', reorderedMessages)
 
     // Save the new order to the server
-    const { currentStoryStore } = await import('./currentStoryStore')
     if (currentStoryStore.storageMode === 'server' && currentStoryStore.id) {
       const items = reorderedMessages.map((msg) => ({
         messageId: msg.id,
@@ -1435,7 +1464,6 @@ export const messagesStore = {
     setMessagesState('messages', reorderedMessages)
 
     // Save the new order to the server
-    const { currentStoryStore } = await import('./currentStoryStore')
     if (currentStoryStore.storageMode === 'server' && currentStoryStore.id) {
       const items = reorderedMessages.map((msg) => ({
         messageId: msg.id,
@@ -1524,14 +1552,12 @@ export const messagesStore = {
 
   // Refresh messages from current story
   refreshMessages: async () => {
-    const { currentStoryStore } = await import('./currentStoryStore')
     const storyId = currentStoryStore.id
 
     if (!storyId) return
 
     // For server stories, reload from server
     if (currentStoryStore.storageMode === 'server') {
-      const { apiClient } = await import('../utils/apiClient')
       try {
         const story = await apiClient.getStory(storyId)
         if (story) {
@@ -1542,7 +1568,6 @@ export const messagesStore = {
       }
     } else {
       // For local stories, reload from storyManager
-      const { storyManager } = await import('../utils/storyManager')
       const story = await storyManager.loadStory(storyId)
       if (story) {
         messagesStore.setMessages(story.messages)
@@ -1550,3 +1575,6 @@ export const messagesStore = {
     }
   },
 }
+
+// Wire up forward reference so event subscriptions can call store methods
+messagesStoreApi = messagesStore

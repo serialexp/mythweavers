@@ -4,6 +4,7 @@ import { saveService } from '../services/saveService'
 import { Node, NodeType } from '../types/core'
 import { generateMessageId } from '../utils/id'
 import { currentStoryStore } from './currentStoryStore'
+import { on } from './storeEvents'
 
 // Lightweight tree structure with only IDs
 export interface TreeNode {
@@ -645,9 +646,11 @@ export const nodeStore = {
     }
   },
 
-  // Generate summary for a node (scene or chapter type)
+  // Generate summary for a node (scene or chapter type).
+  // `messages` is the full messages array — passed by the caller to avoid a circular import.
   async generateNodeSummary(
     nodeId: string,
+    messages: Array<{ sceneId?: string; role: string; type?: string | null; isQuery?: boolean; content: string }>,
     generateSummaryFn: (params: {
       nodeId: string
       messageContents: string[]
@@ -667,9 +670,8 @@ export const nodeStore = {
       // Mark node as summarizing
       setNodeState('nodes', nodeId, 'isSummarizing', true)
 
-      // Get all messages in this node
-      const { messagesStore } = await import('./messagesStore')
-      const nodeMessages = messagesStore.messages.filter(
+      // Filter messages for this node
+      const nodeMessages = messages.filter(
         (msg) => msg.sceneId === nodeId && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
       )
 
@@ -829,3 +831,19 @@ export const nodeStore = {
     }
   },
 }
+
+// Subscribe to WebSocket node events via the event bus
+on('ws:node-created', ({ storyId, node }) => {
+  if (storyId !== currentStoryStore.id || !node) return
+  nodeStore.upsertNodeFromServer(node as Node)
+})
+
+on('ws:node-updated', ({ storyId, node }) => {
+  if (storyId !== currentStoryStore.id || !node) return
+  nodeStore.upsertNodeFromServer(node as Node)
+})
+
+on('ws:node-deleted', ({ storyId, nodeId }) => {
+  if (storyId !== currentStoryStore.id || !nodeId) return
+  nodeStore.deleteNodeNoSave(nodeId)
+})

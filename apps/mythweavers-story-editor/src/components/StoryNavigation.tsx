@@ -807,7 +807,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
   const handleGenerateSummary = async () => {
     try {
-      await nodeStore.generateNodeSummary(props.treeNode.id, generateNodeSummary)
+      await nodeStore.generateNodeSummary(props.treeNode.id, messagesStore.messages, generateNodeSummary)
     } catch (error) {
       console.error('Failed to generate summary:', error)
       alert(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`)
