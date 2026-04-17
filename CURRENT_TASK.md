@@ -1,61 +1,54 @@
-# Current Task: Global vs Story-Level AI Settings
+# Current Task: Provider Balance Ledger with Automated Cost Sync
 
 ## Status: Implementation Complete — Needs Prisma Migration
 
 ## What Was Done
 
-Separated global user preferences from story-level AI settings to fix a bug where model overrides set on one browser wouldn't appear on another (because `syncFromStory()` was overwriting global preferences with story-specific values, which then got synced back to the server).
+Added a provider balance/ledger system to the mythweavers admin that tracks:
+- **Top-ups**: Manual entries for when you add credits to a provider
+- **Cost syncs**: Automatically synced from OpenAI and Anthropic cost APIs every hour
 
-### Architecture (3-layer settings)
+### Files created
+- `apps/mythweavers-backend/src/lib/provider-costs.ts` — Shared cost-fetching and upsert logic
+- `apps/mythweavers-backend/src/lib/cost-sync-scheduler.ts` — Hourly background scheduler
+- `apps/mythweavers-backend/tests/admin-llm-balance.test.ts` — 22 tests, all passing
+- `apps/mythweavers-admin/src/components/ProviderBalanceTab.tsx` — Balance tab component
+- `apps/mythweavers-admin/src/components/ProviderBalanceTab.css.ts` — Styles
 
-1. **Global preferences** (`settingsStore`) - user's defaults, synced to `User.preferences` on backend. Never mutated by story loading.
-2. **Story overrides** (`currentStoryStore.aiOverrides`) - per-story overrides stored in `Story.aiOverrides` JSON column. `null` = inherit global.
-3. **Effective settings** (`effectiveSettings`) - computed merge: `storyOverride ?? globalDefault`. All consumers read from here.
+### Files modified
+- `apps/mythweavers-backend/prisma/schema.prisma` — Added `LlmProviderTransaction` model and `LlmProviderTransactionType` enum
+- `apps/mythweavers-backend/src/routes/admin/llm.ts` — Added 4 endpoints, uses shared cost sync module
+- `apps/mythweavers-backend/src/index.ts` — Starts/stops cost sync scheduler
+- `apps/mythweavers-admin/src/pages/ProviderDetailPage.tsx` — Added Balance tab
+- `apps/mythweavers-admin/src/pages/ProvidersPage.tsx` — Added inline balance display per provider
 
-### Key Changes
+## Architecture
 
-**New files:**
-- `src/stores/effectiveSettingsStore.ts` - Read-only reactive getters + inline setters that write to story or global depending on context
-- `src/components/AISettingsPanel.css.ts` - Styles for global/story toggle
+### Cost Sync Scheduler
+- Runs automatically every hour (first run 10s after server start)
+- Syncs yesterday + today for all enabled non-Cloudflare providers
+- Uses **upsert** logic: re-syncing the same day updates the amount as costs grow
+- Each provider syncs independently — one failure doesn't block others
+- Graceful shutdown via SIGINT/SIGTERM handlers
 
-**Backend:**
-- Added `aiOverrides Json?` column to Story model in Prisma schema
-- Added `aiOverrides` to story response schema, update body schema, and export schema
+### Balance Calculation
+- `balance = sum(TOP_UP amounts) - sum(COST_SYNC amounts)`
+- Deduplication via `syncKey` (e.g. `anthropic:2026-04-10`)
+- Upsert ensures today's cost stays current as it grows throughout the day
 
-**Frontend stores:**
-- Removed `syncFromStory()` from `settingsStore` (root cause of the original bug)
-- Removed cross-store syncing from `setModel`/`setProvider` on `settingsStore`
-- Added `aiOverrides`, `loadAIOverrides`, `setAIOverride`, `clearAllAIOverrides` to `currentStoryStore`
-- Added `aiOverrides` to `CurrentStory` and `SavedStory` types
-- Added `aiOverrides` to save payload and save service
-
-**All generation consumers switched from settingsStore to effectiveSettings:**
-- resolveModel, useStoryGeneration, useOllama, useAdventureEngine, AdventureHeader, SetupScreen, QuickLlmDialog, NewAdventureForm, AdventureList, copyPreviewStore, StoryStats, StoryNavigation, StoryHeader, LandmarkDetail, App.tsx, modelsStore, TokenSelector, MessageRegenerateButton, StoryInput
-
-**UI:**
-- AI Settings panel shows Global/Story toggle when a story is loaded
-- Models section supports story-level overrides for: provider, model, maxTokens, thinkingBudget
-- CategoryModelOverrides supports story-level overrides
-- Inline controls (token selector, thinking toggle, provider/model) write to story override when in a story
-- ProviderSelector accepts optional provider/setProvider props
+### Manual Sync
+- Still available via the admin UI "Sync Costs" button for arbitrary date ranges
+- Also uses upsert — safe to run multiple times
 
 ## What Bart Needs To Do
 
 ### 1. Run Prisma Migration
 ```bash
 cd apps/mythweavers-backend
-pnpm prisma migrate dev --name add_story_ai_overrides
+pnpm prisma migrate dev --name add_llm_provider_transactions
 ```
 
-### 2. Regenerate API Client
-After the backend picks up the schema change:
-```bash
-cd apps/mythweavers-story-editor
-pnpm generate:client
-```
-
-### 3. Test
-- Load a story, change model → verify global prefs are untouched
-- Open AI Settings → toggle Global/Story → verify both scopes work
-- Inline controls (token selector, thinking toggle) should set story overrides
-- Second browser should show correct global preferences
+### 2. Set Admin API Keys (for cost sync)
+- `ANTHROPIC_ADMIN_API_KEY` — from https://console.anthropic.com (needs admin role, key starts with `sk-ant-admin...`)
+- `OPENAI_ADMIN_API_KEY` — from OpenAI platform settings
+- Falls back to the provider's regular API key if admin keys aren't set
