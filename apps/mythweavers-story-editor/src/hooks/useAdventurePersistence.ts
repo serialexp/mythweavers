@@ -16,6 +16,11 @@ export interface AdventureTurn {
   dead?: boolean
 }
 
+export interface AdventureCompaction {
+  summary: string
+  generatedAt: string
+}
+
 export type AdventurePhase = 'setup' | 'playing'
 
 export interface PersistedState {
@@ -24,8 +29,10 @@ export interface PersistedState {
   protagonistInput: string
   settingDescription: string
   turns: AdventureTurn[]
+  compactions?: Record<string, AdventureCompaction>
   directive?: string
   pendingAction?: string | null
+  worldMomentumEnabled?: boolean
 }
 
 // --- localStorage helpers (offline / crash recovery) ---
@@ -113,13 +120,17 @@ export interface AdventurePersistence {
 }
 
 export function useAdventurePersistence(routeId: string): AdventurePersistence {
-  const isBackendMode = authStore.isAuthenticated && !authStore.isOfflineMode && routeId !== 'local'
   const isNew = routeId === 'new'
+  const isLocal = routeId === 'local'
+  // If we have a real adventure ID (not 'new' or 'local'), always attempt backend load
+  // regardless of auth state — the API call will fail if not authenticated, which is fine.
+  const hasRealId = !isNew && !isLocal
+  const isBackendMode = hasRealId || (authStore.isAuthenticated && !authStore.isOfflineMode && !isLocal)
 
-  const [isLoading, setIsLoading] = createSignal(isBackendMode && !isNew)
+  const [isLoading, setIsLoading] = createSignal(hasRealId || (isBackendMode && !isNew))
   const [loadError, setLoadError] = createSignal<string | null>(null)
   const [adventureId, setAdventureId] = createSignal<string | null>(
-    isBackendMode && !isNew ? routeId : null,
+    hasRealId ? routeId : null,
   )
   const [initialState, setInitialState] = createSignal<PersistedState | null>(null)
 
@@ -137,8 +148,8 @@ export function useAdventurePersistence(routeId: string): AdventurePersistence {
 
   // --- Initial load ---
 
-  if (isBackendMode && !isNew) {
-    // Load from backend
+  if (hasRealId) {
+    // Load from backend — always attempt when we have a real ID in the URL
     ;(async () => {
       try {
         const { data, error } = await getMyAdventuresById({ path: { id: routeId } })
@@ -164,7 +175,7 @@ export function useAdventurePersistence(routeId: string): AdventurePersistence {
         setIsLoading(false)
       }
     })()
-  } else if (!isBackendMode) {
+  } else if (isLocal) {
     // Offline mode: load from localStorage
     setInitialState(localLoad())
   }

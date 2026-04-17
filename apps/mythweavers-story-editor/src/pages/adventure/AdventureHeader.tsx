@@ -2,6 +2,12 @@ import { type Component, Show } from 'solid-js'
 import { Button } from '@mythweavers/ui'
 import { effectiveSettings } from '../../stores/effectiveSettingsStore'
 import { adventureStore } from '../../stores/adventureStore'
+import { llmActivityStore } from '../../stores/llmActivityStore'
+import { quickLlmStore } from '../../stores/quickLlmStore'
+import { LlmActivityPanel } from '../../components/LlmActivityPanel'
+import { LlmCacheDots } from '../../components/LlmCacheDots'
+import { QuickLlmDialog } from '../../components/QuickLlmDialog'
+import { OverlayPanel } from '../../components/OverlayPanel'
 import { useEngine } from './useAdventureEngine'
 import * as styles from '../AdventurePage.css'
 
@@ -30,6 +36,19 @@ const HeaderActions: Component = () => {
         </Show>
       </span>
       <Button
+        variant={adventureStore.worldMomentumEnabled ? 'ghost' : 'secondary'}
+        size="sm"
+        onClick={() => {
+          adventureStore.setWorldMomentumEnabled(!adventureStore.worldMomentumEnabled)
+          engine.persist()
+        }}
+        title={adventureStore.worldMomentumEnabled
+          ? 'World momentum is ON — director and trajectory run automatically'
+          : 'World momentum is OFF — narrative only, no background systems'}
+      >
+        {adventureStore.worldMomentumEnabled ? '🌍 Momentum' : '⏸ Momentum'}
+      </Button>
+      <Button
         variant="ghost"
         size="sm"
         onClick={() =>
@@ -55,6 +74,15 @@ const HeaderActions: Component = () => {
       >
         {adventureStore.showDirective ? 'Hide Directive' : 'Directive'}
       </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => quickLlmStore.toggle()}
+        title="Quick LLM chat"
+      >
+        💬 LLM
+      </Button>
+      <LlmCacheDots />
       <Button variant="secondary" size="sm" onClick={engine.handleReset}>
         New Adventure
       </Button>
@@ -111,9 +139,13 @@ export const AdventureHeader: Component<{
         }
       >
         {(() => {
-          const latest = [...adventureStore.turns]
-            .reverse()
-            .find((t) => t.directorNotes)
+          const latestNotes = () => {
+            const turns = adventureStore.turns
+            for (let i = turns.length - 1; i >= 0; i--) {
+              if (turns[i].directorNotes) return turns[i].directorNotes
+            }
+            return undefined
+          }
           return (
             <div class={styles.headerDirectivePanel}>
               <div style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'space-between' }}>
@@ -133,7 +165,7 @@ export const AdventureHeader: Component<{
                 </Button>
               </div>
               <Show
-                when={latest?.directorNotes}
+                when={latestNotes()}
                 fallback={
                   <div class={styles.directiveHint}>
                     {adventureStore.isDirectorRunning
@@ -142,9 +174,21 @@ export const AdventureHeader: Component<{
                   </div>
                 }
               >
-                <div class={styles.directorNotesContent}>
-                  {latest!.directorNotes}
-                </div>
+                <textarea
+                  class={styles.directorNotesContent}
+                  value={latestNotes()!}
+                  onInput={(e) => {
+                    adventureStore.updateLastTurn({
+                      directorNotes: e.currentTarget.value,
+                    })
+                    engine.persist()
+                  }}
+                  rows={12}
+                  disabled={
+                    adventureStore.isGenerating ||
+                    adventureStore.isDirectorRunning
+                  }
+                />
               </Show>
             </div>
           )
@@ -175,6 +219,26 @@ export const AdventureHeader: Component<{
           </div>
         </div>
       </Show>
+
+      {/* LLM Activity overlay */}
+      <OverlayPanel
+        show={llmActivityStore.isOpen}
+        onClose={() => llmActivityStore.hide()}
+        title="LLM Activity"
+        position="right"
+      >
+        <LlmActivityPanel />
+      </OverlayPanel>
+
+      {/* Quick LLM overlay */}
+      <OverlayPanel
+        show={quickLlmStore.isOpen}
+        onClose={() => quickLlmStore.hide()}
+        title="Quick LLM"
+        position="right"
+      >
+        <QuickLlmDialog />
+      </OverlayPanel>
     </>
   )
 }

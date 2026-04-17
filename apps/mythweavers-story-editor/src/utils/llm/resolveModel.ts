@@ -38,8 +38,11 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   adventure: 'writing',
 
   // Analysis
+  'adventure-nonsense': 'analysis',
+  'adventure-revision': 'rewriting',
   'adventure-director': 'analysis',
   'adventure-trajectory': 'analysis',
+  'adventure-compaction': 'writing',
   'cliche:critique': 'analysis',
   'summary:node': 'analysis',
   'summary:sentence': 'analysis',

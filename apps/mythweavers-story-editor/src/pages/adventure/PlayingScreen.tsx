@@ -1,6 +1,7 @@
-import { type Component, For, Show } from 'solid-js'
+import { type Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { Button, Text } from '@mythweavers/ui'
 import { adventureStore } from '../../stores/adventureStore'
+import { getCompactionRanges, type CompactionRange } from './prompts'
 import { useEngine } from './useAdventureEngine'
 import * as styles from '../AdventurePage.css'
 
@@ -86,6 +87,234 @@ function renderStreamingContent() {
   )
 }
 
+// --- Compaction block ---
+
+function EditablePlayerAction(props: {
+  action: string
+  isLastTurn: boolean
+  isGenerating: boolean
+  engine: ReturnType<typeof useEngine>
+}) {
+  const [editing, setEditing] = createSignal(false)
+  const [editText, setEditText] = createSignal('')
+  let textareaRef: HTMLTextAreaElement | undefined
+
+  function startEditing() {
+    setEditText(props.action)
+    setEditing(true)
+    // Focus after render
+    requestAnimationFrame(() => textareaRef?.focus())
+  }
+
+  function save() {
+    const newAction = editText().trim()
+    if (!newAction || newAction === props.action) {
+      setEditing(false)
+      return
+    }
+    setEditing(false)
+    props.engine.handleEditAndRegenerate(newAction)
+  }
+
+  function cancel() {
+    setEditing(false)
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      save()
+    } else if (e.key === 'Escape') {
+      cancel()
+    }
+  }
+
+  return (
+    <Show
+      when={editing()}
+      fallback={
+        <div class={styles.playerAction}>
+          <span class={styles.playerActionLabel}>You:</span>
+          {props.action}
+          <Show when={props.isLastTurn && !props.isGenerating}>
+            <button
+              class={styles.editActionButton}
+              onClick={startEditing}
+              title="Edit action and regenerate"
+            >
+              ✏️
+            </button>
+          </Show>
+        </div>
+      }
+    >
+      <div class={styles.playerActionEdit}>
+        <span class={styles.playerActionLabel}>You:</span>
+        <textarea
+          ref={textareaRef}
+          class={styles.playerActionTextarea}
+          value={editText()}
+          onInput={(e) => setEditText(e.currentTarget.value)}
+          onKeyDown={handleKeyDown}
+          rows={2}
+        />
+        <div class={styles.playerActionEditButtons}>
+          <Button variant="primary" size="sm" onClick={save}>
+            Save & Regenerate
+          </Button>
+          <Button variant="ghost" size="sm" onClick={cancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </Show>
+  )
+}
+
+function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
+  const turn = () => adventureStore.turns[index]
+  if (!turn()) return null
+
+  const isLastTurn = () => index === adventureStore.turns.length - 1
+
+  return (
+    <div class={styles.turn}>
+      <Show when={turn().playerAction}>
+        <EditablePlayerAction
+          action={turn().playerAction!}
+          isLastTurn={isLastTurn()}
+          isGenerating={adventureStore.isGenerating}
+          engine={engine}
+        />
+      </Show>
+
+      {renderNarrative(turn().narrative, turn().dead)}
+
+      {/* Empty/failed generation — offer retry on the last turn */}
+      <Show
+        when={
+          !adventureStore.isGenerating &&
+          index === adventureStore.turns.length - 1 &&
+          turn().narrative.trim().length < 50
+        }
+      >
+        <div class={styles.nonsenseWarning}>
+          <div class={styles.nonsenseWarningHeader}>
+            ⚠️ Generation appears to have failed
+          </div>
+          <div class={styles.nonsenseWarningContent}>
+            The narrative for this turn is empty or too short. This usually means the LLM returned no usable content.
+          </div>
+          <div class={styles.nonsenseWarningActions}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => engine.handleRegenerate()}
+            >
+              ↻ Retry turn
+            </Button>
+          </div>
+        </div>
+      </Show>
+
+      <div class={styles.turnFooter}>
+        <Show when={turn().worldTrajectory}>
+          <div
+            class={styles.worldTrajectory}
+            onClick={() => adventureStore.toggleTrajectory(index)}
+          >
+            <div class={styles.worldTrajectoryLabel}>
+              {adventureStore.isTrajectoryExpanded(index) ? '▾' : '▸'}{' '}
+              World Momentum
+            </div>
+            <Show when={adventureStore.isTrajectoryExpanded(index)}>
+              <div class={styles.worldTrajectoryContent}>
+                {turn().worldTrajectory}
+              </div>
+            </Show>
+          </div>
+        </Show>
+
+        <Show
+          when={
+            !adventureStore.isGenerating &&
+            index < adventureStore.turns.length - 1
+          }
+        >
+          <button
+            class={styles.rewindButton}
+            onClick={() => engine.handleRewindTo(index)}
+            title={`Rewind to this point (removes ${adventureStore.turns.length - 1 - index} turn${adventureStore.turns.length - 1 - index > 1 ? 's' : ''})`}
+          >
+            ↩ Rewind here
+          </button>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
+const CompactionBlock: Component<{ range: CompactionRange }> = (props) => {
+  const [expanded, setExpanded] = createSignal(false)
+
+  const comp = () => adventureStore.compactions[props.range.key]
+  const isCompacting = () => adventureStore.isCompacting(props.range.key)
+  const engine = useEngine()
+
+  return (
+    <div class={styles.compactionBlock}>
+      <div
+        class={styles.compactionHeader}
+        onClick={() => setExpanded(!expanded())}
+      >
+        <span>
+          📦 Turns {props.range.start + 1}–{props.range.end + 1}
+          <Show when={isCompacting()}>
+            {' '}
+            <span class={styles.compactionPending}>⏳ compacting...</span>
+          </Show>
+        </span>
+        <div style={{ display: 'flex', gap: '8px', 'align-items': 'center' }}>
+          <Show when={!isCompacting()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e: MouseEvent) => {
+                e.stopPropagation()
+                engine.handleCompactRange(props.range)
+              }}
+            >
+              {comp() ? '🔄 Regenerate' : 'Compact'}
+            </Button>
+          </Show>
+          <span>{expanded() ? '▾' : '▸'}</span>
+        </div>
+      </div>
+
+      {/* Summary (shown when collapsed and compaction exists) */}
+      <Show when={comp()?.summary && !expanded()}>
+        <div class={styles.compactionSummary}>{comp()!.summary}</div>
+      </Show>
+
+      {/* Expanded: show summary + original turns */}
+      <Show when={expanded()}>
+        <Show when={comp()?.summary}>
+          <div class={styles.compactionSummary}>
+            <div class={styles.compactionOriginalLabel}>Summary</div>
+            {comp()!.summary}
+          </div>
+        </Show>
+        <div class={styles.compactionOriginal}>
+          <div class={styles.compactionOriginalLabel}>Original turns</div>
+          <For each={Array.from({ length: props.range.end - props.range.start + 1 }, (_, i) => props.range.start + i)}>
+            {(turnIndex) => renderTurn(turnIndex, engine)}
+          </For>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
 // --- Component ---
 
 export const PlayingScreen: Component = () => {
@@ -95,6 +324,34 @@ export const PlayingScreen: Component = () => {
     const t = adventureStore.turns
     return t.length > 0 && t[t.length - 1].dead
   }
+
+  const ranges = createMemo(() => getCompactionRanges(adventureStore.turns.length))
+
+  // Turns between last compaction range and verbatim window (partial chunk, not yet compactable)
+  const gapStart = createMemo(() => {
+    const r = ranges()
+    return r.length > 0 ? r[r.length - 1].end + 1 : 0
+  })
+
+  const verbatimStart = createMemo(() =>
+    Math.max(0, adventureStore.turns.length - 30),
+  )
+
+  const gapIndices = createMemo(() => {
+    const result: number[] = []
+    for (let i = gapStart(); i < verbatimStart(); i++) {
+      result.push(i)
+    }
+    return result
+  })
+
+  const verbatimIndices = createMemo(() => {
+    const result: number[] = []
+    for (let i = verbatimStart(); i < adventureStore.turns.length; i++) {
+      result.push(i)
+    }
+    return result
+  })
 
   return (
     <>
@@ -114,60 +371,48 @@ export const PlayingScreen: Component = () => {
             </div>
           }
         >
-          <For each={adventureStore.turns}>
-            {(turn, index) => (
-              <div class={styles.turn}>
-                <Show when={turn.playerAction}>
-                  <div class={styles.playerAction}>
-                    <span class={styles.playerActionLabel}>You:</span>
-                    {turn.playerAction}
-                  </div>
-                </Show>
-
-                {renderNarrative(turn.narrative, turn.dead)}
-
-                <div class={styles.turnFooter}>
-                  <Show when={turn.worldTrajectory}>
-                    <div
-                      class={styles.worldTrajectory}
-                      onClick={() =>
-                        adventureStore.toggleTrajectory(index())
-                      }
-                    >
-                      <div class={styles.worldTrajectoryLabel}>
-                        {adventureStore.isTrajectoryExpanded(index())
-                          ? '▾'
-                          : '▸'}{' '}
-                        World Momentum
-                      </div>
-                      <Show
-                        when={adventureStore.isTrajectoryExpanded(index())}
-                      >
-                        <div class={styles.worldTrajectoryContent}>
-                          {turn.worldTrajectory}
-                        </div>
-                      </Show>
-                    </div>
-                  </Show>
-
-                  <Show
-                    when={
-                      !adventureStore.isGenerating &&
-                      index() < adventureStore.turns.length - 1
-                    }
-                  >
-                    <button
-                      class={styles.rewindButton}
-                      onClick={() => engine.handleRewindTo(index())}
-                      title={`Rewind to this point (removes ${adventureStore.turns.length - 1 - index()} turn${adventureStore.turns.length - 1 - index() > 1 ? 's' : ''})`}
-                    >
-                      ↩ Rewind here
-                    </button>
-                  </Show>
-                </div>
-              </div>
-            )}
+          {/* Compacted ranges */}
+          <For each={ranges()}>
+            {(range) => <CompactionBlock range={range} />}
           </For>
+
+          {/* Gap turns (between last compaction and verbatim window) */}
+          <For each={gapIndices()}>
+            {(turnIndex) => renderTurn(turnIndex, engine)}
+          </For>
+
+          {/* Recent verbatim turns */}
+          <For each={verbatimIndices()}>
+            {(turnIndex) => renderTurn(turnIndex, engine)}
+          </For>
+
+          {/* Nonsense warning */}
+          <Show when={adventureStore.nonsenseWarning && !adventureStore.isGenerating}>
+            <div class={styles.nonsenseWarning}>
+              <div class={styles.nonsenseWarningHeader}>
+                ⚠️ Potential issues detected
+              </div>
+              <div class={styles.nonsenseWarningContent}>
+                {adventureStore.nonsenseWarning}
+              </div>
+              <div class={styles.nonsenseWarningActions}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => engine.handleReviseNarrative()}
+                >
+                  Revise narrative
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => adventureStore.setNonsenseWarning(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </Show>
 
           {/* Death screen */}
           <Show when={isDead()}>

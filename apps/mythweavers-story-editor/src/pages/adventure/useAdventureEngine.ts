@@ -12,10 +12,14 @@ import {
   buildNarrativeMessages,
   buildTrajectoryMessages,
   buildDirectorMessages,
+  buildNonsenseCheckMessages,
+  buildRevisionMessages,
+  buildCompactionMessages,
+  getCompactionRanges,
   cleanNarrative,
   parseTrajectory,
+  sanitizeDirectorNotes,
 } from './prompts'
-import { processLLMDiffResponse } from '@mythweavers/shared'
 
 // --- Engine interface & context ---
 
@@ -26,10 +30,13 @@ export interface AdventureEngine {
   handleAbort: () => void
   handleRetry: () => void
   handleRegenerate: () => void
+  handleEditAndRegenerate: (newAction: string) => void
+  handleReviseNarrative: () => void
   handleRegenerateDirector: () => void
   handleRewindTo: (turnIndex: number) => void
   handleReset: () => void
   handleGenerateSetting: () => Promise<void>
+  handleCompactRange: (range: { start: number; end: number; key: string }) => void
   persist: () => void
   setStoryAreaRef: (el: HTMLDivElement) => void
   setInputRef: (el: HTMLTextAreaElement) => void
@@ -103,6 +110,7 @@ export function createAdventureEngine(
 
     adventureStore.setError(null)
     adventureStore.setLastFailedAction(undefined)
+    adventureStore.setNonsenseWarning(null)
     adventureStore.setIsGenerating(true)
     adventureStore.setStreamingContent('')
     adventureStore.setPendingAction(playerAction)
@@ -117,6 +125,7 @@ export function createAdventureEngine(
         adventureStore.settingDescription,
         playerAction,
         adventureStore.directive,
+        adventureStore.compactions,
       )
 
       const narrativeResolved = resolveModel('adventure')
@@ -153,64 +162,82 @@ export function createAdventureEngine(
 
       const narrative = cleanNarrative(accumulated)
 
-      // --- Step 2: Run director agent (silent) ---
-      adventureStore.setStreamingContent(
-        `${narrative}\n\n⏳ Updating the world...`,
-      )
+      // --- Step 1.5: Consistency check loop ---
+      const checkedNarrative = await runNarrativeChecks(narrative, playerAction)
 
-      const directorNotes = await runDirector({ playerAction, narrative })
+      let directorNotes: string | undefined
+      let worldTrajectory = ''
+      let dead = false
 
-      // --- Step 3: Generate world trajectory using fresh director notes ---
-      adventureStore.setStreamingContent(
-        `${narrative}\n\n⏳ Reading the world...`,
-      )
+      if (adventureStore.worldMomentumEnabled) {
+        // --- Step 2: Run director agent every 5 turns, or immediately if flagged ---
+        const turnIndex = adventureStore.turns.length
+        const shouldRunDirector = turnIndex % 5 === 0 || adventureStore.directorDueNextTurn
 
-      const trajectoryMessages = buildTrajectoryMessages(
-        adventureStore.turns,
-        narrative,
-        playerAction,
-        directorNotes,
-        { directive: adventureStore.directive },
-      )
-
-      const trajectoryResolved = resolveModel('adventure-trajectory')
-      const trajectoryClient = LLMClientFactory.getClient(
-        trajectoryResolved.provider,
-      )
-
-      let trajectoryAccumulated = ''
-      const trajectoryResponse = trajectoryClient.generate({
-        model: trajectoryResolved.model,
-        messages: trajectoryMessages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
-          ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
-            )
-          : undefined,
-        signal: abortController.signal,
-        metadata: { callType: 'adventure-trajectory' },
-      })
-
-      for await (const event of trajectoryResponse) {
-        if (event.type === 'chunk') {
-          trajectoryAccumulated += event.text
+        if (shouldRunDirector) {
+          adventureStore.setDirectorDueNextTurn(false)
+          adventureStore.setStreamingContent(
+            `${checkedNarrative}\n\n⏳ Updating the world...`,
+          )
+          directorNotes = await runDirector({ playerAction, narrative: checkedNarrative })
         }
-      }
 
-      const { trajectory: worldTrajectory, dead } =
-        parseTrajectory(trajectoryAccumulated)
+        // --- Step 3: Generate world trajectory using fresh director notes ---
+        adventureStore.setStreamingContent(
+          `${checkedNarrative}\n\n⏳ Reading the world...`,
+        )
+
+        const trajectoryMessages = buildTrajectoryMessages(
+          adventureStore.turns,
+          checkedNarrative,
+          playerAction,
+          directorNotes,
+          { directive: adventureStore.directive, compactions: adventureStore.compactions },
+        )
+
+        const trajectoryResolved = resolveModel('adventure-trajectory')
+        const trajectoryClient = LLMClientFactory.getClient(
+          trajectoryResolved.provider,
+        )
+
+        let trajectoryAccumulated = ''
+        const trajectoryResponse = trajectoryClient.generate({
+          model: trajectoryResolved.model,
+          messages: trajectoryMessages,
+          max_tokens: effectiveSettings.maxTokens,
+          thinking_budget: effectiveSettings.thinkingBudget
+            ? Math.min(
+                effectiveSettings.thinkingBudget,
+                Math.floor(effectiveSettings.maxTokens / 2),
+              )
+            : undefined,
+          signal: abortController.signal,
+          metadata: { callType: 'adventure-trajectory' },
+        })
+
+        for await (const event of trajectoryResponse) {
+          if (event.type === 'chunk') {
+            trajectoryAccumulated += event.text
+          }
+        }
+
+        const parsed = parseTrajectory(trajectoryAccumulated)
+        worldTrajectory = parsed.trajectory
+        dead = parsed.dead
+      }
 
       // Batch-finalize: clear streaming and add turn in one render frame
       adventureStore.finalizeTurn({
         playerAction,
-        narrative,
+        narrative: checkedNarrative,
         worldTrajectory,
         ...(dead ? { dead: true } : {}),
         ...(directorNotes ? { directorNotes } : {}),
       })
       persist()
+
+      // Run compaction in the background (non-blocking, fire-and-forget)
+      runPendingCompactions()
 
       // Focus input for next action
       if (!dead) {
@@ -259,7 +286,7 @@ export function createAdventureEngine(
     try {
       const directorResolved = resolveModel('adventure-director')
       const client = LLMClientFactory.getClient(directorResolved.provider)
-      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive)
+      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive, adventureStore.compactions)
 
       let accumulated = ''
       const response = client.generate({
@@ -288,24 +315,237 @@ export function createAdventureEngine(
 
       if (!rawResponse) return undefined
 
-      // Check if we have previous notes — if so, the response is a diff
-      const previousNotes = [...adventureStore.turns]
-        .reverse()
-        .find((t) => t.directorNotes)?.directorNotes
-
-      if (previousNotes) {
-        const result = processLLMDiffResponse(previousNotes, rawResponse)
-        return result.resultContent || undefined
-      }
-
-      // First turn: response is the full notes
-      return rawResponse
+      // Always full notes — sanitize in case the model misbehaves
+      const sanitizedNotes = sanitizeDirectorNotes(rawResponse)
+      console.log('[Director] Notes:\n', sanitizedNotes)
+      return sanitizedNotes
     } catch (err) {
       // Director failures are silent — they don't affect the player experience
       console.warn('Director agent error:', err)
       return undefined
     } finally {
       adventureStore.setIsDirectorRunning(false)
+    }
+  }
+
+  // --- Compaction (background, non-blocking) ---
+
+  /** Generate a compaction summary for a single range. */
+  async function compactRange(range: { start: number; end: number; key: string }) {
+    if (adventureStore.isCompacting(range.key)) return
+    adventureStore.setCompactingKey(range.key, true)
+
+    try {
+      console.log(`[Compaction] Generating summary for turns ${range.start}–${range.end}`)
+
+      const resolved = resolveModel('adventure-compaction')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      const messages = buildCompactionMessages(adventureStore.turns, range)
+
+      let accumulated = ''
+      const response = client.generate({
+        model: resolved.model,
+        messages,
+        max_tokens: effectiveSettings.maxTokens,
+        metadata: { callType: 'adventure-compaction' },
+      })
+
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          accumulated += event.text
+        }
+      }
+
+      const summary = accumulated
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/^#+\s+[^\n]+\n+/gm, '')
+        .replace(/^(Story\s+)?Summary\s*:\s*/i, '')
+        .trim()
+
+      if (summary) {
+        adventureStore.setCompaction(range.key, {
+          summary,
+          generatedAt: new Date().toISOString(),
+        })
+        persist()
+        console.log(`[Compaction] Saved summary for ${range.key} (${summary.length} chars)`)
+      }
+    } catch (err) {
+      console.warn(`[Compaction] Failed for range ${range.key}:`, err)
+    } finally {
+      adventureStore.setCompactingKey(range.key, false)
+    }
+  }
+
+  /**
+   * Check if any new compaction ranges need summaries and generate them.
+   * Runs after turn finalization — failures are silent.
+   */
+  async function runPendingCompactions() {
+    const ranges = getCompactionRanges(adventureStore.turns.length)
+    const pending = ranges.filter((r) => !adventureStore.compactions[r.key])
+    for (const range of pending) {
+      await compactRange(range)
+    }
+  }
+
+  // --- Narrative quality checks (consistency + nonsense, run in parallel) ---
+
+  /** Run a single check agent and return its issues (empty string = passed) */
+  async function runSingleCheck(
+    label: string,
+    messages: LLMMessage[],
+    callType: string,
+  ): Promise<string> {
+    const resolved = resolveModel(callType)
+    const client = LLMClientFactory.getClient(resolved.provider)
+
+    let accumulated = ''
+    const response = client.generate({
+      model: resolved.model,
+      messages,
+      max_tokens: effectiveSettings.maxTokens,
+      thinking_budget: effectiveSettings.thinkingBudget
+        ? Math.min(
+            effectiveSettings.thinkingBudget,
+            Math.floor(effectiveSettings.maxTokens / 2),
+          )
+        : undefined,
+      signal: abortController!.signal,
+      metadata: { callType },
+    })
+
+    for await (const event of response) {
+      if (event.type === 'chunk') {
+        accumulated += event.text
+      }
+    }
+
+    const result = accumulated
+      .replace(/<think>[\s\S]*?<\/think>/g, '')
+      .trim()
+
+    console.log(`[${label}] Analysis result:\n`, result)
+
+    if (result.startsWith('CONSISTENT')) {
+      console.log(`[${label}] Passed`)
+      return ''
+    }
+
+    const issues = result.replace(/^INCONSISTENT\s*/i, '').trim()
+    if (!issues) {
+      console.log(`[${label}] Said INCONSISTENT but gave no specifics — treating as passed`)
+      return ''
+    }
+
+    return issues
+  }
+
+  async function runNarrativeChecks(
+    narrative: string,
+    _playerAction: string | null,
+  ): Promise<string> {
+    // Nothing to check on the opening turn or if the narrative is empty/trivial
+    if (adventureStore.turns.length === 0) return narrative
+    if (!narrative || narrative.trim().length < 50) return narrative
+
+    adventureStore.setStreamingContent(
+      `${narrative}\n\n⏳ Checking narrative...`,
+    )
+
+    // Only check physical/logical sense — no full-history consistency check
+    const nonsenseIssues = await runSingleCheck(
+      'Nonsense',
+      buildNonsenseCheckMessages(
+        narrative,
+        adventureStore.settingDescription,
+        adventureStore.directive,
+      ),
+      'adventure-nonsense',
+    )
+
+    if (!nonsenseIssues) {
+      console.log('[Checks] Narrative passed all checks')
+      adventureStore.setNonsenseWarning(null)
+      return narrative
+    }
+
+    // Store the warning for the user to review — don't auto-revise
+    console.log('[Checks] Issues found (user will decide):\n', nonsenseIssues)
+    adventureStore.setNonsenseWarning(nonsenseIssues)
+
+    return narrative
+  }
+
+  /** Revise the latest turn's narrative based on the nonsense warning. Called on user request. */
+  async function handleReviseNarrative() {
+    if (adventureStore.isGenerating) return
+    if (adventureStore.turns.length === 0) return
+    if (!adventureStore.nonsenseWarning) return
+
+    const lastTurn = adventureStore.turns[adventureStore.turns.length - 1]
+    const nonsenseIssues = adventureStore.nonsenseWarning
+
+    adventureStore.setIsGenerating(true)
+    adventureStore.setStreamingContent('⏳ Revising narrative...')
+    abortController = new AbortController()
+
+    try {
+      const revisionMessages = buildRevisionMessages(
+        adventureStore.turns.slice(0, -1),
+        adventureStore.settingDescription,
+        lastTurn.playerAction,
+        lastTurn.narrative,
+        nonsenseIssues,
+        adventureStore.directive,
+        adventureStore.compactions,
+      )
+
+      const revisionResolved = resolveModel('adventure-revision')
+      const revisionClient = LLMClientFactory.getClient(
+        revisionResolved.provider,
+      )
+
+      let revisionAccumulated = ''
+      const revisionResponse = revisionClient.generate({
+        model: revisionResolved.model,
+        messages: revisionMessages,
+        max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
+          ? Math.min(
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
+            )
+          : undefined,
+        signal: abortController!.signal,
+        metadata: { callType: 'adventure-revision' },
+      })
+
+      for await (const event of revisionResponse) {
+        if (event.type === 'chunk') {
+          revisionAccumulated += event.text
+          const displayContent = revisionAccumulated
+            .replace(/<think>[\s\S]*?<\/think>/g, '')
+            .replace(/<\/?narrative>/g, '')
+            .trim()
+          adventureStore.setStreamingContent(displayContent)
+        }
+      }
+
+      const revisedNarrative = cleanNarrative(revisionAccumulated)
+      if (revisedNarrative) {
+        adventureStore.updateLastTurn({ narrative: revisedNarrative })
+        adventureStore.setNonsenseWarning(null)
+        persist()
+      }
+    } catch (err) {
+      console.error('[Revision] Error:', err)
+      adventureStore.setError(
+        err instanceof Error ? err.message : 'Failed to revise narrative',
+      )
+    } finally {
+      adventureStore.setIsGenerating(false)
+      adventureStore.setStreamingContent('')
     }
   }
 
@@ -382,6 +622,15 @@ export function createAdventureEngine(
     generate(action)
   }
 
+  function handleEditAndRegenerate(newAction: string) {
+    if (adventureStore.isGenerating) return
+    if (adventureStore.turns.length === 0) return
+
+    adventureStore.removeLastTurn()
+    persist()
+    generate(newAction)
+  }
+
   async function handleRegenerateDirector() {
     if (adventureStore.isGenerating || adventureStore.isDirectorRunning) return
     if (adventureStore.turns.length === 0) return
@@ -423,7 +672,7 @@ export function createAdventureEngine(
         lastTurn.narrative,
         lastTurn.playerAction,
         directorNotes,
-        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive },
+        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive, compactions: adventureStore.compactions },
       )
 
       const trajectoryResolved = resolveModel('adventure-trajectory')
@@ -614,10 +863,13 @@ export function createAdventureEngine(
     handleAbort,
     handleRetry,
     handleRegenerate,
+    handleEditAndRegenerate,
+    handleReviseNarrative,
     handleRegenerateDirector,
     handleRewindTo,
     handleReset,
     handleGenerateSetting,
+    handleCompactRange: compactRange,
     persist,
     setStoryAreaRef,
     setInputRef,

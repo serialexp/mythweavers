@@ -2,6 +2,7 @@ import { batch } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import type {
   AdventureTurn,
+  AdventureCompaction,
   AdventurePhase,
   PersistedState,
 } from '../hooks/useAdventurePersistence'
@@ -16,6 +17,7 @@ interface AdventureState {
   protagonistInput: string
   settingDescription: string
   turns: AdventureTurn[]
+  compactions: Record<string, AdventureCompaction>
   directive: string
 
   // Generation state
@@ -28,11 +30,21 @@ interface AdventureState {
   // Director agent
   isDirectorRunning: boolean
 
+  // Compaction
+  compactingKeys: Record<string, boolean>
+
   // Setting generator
   isGeneratingSetting: boolean
   settingGenFailed: boolean
   knobValues: Record<string, string>
   knobLocks: Record<string, boolean>
+
+  // Feature toggles
+  worldMomentumEnabled: boolean
+  directorDueNextTurn: boolean
+
+  // Nonsense check
+  nonsenseWarning: string | null
 
   // UI state
   playerInput: string
@@ -62,6 +74,7 @@ const [state, setState] = createStore<AdventureState>({
   protagonistInput: '',
   settingDescription: '',
   turns: [],
+  compactions: {},
   directive: '',
 
   isGenerating: false,
@@ -72,10 +85,17 @@ const [state, setState] = createStore<AdventureState>({
 
   isDirectorRunning: false,
 
+  compactingKeys: {},
+
   isGeneratingSetting: false,
   settingGenFailed: false,
   knobValues: defaultKnobValues(),
   knobLocks: defaultKnobLocks(),
+
+  worldMomentumEnabled: true,
+  directorDueNextTurn: false,
+
+  nonsenseWarning: null,
 
   playerInput: '',
   expandedTrajectories: {},
@@ -104,6 +124,9 @@ export const adventureStore = {
   get turns() {
     return state.turns
   },
+  get compactions() {
+    return state.compactions
+  },
   get directive() {
     return state.directive
   },
@@ -128,6 +151,14 @@ export const adventureStore = {
     return state.isDirectorRunning
   },
 
+  get compactingKeys() {
+    return state.compactingKeys
+  },
+
+  isCompacting(key: string): boolean {
+    return !!state.compactingKeys[key]
+  },
+
   get isGeneratingSetting() {
     return state.isGeneratingSetting
   },
@@ -139,6 +170,16 @@ export const adventureStore = {
   },
   get knobLocks() {
     return state.knobLocks
+  },
+
+  get worldMomentumEnabled() {
+    return state.worldMomentumEnabled
+  },
+  get directorDueNextTurn() {
+    return state.directorDueNextTurn
+  },
+  get nonsenseWarning() {
+    return state.nonsenseWarning
   },
 
   get playerInput() {
@@ -177,6 +218,10 @@ export const adventureStore = {
   setSettingDescription(v: string) {
     setState('settingDescription', v)
   },
+  setCompaction(key: string, compaction: AdventureCompaction) {
+    setState('compactions', key, compaction)
+  },
+
   setDirective(v: string) {
     setState('directive', v)
   },
@@ -201,6 +246,14 @@ export const adventureStore = {
     setState('isDirectorRunning', v)
   },
 
+  setCompactingKey(key: string, v: boolean) {
+    if (v) {
+      setState('compactingKeys', key, true)
+    } else {
+      setState('compactingKeys', key, undefined as unknown as boolean)
+    }
+  },
+
   setIsGeneratingSetting(v: boolean) {
     setState('isGeneratingSetting', v)
   },
@@ -209,6 +262,20 @@ export const adventureStore = {
   },
   setKnobValues(v: Record<string, string>) {
     setState('knobValues', reconcile(v))
+  },
+
+  setWorldMomentumEnabled(v: boolean) {
+    setState('worldMomentumEnabled', v)
+    // When re-enabling momentum, force the director to run on the next turn
+    if (v) {
+      setState('directorDueNextTurn', true)
+    }
+  },
+  setDirectorDueNextTurn(v: boolean) {
+    setState('directorDueNextTurn', v)
+  },
+  setNonsenseWarning(v: string | null) {
+    setState('nonsenseWarning', v)
   },
 
   setPlayerInput(v: string) {
@@ -269,7 +336,18 @@ export const adventureStore = {
 
   /** Rewind the story to a specific turn index (inclusive). */
   rewindTo(turnIndex: number) {
-    setState('turns', reconcile([...state.turns.slice(0, turnIndex + 1)]))
+    const newCount = turnIndex + 1
+    setState('turns', reconcile([...state.turns.slice(0, newCount)]))
+
+    // Invalidate compactions that reference turns beyond the new count
+    const cleaned: Record<string, AdventureCompaction> = {}
+    for (const [key, comp] of Object.entries(state.compactions)) {
+      const end = Number.parseInt(key.split('-')[1], 10)
+      if (end < newCount) {
+        cleaned[key] = comp
+      }
+    }
+    setState('compactions', reconcile(cleaned))
   },
 
   /** Remove the last turn and return it. */
@@ -290,7 +368,9 @@ export const adventureStore = {
       protagonistInput: state.protagonistInput,
       settingDescription: state.settingDescription,
       turns: [...state.turns],
+      compactions: { ...state.compactions },
       directive: state.directive,
+      worldMomentumEnabled: state.worldMomentumEnabled,
       ...(action ? { pendingAction: action } : {}),
     }
   },
@@ -343,6 +423,8 @@ export const adventureStore = {
         isGeneratingSetting: false,
         settingGenFailed: false,
 
+        worldMomentumEnabled: saved?.worldMomentumEnabled ?? true,
+
         playerInput: '',
         showDirectorNotes: false,
         showMenu: false,
@@ -352,6 +434,8 @@ export const adventureStore = {
       })
       // Use reconcile for nested objects/arrays to ensure old keys are cleared
       setState('turns', reconcile(saved?.turns ?? []))
+      setState('compactions', reconcile(saved?.compactions ?? {}))
+      setState('compactingKeys', reconcile({}))
       setState('expandedTrajectories', reconcile({}))
       setState('knobValues', reconcile(defaultKnobValues()))
       setState('knobLocks', reconcile(defaultKnobLocks()))
@@ -379,6 +463,8 @@ export const adventureStore = {
         isGeneratingSetting: false,
         settingGenFailed: false,
 
+        worldMomentumEnabled: true,
+
         playerInput: '',
         showDirectorNotes: false,
         showMenu: false,
@@ -387,6 +473,8 @@ export const adventureStore = {
         scrollLocked: true,
       })
       setState('turns', reconcile([]))
+      setState('compactions', reconcile({}))
+      setState('compactingKeys', reconcile({}))
       setState('expandedTrajectories', reconcile({}))
       setState('knobValues', reconcile(defaultKnobValues()))
       setState('knobLocks', reconcile(defaultKnobLocks()))

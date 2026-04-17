@@ -108,6 +108,61 @@ export const directorIndicator = style({
   cursor: 'default',
 })
 
+// cacheDots styles live in LlmCacheDots.css.ts
+
+// Compaction block
+export const compactionBlock = style({
+  marginBottom: tokens.space['4'],
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+  overflow: 'hidden',
+})
+
+export const compactionHeader = style({
+  padding: `${tokens.space['3']} ${tokens.space['4']}`,
+  background: tokens.color.bg.raised,
+  cursor: 'pointer',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.secondary,
+  userSelect: 'none',
+  ':hover': {
+    background: tokens.color.bg.elevated,
+  },
+})
+
+export const compactionSummary = style({
+  padding: `${tokens.space['3']} ${tokens.space['4']}`,
+  borderTop: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  lineHeight: '1.6',
+  color: tokens.color.text.secondary,
+  fontStyle: 'italic',
+  fontSize: tokens.font.size.sm,
+  whiteSpace: 'pre-wrap',
+})
+
+export const compactionOriginal = style({
+  padding: `${tokens.space['3']} ${tokens.space['4']}`,
+  borderTop: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  maxHeight: '400px',
+  overflowY: 'auto',
+})
+
+export const compactionOriginalLabel = style({
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+  marginBottom: tokens.space['2'],
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+})
+
+export const compactionPending = style({
+  fontSize: tokens.font.size.xs,
+  color: 'var(--warning-color, #ffc107)',
+})
+
 // Story area
 export const storyArea = style({
   flex: 1,
@@ -153,6 +208,34 @@ export const rewindButton = style({
   },
 })
 
+// Nonsense warning
+export const nonsenseWarning = style({
+  margin: `${tokens.space['4']} 0`,
+  padding: tokens.space['4'],
+  borderRadius: tokens.radius.md,
+  border: `1px solid var(--warning-color, #ffc107)`,
+  backgroundColor: 'color-mix(in srgb, var(--warning-color, #ffc107) 8%, transparent)',
+})
+
+export const nonsenseWarningHeader = style({
+  fontWeight: tokens.font.weight.semibold,
+  marginBottom: tokens.space['2'],
+  color: 'var(--warning-color, #ffc107)',
+})
+
+export const nonsenseWarningContent = style({
+  fontSize: tokens.font.size.sm,
+  lineHeight: '1.6',
+  whiteSpace: 'pre-wrap',
+  color: tokens.color.text.secondary,
+  marginBottom: tokens.space['3'],
+})
+
+export const nonsenseWarningActions = style({
+  display: 'flex',
+  gap: tokens.space['2'],
+})
+
 export const deathScreen = style({
   display: 'flex',
   flexDirection: 'column',
@@ -193,6 +276,60 @@ export const playerActionLabel = style({
   fontWeight: 600,
   fontStyle: 'normal',
   whiteSpace: 'nowrap',
+})
+
+export const editActionButton = style({
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: `0 ${tokens.space['1']}`,
+  fontSize: tokens.font.size.xs,
+  opacity: 0,
+  transition: `opacity ${tokens.duration.fast} ${tokens.easing.default}`,
+  marginLeft: 'auto',
+  flexShrink: 0,
+  selectors: {
+    [`${playerAction}:hover &`]: {
+      opacity: 0.7,
+    },
+    '&:hover': {
+      opacity: '1 !important' as string,
+    },
+  },
+})
+
+export const playerActionEdit = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['2'],
+  marginBottom: tokens.space['3'],
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  backgroundColor: tokens.color.bg.base,
+  borderRadius: tokens.radius.md,
+  borderLeft: `3px solid ${tokens.color.accent.primary}`,
+})
+
+export const playerActionTextarea = style({
+  width: '100%',
+  padding: tokens.space['2'],
+  backgroundColor: tokens.color.bg.raised,
+  color: tokens.color.text.primary,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.sm,
+  fontFamily: 'inherit',
+  fontSize: 'inherit',
+  resize: 'vertical',
+  boxSizing: 'border-box',
+  ':focus': {
+    outline: 'none',
+    borderColor: tokens.color.accent.primary,
+  },
+})
+
+export const playerActionEditButtons = style({
+  display: 'flex',
+  gap: tokens.space['2'],
+  justifyContent: 'flex-end',
 })
 
 export const narrative = style({})
@@ -239,6 +376,7 @@ export const worldTrajectoryLabel = style({
 export const worldTrajectoryContent = style({
   lineHeight: 1.5,
   color: tokens.color.text.secondary,
+  whiteSpace: 'pre-wrap',
 })
 
 // Streaming
@@ -629,6 +767,14 @@ export const directorNotesContent = style({
   borderRadius: tokens.radius.md,
   maxHeight: '300px',
   overflowY: 'auto',
+  width: '100%',
+  fontFamily: 'inherit',
+  resize: 'vertical',
+  boxSizing: 'border-box',
+  ':focus': {
+    outline: 'none',
+    borderColor: tokens.color.border.focus,
+  },
 })
 
 export const headerDirectivePanel = style({
