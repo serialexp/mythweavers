@@ -19,6 +19,7 @@ import {
   putAdminLlmProvidersById,
   deleteAdminLlmProvidersById,
 } from "../api/config"
+import { getApiBaseUrl } from "../api/config"
 import { ProtocolBadge } from "../components/ProtocolBadge"
 import { ProviderForm } from "../components/ProviderForm"
 import { StatusDot } from "../components/StatusDot"
@@ -44,6 +45,42 @@ export function ProvidersPage() {
     const res = await getAdminLlmProviders()
     return (res.data?.providers ?? []) as Provider[]
   })
+
+  // Fetch balances for all providers
+  const [balances] = createResource(
+    providers,
+    async (providerList) => {
+      const results = new Map<string, { balance: string; totalTopUps: string; totalCosts: string }>()
+      await Promise.all(
+        providerList.map(async (p) => {
+          try {
+            const res = await fetch(`${getApiBaseUrl()}/admin/llm/providers/${p.id}/balance`, {
+              credentials: "include",
+            })
+            if (res.ok) {
+              const body = (await res.json()) as {
+                balance: { balance: string; totalTopUps: string; totalCosts: string }
+              }
+              results.set(p.id, body.balance)
+            }
+          } catch {
+            // Silently skip — balance is supplementary info
+          }
+        }),
+      )
+      return results
+    },
+  )
+
+  const getProviderBalance = (id: string): string | null => {
+    const bal = balances()?.get(id)
+    if (!bal) return null
+    // Only show balance if there are any transactions
+    if (bal.totalTopUps === "0.000000" && bal.totalCosts === "0.000000") return null
+    const num = Number.parseFloat(bal.balance)
+    return `$${num.toFixed(2)}`
+  }
+
   const [error, setError] = createSignal("")
   const [confirmDelete, setConfirmDelete] = createSignal<Provider | null>(null)
   let panelRef: ListDetailPanelRef | undefined
@@ -149,6 +186,17 @@ export function ProvidersPage() {
                   <div class={styles.providerSlug}>{provider.name}</div>
                 </div>
                 <ProtocolBadge protocol={provider.protocol} />
+                <Show when={getProviderBalance(provider.id)}>
+                  {(bal) => (
+                    <Text
+                      size="xs"
+                      weight="semibold"
+                      color={bal().startsWith("$-") ? "error" : "success"}
+                    >
+                      {bal()}
+                    </Text>
+                  )}
+                </Show>
               </div>
             )}
             detailTitle={(p) => p.displayName}
@@ -177,6 +225,23 @@ export function ProvidersPage() {
                     Delete
                   </Button>
                 </Stack>
+
+                <Show when={getProviderBalance(provider.id)}>
+                  {(bal) => (
+                    <Stack direction="vertical" gap="xs">
+                      <Text size="sm" color="secondary">
+                        Balance
+                      </Text>
+                      <Text
+                        size="lg"
+                        weight="bold"
+                        color={bal().startsWith("$-") ? "error" : "success"}
+                      >
+                        {bal()}
+                      </Text>
+                    </Stack>
+                  )}
+                </Show>
 
                 <Stack direction="vertical" gap="xs">
                   <Text size="sm" color="secondary">

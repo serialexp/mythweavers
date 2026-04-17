@@ -229,6 +229,10 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
           ...(m.cache_control ? { cache_control: m.cache_control } : {}),
         }))
 
+        const t0 = Date.now()
+        let firstChunkAt: number | undefined
+        let chunkCount = 0
+
         for await (const event of client.generate({
           model: upstream.model,
           messages,
@@ -237,11 +241,23 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
           thinking_budget: request.body.thinking_budget,
           signal: abortController.signal,
         })) {
+          if (event.type === 'chunk' && !firstChunkAt) {
+            firstChunkAt = Date.now()
+            fastify.log.info({ model: upstream.model, ttfb: firstChunkAt - t0 }, '[llm-proxy] first chunk (TTFB)')
+          }
+          if (event.type === 'chunk') chunkCount++
           writeSSE(raw, event)
           if (event.type === 'usage') {
             onUsage(event as LLMStreamEvent & { type: 'usage' })
           }
         }
+
+        fastify.log.info({
+          model: upstream.model,
+          totalMs: Date.now() - t0,
+          ttfbMs: firstChunkAt ? firstChunkAt - t0 : null,
+          chunks: chunkCount,
+        }, '[llm-proxy] stream complete')
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
           streamAborted = true

@@ -1,6 +1,5 @@
 import {
   Alert,
-  Button,
   Container,
   Heading,
   NavBar,
@@ -15,6 +14,7 @@ import { useLocation } from "@solidjs/router"
 import { type JSX, Match, Show, Switch, createResource } from "solid-js"
 import { getAuthSession, getAdminUsers } from "./api/config"
 import * as styles from "./components/Layout.css"
+import { LoginForm } from "./components/LoginForm"
 
 type AuthState =
   | { status: "loading" }
@@ -43,7 +43,7 @@ async function checkAdminAccess(): Promise<AuthState> {
 
 export function App(props: { children?: JSX.Element }) {
   const location = useLocation()
-  const [auth] = createResource(checkAdminAccess)
+  const [auth, { refetch }] = createResource(checkAdminAccess)
 
   return (
     <div class={styles.layout}>
@@ -76,28 +76,7 @@ export function App(props: { children?: JSX.Element }) {
           </Match>
 
           <Match when={auth()?.status === "not_authenticated"}>
-            <Container size="sm" padding="lg" center>
-              <Stack direction="vertical" gap="lg" align="center" style={{ "padding-top": "4rem" }}>
-                <Heading level={1} size="2xl">
-                  Not Logged In
-                </Heading>
-                <Alert variant="warning" title="Authentication required">
-                  <Text>
-                    You need to log in to the main MythWeavers app first, then
-                    come back here.
-                  </Text>
-                </Alert>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    const { protocol, hostname } = window.location
-                    window.location.href = `${protocol}//${hostname}:3203/login`
-                  }}
-                >
-                  Go to Login
-                </Button>
-              </Stack>
-            </Container>
+            <LoginForm onSuccess={() => refetch()} />
           </Match>
 
           <Match when={auth()?.status === "not_admin"}>

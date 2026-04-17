@@ -3,6 +3,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAdmin } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
+import { fetchAnthropicCosts, fetchOpenAICosts, syncProviderCosts } from '../../lib/provider-costs.js'
 
 // --- Shared schemas ---
 
@@ -86,6 +87,39 @@ const updateModelSchema = createModelSchema.partial()
 const idParam = z.object({ id: z.string() })
 const providerIdParam = z.object({ providerId: z.string() })
 
+// --- Balance/Ledger schemas ---
+
+const transactionTypeEnum = z.enum(['TOP_UP', 'COST_SYNC'])
+
+const transactionSchema = z.object({
+  id: z.string(),
+  providerId: z.string(),
+  type: transactionTypeEnum,
+  amount: z.string().meta({ description: 'Amount in USD as decimal string' }),
+  date: z.string().meta({ description: 'ISO date string' }),
+  notes: z.string().nullable(),
+  syncKey: z.string().nullable(),
+  createdAt: z.string(),
+})
+
+const balanceSchema = z.object({
+  providerId: z.string(),
+  totalTopUps: z.string().meta({ description: 'Sum of top-ups in USD' }),
+  totalCosts: z.string().meta({ description: 'Sum of synced costs in USD' }),
+  balance: z.string().meta({ description: 'top-ups minus costs' }),
+})
+
+const addTopUpBodySchema = z.object({
+  amount: z.number().positive().meta({ description: 'Top-up amount in USD', example: 100.0 }),
+  date: z.string().optional().meta({ description: 'Effective date (ISO string). Defaults to now.' }),
+  notes: z.string().optional().meta({ description: 'Optional note', example: 'April top-up' }),
+})
+
+const syncCostsBodySchema = z.object({
+  startDate: z.string().meta({ description: 'Start date for cost sync (YYYY-MM-DD)', example: '2026-04-01' }),
+  endDate: z.string().meta({ description: 'End date for cost sync (YYYY-MM-DD)', example: '2026-04-13' }),
+})
+
 // --- Helpers ---
 
 function enrichProvider(p: any) {
@@ -102,6 +136,19 @@ function enrichModel(m: any) {
     ...m,
     createdAt: m.createdAt.toISOString(),
     updatedAt: m.updatedAt.toISOString(),
+  }
+}
+
+function enrichTransaction(t: any) {
+  return {
+    id: t.id,
+    providerId: t.providerId,
+    type: t.type,
+    amount: t.amount.toString(),
+    date: t.date.toISOString(),
+    notes: t.notes,
+    syncKey: t.syncKey,
+    createdAt: t.createdAt.toISOString(),
   }
 }
 
@@ -456,6 +503,215 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
   )
   // =====================
+  // PROVIDER BALANCE & TRANSACTIONS
+  // =====================
+
+  /** Get computed balance for a provider */
+  fastify.get(
+    '/llm/providers/:providerId/balance',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        description: 'Get the computed balance (top-ups minus costs) for a provider',
+        tags: ['admin-llm'],
+        params: providerIdParam,
+        response: {
+          200: z.object({ balance: balanceSchema }),
+          401: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const provider = await prisma.llmProvider.findUnique({
+        where: { id: request.params.providerId },
+      })
+      if (!provider) return reply.status(404).send({ error: 'Provider not found' })
+
+      const aggregations = await prisma.llmProviderTransaction.groupBy({
+        by: ['type'],
+        where: { providerId: request.params.providerId },
+        _sum: { amount: true },
+      })
+
+      const totalTopUps = aggregations.find((a) => a.type === 'TOP_UP')?._sum.amount?.toNumber() ?? 0
+      const totalCosts = aggregations.find((a) => a.type === 'COST_SYNC')?._sum.amount?.toNumber() ?? 0
+      const balance = totalTopUps - totalCosts
+
+      return {
+        balance: {
+          providerId: request.params.providerId,
+          totalTopUps: totalTopUps.toFixed(6),
+          totalCosts: totalCosts.toFixed(6),
+          balance: balance.toFixed(6),
+        },
+      }
+    },
+  )
+
+  /** List transactions for a provider */
+  fastify.get(
+    '/llm/providers/:providerId/transactions',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        description: 'List transactions for a provider with pagination',
+        tags: ['admin-llm'],
+        params: providerIdParam,
+        querystring: z.object({
+          page: z.coerce.number().int().positive().default(1).meta({ description: 'Page number', example: 1 }),
+          pageSize: z.coerce.number().int().positive().max(100).default(50).meta({ description: 'Items per page', example: 50 }),
+        }),
+        response: {
+          200: z.object({
+            transactions: z.array(transactionSchema),
+            pagination: z.object({
+              page: z.number(),
+              pageSize: z.number(),
+              total: z.number(),
+            }),
+          }),
+          401: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const provider = await prisma.llmProvider.findUnique({
+        where: { id: request.params.providerId },
+      })
+      if (!provider) return reply.status(404).send({ error: 'Provider not found' })
+
+      const { page, pageSize } = request.query
+      const [transactions, total] = await Promise.all([
+        prisma.llmProviderTransaction.findMany({
+          where: { providerId: request.params.providerId },
+          orderBy: { date: 'desc' },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        prisma.llmProviderTransaction.count({
+          where: { providerId: request.params.providerId },
+        }),
+      ])
+
+      return {
+        transactions: transactions.map(enrichTransaction),
+        pagination: { page, pageSize, total },
+      }
+    },
+  )
+
+  /** Add a manual top-up */
+  fastify.post(
+    '/llm/providers/:providerId/top-up',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        description: 'Record a manual top-up for a provider',
+        tags: ['admin-llm'],
+        params: providerIdParam,
+        body: addTopUpBodySchema,
+        response: {
+          201: z.object({ transaction: transactionSchema }),
+          401: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const provider = await prisma.llmProvider.findUnique({
+        where: { id: request.params.providerId },
+      })
+      if (!provider) return reply.status(404).send({ error: 'Provider not found' })
+
+      const transaction = await prisma.llmProviderTransaction.create({
+        data: {
+          providerId: request.params.providerId,
+          type: 'TOP_UP',
+          amount: request.body.amount,
+          date: request.body.date ? new Date(request.body.date) : new Date(),
+          notes: request.body.notes,
+        },
+      })
+
+      return reply.status(201).send({ transaction: enrichTransaction(transaction) })
+    },
+  )
+
+  /** Sync costs from upstream provider API */
+  fastify.post(
+    '/llm/providers/:providerId/sync-costs',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        description: 'Sync costs from the upstream provider cost API (OpenAI or Anthropic). Uses upsert — re-syncing the same day updates the amount.',
+        tags: ['admin-llm'],
+        params: providerIdParam,
+        body: syncCostsBodySchema,
+        response: {
+          200: z.object({
+            synced: z.number().meta({ description: 'Number of new cost records created' }),
+            updated: z.number().meta({ description: 'Number of existing records updated' }),
+            totalCost: z.string().meta({ description: 'Total cost for the period in USD' }),
+          }),
+          400: errorSchema,
+          401: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+          502: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const provider = await prisma.llmProvider.findUnique({
+        where: { id: request.params.providerId },
+      })
+      if (!provider) return reply.status(404).send({ error: 'Provider not found' })
+
+      if (provider.protocol === 'CLOUDFLARE') {
+        return reply.status(400).send({ error: 'Cost sync is not supported for Cloudflare providers' })
+      }
+
+      const { startDate, endDate } = request.body
+
+      // Try dedicated admin key first, fall back to provider's inference key
+      const adminKeyEnvName =
+        provider.protocol === 'ANTHROPIC'
+          ? 'ANTHROPIC_ADMIN_API_KEY'
+          : 'OPENAI_ADMIN_API_KEY'
+      const apiKey = process.env[adminKeyEnvName] || process.env[provider.envKeyName]
+
+      if (!apiKey) {
+        return reply.status(502).send({
+          error: `No API key available. Set ${adminKeyEnvName} or ${provider.envKeyName}.`,
+        })
+      }
+
+      try {
+        const dailyCosts =
+          provider.protocol === 'ANTHROPIC'
+            ? await fetchAnthropicCosts(apiKey, startDate, endDate)
+            : await fetchOpenAICosts(apiKey, startDate, endDate)
+
+        const result = await syncProviderCosts(provider.id, provider.name, dailyCosts)
+
+        return {
+          synced: result.synced,
+          updated: result.updated,
+          totalCost: result.totalCost.toFixed(6),
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        return reply.status(502).send({ error: `Failed to sync costs: ${message}` })
+      }
+    },
+  )
+
+  // =====================
   // DISCOVER MODELS
   // =====================
 
@@ -497,46 +753,58 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       const apiKey = process.env[provider.envKeyName]
       if (!apiKey) {
-        return reply.status(502).send({
-          error: `API key not configured (env var ${provider.envKeyName} is not set)`,
-        })
+        const msg = `API key not configured (env var ${provider.envKeyName} is not set)`
+        fastify.log.warn({ provider: provider.name, envKeyName: provider.envKeyName }, `Discover: ${msg}`)
+        return reply.status(502).send({ error: msg })
       }
 
       // Build request URL and headers based on protocol
       let url: string
       const headers: Record<string, string> = {}
 
+      // Some providers store just the domain (https://api.openai.com),
+      // others include a version path (https://api.z.ai/v4).
+      // Only prepend /v1 if the endpoint URL has no path beyond "/".
+      const endpointHasPath = new URL(provider.endpointUrl).pathname.replace(/\/+$/, '').length > 0
+      const base = provider.endpointUrl.replace(/\/+$/, '')
+
       switch (provider.protocol) {
         case 'ANTHROPIC':
-          url = `${provider.endpointUrl}/v1/models?limit=100`
+          url = endpointHasPath
+            ? `${base}/models?limit=100`
+            : `${base}/v1/models?limit=100`
           headers['x-api-key'] = apiKey
           headers['anthropic-version'] = '2023-06-01'
           break
         case 'CLOUDFLARE':
           // Cloudflare endpoint already includes /accounts/<id>/ai
-          url = `${provider.endpointUrl}/models/search?task=Text+Generation`
+          url = `${base}/models/search?task=Text+Generation`
           headers['Authorization'] = `Bearer ${apiKey}`
           break
         default: // OPENAI_COMPATIBLE
-          url = `${provider.endpointUrl}/v1/models`
+          url = endpointHasPath
+            ? `${base}/models`
+            : `${base}/v1/models`
           headers['Authorization'] = `Bearer ${apiKey}`
           break
       }
+
+      fastify.log.info({ provider: provider.name, url }, 'Discover: fetching models from upstream')
 
       let res: Response
       try {
         res = await fetch(url, { headers })
       } catch (err) {
-        return reply.status(502).send({
-          error: `Failed to connect to ${provider.endpointUrl}: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        })
+        const msg = `Failed to connect to ${provider.endpointUrl}: ${err instanceof Error ? err.message : 'Unknown error'}`
+        fastify.log.error({ provider: provider.name, url, error: err instanceof Error ? err.message : String(err) }, `Discover: ${msg}`)
+        return reply.status(502).send({ error: msg })
       }
 
       if (!res.ok) {
         const text = await res.text().catch(() => '')
-        return reply.status(502).send({
-          error: `Provider API returned ${res.status}: ${text.slice(0, 500)}`,
-        })
+        const msg = `Provider API returned ${res.status}: ${text.slice(0, 500)}`
+        fastify.log.error({ provider: provider.name, url, status: res.status, responseBody: text.slice(0, 1000) }, `Discover: ${msg}`)
+        return reply.status(502).send({ error: msg })
       }
 
       const body = await res.json() as any

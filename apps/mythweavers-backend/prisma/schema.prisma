@@ -922,7 +922,8 @@ model LlmProvider {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  models LlmModel[]
+  models       LlmModel[]
+  transactions LlmProviderTransaction[]
 }
 
 model LlmModel {
@@ -952,6 +953,35 @@ model LlmModel {
 
   @@unique([providerId, modelId])
   @@index([enabled])
+}
+
+// ============================================================================
+// LLM PROVIDER BALANCE LEDGER
+// ============================================================================
+
+enum LlmProviderTransactionType {
+  TOP_UP
+  COST_SYNC
+}
+
+/// Tracks top-ups and synced costs per LLM provider.
+/// Balance = sum(TOP_UP amounts) - sum(COST_SYNC amounts).
+model LlmProviderTransaction {
+  id         String                      @id @default(cuid())
+  providerId String
+  provider   LlmProvider                 @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  type       LlmProviderTransactionType
+  /// Always positive; sign is determined by type (TOP_UP = credit, COST_SYNC = debit)
+  amount     Decimal                     @db.Decimal(12, 6)
+  /// The date the cost/top-up applies to (not necessarily createdAt)
+  date       DateTime
+  notes      String?
+  /// For COST_SYNC: a unique key to prevent duplicate imports (e.g. "anthropic:2026-04-01:2026-04-13")
+  syncKey    String?                     @unique
+  createdAt  DateTime                    @default(now())
+
+  @@index([providerId])
+  @@index([providerId, date])
 }
 
 // ============================================================================

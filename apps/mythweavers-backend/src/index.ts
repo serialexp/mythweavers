@@ -64,6 +64,7 @@ import myLlmRoutes from './routes/my/llm.js'
 import stripeWebhookRoutes from './routes/webhooks/stripe.js'
 import wsRoutes from './routes/ws.js'
 import { prisma } from './lib/prisma.js'
+import { startCostSyncScheduler, stopCostSyncScheduler } from './lib/cost-sync-scheduler.js'
 import adminLlmRoutes from './routes/admin/llm.js'
 import adminUsersRoutes from './routes/admin/users.js'
 import publicStoriesRoutes from './routes/stories/public.js'
@@ -343,6 +344,9 @@ try {
   await server.listen({ port: PORT, host: HOST })
   server.log.info(`Server listening on http://${HOST}:${PORT}`)
   server.log.info(`OpenAPI docs available at http://${HOST}:${PORT}/docs`)
+
+  // Start background cost sync scheduler
+  startCostSyncScheduler(server.log)
 } catch (err) {
   server.log.error(err)
   process.exit(1)
@@ -353,6 +357,7 @@ const signals = ['SIGINT', 'SIGTERM']
 signals.forEach((signal) => {
   process.on(signal, async () => {
     server.log.info(`Received ${signal}, closing server...`)
+    stopCostSyncScheduler()
     await server.close()
     process.exit(0)
   })

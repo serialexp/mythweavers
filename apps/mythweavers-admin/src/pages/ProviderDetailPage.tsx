@@ -30,6 +30,7 @@ import {
 } from "../api/config"
 import { getApiBaseUrl } from "../api/config"
 import { ModelForm, type ModelFormData, type ModelFormStrings, toFormStrings, fromFormStrings, DEFAULT_MARKUP, applyMarkupToNumber } from "../components/ModelForm"
+import { ProviderBalanceTab } from "../components/ProviderBalanceTab"
 import { ProtocolBadge } from "../components/ProtocolBadge"
 import { ProviderForm } from "../components/ProviderForm"
 import { StatusDot } from "../components/StatusDot"
@@ -304,6 +305,10 @@ export function ProviderDetailPage() {
       const res = await getAdminLlmProvidersByProviderIdDiscover({
         path: { providerId: params.id },
       })
+      if (res.error) {
+        const errMsg = (res.error as { error?: string })?.error ?? "Failed to discover models"
+        throw new Error(errMsg)
+      }
       const models = (res.data?.models ?? []) as Array<{
         id: string
         name: string | null
@@ -455,6 +460,7 @@ export function ProviderDetailPage() {
                 Models ({models().length})
               </Tab>
               <Tab id="settings">Provider Settings</Tab>
+              <Tab id="balance">Balance</Tab>
             </TabList>
 
             {/* ========== MODELS TAB ========== */}
@@ -714,6 +720,14 @@ export function ProviderDetailPage() {
                   </CardBody>
                 </Card>
               </Stack>
+            </TabPanel>
+
+            {/* ========== BALANCE TAB ========== */}
+            <TabPanel id="balance">
+              <ProviderBalanceTab
+                providerId={prov().id}
+                protocol={prov().protocol}
+              />
             </TabPanel>
           </Tabs>
         )}
