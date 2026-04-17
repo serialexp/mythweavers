@@ -310,7 +310,7 @@ export function createAdventureEngine(
             checkedNarrative,
             playerAction,
             directorNotes,
-            { directive: adventureStore.directive, compactions: adventureStore.compactions },
+            { directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription },
           )
 
           const trajectoryResolved = resolveModel('adventure-trajectory')
@@ -417,7 +417,7 @@ export function createAdventureEngine(
     try {
       const directorResolved = resolveModel('adventure-director')
       const client = LLMClientFactory.getClient(directorResolved.provider)
-      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive, adventureStore.compactions)
+      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive, adventureStore.compactions, adventureStore.settingDescription)
 
       let accumulated = ''
       const response = client.generate({
@@ -804,7 +804,7 @@ export function createAdventureEngine(
         lastTurn.narrative,
         lastTurn.playerAction,
         directorNotes,
-        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive, compactions: adventureStore.compactions },
+        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription },
       )
 
       const trajectoryResolved = resolveModel('adventure-trajectory')

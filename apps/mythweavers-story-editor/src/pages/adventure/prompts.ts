@@ -275,10 +275,14 @@ function appendDirective(messages: LLMMessage[], directive?: string): void {
  *
  * Older turns beyond VERBATIM_TURN_COUNT are replaced by compaction summaries
  * when available, dramatically reducing context size for long adventures.
+ *
+ * @param settingDescription - The adventure's world/setting prompt. Included in
+ *   the opening turn so all consumers (director, trajectory, narrative) see it.
  */
 export function buildSharedHistory(
   turns: AdventureTurn[],
   compactions?: Record<string, AdventureCompaction>,
+  settingDescription?: string,
 ): LLMMessage[] {
   const messages: LLMMessage[] = []
 
@@ -308,7 +312,7 @@ export function buildSharedHistory(
     } else {
       // Not yet compacted: include original turns
       for (let i = range.start; i <= range.end; i++) {
-        addTurnToMessages(messages, turns, i, false)
+        addTurnToMessages(messages, turns, i, false, settingDescription)
       }
     }
   }
@@ -317,13 +321,13 @@ export function buildSharedHistory(
   // (partial chunk not yet eligible for compaction)
   const compactedEnd = ranges.length > 0 ? ranges[ranges.length - 1].end + 1 : 0
   for (let i = compactedEnd; i < recentStart; i++) {
-    addTurnToMessages(messages, turns, i, false)
+    addTurnToMessages(messages, turns, i, false, settingDescription)
   }
 
   // Recent turns: always verbatim
   for (let i = recentStart; i < turns.length; i++) {
     const isLastTurn = i === turns.length - 1
-    addTurnToMessages(messages, turns, i, isLastTurn)
+    addTurnToMessages(messages, turns, i, isLastTurn, settingDescription)
   }
 
   return messages
@@ -335,6 +339,7 @@ function addTurnToMessages(
   turns: AdventureTurn[],
   i: number,
   addCacheBreakpoint: boolean,
+  settingDescription?: string,
 ): void {
   const turn = turns[i]
 
@@ -345,9 +350,14 @@ function addTurnToMessages(
       : turn.playerAction
     messages.push({ role: 'user', content: userContent })
   } else if (i === 0) {
+    // Include the setting description in the opening turn so all consumers
+    // (director, trajectory, narrative) see the world context.
+    const openingContent = settingDescription
+      ? `Begin the adventure.\n\n${settingDescription}`
+      : 'Begin the adventure.'
     messages.push({
       role: 'user',
-      content: 'Begin the adventure.',
+      content: openingContent,
     })
   }
 
@@ -368,7 +378,7 @@ export function buildNarrativeMessages(
   compactions?: Record<string, AdventureCompaction>,
   resolvedMomentum?: string | null,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions)
+  const messages = buildSharedHistory(turns, compactions, settingDescription)
 
   const isOpeningTurn = turns.length === 0 && playerAction === null
 
@@ -414,10 +424,10 @@ export function buildTrajectoryMessages(
   latestNarrative: string,
   playerAction: string | null,
   currentDirectorNotes?: string,
-  options?: { rejectedTrajectory?: string; directive?: string; compactions?: Record<string, AdventureCompaction> },
+  options?: { rejectedTrajectory?: string; directive?: string; compactions?: Record<string, AdventureCompaction>; settingDescription?: string },
 ): LLMMessage[] {
   // Shared history + the just-completed turn's narrative
-  const messages = buildSharedHistory(turns, options?.compactions)
+  const messages = buildSharedHistory(turns, options?.compactions, options?.settingDescription)
 
   // Append the current turn as if it already happened (so trajectory sees it)
   if (playerAction !== null) {
@@ -470,8 +480,9 @@ export function buildDirectorMessages(
   currentTurn?: { playerAction: string | null; narrative: string },
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
+  settingDescription?: string,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions)
+  const messages = buildSharedHistory(turns, compactions, settingDescription)
 
   // Append the current (not-yet-finalized) turn so the director sees it
   if (currentTurn) {
@@ -539,7 +550,7 @@ export function buildRevisionMessages(
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions)
+  const messages = buildSharedHistory(turns, compactions, settingDescription)
 
   const revisionProtagonistInfo = getLatestProtagonistInfo(turns)
   const revisionProtagonistSection = revisionProtagonistInfo
