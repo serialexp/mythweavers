@@ -86,34 +86,12 @@ export const LlmActivityPanel: Component = () => {
 
                   <CardBody>
                     <Stack gap="md">
-                      <div>
-                        <div class={styles.sectionLabel}>Input Messages</div>
-                        <Stack gap="sm">
-                          <For each={entry.requestMessages}>
-                            {(message, index) => (
-                              <div class={styles.messageBox}>
-                                <div class={styles.messageHeader}>
-                                  #{index() + 1} · {message.role}
-                                  <Show when={message.cache_control}>
-                                    {(cache) => (
-                                      <Badge variant="info" size="sm">
-                                        cache: {cache().type}
-                                        {cache().ttl ? ` · ${cache().ttl}` : ''}
-                                      </Badge>
-                                    )}
-                                  </Show>
-                                </div>
-                                <pre class={styles.preformatted}>{message.content}</pre>
-                              </div>
-                            )}
-                          </For>
-                        </Stack>
-                      </div>
-
-                      <div>
-                        <div class={styles.sectionLabel}>Output</div>
-                        <pre class={styles.outputBox}>{entry.response || '<empty response>'}</pre>
-                      </div>
+                      <Show when={entry.error}>
+                        <Alert variant="error">
+                          <div class={styles.errorTitle}>Error</div>
+                          <pre class={styles.preformatted}>{entry.error}</pre>
+                        </Alert>
+                      </Show>
 
                       <Show when={entry.usage}>
                         {(usage) => (
@@ -161,12 +139,38 @@ export const LlmActivityPanel: Component = () => {
                         </div>
                       </Show>
 
-                      <Show when={entry.error}>
-                        <Alert variant="error">
-                          <div class={styles.errorTitle}>Error</div>
-                          <pre class={styles.preformatted}>{entry.error}</pre>
-                        </Alert>
-                      </Show>
+                      <details class={styles.collapsibleSection}>
+                        <summary class={styles.collapsibleSummary}>
+                          Output {entry.response ? `(${entry.response.length} chars)` : '(empty)'}
+                        </summary>
+                        <pre class={styles.outputBox}>{entry.response || '<empty response>'}</pre>
+                      </details>
+
+                      <details class={styles.collapsibleSection}>
+                        <summary class={styles.collapsibleSummary}>
+                          Input Messages ({entry.requestMessages.length})
+                        </summary>
+                        <Stack gap="sm">
+                          <For each={entry.requestMessages}>
+                            {(message, index) => (
+                              <div class={styles.messageBox}>
+                                <div class={styles.messageHeader}>
+                                  #{index() + 1} · {message.role}
+                                  <Show when={message.cache_control}>
+                                    {(cache) => (
+                                      <Badge variant="info" size="sm">
+                                        cache: {cache().type}
+                                        {cache().ttl ? ` · ${cache().ttl}` : ''}
+                                      </Badge>
+                                    )}
+                                  </Show>
+                                </div>
+                                <pre class={styles.preformatted}>{message.content}</pre>
+                              </div>
+                            )}
+                          </For>
+                        </Stack>
+                      </details>
                     </Stack>
                   </CardBody>
                 </details>

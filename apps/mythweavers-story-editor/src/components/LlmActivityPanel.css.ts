@@ -141,3 +141,20 @@ export const errorTitle = style({
   fontWeight: tokens.font.weight.semibold,
   marginBottom: tokens.space['1'],
 })
+
+export const collapsibleSection = style({
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+  overflow: 'hidden',
+})
+
+export const collapsibleSummary = style({
+  cursor: 'pointer',
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.secondary,
+  userSelect: 'none',
+  ':hover': {
+    background: tokens.color.bg.elevated,
+  },
+})
