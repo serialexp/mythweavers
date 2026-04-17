@@ -137,6 +137,42 @@ INCONSISTENT
 2. ...
 Maximum 5 items.`
 
+// --- Momentum resolution ---
+
+export const MOMENTUM_RESOLUTION_INSTRUCTION = `You are resolving world momentum against a player action. Given the pending world momentum (bullet points describing what NPCs and the environment were about to do) and the player's action, determine which momentum items still apply, which are pre-empted or invalidated, and which need adjustment.
+
+RULES:
+- If the player's action directly prevents, interrupts, or makes a momentum item impossible, DROP it entirely.
+- If the player's action changes the conditions of a momentum item (e.g. a conditional "if the player doesn't X" but the player DID X), RESOLVE the condition and rewrite accordingly.
+- If a momentum item is completely unrelated to the player's action, KEEP it unchanged.
+- If the player's action partially affects a momentum item, ADJUST it to reflect the new situation.
+
+RESPONSE FORMAT:
+Output ONLY the surviving/adjusted bullet points, one per line. If ALL momentum is invalidated, respond with exactly: NONE
+
+Do not explain your reasoning. Do not add new momentum items. Do not add any other text.`
+
+/**
+ * Build messages for the momentum resolution call.
+ * This is a lightweight call — no shared history, just the immediate context.
+ */
+export function buildMomentumResolutionMessages(
+  lastNarrative: string,
+  rawMomentum: string,
+  playerAction: string,
+): LLMMessage[] {
+  return [
+    {
+      role: 'system',
+      content: MOMENTUM_RESOLUTION_INSTRUCTION,
+    },
+    {
+      role: 'user',
+      content: `LAST NARRATIVE (context for what just happened):\n${lastNarrative}\n\nPENDING WORLD MOMENTUM:\n${rawMomentum}\n\nPLAYER'S ACTION:\n${playerAction}`,
+    },
+  ]
+}
+
 // --- Compaction ---
 
 export const COMPACTION_CHUNK_SIZE = 10
@@ -330,6 +366,7 @@ export function buildNarrativeMessages(
   playerAction: string | null,
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
+  resolvedMomentum?: string | null,
 ): LLMMessage[] {
   const messages = buildSharedHistory(turns, compactions)
 
@@ -347,9 +384,13 @@ export function buildNarrativeMessages(
 
   // Final user message
   if (playerAction !== null) {
-    const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null
-    const userContent = lastTurn?.worldTrajectory
-      ? formatMomentumContext(lastTurn.worldTrajectory, playerAction)
+    // Use pre-resolved momentum when available (momentum resolution step ran),
+    // otherwise fall back to the raw trajectory from the last turn.
+    const momentum = resolvedMomentum !== undefined
+      ? resolvedMomentum
+      : (turns.length > 0 ? turns[turns.length - 1]?.worldTrajectory : null)
+    const userContent = momentum
+      ? formatMomentumContext(momentum, playerAction)
       : playerAction
     messages.push({ role: 'user', content: userContent })
   } else if (isOpeningTurn) {

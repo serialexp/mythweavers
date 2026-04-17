@@ -14,6 +14,7 @@ import {
   buildDirectorMessages,
   buildNonsenseCheckMessages,
   buildRevisionMessages,
+  buildMomentumResolutionMessages,
   buildCompactionMessages,
   getCompactionRanges,
   cleanNarrative,
@@ -119,6 +120,59 @@ export function createAdventureEngine(
     abortController = new AbortController()
 
     try {
+      // --- Step 0: Resolve momentum against player action ---
+      // When world momentum is enabled and there's a previous turn with trajectory,
+      // run a lightweight reasoning call to filter/adjust momentum items based on
+      // what the player actually did, instead of dumping raw momentum into the narrative.
+      let resolvedMomentum: string | null | undefined
+      const lastTurn = adventureStore.turns.length > 0
+        ? adventureStore.turns[adventureStore.turns.length - 1]
+        : null
+
+      if (
+        adventureStore.worldMomentumEnabled &&
+        playerAction !== null &&
+        lastTurn?.worldTrajectory
+      ) {
+        adventureStore.setStreamingContent('⏳ Resolving world momentum...')
+
+        const momentumMessages = buildMomentumResolutionMessages(
+          lastTurn.narrative,
+          lastTurn.worldTrajectory,
+          playerAction,
+        )
+
+        const momentumResolved = resolveModel('adventure-momentum')
+        const momentumClient = LLMClientFactory.getClient(momentumResolved.provider)
+
+        let momentumAccumulated = ''
+        const momentumResponse = momentumClient.generate({
+          model: momentumResolved.model,
+          messages: momentumMessages,
+          max_tokens: 1024,
+          signal: abortController.signal,
+          metadata: { callType: 'adventure-momentum' },
+        })
+
+        for await (const event of momentumResponse) {
+          if (event.type === 'chunk') {
+            momentumAccumulated += event.text
+          }
+        }
+
+        const cleaned = momentumAccumulated
+          .replace(/<think>[\s\S]*?<\/think>/g, '')
+          .trim()
+
+        if (cleaned === 'NONE' || !cleaned) {
+          resolvedMomentum = null // All momentum invalidated
+          console.log('[Momentum] All momentum invalidated by player action')
+        } else {
+          resolvedMomentum = cleaned
+          console.log('[Momentum] Resolved momentum:\n', cleaned)
+        }
+      }
+
       // --- Step 1: Stream narrative ---
       const narrativeMessages = buildNarrativeMessages(
         adventureStore.turns,
@@ -126,6 +180,7 @@ export function createAdventureEngine(
         playerAction,
         adventureStore.directive,
         adventureStore.compactions,
+        resolvedMomentum,
       )
 
       const narrativeResolved = resolveModel('adventure')
