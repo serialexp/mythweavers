@@ -31,7 +31,10 @@ const AISettingsContent: Component = () => {
   const [scope, setScope] = createSignal<SettingsScope>('global')
 
   onMount(() => {
-    panelRef?.select('api-keys')
+    // Auto-select first section on desktop; on mobile, show the sidebar list first
+    if (window.innerWidth > 768) {
+      panelRef?.select('api-keys')
+    }
     // Default to story scope if a story is loaded
     if (currentStoryStore.isInitialized) {
       setScope('story')

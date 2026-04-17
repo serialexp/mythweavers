@@ -102,9 +102,11 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   let panelRef: ListDetailPanelRef | undefined
 
-  // Auto-select first section on mount
+  // Auto-select first section on desktop; on mobile, show the sidebar list first
   onMount(() => {
-    panelRef?.select('api-keys')
+    if (window.innerWidth > 768) {
+      panelRef?.select('api-keys')
+    }
   })
 
   const needsMigrationCount = createMemo(() => messagesStore.getNeedsMigrationCount())
