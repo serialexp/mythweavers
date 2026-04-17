@@ -1,5 +1,5 @@
 import { createEffect, createSignal } from 'solid-js'
-import { createStore } from 'solid-js/store'
+import { createStore, reconcile } from 'solid-js/store'
 import { DEFAULT_CHARS_PER_TOKEN, DEFAULT_CONTEXT_SIZE } from '../constants'
 import { putMyPreferences } from '../client/config'
 import {
@@ -54,7 +54,7 @@ const getInitialCharsPerToken = (): number => {
 }
 
 const [settingsState, setSettingsState] = createStore({
-  model: '', // Start empty, will be set when models load
+  model: localStorage.getItem('story-model') || '',
   storySetting: localStorage.getItem('story-setting') || '',
   contextSize: getInitialContextSize(),
   charsPerToken: getInitialCharsPerToken(),
@@ -269,9 +269,14 @@ function scheduleSyncToBackend() {
 }
 
 // Watch all synced keys and schedule a backend save when they change.
+// JSON.stringify is used to deep-track object values (e.g. categoryOverrides)
+// so nested property changes also trigger the sync.
 for (const key of SYNCED_KEYS) {
   createEffect(() => {
-    void settingsState[key]
+    const val = settingsState[key]
+    if (typeof val === 'object' && val !== null) {
+      JSON.stringify(val)
+    }
     scheduleSyncToBackend()
   })
 }
@@ -283,7 +288,7 @@ for (const key of SECRET_KEYS) {
   })
 }
 createEffect(() => {
-  void settingsState.customProviders
+  JSON.stringify(settingsState.customProviders)
   scheduleSyncToBackend()
 })
 
@@ -405,10 +410,10 @@ export const settingsStore = {
     if (override) {
       setSettingsState('categoryOverrides', category as keyof CategoryOverrides, override as any)
     } else {
-      // Remove the override — create a new object without the key
+      // Remove the override — reconcile to actually remove the key from the store proxy
       const current = { ...settingsState.categoryOverrides }
       delete current[category as keyof CategoryOverrides]
-      setSettingsState('categoryOverrides', current)
+      setSettingsState('categoryOverrides', reconcile(current))
     }
   },
 
@@ -425,7 +430,7 @@ export const settingsStore = {
     if (prefs.thinkingBudget != null) setSettingsState('thinkingBudget', prefs.thinkingBudget as number)
     if (prefs.contextSize != null) setSettingsState('contextSize', prefs.contextSize as number)
     if (prefs.cloudflareEndpoint != null) setSettingsState('cloudflareEndpoint', prefs.cloudflareEndpoint as string)
-    if (prefs.categoryOverrides != null) setSettingsState('categoryOverrides', prefs.categoryOverrides as CategoryOverrides)
+    if (prefs.categoryOverrides != null) setSettingsState('categoryOverrides', reconcile(prefs.categoryOverrides as CategoryOverrides))
 
     // Custom providers (without API keys — those are in the encrypted blob)
     if (prefs.customProviders != null) {
