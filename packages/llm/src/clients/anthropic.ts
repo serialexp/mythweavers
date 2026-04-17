@@ -9,7 +9,7 @@ import type {
 import { resolve } from "../types"
 import { parseSSEStream } from "../utils/sse-parser"
 
-const DEFAULT_ENDPOINT = "https://api.anthropic.com"
+const DEFAULT_ENDPOINT = "https://api.anthropic.com/v1"
 
 // Pricing map for Anthropic models (prices per million tokens).
 // Kept in the shared package so both frontend and backend can look up pricing
@@ -224,16 +224,21 @@ export class AnthropicClient implements LLMClient {
     this.config = config
   }
 
+  /** Build the full URL for an API path. */
+  private buildUrl(path: string): string {
+    const base = (this.config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "")
+    return `${base}${path}`
+  }
+
   async list(): Promise<{ models: LLMModel[] }> {
     const apiKey = resolve(this.config.apiKey)
     if (!apiKey) return { models: [] }
 
-    const endpoint = this.config.endpoint ?? DEFAULT_ENDPOINT
     const extra = this.config.extraHeaders
       ? resolve(this.config.extraHeaders)
       : {}
 
-    const response = await fetch(`${endpoint}/v1/models`, {
+    const response = await fetch(this.buildUrl("/models"), {
       method: "GET",
       headers: {
         "x-api-key": apiKey,
@@ -270,7 +275,6 @@ export class AnthropicClient implements LLMClient {
     const apiKey = resolve(this.config.apiKey)
     if (!apiKey) throw new Error("Anthropic API key not configured")
 
-    const endpoint = this.config.endpoint ?? DEFAULT_ENDPOINT
     const extra = this.config.extraHeaders
       ? resolve(this.config.extraHeaders)
       : {}
@@ -301,7 +305,7 @@ export class AnthropicClient implements LLMClient {
       }
     }
 
-    const response = await fetch(`${endpoint}/v1/messages`, {
+    const response = await fetch(this.buildUrl("/messages"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

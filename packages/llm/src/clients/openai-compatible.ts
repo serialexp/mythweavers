@@ -9,7 +9,7 @@ import type {
 import { resolve } from "../types"
 import { parseSSEStream } from "../utils/sse-parser"
 
-const DEFAULT_ENDPOINT = "https://api.openai.com"
+const DEFAULT_ENDPOINT = "https://api.openai.com/v1"
 
 // ---- Pricing & context length maps ----
 // Only used when listing models from the built-in OpenAI endpoint.
@@ -145,6 +145,11 @@ export class OpenAICompatibleClient implements LLMClient {
     return (this.config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "")
   }
 
+  /** Build the full URL for an API path. */
+  private buildUrl(path: string): string {
+    return `${this.getBaseUrl()}${path}`
+  }
+
   async list(): Promise<{ models: LLMModel[] }> {
     const apiKey = resolve(this.config.apiKey)
     if (!apiKey) return { models: [] }
@@ -153,7 +158,7 @@ export class OpenAICompatibleClient implements LLMClient {
       ? resolve(this.config.extraHeaders)
       : {}
 
-    const response = await fetch(`${this.getBaseUrl()}/v1/models`, {
+    const response = await fetch(this.buildUrl("/models"), {
       method: "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -227,7 +232,7 @@ export class OpenAICompatibleClient implements LLMClient {
     }
 
     const response = await fetch(
-      `${this.getBaseUrl()}/v1/chat/completions`,
+      this.buildUrl("/chat/completions"),
       {
         method: "POST",
         headers: {

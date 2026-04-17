@@ -74,11 +74,9 @@ export class CloudflareClient implements LLMClient {
     this.config = config
 
     // Cloudflare exposes an OpenAI-compatible endpoint at {base}/v1
-    // The OpenAICompatibleClient will append /v1/chat/completions itself,
-    // so we pass {base} as the endpoint.
     this.openaiClient = new OpenAICompatibleClient({
       apiKey: config.apiKey,
-      endpoint: this.getBaseUrl(),
+      endpoint: `${this.getBaseUrl()}/v1`,
       extraHeaders: config.extraHeaders,
       unfiltered: true,
     })

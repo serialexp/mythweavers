@@ -143,7 +143,7 @@ export class LLMClientFactory {
       case 'openrouter':
         client = new OpenAICompatibleClient({
           apiKey: () => settingsStore.openrouterApiKey,
-          endpoint: 'https://openrouter.ai/api',
+          endpoint: 'https://openrouter.ai/api/v1',
           extraHeaders: () => ({
             'HTTP-Referer': window.location.origin,
             'X-Title': 'Story Writing App',
