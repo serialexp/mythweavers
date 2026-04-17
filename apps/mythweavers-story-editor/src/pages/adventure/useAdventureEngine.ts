@@ -162,6 +162,14 @@ export function createAdventureEngine(
 
       const narrative = cleanNarrative(accumulated)
 
+      // If the model returned nothing (or only whitespace / thinking tags),
+      // skip all downstream calls — there's nothing to analyse.
+      if (!narrative) {
+        adventureStore.setError('The model returned an empty response. Try again or switch models.')
+        adventureStore.setLastFailedAction(playerAction)
+        return
+      }
+
       // --- Step 1.5: Consistency check loop ---
       const checkedNarrative = await runNarrativeChecks(narrative, playerAction)
 
