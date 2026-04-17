@@ -108,14 +108,24 @@ export function applyUnifiedDiff(originalContent: string, diffText: string): str
 }
 
 /**
- * Strip markdown code blocks from diff output if present.
- * LLMs sometimes wrap their output in ```diff blocks.
+ * Strip markdown code blocks and line-number pipe prefixes from diff output.
+ * LLMs sometimes wrap their output in ```diff blocks, and when the input
+ * was formatted with `formatWithLineNumbers` ("1| line"), models often
+ * reproduce the "| " prefix in their diff lines.
  */
 export function cleanDiffOutput(response: string): string {
   let cleaned = response.trim()
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:diff)?\n/, '').replace(/\n```$/, '')
   }
+
+  // Strip "| " pipe prefixes that LLMs copy from line-numbered input.
+  // Diff content lines start with +, -, or space — the pipe appears right after:
+  //   "+| added line"  → "+added line"
+  //   "-| removed line" → "-removed line"
+  //   " | context line" → " context line"
+  cleaned = cleaned.replace(/^([+ -])\| /gm, '$1')
+
   return cleaned
 }
 
