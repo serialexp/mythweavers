@@ -194,6 +194,18 @@ export function createAdventureEngine(
           // Cache for retries
           cachedMomentum = { turnCount, playerAction, resolved: resolvedMomentum }
         }
+
+        // Show the resolution result briefly before narrative starts streaming
+        if (resolvedMomentum === null) {
+          adventureStore.setStreamingContent('⏳ World pauses for your move...')
+        } else if (resolvedMomentum) {
+          // Show a trimmed preview of what survived
+          const bulletCount = resolvedMomentum.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('•')).length
+          const label = bulletCount > 0
+            ? `⏳ ${bulletCount} world event${bulletCount > 1 ? 's' : ''} in motion...`
+            : '⏳ World momentum resolved...'
+          adventureStore.setStreamingContent(label)
+        }
       }
 
       // --- Step 1: Stream narrative ---
