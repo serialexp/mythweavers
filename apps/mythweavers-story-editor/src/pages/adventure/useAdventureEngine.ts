@@ -224,6 +224,7 @@ export function createAdventureEngine(
       )
 
       let accumulated = ''
+      const streamErrors: string[] = []
       const narrativeResponse = narrativeClient.generate({
         model: narrativeResolved.model,
         messages: narrativeMessages,
@@ -248,9 +249,22 @@ export function createAdventureEngine(
             .trim()
           adventureStore.setStreamingContent(displayContent)
         }
+        if (event.type === 'error') {
+          streamErrors.push((event as { type: 'error'; error: string }).error)
+        }
       }
 
       const narrative = cleanNarrative(accumulated)
+
+      // If we got stream-level errors (e.g. 429, 500), show those instead
+      // of a generic "empty response" message.
+      if (streamErrors.length > 0 && !narrative) {
+        adventureStore.setStreamingContent('')
+        adventureStore.setError(streamErrors.join('\n'))
+        adventureStore.setLastFailedAction(playerAction)
+        if (playerAction) adventureStore.setPlayerInput(playerAction)
+        return
+      }
 
       // If the model returned nothing (or only whitespace / thinking tags),
       // skip all downstream calls — there's nothing to analyse.
