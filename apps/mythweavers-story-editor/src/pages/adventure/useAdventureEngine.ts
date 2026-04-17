@@ -257,60 +257,73 @@ export function createAdventureEngine(
       let dead = false
 
       if (adventureStore.worldMomentumEnabled) {
-        // --- Step 2: Run director agent every 5 turns, or immediately if flagged ---
-        const turnIndex = adventureStore.turns.length
-        const shouldRunDirector = turnIndex % 5 === 0 || adventureStore.directorDueNextTurn
+        // Director and trajectory are non-fatal — if they fail, we still
+        // finalize the turn with the narrative we already have.
+        try {
+          // --- Step 2: Run director agent every 5 turns, or immediately if flagged ---
+          const turnIndex = adventureStore.turns.length
+          const shouldRunDirector = turnIndex % 5 === 0 || adventureStore.directorDueNextTurn
 
-        if (shouldRunDirector) {
-          adventureStore.setDirectorDueNextTurn(false)
-          adventureStore.setStreamingContent(
-            `${checkedNarrative}\n\n⏳ Updating the world...`,
-          )
-          directorNotes = await runDirector({ playerAction, narrative: checkedNarrative })
-        }
-
-        // --- Step 3: Generate world trajectory using fresh director notes ---
-        adventureStore.setStreamingContent(
-          `${checkedNarrative}\n\n⏳ Reading the world...`,
-        )
-
-        const trajectoryMessages = buildTrajectoryMessages(
-          adventureStore.turns,
-          checkedNarrative,
-          playerAction,
-          directorNotes,
-          { directive: adventureStore.directive, compactions: adventureStore.compactions },
-        )
-
-        const trajectoryResolved = resolveModel('adventure-trajectory')
-        const trajectoryClient = LLMClientFactory.getClient(
-          trajectoryResolved.provider,
-        )
-
-        let trajectoryAccumulated = ''
-        const trajectoryResponse = trajectoryClient.generate({
-          model: trajectoryResolved.model,
-          messages: trajectoryMessages,
-          max_tokens: effectiveSettings.maxTokens,
-          thinking_budget: effectiveSettings.thinkingBudget
-            ? Math.min(
-                effectiveSettings.thinkingBudget,
-                Math.floor(effectiveSettings.maxTokens / 2),
-              )
-            : undefined,
-          signal: abortController.signal,
-          metadata: { callType: 'adventure-trajectory' },
-        })
-
-        for await (const event of trajectoryResponse) {
-          if (event.type === 'chunk') {
-            trajectoryAccumulated += event.text
+          if (shouldRunDirector) {
+            adventureStore.setDirectorDueNextTurn(false)
+            adventureStore.setStreamingContent(
+              `${checkedNarrative}\n\n⏳ Updating the world...`,
+            )
+            directorNotes = await runDirector({ playerAction, narrative: checkedNarrative })
           }
-        }
 
-        const parsed = parseTrajectory(trajectoryAccumulated)
-        worldTrajectory = parsed.trajectory
-        dead = parsed.dead
+          // --- Step 3: Generate world trajectory using fresh director notes ---
+          adventureStore.setStreamingContent(
+            `${checkedNarrative}\n\n⏳ Reading the world...`,
+          )
+
+          const trajectoryMessages = buildTrajectoryMessages(
+            adventureStore.turns,
+            checkedNarrative,
+            playerAction,
+            directorNotes,
+            { directive: adventureStore.directive, compactions: adventureStore.compactions },
+          )
+
+          const trajectoryResolved = resolveModel('adventure-trajectory')
+          const trajectoryClient = LLMClientFactory.getClient(
+            trajectoryResolved.provider,
+          )
+
+          let trajectoryAccumulated = ''
+          const trajectoryResponse = trajectoryClient.generate({
+            model: trajectoryResolved.model,
+            messages: trajectoryMessages,
+            max_tokens: effectiveSettings.maxTokens,
+            thinking_budget: effectiveSettings.thinkingBudget
+              ? Math.min(
+                  effectiveSettings.thinkingBudget,
+                  Math.floor(effectiveSettings.maxTokens / 2),
+                )
+              : undefined,
+            signal: abortController.signal,
+            metadata: { callType: 'adventure-trajectory' },
+          })
+
+          for await (const event of trajectoryResponse) {
+            if (event.type === 'chunk') {
+              trajectoryAccumulated += event.text
+            }
+          }
+
+          const parsed = parseTrajectory(trajectoryAccumulated)
+          worldTrajectory = parsed.trajectory
+          dead = parsed.dead
+        } catch (momentumErr) {
+          // Re-throw aborts so the outer handler can deal with them
+          if (momentumErr instanceof DOMException && momentumErr.name === 'AbortError') {
+            throw momentumErr
+          }
+          // Non-abort errors: log and continue without trajectory
+          console.warn('[Momentum] Director/trajectory failed, finalizing turn without trajectory:', momentumErr)
+          // Schedule director for next turn since we missed this one
+          adventureStore.setDirectorDueNextTurn(true)
+        }
       }
 
       // Batch-finalize: clear streaming and add turn in one render frame
