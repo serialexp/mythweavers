@@ -77,6 +77,9 @@ export const LlmActivityPanel: Component = () => {
                         <Show when={entry.error}>
                           <Badge variant="error">error</Badge>
                         </Show>
+                        <Show when={!entry.error && !entry.response}>
+                          <Badge variant="warning">empty</Badge>
+                        </Show>
                       </div>
                     </div>
                   </summary>

@@ -66,6 +66,7 @@ class LoggedLLMClient implements LLMClient {
     let aggregatedUsage: TokenUsage | undefined
     let combinedResponse = ''
     let error: Error | undefined
+    const streamErrors: string[] = []
 
     const delegate = this.inner.generate(options)
 
@@ -77,6 +78,9 @@ class LoggedLLMClient implements LLMClient {
         if (event.type === 'usage') {
           aggregatedUsage = mergeUsage(aggregatedUsage, event.usage)
         }
+        if (event.type === 'error') {
+          streamErrors.push((event as { type: 'error'; error: string }).error)
+        }
         yield event
       }
     } catch (err) {
@@ -86,6 +90,13 @@ class LoggedLLMClient implements LLMClient {
       const durationMs = now() - start
       const rawUsage = aggregatedUsage ? { ...aggregatedUsage } : undefined
       const usage = normalizeTokenUsage(aggregatedUsage)
+
+      // Combine JS exceptions and SSE-level error events into a single string
+      const errorParts: string[] = []
+      if (error) {
+        errorParts.push(error instanceof Error ? error.message : String(error))
+      }
+      errorParts.push(...streamErrors)
 
       llmActivityStore.log({
         id,
@@ -98,7 +109,7 @@ class LoggedLLMClient implements LLMClient {
         response: combinedResponse,
         usage,
         rawUsage,
-        error: error ? (error instanceof Error ? error.message : String(error)) : undefined,
+        error: errorParts.length > 0 ? errorParts.join('\n') : undefined,
       })
     }
   }
