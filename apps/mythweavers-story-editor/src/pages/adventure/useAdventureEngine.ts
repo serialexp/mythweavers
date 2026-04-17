@@ -65,6 +65,14 @@ export function createAdventureEngine(
   let inputRef: HTMLTextAreaElement | undefined
   let abortController: AbortController | null = null
 
+  // Cache the last momentum resolution so retries don't re-run it.
+  // Keyed by turnCount + playerAction — if either changes, the cache is stale.
+  let cachedMomentum: {
+    turnCount: number
+    playerAction: string
+    resolved: string | null
+  } | null = null
+
   onCleanup(() => {
     abortController?.abort()
   })
@@ -124,52 +132,67 @@ export function createAdventureEngine(
       // When world momentum is enabled and there's a previous turn with trajectory,
       // run a lightweight reasoning call to filter/adjust momentum items based on
       // what the player actually did, instead of dumping raw momentum into the narrative.
+      // The result is cached so retries (same turn + same action) skip the LLM call.
       let resolvedMomentum: string | null | undefined
       const lastTurn = adventureStore.turns.length > 0
         ? adventureStore.turns[adventureStore.turns.length - 1]
         : null
+      const turnCount = adventureStore.turns.length
 
       if (
         adventureStore.worldMomentumEnabled &&
         playerAction !== null &&
         lastTurn?.worldTrajectory
       ) {
-        adventureStore.setStreamingContent('⏳ Resolving world momentum...')
-
-        const momentumMessages = buildMomentumResolutionMessages(
-          lastTurn.narrative,
-          lastTurn.worldTrajectory,
-          playerAction,
-        )
-
-        const momentumResolved = resolveModel('adventure-momentum')
-        const momentumClient = LLMClientFactory.getClient(momentumResolved.provider)
-
-        let momentumAccumulated = ''
-        const momentumResponse = momentumClient.generate({
-          model: momentumResolved.model,
-          messages: momentumMessages,
-          max_tokens: 1024,
-          signal: abortController.signal,
-          metadata: { callType: 'adventure-momentum' },
-        })
-
-        for await (const event of momentumResponse) {
-          if (event.type === 'chunk') {
-            momentumAccumulated += event.text
-          }
-        }
-
-        const cleaned = momentumAccumulated
-          .replace(/<think>[\s\S]*?<\/think>/g, '')
-          .trim()
-
-        if (cleaned === 'NONE' || !cleaned) {
-          resolvedMomentum = null // All momentum invalidated
-          console.log('[Momentum] All momentum invalidated by player action')
+        // Check cache — reuse if same turn count and player action
+        if (
+          cachedMomentum &&
+          cachedMomentum.turnCount === turnCount &&
+          cachedMomentum.playerAction === playerAction
+        ) {
+          resolvedMomentum = cachedMomentum.resolved
+          console.log('[Momentum] Using cached resolution')
         } else {
-          resolvedMomentum = cleaned
-          console.log('[Momentum] Resolved momentum:\n', cleaned)
+          adventureStore.setStreamingContent('⏳ Resolving world momentum...')
+
+          const momentumMessages = buildMomentumResolutionMessages(
+            lastTurn.narrative,
+            lastTurn.worldTrajectory,
+            playerAction,
+          )
+
+          const momentumResolved = resolveModel('adventure-momentum')
+          const momentumClient = LLMClientFactory.getClient(momentumResolved.provider)
+
+          let momentumAccumulated = ''
+          const momentumResponse = momentumClient.generate({
+            model: momentumResolved.model,
+            messages: momentumMessages,
+            max_tokens: 1024,
+            signal: abortController.signal,
+            metadata: { callType: 'adventure-momentum' },
+          })
+
+          for await (const event of momentumResponse) {
+            if (event.type === 'chunk') {
+              momentumAccumulated += event.text
+            }
+          }
+
+          const cleaned = momentumAccumulated
+            .replace(/<think>[\s\S]*?<\/think>/g, '')
+            .trim()
+
+          if (cleaned === 'NONE' || !cleaned) {
+            resolvedMomentum = null
+            console.log('[Momentum] All momentum invalidated by player action')
+          } else {
+            resolvedMomentum = cleaned
+            console.log('[Momentum] Resolved momentum:\n', cleaned)
+          }
+
+          // Cache for retries
+          cachedMomentum = { turnCount, playerAction, resolved: resolvedMomentum }
         }
       }
 
