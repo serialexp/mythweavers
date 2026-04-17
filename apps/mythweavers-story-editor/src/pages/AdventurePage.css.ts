@@ -31,7 +31,7 @@ export const headerRight = style({
   gap: tokens.space['2'],
 
   '@media': {
-    '(max-width: 640px)': {
+    '(max-width: 1024px)': {
       display: 'none',
     },
   },
@@ -48,7 +48,7 @@ export const menuToggle = style({
   lineHeight: 1,
 
   '@media': {
-    '(max-width: 640px)': {
+    '(max-width: 1024px)': {
       display: 'block',
     },
   },
@@ -58,7 +58,7 @@ export const mobileMenu = style({
   display: 'none',
 
   '@media': {
-    '(max-width: 640px)': {
+    '(max-width: 1024px)': {
       display: 'flex',
       flexDirection: 'column',
       gap: tokens.space['2'],
