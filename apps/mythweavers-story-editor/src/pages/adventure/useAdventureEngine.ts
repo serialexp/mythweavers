@@ -220,6 +220,7 @@ export function createAdventureEngine(
       // If the model returned nothing (or only whitespace / thinking tags),
       // skip all downstream calls — there's nothing to analyse.
       if (!narrative) {
+        adventureStore.setStreamingContent('')
         adventureStore.setError('The model returned an empty response. Try again or switch models.')
         adventureStore.setLastFailedAction(playerAction)
         return
@@ -310,10 +311,10 @@ export function createAdventureEngine(
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        // User aborted — if we have partial content, save it as narrative-only
+        // User aborted — if we have partial narrative content, save it
         const partial = adventureStore.streamingContent
-        if (partial) {
-          const narrative = cleanNarrative(partial)
+        const narrative = partial ? cleanNarrative(partial) : ''
+        if (narrative && !narrative.startsWith('⏳')) {
           adventureStore.finalizeAbort({
             playerAction,
             narrative,
@@ -332,6 +333,7 @@ export function createAdventureEngine(
       }
     } finally {
       adventureStore.setIsGenerating(false)
+      adventureStore.setStreamingContent('')
       adventureStore.setPendingAction(null)
       abortController = null
     }
