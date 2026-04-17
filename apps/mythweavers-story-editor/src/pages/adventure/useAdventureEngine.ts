@@ -258,6 +258,8 @@ export function createAdventureEngine(
         adventureStore.setStreamingContent('')
         adventureStore.setError('The model returned an empty response. Try again or switch models.')
         adventureStore.setLastFailedAction(playerAction)
+        // Restore the action to the input so the user can edit and resubmit
+        if (playerAction) adventureStore.setPlayerInput(playerAction)
         return
       }
 
@@ -377,6 +379,8 @@ export function createAdventureEngine(
           err instanceof Error ? err.message : 'Unknown error occurred'
         adventureStore.setError(message)
         adventureStore.setLastFailedAction(playerAction)
+        // Restore the action to the input so the user can edit and resubmit
+        if (playerAction) adventureStore.setPlayerInput(playerAction)
         console.error('Adventure generation error:', err)
       }
     } finally {
@@ -721,6 +725,7 @@ export function createAdventureEngine(
   function handleRetry() {
     const action = adventureStore.lastFailedAction
     if (action === undefined) return
+    adventureStore.setPlayerInput('')
     generate(action)
   }
 

@@ -463,17 +463,27 @@ export const PlayingScreen: Component = () => {
         </Show>
 
         <Show when={adventureStore.error}>
-          <div class={styles.errorRow}>
-            <div class={styles.errorText}>Error: {adventureStore.error}</div>
-            <Show when={adventureStore.lastFailedAction !== undefined}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={engine.handleRetry}
-              >
-                Retry
-              </Button>
+          <div class={styles.turn}>
+            <Show when={adventureStore.lastFailedAction}>
+              {(action) => (
+                <div class={styles.playerAction}>
+                  <span class={styles.playerActionLabel}>You:</span>
+                  {action()}
+                </div>
+              )}
             </Show>
+            <div class={styles.errorRow}>
+              <div class={styles.errorText}>Error: {adventureStore.error}</div>
+              <Show when={adventureStore.lastFailedAction !== undefined}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={engine.handleRetry}
+                >
+                  Retry
+                </Button>
+              </Show>
+            </div>
           </div>
         </Show>
       </div>
