@@ -52,27 +52,14 @@ const HeaderActions: Component = () => {
         variant="ghost"
         size="sm"
         onClick={() =>
-          adventureStore.setShowDirectorNotes(
-            !adventureStore.showDirectorNotes,
-          )
+          adventureStore.setShowStoryPanel(!adventureStore.showStoryPanel)
         }
-        title="View latest director notes"
-        disabled={!adventureStore.turns.some((t) => t.directorNotes)}
+        title="Story tools — world bible, director notes, and per-turn directive"
       >
         <Show when={adventureStore.isDirectorRunning}>
           <span class={styles.directorIndicator}>🎬 </span>
         </Show>
-        {adventureStore.showDirectorNotes ? 'Hide Director' : 'Director'}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() =>
-          adventureStore.setShowDirective(!adventureStore.showDirective)
-        }
-        title="Edit per-turn directive"
-      >
-        {adventureStore.showDirective ? 'Hide Directive' : 'Directive'}
+        {adventureStore.showStoryPanel ? 'Hide Story' : '📋 Story'}
       </Button>
       <Button
         variant="ghost"
@@ -131,91 +118,113 @@ export const AdventureHeader: Component<{
         </div>
       </Show>
 
-      {/* Director notes panel */}
+      {/* Combined story panel: World Bible + Director Notes + Directive */}
       <Show
         when={
           adventureStore.phase === 'playing' &&
-          adventureStore.showDirectorNotes
-        }
-      >
-        {(() => {
-          const latestNotes = () => {
-            const turns = adventureStore.turns
-            for (let i = turns.length - 1; i >= 0; i--) {
-              if (turns[i].directorNotes) return turns[i].directorNotes
-            }
-            return undefined
-          }
-          return (
-            <div class={styles.headerDirectivePanel}>
-              <div style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'space-between' }}>
-                <label class={styles.formLabel}>🎬 Director Notes</label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={engine.handleRegenerateDirector}
-                  disabled={
-                    adventureStore.isGenerating ||
-                    adventureStore.isDirectorRunning ||
-                    adventureStore.turns.length === 0
-                  }
-                  title="Regenerate director notes and world momentum for the last turn"
-                >
-                  ↻ Regenerate
-                </Button>
-              </div>
-              <Show
-                when={latestNotes()}
-                fallback={
-                  <div class={styles.directiveHint}>
-                    {adventureStore.isDirectorRunning
-                      ? 'Director is analyzing the story...'
-                      : 'No director notes yet.'}
-                  </div>
-                }
-              >
-                <textarea
-                  class={styles.directorNotesContent}
-                  value={latestNotes()!}
-                  onInput={(e) => {
-                    adventureStore.updateLastTurn({
-                      directorNotes: e.currentTarget.value,
-                    })
-                    engine.persist()
-                  }}
-                  rows={12}
-                  disabled={
-                    adventureStore.isGenerating ||
-                    adventureStore.isDirectorRunning
-                  }
-                />
-              </Show>
-            </div>
-          )
-        })()}
-      </Show>
-
-      {/* Per-turn directive panel */}
-      <Show
-        when={
-          adventureStore.phase === 'playing' && adventureStore.showDirective
+          adventureStore.showStoryPanel
         }
       >
         <div class={styles.headerDirectivePanel}>
-          <label class={styles.formLabel}>Per-Turn Directive</label>
-          <textarea
-            class={styles.directiveTextarea}
-            value={adventureStore.directive}
-            onInput={(e) => {
-              adventureStore.setDirective(e.currentTarget.value)
-              engine.persist()
-            }}
-            placeholder="Instructions repeated with every story turn..."
-            rows={3}
-          />
-          <div class={styles.directiveHint}>
-            This instruction is included in the system prompt on every turn.
-            Changes take effect on the next generation.
+          {/* World Bible section */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>📖 World Bible</label>
+            <div class={styles.directiveHint}>
+              Foundational context injected at the start of every LLM call.
+              Use for world background, character lists, lore, and rules that rarely change.
+            </div>
+            <textarea
+              class={styles.directiveTextarea}
+              value={adventureStore.worldBible}
+              onInput={(e) => {
+                adventureStore.setWorldBible(e.currentTarget.value)
+                engine.persist()
+              }}
+              placeholder="Background world info, character lists, lore, rules of magic..."
+              rows={6}
+            />
+          </div>
+
+          {/* Director Notes section */}
+          <div class={styles.storyPanelSection}>
+            {(() => {
+              const latestNotes = () => {
+                const turns = adventureStore.turns
+                for (let i = turns.length - 1; i >= 0; i--) {
+                  if (turns[i].directorNotes) return turns[i].directorNotes
+                }
+                return undefined
+              }
+              return (
+                <>
+                  <div class={styles.storyPanelSectionHeader}>
+                    <label class={styles.formLabel}>🎬 Director Notes</label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={engine.handleRegenerateDirector}
+                      disabled={
+                        adventureStore.isGenerating ||
+                        adventureStore.isDirectorRunning ||
+                        adventureStore.turns.length === 0
+                      }
+                      title="Regenerate director notes and world momentum for the last turn"
+                    >
+                      ↻ Regenerate
+                    </Button>
+                  </div>
+                  <div class={styles.directiveHint}>
+                    Auto-generated behind-the-scenes notes the LLM uses to maintain
+                    story consistency. Updated every 5 turns. Editable.
+                  </div>
+                  <Show
+                    when={latestNotes()}
+                    fallback={
+                      <div class={styles.directiveHint}>
+                        {adventureStore.isDirectorRunning
+                          ? 'Director is analyzing the story...'
+                          : 'No director notes yet — they appear after the first few turns.'}
+                      </div>
+                    }
+                  >
+                    <textarea
+                      class={styles.directorNotesContent}
+                      value={latestNotes()!}
+                      onInput={(e) => {
+                        adventureStore.updateLastTurn({
+                          directorNotes: e.currentTarget.value,
+                        })
+                        engine.persist()
+                      }}
+                      rows={10}
+                      disabled={
+                        adventureStore.isGenerating ||
+                        adventureStore.isDirectorRunning
+                      }
+                    />
+                  </Show>
+                </>
+              )
+            })()}
+          </div>
+
+          {/* Directive section */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>Per-Turn Directive</label>
+            <div class={styles.directiveHint}>
+              Instructions appended to the end of every LLM call (recency bias).
+              Use for style guidance, tone, or constraints for the current arc.
+            </div>
+            <textarea
+              class={styles.directiveTextarea}
+              value={adventureStore.directive}
+              onInput={(e) => {
+                adventureStore.setDirective(e.currentTarget.value)
+                engine.persist()
+              }}
+              placeholder="Instructions repeated with every story turn..."
+              rows={3}
+            />
           </div>
         </div>
       </Show>

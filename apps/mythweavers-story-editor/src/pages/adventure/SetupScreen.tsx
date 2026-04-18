@@ -1,4 +1,4 @@
-import { type Component, For, Show } from 'solid-js'
+import { type Component, For, Show, createSignal } from 'solid-js'
 import { Button, Text } from '@mythweavers/ui'
 import { ProviderModelSelector } from '../../components/ProviderModelSelector'
 import { effectiveSettings } from '../../stores/effectiveSettingsStore'
@@ -9,6 +9,7 @@ import * as styles from '../AdventurePage.css'
 
 export const SetupScreen: Component = () => {
   const engine = useEngine()
+  const [showAdvanced, setShowAdvanced] = createSignal(false)
 
   return (
     <div class={styles.setupContainer}>
@@ -138,29 +139,46 @@ export const SetupScreen: Component = () => {
         <div style={{ 'margin-top': '0.5rem' }}>
           <button
             class={styles.directiveToggle}
-            onClick={() =>
-              adventureStore.setShowDirective(!adventureStore.showDirective)
-            }
+            onClick={() => setShowAdvanced(!showAdvanced())}
           >
-            {adventureStore.showDirective
-              ? '▾ Per-Turn Directive'
-              : '▸ Per-Turn Directive'}
+            {showAdvanced()
+              ? '▾ Advanced Options'
+              : '▸ Advanced Options'}
           </button>
-          <Show when={adventureStore.showDirective}>
+          <Show when={showAdvanced()}>
             <div class={styles.directivePanel}>
+              <label class={styles.formLabel}>📖 World Bible</label>
               <textarea
                 class={styles.directiveTextarea}
-                value={adventureStore.directive}
+                value={adventureStore.worldBible}
                 onInput={(e) => {
-                  adventureStore.setDirective(e.currentTarget.value)
+                  adventureStore.setWorldBible(e.currentTarget.value)
                   engine.persist()
                 }}
-                placeholder="Instructions repeated with every story turn..."
+                placeholder="Background world info, character lists, lore, rules of magic..."
                 rows={4}
               />
               <div class={styles.directiveHint}>
-                This instruction is injected into the system prompt on every
-                turn to keep the AI on track.
+                Foundational context injected at the start of every LLM call.
+                Rarely changes during play.
+              </div>
+
+              <div style={{ 'margin-top': '0.75rem' }}>
+                <label class={styles.formLabel}>Per-Turn Directive</label>
+                <textarea
+                  class={styles.directiveTextarea}
+                  value={adventureStore.directive}
+                  onInput={(e) => {
+                    adventureStore.setDirective(e.currentTarget.value)
+                    engine.persist()
+                  }}
+                  placeholder="Instructions repeated with every story turn..."
+                  rows={3}
+                />
+                <div class={styles.directiveHint}>
+                  Appended to the end of every LLM call (recency bias).
+                  Use for style or tone guidance.
+                </div>
               </div>
             </div>
           </Show>

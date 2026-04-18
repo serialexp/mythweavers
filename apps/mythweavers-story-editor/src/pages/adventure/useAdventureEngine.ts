@@ -216,6 +216,7 @@ export function createAdventureEngine(
         adventureStore.directive,
         adventureStore.compactions,
         resolvedMomentum,
+        adventureStore.worldBible,
       )
 
       const narrativeResolved = resolveModel('adventure')
@@ -310,7 +311,7 @@ export function createAdventureEngine(
             checkedNarrative,
             playerAction,
             directorNotes,
-            { directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription },
+            { directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription, worldBible: adventureStore.worldBible },
           )
 
           const trajectoryResolved = resolveModel('adventure-trajectory')
@@ -417,7 +418,7 @@ export function createAdventureEngine(
     try {
       const directorResolved = resolveModel('adventure-director')
       const client = LLMClientFactory.getClient(directorResolved.provider)
-      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive, adventureStore.compactions, adventureStore.settingDescription)
+      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive, adventureStore.compactions, adventureStore.settingDescription, adventureStore.worldBible)
 
       let accumulated = ''
       const response = client.generate({
@@ -630,6 +631,7 @@ export function createAdventureEngine(
         nonsenseIssues,
         adventureStore.directive,
         adventureStore.compactions,
+        adventureStore.worldBible,
       )
 
       const revisionResolved = resolveModel('adventure-revision')
@@ -804,7 +806,7 @@ export function createAdventureEngine(
         lastTurn.narrative,
         lastTurn.playerAction,
         directorNotes,
-        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription },
+        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription, worldBible: adventureStore.worldBible },
       )
 
       const trajectoryResolved = resolveModel('adventure-trajectory')

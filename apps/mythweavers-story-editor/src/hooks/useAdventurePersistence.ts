@@ -31,6 +31,7 @@ export interface PersistedState {
   turns: AdventureTurn[]
   compactions?: Record<string, AdventureCompaction>
   directive?: string
+  worldBible?: string
   pendingAction?: string | null
   worldMomentumEnabled?: boolean
 }

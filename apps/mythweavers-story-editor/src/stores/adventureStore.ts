@@ -19,6 +19,7 @@ interface AdventureState {
   turns: AdventureTurn[]
   compactions: Record<string, AdventureCompaction>
   directive: string
+  worldBible: string
 
   // Generation state
   isGenerating: boolean
@@ -49,9 +50,8 @@ interface AdventureState {
   // UI state
   playerInput: string
   expandedTrajectories: Record<number, boolean>
-  showDirectorNotes: boolean
+  showStoryPanel: boolean
   showMenu: boolean
-  showDirective: boolean
   showKnobs: boolean
   scrollLocked: boolean
 }
@@ -76,6 +76,7 @@ const [state, setState] = createStore<AdventureState>({
   turns: [],
   compactions: {},
   directive: '',
+  worldBible: '',
 
   isGenerating: false,
   streamingContent: '',
@@ -99,9 +100,8 @@ const [state, setState] = createStore<AdventureState>({
 
   playerInput: '',
   expandedTrajectories: {},
-  showDirectorNotes: false,
+  showStoryPanel: false,
   showMenu: false,
-  showDirective: false,
   showKnobs: false,
   scrollLocked: true,
 })
@@ -129,6 +129,9 @@ export const adventureStore = {
   },
   get directive() {
     return state.directive
+  },
+  get worldBible() {
+    return state.worldBible
   },
 
   get isGenerating() {
@@ -188,14 +191,11 @@ export const adventureStore = {
   get expandedTrajectories() {
     return state.expandedTrajectories
   },
-  get showDirectorNotes() {
-    return state.showDirectorNotes
+  get showStoryPanel() {
+    return state.showStoryPanel
   },
   get showMenu() {
     return state.showMenu
-  },
-  get showDirective() {
-    return state.showDirective
   },
   get showKnobs() {
     return state.showKnobs
@@ -224,6 +224,9 @@ export const adventureStore = {
 
   setDirective(v: string) {
     setState('directive', v)
+  },
+  setWorldBible(v: string) {
+    setState('worldBible', v)
   },
 
   setIsGenerating(v: boolean) {
@@ -281,14 +284,11 @@ export const adventureStore = {
   setPlayerInput(v: string) {
     setState('playerInput', v)
   },
-  setShowDirectorNotes(v: boolean) {
-    setState('showDirectorNotes', v)
+  setShowStoryPanel(v: boolean) {
+    setState('showStoryPanel', v)
   },
   setShowMenu(v: boolean) {
     setState('showMenu', v)
-  },
-  setShowDirective(v: boolean) {
-    setState('showDirective', v)
   },
   setShowKnobs(v: boolean) {
     setState('showKnobs', v)
@@ -370,6 +370,7 @@ export const adventureStore = {
       turns: [...state.turns],
       compactions: { ...state.compactions },
       directive: state.directive,
+      worldBible: state.worldBible,
       worldMomentumEnabled: state.worldMomentumEnabled,
       ...(action ? { pendingAction: action } : {}),
     }
@@ -409,6 +410,7 @@ export const adventureStore = {
         protagonistInput: saved?.protagonistInput ?? '',
         settingDescription: saved?.settingDescription ?? '',
         directive: saved?.directive ?? '',
+        worldBible: saved?.worldBible ?? '',
 
         isGenerating: false,
         streamingContent: '',
@@ -426,9 +428,8 @@ export const adventureStore = {
         worldMomentumEnabled: saved?.worldMomentumEnabled ?? true,
 
         playerInput: '',
-        showDirectorNotes: false,
+        showStoryPanel: false,
         showMenu: false,
-        showDirective: false,
         showKnobs: false,
         scrollLocked: true,
       })
@@ -451,6 +452,7 @@ export const adventureStore = {
         protagonistInput: '',
         settingDescription: '',
         directive: '',
+        worldBible: '',
 
         isGenerating: false,
         streamingContent: '',
@@ -466,9 +468,8 @@ export const adventureStore = {
         worldMomentumEnabled: true,
 
         playerInput: '',
-        showDirectorNotes: false,
+        showStoryPanel: false,
         showMenu: false,
-        showDirective: false,
         showKnobs: false,
         scrollLocked: true,
       })

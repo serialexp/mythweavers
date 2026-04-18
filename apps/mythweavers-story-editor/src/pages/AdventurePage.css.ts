@@ -787,3 +787,23 @@ export const headerDirectivePanel = style({
   margin: '0 auto',
   boxSizing: 'border-box',
 })
+
+export const storyPanelSection = style({
+  paddingTop: tokens.space['3'],
+  selectors: {
+    '&:first-child': {
+      paddingTop: 0,
+    },
+    '& + &': {
+      marginTop: tokens.space['3'],
+      borderTop: `1px solid ${tokens.color.border.default}`,
+    },
+  },
+})
+
+export const storyPanelSectionHeader = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: tokens.space['1'],
+})

@@ -283,13 +283,19 @@ export function buildSharedHistory(
   turns: AdventureTurn[],
   compactions?: Record<string, AdventureCompaction>,
   settingDescription?: string,
+  worldBible?: string,
 ): LLMMessage[] {
   const messages: LLMMessage[] = []
 
   // Shared system prompt — cache breakpoint: static across all calls and turns
+  // If there's a world bible, combine it with the base prompt under the same
+  // cache breakpoint so the entire static prefix is cached together.
+  const worldBibleTrimmed = worldBible?.trim()
   messages.push({
     role: 'system',
-    content: BASE_SYSTEM_PROMPT,
+    content: worldBibleTrimmed
+      ? `${BASE_SYSTEM_PROMPT}\n\n[WORLD BIBLE — persistent reference for the world, characters, and lore]\n${worldBibleTrimmed}`
+      : BASE_SYSTEM_PROMPT,
     cache_control: { type: 'ephemeral', ttl: '1h' },
   })
 
@@ -377,8 +383,9 @@ export function buildNarrativeMessages(
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   resolvedMomentum?: string | null,
+  worldBible?: string,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription)
+  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
   const isOpeningTurn = turns.length === 0 && playerAction === null
 
@@ -424,10 +431,10 @@ export function buildTrajectoryMessages(
   latestNarrative: string,
   playerAction: string | null,
   currentDirectorNotes?: string,
-  options?: { rejectedTrajectory?: string; directive?: string; compactions?: Record<string, AdventureCompaction>; settingDescription?: string },
+  options?: { rejectedTrajectory?: string; directive?: string; compactions?: Record<string, AdventureCompaction>; settingDescription?: string; worldBible?: string },
 ): LLMMessage[] {
   // Shared history + the just-completed turn's narrative
-  const messages = buildSharedHistory(turns, options?.compactions, options?.settingDescription)
+  const messages = buildSharedHistory(turns, options?.compactions, options?.settingDescription, options?.worldBible)
 
   // Append the current turn as if it already happened (so trajectory sees it)
   if (playerAction !== null) {
@@ -481,8 +488,9 @@ export function buildDirectorMessages(
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   settingDescription?: string,
+  worldBible?: string,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription)
+  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
   // Append the current (not-yet-finalized) turn so the director sees it
   if (currentTurn) {
@@ -549,8 +557,9 @@ export function buildRevisionMessages(
   inconsistencies: string,
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
+  worldBible?: string,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription)
+  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
   const revisionProtagonistInfo = getLatestProtagonistInfo(turns)
   const revisionProtagonistSection = revisionProtagonistInfo
