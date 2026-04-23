@@ -15,11 +15,16 @@ export const treeContainer = style({
   flex: 1,
   overflowY: 'auto',
   padding: tokens.space['2'],
+  paddingTop: 0,
   minHeight: 0,
 })
 
 export const nodeItem = style({
   userSelect: 'none',
+})
+
+export const storyRow = style({
+  borderBottom: `1px solid ${tokens.color.border.default}`,
 })
 
 export const nodeItemDragging = style({
@@ -97,6 +102,17 @@ export const expandButton = style({
 export const expandPlaceholder = style({
   width: '20px',
   height: '20px',
+})
+
+export const expandLeaf = style({
+  width: '20px',
+  height: '20px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: tokens.color.text.muted,
+  fontSize: '10px',
+  lineHeight: 1,
 })
 
 export const nodeIcon = style({

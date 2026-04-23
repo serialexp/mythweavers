@@ -1,28 +1,5 @@
 import { Button, Dropdown, DropdownDivider, DropdownItem, IconButton, useTheme } from '@mythweavers/ui'
 import { useNavigate } from '@solidjs/router'
-import {
-  BsArrowsMove,
-  BsBook,
-  BsBookHalf,
-  BsBoxArrowRight,
-  BsCalendar3,
-  BsChatDots,
-  BsTranslate,
-  BsChevronDown,
-  BsChevronUp,
-  BsCodeSlash,
-  BsCpu,
-  BsFilm,
-  BsGear,
-  BsGlobe,
-  BsMap,
-  BsMoon,
-  BsPeople,
-  BsPlus,
-  BsSearch,
-  BsSun,
-  BsThreeDots,
-} from 'solid-icons/bs'
 import * as styles from './StoryHeader.css'
 import { Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js'
 import { authStore } from '../stores/authStore'
@@ -58,6 +35,7 @@ import { StoryStats } from './StoryStats'
 import { QuickLlmDialog } from './QuickLlmDialog'
 import { quickLlmStore } from '../stores/quickLlmStore'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
+import { PhArrowsOutCardinalIcon, PhBookIcon, PhBookOpenIcon, PhCalendarBlankIcon, PhCaretDownIcon, PhCaretUpIcon, PhChatDotsIcon, PhCodeIcon, PhCpuIcon, PhDotsThreeIcon, PhFilmSlateIcon, PhGearIcon, PhGlobeIcon, PhMagnifyingGlassIcon, PhMapTrifoldIcon, PhMoonIcon, PhPlusIcon, PhSignOutIcon, PhSunIcon, PhTranslateIcon, PhUsersIcon } from 'solidjs-phosphor'
 
 interface StoryHeaderProps {
   onLoadStory: (
@@ -140,8 +118,8 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           }}
           aria-label={isCollapsed() ? 'Show header' : 'Hide header'}
         >
-          <Show when={isCollapsed()} fallback={<BsChevronUp />}>
-            <BsChevronDown />
+          <Show when={isCollapsed()} fallback={<PhCaretUpIcon />}>
+            <PhCaretDownIcon />
           </Show>
         </IconButton>
         <header
@@ -166,7 +144,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               }}
               title={activeSection() === 'navigation' ? 'Hide chapters' : 'Navigate chapters'}
             >
-              <BsBookHalf />
+              <PhBookOpenIcon />
             </button>
           </Show>
           <div class={styles.config}>
@@ -183,7 +161,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               variant={activeSection() === 'characters' ? 'active' : 'default'}
               title={activeSection() === 'characters' ? 'Hide characters' : 'Show characters'}
             >
-              <BsPeople />
+              <PhUsersIcon />
             </HeaderButton>
             <HeaderButton
               onClick={() => {
@@ -198,7 +176,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               variant={activeSection() === 'context' ? 'active' : 'default'}
               title={activeSection() === 'context' ? 'Hide context items' : 'Show context items'}
             >
-              <BsGlobe />
+              <PhGlobeIcon />
             </HeaderButton>
             <HeaderButton
               onClick={() => {
@@ -213,7 +191,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               variant={activeSection() === 'maps' ? 'active' : 'default'}
               title={activeSection() === 'maps' ? 'Hide maps' : 'Show maps'}
             >
-              <BsMap />
+              <PhMapTrifoldIcon />
             </HeaderButton>
             {/* View Mode Dropdown */}
             <Show when={messagesStore.hasStoryMessages}>
@@ -225,38 +203,38 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                     variant={viewModeStore.viewMode() !== 'normal' ? 'active' : 'default'}
                   >
                     <div style={{ display: 'flex', 'flex-direction': 'column', 'align-items': 'center', 'padding-top': '4px' }}>
-                      {viewModeStore.viewMode() === 'normal' && <BsBook />}
-                      {viewModeStore.viewMode() === 'reorder' && <BsArrowsMove />}
-                      {viewModeStore.viewMode() === 'script' && <BsCodeSlash />}
-                      {viewModeStore.viewMode() === 'read' && <BsBookHalf />}
-                      <BsChevronDown style={{ 'font-size': '10px' }} />
+                      {viewModeStore.viewMode() === 'normal' && <PhBookIcon />}
+                      {viewModeStore.viewMode() === 'reorder' && <PhArrowsOutCardinalIcon />}
+                      {viewModeStore.viewMode() === 'script' && <PhCodeIcon />}
+                      {viewModeStore.viewMode() === 'read' && <PhBookOpenIcon />}
+                      <PhCaretDownIcon style={{ 'font-size': '10px' }} />
                     </div>
                   </HeaderButton>
                 }
               >
                 <DropdownItem
-                  icon={<BsBook />}
+                  icon={<PhBookIcon />}
                   active={viewModeStore.viewMode() === 'normal'}
                   onClick={() => viewModeStore.setViewMode('normal')}
                 >
                   Normal View
                 </DropdownItem>
                 <DropdownItem
-                  icon={<BsArrowsMove />}
+                  icon={<PhArrowsOutCardinalIcon />}
                   active={viewModeStore.viewMode() === 'reorder'}
                   onClick={() => viewModeStore.setViewMode('reorder')}
                 >
                   Reorder/Move Messages
                 </DropdownItem>
                 <DropdownItem
-                  icon={<BsCodeSlash />}
+                  icon={<PhCodeIcon />}
                   active={viewModeStore.viewMode() === 'script'}
                   onClick={() => viewModeStore.setViewMode('script')}
                 >
                   Script View
                 </DropdownItem>
                 <DropdownItem
-                  icon={<BsBookHalf />}
+                  icon={<PhBookOpenIcon />}
                   active={viewModeStore.viewMode() === 'read'}
                   onClick={() => viewModeStore.setViewMode('read')}
                 >
@@ -275,8 +253,8 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                     variant={navigationStore.selectedStorylineId ? 'active' : 'default'}
                   >
                     <div style={{ display: 'flex', 'flex-direction': 'column', 'align-items': 'center', 'padding-top': '4px' }}>
-                      <BsGlobe />
-                      <BsChevronDown style={{ 'font-size': '10px' }} />
+                      <PhGlobeIcon />
+                      <PhCaretDownIcon style={{ 'font-size': '10px' }} />
                     </div>
                   </HeaderButton>
                 }
@@ -306,18 +284,18 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               alignRight
               trigger={
                 <HeaderButton title="More options">
-                  <BsThreeDots />
+                  <PhDotsThreeIcon />
                 </HeaderButton>
               }
             >
               <DropdownItem
-                icon={<BsBook />}
+                icon={<PhBookIcon />}
                 onClick={() => navigate('/stories/list')}
               >
                 Story List
               </DropdownItem>
               <DropdownItem
-                icon={<BsGear />}
+                icon={<PhGearIcon />}
                 onClick={() => {
                   const newSection = activeSection() === 'settings' ? null : 'settings'
                   setActiveSection(newSection)
@@ -331,29 +309,29 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                 Story Settings
               </DropdownItem>
               <Show when={messagesStore.hasStoryMessages}>
-                <DropdownItem icon={<BsSearch />} onClick={() => searchModalStore.show()}>
+                <DropdownItem icon={<PhMagnifyingGlassIcon />} onClick={() => searchModalStore.show()}>
                   Search
                 </DropdownItem>
               </Show>
-              <DropdownItem icon={<BsFilm />} onClick={() => episodeViewerStore.toggle()}>
+              <DropdownItem icon={<PhFilmSlateIcon />} onClick={() => episodeViewerStore.toggle()}>
                 Episode Viewer
               </DropdownItem>
-              <DropdownItem icon={<BsCpu />} onClick={() => llmActivityStore.show()}>
+              <DropdownItem icon={<PhCpuIcon />} onClick={() => llmActivityStore.show()}>
                 LLM Activity
               </DropdownItem>
-              <DropdownItem icon={<BsChatDots />} onClick={() => quickLlmStore.show()}>
+              <DropdownItem icon={<PhChatDotsIcon />} onClick={() => quickLlmStore.show()}>
                 Quick LLM
               </DropdownItem>
               <Show when={mapsStore.maps.length > 0}>
-                <DropdownItem icon={<BsArrowsMove />} onClick={() => setShowTravelTimeCalculator(true)}>
+                <DropdownItem icon={<PhArrowsOutCardinalIcon />} onClick={() => setShowTravelTimeCalculator(true)}>
                   Travel Time Calculator
                 </DropdownItem>
               </Show>
               <Show when={currentStoryStore.storageMode === 'server'}>
-                <DropdownItem icon={<BsCalendar3 />} onClick={() => setShowCalendarManagement(true)}>
+                <DropdownItem icon={<PhCalendarBlankIcon />} onClick={() => setShowCalendarManagement(true)}>
                   Calendars
                 </DropdownItem>
-                <DropdownItem icon={<BsTranslate />} onClick={() => setShowLanguageManagement(true)}>
+                <DropdownItem icon={<PhTranslateIcon />} onClick={() => setShowLanguageManagement(true)}>
                   Languages
                 </DropdownItem>
               </Show>
@@ -363,12 +341,12 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               </Show>
               <DropdownDivider />
               <DropdownItem
-                icon={resolvedTheme() === 'chronicle' ? <BsSun /> : <BsMoon />}
+                icon={resolvedTheme() === 'chronicle' ? <PhSunIcon /> : <PhMoonIcon />}
                 onClick={() => setTheme(resolvedTheme() === 'chronicle' ? 'starlight' : 'chronicle')}
               >
                 {resolvedTheme() === 'chronicle' ? 'Light Theme' : 'Dark Theme'}
               </DropdownItem>
-              <DropdownItem icon={<BsBoxArrowRight />} onClick={() => authStore.logout()}>
+              <DropdownItem icon={<PhSignOutIcon />} onClick={() => authStore.logout()}>
                 Logout
               </DropdownItem>
             </Dropdown>
@@ -438,7 +416,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
         position="left"
         headerAction={
           <Button size="sm" onClick={() => charactersRef?.addNew()}>
-            <BsPlus /> Add
+            <PhPlusIcon /> Add
           </Button>
         }
       >
@@ -455,7 +433,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
         position="left"
         headerAction={
           <Button size="sm" onClick={() => contextItemsRef?.addNew()}>
-            <BsPlus /> Add
+            <PhPlusIcon /> Add
           </Button>
         }
       >

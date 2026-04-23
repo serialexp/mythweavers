@@ -160,6 +160,11 @@ export interface Node {
   // Story timeline (minutes from 0 BBY - negative = BBY, positive = ABY)
   storyTime?: number // When this node occurs in story time (typically set on scenes)
 
+  // Publishing (chapter-only in practice, but kept on the union so any Node
+  // carrying a chapter publishedAt flows through unchanged). null = draft,
+  // future = scheduled, past = live. Only meaningful on type === 'chapter'.
+  publishedAt?: string | null
+
   // Metadata
   createdAt: Date
   updatedAt: Date

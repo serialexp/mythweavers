@@ -8,7 +8,7 @@
     "dev": "bun --env-file=../../.env.local --watch src/index.ts",
     "build": "tsc",
     "start": "bun src/index.ts",
-    "test": "bun test --env-file=.env.test",
+    "test": "bun --env-file=.env.test prisma migrate reset --force && bun test --env-file=.env.test",
     "test:watch": "bun test --watch --env-file=.env.test",
     "prisma:generate": "prisma generate",
     "prisma:generate:source": "prisma generate --schema=prisma/story-source.prisma",

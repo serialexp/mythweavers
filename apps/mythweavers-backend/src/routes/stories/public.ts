@@ -59,6 +59,18 @@ const publicStorySchema = z.strictObject({
     description: 'Estimated page count',
     example: 120,
   }),
+  publishedAt: z.string().meta({
+    description: 'When this story became publicly visible (ISO-8601). Always set for public responses.',
+    example: '2025-12-05T12:00:00.000Z',
+  }),
+  firstChapterReleasedAt: z.string().nullable().meta({
+    description: 'Earliest publishedAt across the story\'s non-deleted chapters (ISO-8601). Null if no chapters are live yet.',
+    example: '2025-12-05T12:00:00.000Z',
+  }),
+  lastChapterReleasedAt: z.string().nullable().meta({
+    description: 'Latest publishedAt across the story\'s non-deleted chapters (ISO-8601). Null if no chapters are live yet.',
+    example: '2026-03-01T12:00:00.000Z',
+  }),
   createdAt: z.string().meta({
     description: 'Creation timestamp',
     example: '2025-12-05T12:00:00.000Z',
@@ -129,9 +141,47 @@ function formatPublicStory(story: any) {
     coverTextColor: story.coverTextColor,
     coverFontFamily: story.coverFontFamily,
     pages: story.pages,
+    publishedAt: story.publishedAt.toISOString(),
+    firstChapterReleasedAt: story.firstChapterReleasedAt
+      ? story.firstChapterReleasedAt.toISOString()
+      : null,
+    lastChapterReleasedAt: story.lastChapterReleasedAt
+      ? story.lastChapterReleasedAt.toISOString()
+      : null,
     createdAt: story.createdAt.toISOString(),
     updatedAt: story.updatedAt.toISOString(),
   }
+}
+
+// ---- Visibility filter helpers ----
+// A story is visible iff publishedAt is set AND <= now.
+// A chapter is visible iff its own publishedAt is set AND <= now, its
+// parent story is visible, and it's not soft-deleted.
+function storyVisibleWhere(now: Date) {
+  return { publishedAt: { not: null, lte: now } } as const
+}
+function chapterVisibleWhere(now: Date) {
+  return { deleted: false, publishedAt: { not: null, lte: now } } as const
+}
+
+// ---- ETag / conditional response helper ----
+// Builds a weak ETag from a list of timestamps plus a stable identifier.
+// Returns 304 (without body) when the client's If-None-Match matches.
+function buildETag(id: string, timestamps: Array<Date | null | undefined>): string {
+  const max = timestamps
+    .filter((d): d is Date => d instanceof Date && !isNaN(d.getTime()))
+    .reduce((acc, d) => (d.getTime() > acc ? d.getTime() : acc), 0)
+  return `W/"${id}-${max}"`
+}
+
+function setCacheHeaders(reply: any, etag: string, lastModified?: Date | null) {
+  reply.header('ETag', etag)
+  if (lastModified) {
+    reply.header('Last-Modified', lastModified.toUTCString())
+  }
+  // Reader content is semi-dynamic; allow short shared caching but require
+  // revalidation so publishedAt scheduling / updates aren't stuck in caches.
+  reply.header('Cache-Control', 'public, max-age=0, must-revalidate')
 }
 
 // Chapter schema for public view
@@ -151,6 +201,14 @@ const publicChapterSchema = z.strictObject({
   summary: z.string().nullable().meta({
     description: 'Chapter summary',
     example: 'Our hero sets out on their journey',
+  }),
+  publishedAt: z.string().meta({
+    description: 'When this chapter became publicly visible (ISO-8601). Always set for public responses.',
+    example: '2025-12-05T12:00:00.000Z',
+  }),
+  wordCount: z.number().int().meta({
+    description: 'Cached total word count for this chapter',
+    example: 2500,
   }),
 })
 
@@ -211,12 +269,16 @@ const chapterContentSchema = z.strictObject({
     description: 'Chapter content as HTML',
     example: '<p>Once upon a time...</p>',
   }),
+  publishedAt: z.string().meta({
+    description: 'When this chapter became publicly visible (ISO-8601).',
+    example: '2025-12-05T12:00:00.000Z',
+  }),
   previousChapterId: z.string().nullable().meta({
-    description: 'ID of the previous chapter',
+    description: 'ID of the previous visible chapter',
     example: 'clx1234567889',
   }),
   nextChapterId: z.string().nullable().meta({
-    description: 'ID of the next chapter',
+    description: 'ID of the next visible chapter',
     example: 'clx1234567891',
   }),
 })
@@ -259,6 +321,8 @@ function formatPublicStoryWithStructure(story: any) {
                 name: chapter.name,
                 sortOrder: chapter.sortOrder,
                 summary: chapter.summary,
+                publishedAt: chapter.publishedAt.toISOString(),
+                wordCount: chapter.wordCount ?? 0,
               })),
           })),
       })),
@@ -316,9 +380,13 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
         const skip = (page - 1) * pageSize
 
-        // Build where clause - only show published stories
+        // Build where clause - only show stories whose publishedAt window has
+        // opened (publishedAt != null AND <= now). The legacy `published`
+        // boolean is still dual-written by the writer endpoints but we filter
+        // exclusively on publishedAt to support scheduled publication.
+        const now = new Date()
         const where: any = {
-          published: true,
+          ...storyVisibleWhere(now),
         }
 
         if (search) {
@@ -422,11 +490,12 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     async (request, reply) => {
       try {
         const { id } = request.params
+        const now = new Date()
 
         const story = await prisma.story.findFirst({
           where: {
             id,
-            published: true, // Only show if published
+            ...storyVisibleWhere(now),
           },
           include: {
             owner: {
@@ -441,6 +510,16 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         if (!story) {
           return reply.status(404).send({ error: 'Story not found' })
         }
+
+        const etag = buildETag(story.id, [
+          story.updatedAt,
+          story.publishedAt,
+          story.lastChapterReleasedAt,
+        ])
+        if (request.headers['if-none-match'] === etag) {
+          return reply.status(304).send()
+        }
+        setCacheHeaders(reply, etag, story.updatedAt)
 
         return {
           story: formatPublicStory(story),
@@ -470,11 +549,12 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     async (request, reply) => {
       try {
         const { id } = request.params
+        const now = new Date()
 
         const story = await prisma.story.findFirst({
           where: {
             id,
-            published: true, // Only show if published
+            ...storyVisibleWhere(now),
           },
           include: {
             owner: {
@@ -488,11 +568,18 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 arcs: {
                   include: {
                     chapters: {
+                      // IMPORTANT: this is the visibility filter that stops
+                      // unpublished / scheduled / soft-deleted chapters from
+                      // leaking into the reader's table of contents.
+                      where: chapterVisibleWhere(now),
                       select: {
                         id: true,
                         name: true,
                         sortOrder: true,
                         summary: true,
+                        publishedAt: true,
+                        updatedAt: true,
+                        wordCount: true,
                       },
                     },
                   },
@@ -506,8 +593,35 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Story not found' })
         }
 
+        // Prune empty branches from the tree. Prisma's `where` on the
+        // `chapters` include already hides unpublished/scheduled/soft-deleted
+        // chapters, but arcs/books with zero visible chapters would still come
+        // through and clutter the reader's table of contents. Drop them here.
+        const visibleBooks = story.books
+          .map((book) => ({
+            ...book,
+            arcs: book.arcs.filter((arc) => arc.chapters.length > 0),
+          }))
+          .filter((book) => book.arcs.length > 0)
+
+        // Collect chapter timestamps for ETag (max of publishedAt/updatedAt
+        // across all visible chapters + the story's own updatedAt).
+        const chapterTimestamps: Date[] = []
+        for (const book of visibleBooks) {
+          for (const arc of book.arcs) {
+            for (const ch of arc.chapters) {
+              chapterTimestamps.push(ch.publishedAt as Date, ch.updatedAt)
+            }
+          }
+        }
+        const etag = buildETag(story.id, [story.updatedAt, story.publishedAt, ...chapterTimestamps])
+        if (request.headers['if-none-match'] === etag) {
+          return reply.status(304).send()
+        }
+        setCacheHeaders(reply, etag, story.updatedAt)
+
         return {
-          story: formatPublicStoryWithStructure(story),
+          story: formatPublicStoryWithStructure({ ...story, books: visibleBooks }),
         }
       } catch (error) {
         fastify.log.error({ error }, 'Failed to get public story structure')
@@ -534,12 +648,13 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     async (request, reply) => {
       try {
         const { id: storyId, chapterId } = request.params
+        const now = new Date()
 
-        // First, verify the story is published and the chapter belongs to it
+        // First, verify the story's publishedAt window is open.
         const story = await prisma.story.findFirst({
           where: {
             id: storyId,
-            published: true,
+            ...storyVisibleWhere(now),
           },
           select: { id: true },
         })
@@ -548,10 +663,14 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Story not found' })
         }
 
-        // Get the chapter with its content
+        // Get the chapter with its content — must also be visible (publishedAt
+        // set and <= now, not soft-deleted). This is the primary leak fix:
+        // previously ANY chapter of a published story was readable, including
+        // drafts and scheduled-for-the-future chapters.
         const chapter = await prisma.chapter.findFirst({
           where: {
             id: chapterId,
+            ...chapterVisibleWhere(now),
             arc: {
               book: {
                 storyId: storyId,
@@ -588,9 +707,12 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Chapter not found' })
         }
 
-        // Get all chapters in the story to find prev/next
+        // Get all *visible* chapters in the story to find prev/next. Drafts
+        // and future-scheduled chapters must be skipped so readers don't hit
+        // a 404 when clicking "next".
         const allChapters = await prisma.chapter.findMany({
           where: {
+            ...chapterVisibleWhere(now),
             arc: {
               book: {
                 storyId: storyId,
@@ -612,11 +734,23 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const previousChapterId = currentIndex > 0 ? allChapters[currentIndex - 1].id : null
         const nextChapterId = currentIndex < allChapters.length - 1 ? allChapters[currentIndex + 1].id : null
 
+        // ETag: chapter.updatedAt + publishedAt. Note that paragraph-level
+        // revisions don't currently bump Chapter.updatedAt, so content edits
+        // made via revisions won't invalidate the cache. TODO: propagate
+        // paragraph/scene updates up to Chapter.updatedAt (or compute ETag
+        // from a nested max).
+        const etag = buildETag(chapter.id, [chapter.updatedAt, chapter.publishedAt])
+        if (request.headers['if-none-match'] === etag) {
+          return reply.status(304).send()
+        }
+        setCacheHeaders(reply, etag, chapter.updatedAt)
+
         return {
           chapter: {
             id: chapter.id,
             name: chapter.name,
             content: extractChapterContent(chapter),
+            publishedAt: (chapter.publishedAt as Date).toISOString(),
             previousChapterId,
             nextChapterId,
           },

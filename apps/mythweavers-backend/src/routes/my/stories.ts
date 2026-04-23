@@ -85,8 +85,14 @@ const storySchema = z.strictObject({
     example: 12345,
   }),
   published: z.boolean().meta({
-    description: 'Whether the story is published',
+    description:
+      '[Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.',
     example: false,
+  }),
+  publishedAt: z.string().nullable().meta({
+    description:
+      'When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.',
+    example: '2026-05-01T00:00:00.000Z',
   }),
   status: storyStatusSchema,
   type: storyTypeSchema,
@@ -436,7 +442,9 @@ const exportStoryResponseSchema = z.strictObject({
               deleted: z.boolean(),
               deletedAt: z.string().nullable(),
               publishedOn: z.string().nullable(),
+              publishedAt: z.string().nullable(),
               royalRoadId: z.number().nullable(),
+              wordCount: z.number().int(),
               createdAt: z.string(),
               updatedAt: z.string(),
               scenes: z.array(
@@ -606,6 +614,13 @@ const exportStoryResponseSchema = z.strictObject({
 function formatStory(story: any) {
   return {
     ...story,
+    publishedAt: story.publishedAt ? story.publishedAt.toISOString() : null,
+    firstChapterReleasedAt: story.firstChapterReleasedAt
+      ? story.firstChapterReleasedAt.toISOString()
+      : null,
+    lastChapterReleasedAt: story.lastChapterReleasedAt
+      ? story.lastChapterReleasedAt.toISOString()
+      : null,
     createdAt: story.createdAt.toISOString(),
     updatedAt: story.updatedAt.toISOString(),
   }
@@ -844,10 +859,26 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Story not found' })
         }
 
+        // Dual-write: when the legacy `published` boolean is flipped, also
+        // maintain `publishedAt` so the reader-side visibility filter (which
+        // uses publishedAt) stays consistent. true => publishedAt=now if not
+        // already set; false => publishedAt=null. Callers that want scheduled
+        // publishing should use PATCH /my/stories/:storyId/publishing instead.
+        const data: Prisma.StoryUpdateInput = { ...(updates as Prisma.StoryUpdateInput) }
+        if (typeof updates.published === 'boolean') {
+          if (updates.published) {
+            if (!existingStory.publishedAt) {
+              data.publishedAt = new Date()
+            }
+          } else {
+            data.publishedAt = null
+          }
+        }
+
         // Update story
         const story = await prisma.story.update({
           where: { id },
-          data: updates as Prisma.StoryUpdateInput,
+          data,
         })
 
         fastify.log.info({ storyId: story.id, userId }, 'Story updated')

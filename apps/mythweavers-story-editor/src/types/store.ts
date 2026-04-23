@@ -27,6 +27,12 @@ export interface CurrentStory {
   model?: string | null // Model name for the selected provider
   // Story-level AI overrides (null = inherit from global user preferences)
   aiOverrides?: StoryAIOverrides | null
+  // Publishing state (reader-facing). See packages/backend publishing endpoints.
+  // null publishedAt = draft/unpublished; future = scheduled; past = live.
+  // Release dates are server-computed from the story's non-deleted chapters.
+  publishedAt?: string | null
+  firstChapterReleasedAt?: string | null
+  lastChapterReleasedAt?: string | null
 }
 
 export interface CacheEntry {

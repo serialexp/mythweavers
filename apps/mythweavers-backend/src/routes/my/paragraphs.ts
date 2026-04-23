@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { recalculateChapterWordCount } from '../../lib/chapterWordCount.js'
 import { createParagraphsBulk } from '../../lib/paragraphHelpers.js'
 import { prisma } from '../../lib/prisma.js'
 import { transformDates } from '../../lib/transform-dates.js'
@@ -209,6 +210,11 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
           currentParagraphRevisionId: paragraph.paragraphRevisions[0].id,
         },
       })
+
+      // Refresh the chapter's cached word count. We know the full chain
+      // from the ownership check above (messageRevision → message → scene
+      // → chapter), so no extra lookup needed.
+      await recalculateChapterWordCount(messageRevision.message.scene.chapterId)
 
       return reply.code(201).send({
         success: true as const,
@@ -474,6 +480,13 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       })
 
+      // Word count only shifts when the body/contentSchema changed — not
+      // on sortOrder-only or state-only edits. Skip the recompute in those
+      // cases to avoid the query cost on high-frequency reorder saves.
+      if (request.body.body !== undefined || request.body.contentSchema !== undefined) {
+        await recalculateChapterWordCount(paragraph.messageRevision.message.scene.chapterId)
+      }
+
       return {
         success: true as const,
         paragraph: transformDates(updated),
@@ -546,9 +559,13 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(404).send({ error: 'Paragraph not found' })
       }
 
+      const chapterId = paragraph.messageRevision.message.scene.chapterId
+
       await prisma.paragraph.delete({
         where: { id },
       })
+
+      await recalculateChapterWordCount(chapterId)
 
       return { success: true as const }
     },
@@ -629,6 +646,8 @@ const paragraphRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const paragraphIds = await prisma.$transaction(async (tx) => {
         return createParagraphsBulk(tx, revisionId, request.body.paragraphs)
       })
+
+      await recalculateChapterWordCount(messageRevision.message.scene.chapterId)
 
       return reply.code(201).send({
         success: true as const,

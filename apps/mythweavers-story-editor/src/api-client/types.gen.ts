@@ -219,6 +219,11 @@ export type GetAuthSessionResponses = {
                     model: string;
                 };
             };
+            encryptedSecrets?: {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            };
             [key: string]: unknown | string | number | Array<{
                 id: string;
                 name: string;
@@ -229,6 +234,10 @@ export type GetAuthSessionResponses = {
                     provider: string;
                     model: string;
                 };
+            } | {
+                salt: string;
+                iv: string;
+                ciphertext: string;
             } | undefined;
         };
     };
@@ -1028,9 +1037,13 @@ export type PostMyStoriesResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1086,13 +1099,17 @@ export type PostMyStoriesResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -1322,9 +1339,13 @@ export type GetMyStoriesByIdResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1380,13 +1401,17 @@ export type GetMyStoriesByIdResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -1547,6 +1572,10 @@ export type PatchMyStoriesByIdData = {
          * Branch choices JSON object
          */
         branchChoices?: unknown | null;
+        /**
+         * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences.
+         */
+        aiOverrides?: unknown | null;
     };
     path: {
         /**
@@ -1647,9 +1676,13 @@ export type PatchMyStoriesByIdResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1705,13 +1738,17 @@ export type PatchMyStoriesByIdResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -1874,9 +1911,13 @@ export type GetMyStoriesByIdExportResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1932,13 +1973,17 @@ export type GetMyStoriesByIdExportResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -2045,7 +2090,9 @@ export type GetMyStoriesByIdExportResponses = {
                     deleted: boolean;
                     deletedAt: string | null;
                     publishedOn: string | null;
+                    publishedAt: string | null;
                     royalRoadId: number | null;
+                    wordCount: number;
                     createdAt: string;
                     updatedAt: string;
                     scenes: Array<{
@@ -4243,9 +4290,13 @@ export type GetMyArcsByArcIdChaptersResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -4402,9 +4453,13 @@ export type PostMyArcsByArcIdChaptersResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -4594,9 +4649,13 @@ export type GetMyChaptersByIdResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -4757,9 +4816,13 @@ export type PatchMyChaptersByIdResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -15277,6 +15340,501 @@ export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses = {
 
 export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponse = DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses[keyof DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses];
 
+export type PatchMyStoriesByStoryIdPublishingData = {
+    body: {
+        /**
+         * ISO-8601 timestamp at which this entity becomes publicly visible. null = unpublished/draft. A future value = scheduled. A past value = live.
+         */
+        publishedAt: string | null;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/publishing';
+};
+
+export type PatchMyStoriesByStoryIdPublishingErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyStoriesByStoryIdPublishingError = PatchMyStoriesByStoryIdPublishingErrors[keyof PatchMyStoriesByStoryIdPublishingErrors];
+
+export type PatchMyStoriesByStoryIdPublishingResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+    };
+};
+
+export type PatchMyStoriesByStoryIdPublishingResponse = PatchMyStoriesByStoryIdPublishingResponses[keyof PatchMyStoriesByStoryIdPublishingResponses];
+
+export type PostMyStoriesByStoryIdPublishNowData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/publish-now';
+};
+
+export type PostMyStoriesByStoryIdPublishNowErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdPublishNowError = PostMyStoriesByStoryIdPublishNowErrors[keyof PostMyStoriesByStoryIdPublishNowErrors];
+
+export type PostMyStoriesByStoryIdPublishNowResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+    };
+};
+
+export type PostMyStoriesByStoryIdPublishNowResponse = PostMyStoriesByStoryIdPublishNowResponses[keyof PostMyStoriesByStoryIdPublishNowResponses];
+
+export type PostMyStoriesByStoryIdUnpublishData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/unpublish';
+};
+
+export type PostMyStoriesByStoryIdUnpublishErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdUnpublishError = PostMyStoriesByStoryIdUnpublishErrors[keyof PostMyStoriesByStoryIdUnpublishErrors];
+
+export type PostMyStoriesByStoryIdUnpublishResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+    };
+};
+
+export type PostMyStoriesByStoryIdUnpublishResponse = PostMyStoriesByStoryIdUnpublishResponses[keyof PostMyStoriesByStoryIdUnpublishResponses];
+
+export type PatchMyChaptersByChapterIdPublishingData = {
+    body: {
+        /**
+         * ISO-8601 timestamp at which this entity becomes publicly visible. null = unpublished/draft. A future value = scheduled. A past value = live.
+         */
+        publishedAt: string | null;
+    };
+    path: {
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/chapters/{chapterId}/publishing';
+};
+
+export type PatchMyChaptersByChapterIdPublishingErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyChaptersByChapterIdPublishingError = PatchMyChaptersByChapterIdPublishingErrors[keyof PatchMyChaptersByChapterIdPublishingErrors];
+
+export type PatchMyChaptersByChapterIdPublishingResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        chapterId: string;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+        /**
+         * Recomputed earliest publishedAt across the parent story's non-deleted chapters.
+         */
+        firstChapterReleasedAt: string | null;
+        /**
+         * Recomputed latest publishedAt across the parent story's non-deleted chapters.
+         */
+        lastChapterReleasedAt: string | null;
+    };
+};
+
+export type PatchMyChaptersByChapterIdPublishingResponse = PatchMyChaptersByChapterIdPublishingResponses[keyof PatchMyChaptersByChapterIdPublishingResponses];
+
+export type PostMyChaptersByChapterIdPublishNowData = {
+    body?: never;
+    path: {
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/chapters/{chapterId}/publish-now';
+};
+
+export type PostMyChaptersByChapterIdPublishNowErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyChaptersByChapterIdPublishNowError = PostMyChaptersByChapterIdPublishNowErrors[keyof PostMyChaptersByChapterIdPublishNowErrors];
+
+export type PostMyChaptersByChapterIdPublishNowResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        chapterId: string;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+        /**
+         * Recomputed earliest publishedAt across the parent story's non-deleted chapters.
+         */
+        firstChapterReleasedAt: string | null;
+        /**
+         * Recomputed latest publishedAt across the parent story's non-deleted chapters.
+         */
+        lastChapterReleasedAt: string | null;
+    };
+};
+
+export type PostMyChaptersByChapterIdPublishNowResponse = PostMyChaptersByChapterIdPublishNowResponses[keyof PostMyChaptersByChapterIdPublishNowResponses];
+
+export type PostMyChaptersByChapterIdUnpublishData = {
+    body?: never;
+    path: {
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/chapters/{chapterId}/unpublish';
+};
+
+export type PostMyChaptersByChapterIdUnpublishErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyChaptersByChapterIdUnpublishError = PostMyChaptersByChapterIdUnpublishErrors[keyof PostMyChaptersByChapterIdUnpublishErrors];
+
+export type PostMyChaptersByChapterIdUnpublishResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        chapterId: string;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+        /**
+         * Recomputed earliest publishedAt across the parent story's non-deleted chapters.
+         */
+        firstChapterReleasedAt: string | null;
+        /**
+         * Recomputed latest publishedAt across the parent story's non-deleted chapters.
+         */
+        lastChapterReleasedAt: string | null;
+    };
+};
+
+export type PostMyChaptersByChapterIdUnpublishResponse = PostMyChaptersByChapterIdUnpublishResponses[keyof PostMyChaptersByChapterIdUnpublishResponses];
+
 export type GetMyStoriesByStoryIdPdfData = {
     body?: never;
     path: {
@@ -15602,6 +16160,11 @@ export type GetMyPreferencesResponses = {
                     model: string;
                 };
             };
+            encryptedSecrets?: {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            };
             [key: string]: unknown | string | number | Array<{
                 id: string;
                 name: string;
@@ -15612,6 +16175,10 @@ export type GetMyPreferencesResponses = {
                     provider: string;
                     model: string;
                 };
+            } | {
+                salt: string;
+                iv: string;
+                ciphertext: string;
             } | undefined;
         };
     };
@@ -15643,6 +16210,11 @@ export type PutMyPreferencesData = {
                 model: string;
             };
         };
+        encryptedSecrets?: {
+            salt: string;
+            iv: string;
+            ciphertext: string;
+        };
         [key: string]: unknown | string | number | Array<{
             id: string;
             name: string;
@@ -15653,6 +16225,10 @@ export type PutMyPreferencesData = {
                 provider: string;
                 model: string;
             };
+        } | {
+            salt: string;
+            iv: string;
+            ciphertext: string;
         } | undefined;
     };
     path?: never;
@@ -15699,6 +16275,11 @@ export type PutMyPreferencesResponses = {
                     model: string;
                 };
             };
+            encryptedSecrets?: {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            };
             [key: string]: unknown | string | number | Array<{
                 id: string;
                 name: string;
@@ -15709,6 +16290,10 @@ export type PutMyPreferencesResponses = {
                     provider: string;
                     model: string;
                 };
+            } | {
+                salt: string;
+                iv: string;
+                ciphertext: string;
             } | undefined;
         };
     };
@@ -16644,6 +17229,281 @@ export type PutAdminLlmModelsByIdResponses = {
 
 export type PutAdminLlmModelsByIdResponse = PutAdminLlmModelsByIdResponses[keyof PutAdminLlmModelsByIdResponses];
 
+export type GetAdminLlmProvidersByProviderIdBalanceData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/balance';
+};
+
+export type GetAdminLlmProvidersByProviderIdBalanceErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdBalanceError = GetAdminLlmProvidersByProviderIdBalanceErrors[keyof GetAdminLlmProvidersByProviderIdBalanceErrors];
+
+export type GetAdminLlmProvidersByProviderIdBalanceResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        balance: {
+            providerId: string;
+            /**
+             * Sum of top-ups in USD
+             */
+            totalTopUps: string;
+            /**
+             * Sum of synced costs in USD
+             */
+            totalCosts: string;
+            /**
+             * top-ups minus costs
+             */
+            balance: string;
+        };
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdBalanceResponse = GetAdminLlmProvidersByProviderIdBalanceResponses[keyof GetAdminLlmProvidersByProviderIdBalanceResponses];
+
+export type GetAdminLlmProvidersByProviderIdTransactionsData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: {
+        /**
+         * Page number
+         */
+        page?: number;
+        /**
+         * Items per page
+         */
+        pageSize?: number;
+    };
+    url: '/admin/llm/providers/{providerId}/transactions';
+};
+
+export type GetAdminLlmProvidersByProviderIdTransactionsErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdTransactionsError = GetAdminLlmProvidersByProviderIdTransactionsErrors[keyof GetAdminLlmProvidersByProviderIdTransactionsErrors];
+
+export type GetAdminLlmProvidersByProviderIdTransactionsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        transactions: Array<{
+            id: string;
+            providerId: string;
+            type: 'TOP_UP' | 'COST_SYNC';
+            /**
+             * Amount in USD as decimal string
+             */
+            amount: string;
+            /**
+             * ISO date string
+             */
+            date: string;
+            notes: string | null;
+            syncKey: string | null;
+            createdAt: string;
+        }>;
+        pagination: {
+            page: number;
+            pageSize: number;
+            total: number;
+        };
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdTransactionsResponse = GetAdminLlmProvidersByProviderIdTransactionsResponses[keyof GetAdminLlmProvidersByProviderIdTransactionsResponses];
+
+export type PostAdminLlmProvidersByProviderIdTopUpData = {
+    body: {
+        /**
+         * Top-up amount in USD
+         */
+        amount: number;
+        /**
+         * Effective date (ISO string). Defaults to now.
+         */
+        date?: string;
+        /**
+         * Optional note
+         */
+        notes?: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/top-up';
+};
+
+export type PostAdminLlmProvidersByProviderIdTopUpErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdTopUpError = PostAdminLlmProvidersByProviderIdTopUpErrors[keyof PostAdminLlmProvidersByProviderIdTopUpErrors];
+
+export type PostAdminLlmProvidersByProviderIdTopUpResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        transaction: {
+            id: string;
+            providerId: string;
+            type: 'TOP_UP' | 'COST_SYNC';
+            /**
+             * Amount in USD as decimal string
+             */
+            amount: string;
+            /**
+             * ISO date string
+             */
+            date: string;
+            notes: string | null;
+            syncKey: string | null;
+            createdAt: string;
+        };
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdTopUpResponse = PostAdminLlmProvidersByProviderIdTopUpResponses[keyof PostAdminLlmProvidersByProviderIdTopUpResponses];
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsData = {
+    body: {
+        /**
+         * Start date for cost sync (YYYY-MM-DD)
+         */
+        startDate: string;
+        /**
+         * End date for cost sync (YYYY-MM-DD)
+         */
+        endDate: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/sync-costs';
+};
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    502: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsError = PostAdminLlmProvidersByProviderIdSyncCostsErrors[keyof PostAdminLlmProvidersByProviderIdSyncCostsErrors];
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Number of new cost records created
+         */
+        synced: number;
+        /**
+         * Number of existing records updated
+         */
+        updated: number;
+        /**
+         * Total cost for the period in USD
+         */
+        totalCost: string;
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsResponse = PostAdminLlmProvidersByProviderIdSyncCostsResponses[keyof PostAdminLlmProvidersByProviderIdSyncCostsResponses];
+
 export type GetAdminLlmProvidersByProviderIdDiscoverData = {
     body?: never;
     path: {
@@ -17162,6 +18022,18 @@ export type GetStoriesResponses = {
              */
             pages: number | null;
             /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -17289,6 +18161,18 @@ export type GetStoriesByIdResponses = {
              */
             pages: number | null;
             /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -17398,6 +18282,18 @@ export type GetStoriesByIdStructureResponses = {
              */
             pages: number | null;
             /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -17448,6 +18344,14 @@ export type GetStoriesByIdStructureResponses = {
                          * Chapter summary
                          */
                         summary: string | null;
+                        /**
+                         * When this chapter became publicly visible (ISO-8601). Always set for public responses.
+                         */
+                        publishedAt: string;
+                        /**
+                         * Cached total word count for this chapter
+                         */
+                        wordCount: number;
                     }>;
                 }>;
             }>;
@@ -17523,11 +18427,15 @@ export type GetStoriesByIdChaptersByChapterIdResponses = {
              */
             content: string;
             /**
-             * ID of the previous chapter
+             * When this chapter became publicly visible (ISO-8601).
+             */
+            publishedAt: string;
+            /**
+             * ID of the previous visible chapter
              */
             previousChapterId: string | null;
             /**
-             * ID of the next chapter
+             * ID of the next visible chapter
              */
             nextChapterId: string | null;
         };

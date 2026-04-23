@@ -91,7 +91,8 @@ describe('Story Export/Import', () => {
 
       expect(exportResponse.statusCode).toBe(200)
       expect(exportResponse.headers['content-type']).toBe('application/zip')
-      expect(exportResponse.headers['content-disposition']).toContain('story-export')
+      expect(exportResponse.headers['content-disposition']).toContain('test-story')
+      expect(exportResponse.headers['content-disposition']).toContain('.zip')
 
       // Parse the ZIP
       const zipBuffer = exportResponse.rawPayload

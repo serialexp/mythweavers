@@ -49,6 +49,7 @@ import myPathSegmentsRoutes from './routes/my/path-segments.js'
 import myPathsRoutes from './routes/my/paths.js'
 import myPawnsRoutes from './routes/my/pawns.js'
 import myPlotPointStatesRoutes from './routes/my/plot-point-states.js'
+import myPublishingRoutes from './routes/my/publishing.js'
 import myScenesRoutes from './routes/my/scenes.js'
 import myStoriesRoutes from './routes/my/stories.js'
 import myLanguagesRoutes from './routes/my/languages.js'
@@ -313,6 +314,7 @@ await server.register(myPawnsRoutes, { prefix: '/my' })
 await server.register(myPathsRoutes, { prefix: '/my' })
 await server.register(myPathSegmentsRoutes, { prefix: '/my' })
 await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
+await server.register(myPublishingRoutes, { prefix: '/my' })
 await server.register(myExportPdfRoutes, { prefix: '/my' })
 await server.register(myExportStoryRoutes, { prefix: '/my' })
 await server.register(myBalanceRoutes, { prefix: '/my' })

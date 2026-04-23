@@ -29,7 +29,13 @@ const chapterSchema = z.strictObject({
     example: 'clx9876543210',
   }),
   publishedOn: z.string().nullable().meta({
-    description: 'Publication date',
+    description:
+      '[Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.',
+    example: '2025-12-05T12:00:00.000Z',
+  }),
+  publishedAt: z.string().nullable().meta({
+    description:
+      'When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.',
     example: '2025-12-05T12:00:00.000Z',
   }),
   sortOrder: z.number().meta({
@@ -160,6 +166,7 @@ function formatChapter(chapter: any) {
   return {
     ...chapter,
     publishedOn: chapter.publishedOn?.toISOString() || null,
+    publishedAt: chapter.publishedAt?.toISOString() || null,
     createdAt: chapter.createdAt.toISOString(),
     updatedAt: chapter.updatedAt.toISOString(),
   }

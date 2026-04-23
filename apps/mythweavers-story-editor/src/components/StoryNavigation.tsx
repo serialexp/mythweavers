@@ -1,28 +1,3 @@
-import {
-  BsArrowCounterclockwise,
-  BsArrowDown,
-  BsArrowUp,
-  BsBook,
-  BsBoxArrowRight,
-  BsCheckCircle,
-  BsChevronDown,
-  BsChevronRight,
-  BsClock,
-  BsDiagram3,
-  BsExclamationTriangle,
-  BsFileEarmarkText,
-  BsFileEarmarkTextFill,
-  BsFileText,
-  BsPencil,
-  BsPeople,
-  BsPlusCircle,
-  BsScissors,
-  BsSave,
-  BsThreeDots,
-  BsTrash,
-} from 'solid-icons/bs'
-import { FaRegularCircle, FaSolidBookOpen, FaSolidCircleCheck, FaSolidCircleHalfStroke } from 'solid-icons/fa'
-import { VsCode } from 'solid-icons/vs'
 import { useNavigate } from '@solidjs/router'
 import { Dropdown, DropdownItem } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
@@ -43,12 +18,16 @@ import { buildNodeMarkdown, buildPrecedingContextMarkdown, buildTreeMarkdown } f
 import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 import { estimateTokensFromText } from '../utils/templateAI'
 import { createAnthropicClient } from '../utils/anthropicClient'
+import { ChapterPublishingModal } from './ChapterPublishingModal'
 import { CharacterUpdateModal } from './CharacterUpdateModal'
 import { ContextItemGenerateModal } from './ContextItemGenerateModal'
 import { NodeStatusMenu } from './NodeStatusMenu'
+import { PublishingBadge } from './PublishingBadge'
 import { SplitSceneModal } from './SplitSceneModal'
+import { StoryPublishingModal } from './StoryPublishingModal'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
+import { PhArrowCounterClockwiseIcon, PhArrowDownIcon, PhArrowUpIcon, PhBookIcon, PhBookOpenIcon, PhCaretDownIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleHalfIcon, PhCircleIcon, PhClockIcon, PhCodeIcon, PhDotsThreeIcon, PhFileTextIcon, PhFloppyDiskIcon, PhGlobeIcon, PhPencilSimpleIcon, PhPlusCircleIcon, PhScissorsIcon, PhSignOutIcon, PhTrashIcon, PhTreeStructureIcon, PhUsersIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface NodeItemProps {
   treeNode: TreeNode
@@ -56,6 +35,7 @@ interface NodeItemProps {
   onSelectChapter?: () => void
   onSplitScene?: (nodeId: string) => void
   onExtractBook?: (bookId: string) => void
+  onPublishChapter?: (chapterId: string) => void
 }
 
 const getAllowedParentType = (type: NodeType): NodeType | null => {
@@ -310,13 +290,13 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     const includeVal = n?.includeInFull ?? 2 // default to full content
     switch (includeVal) {
       case 0:
-        return <FaRegularCircle /> // Not included
+        return <PhCircleIcon /> // Not included
       case 1:
-        return <FaSolidCircleHalfStroke /> // Summary only
+        return <PhCircleHalfIcon weight="fill" /> // Summary only
       case 2:
-        return <FaSolidCircleCheck /> // Full content
+        return <PhCheckCircleIcon weight="fill" /> // Full content
       default:
-        return <FaSolidCircleHalfStroke />
+        return <PhCircleHalfIcon weight="fill" />
     }
   }
 
@@ -364,13 +344,13 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     if (!n) return null
     switch (n.type) {
       case 'book':
-        return <BsBook />
+        return <PhBookIcon />
       case 'arc':
-        return <FaSolidBookOpen />
+        return <PhBookOpenIcon weight="fill" />
       case 'chapter':
-        return <BsBook />
+        return <PhBookIcon />
       case 'scene':
-        return <BsFileText /> // Different icon for scenes
+        return <PhFileTextIcon /> // Different icon for scenes
       default:
         return null
     }
@@ -923,7 +903,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       >
         <Show when={hasChildren()}>
           <button class={styles.expandButton} onClick={handleToggleExpand}>
-            {isExpanded() ? <BsChevronDown /> : <BsChevronRight />}
+            {isExpanded() ? <PhCaretDownIcon /> : <PhCaretRightIcon />}
           </button>
         </Show>
         <Show when={!hasChildren()}>
@@ -931,6 +911,10 @@ const NodeItem: Component<NodeItemProps> = (props) => {
         </Show>
 
         <span class={styles.nodeIcon}>{getIcon()}</span>
+
+        <Show when={node()?.type === 'chapter'}>
+          <PublishingBadge publishedAt={node()?.publishedAt} />
+        </Show>
 
         <Show when={!isEditing()}>
           <span
@@ -968,7 +952,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 title={getScriptErrorsTooltip()}
                 style={{ color: '#ef4444' }}
               >
-                <VsCode />
+                <PhCodeIcon />
               </span>
             </Show>
 
@@ -978,7 +962,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 title={getScriptChangesTooltip()}
                 style={{ color: '#9333ea' }}
               >
-                <VsCode />
+                <PhCodeIcon />
               </span>
             </Show>
 
@@ -988,7 +972,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 title="This scene contains branch points"
                 style={{ color: '#06b6d4' }}
               >
-                <BsDiagram3 />
+                <PhTreeStructureIcon />
               </span>
             </Show>
 
@@ -998,7 +982,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 title="This scene doesn't have a storyTime set"
                 style={{ color: '#ef4444' }}
               >
-                <BsClock />
+                <PhClockIcon />
               </span>
             </Show>
 
@@ -1008,7 +992,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 title="This scene has content but no summary"
                 style={{ color: '#f59e0b' }}
               >
-                <BsExclamationTriangle />
+                <PhWarningIcon />
               </span>
             </Show>
 
@@ -1031,13 +1015,26 @@ const NodeItem: Component<NodeItemProps> = (props) => {
           </div>
 
           <div class={styles.nodeActions}>
+          <Show when={node()?.type === 'chapter'}>
+            <button
+              class={styles.actionButton}
+              onClick={(e) => {
+                e.stopPropagation()
+                props.onPublishChapter?.(props.treeNode.id)
+              }}
+              title="Publishing…"
+              aria-label="Chapter publishing"
+            >
+              <PhGlobeIcon />
+            </button>
+          </Show>
           <Show when={node()?.type !== 'scene'}>
             <button
               class={styles.actionButton}
               onClick={handleAddChild}
               title={`Add ${node()?.type === 'book' ? 'Arc' : node()?.type === 'arc' ? 'Chapter' : 'Scene'}`}
             >
-              <BsPlusCircle />
+              <PhPlusCircleIcon />
             </button>
           </Show>
 
@@ -1046,17 +1043,17 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             alignRight
             trigger={
               <button class={styles.actionButton}>
-                <BsThreeDots />
+                <PhDotsThreeIcon />
               </button>
             }
           >
-            <DropdownItem icon={<BsPencil />} onClick={handleEdit}>
+            <DropdownItem icon={<PhPencilSimpleIcon />} onClick={handleEdit}>
               Edit Title
             </DropdownItem>
             <Show when={node()?.type === 'chapter' || node()?.type === 'scene'}>
               <Show when={node()?.summary}>
                 <DropdownItem
-                  icon={<BsFileEarmarkTextFill />}
+                  icon={<PhFileTextIcon weight="fill" />}
                   onClick={() => handleGenerateTitle('summary')}
                   disabled={isGeneratingTitle()}
                 >
@@ -1064,19 +1061,19 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 </DropdownItem>
               </Show>
               <DropdownItem
-                icon={<BsFileText />}
+                icon={<PhFileTextIcon />}
                 onClick={() => handleGenerateTitle('content')}
                 disabled={isGeneratingTitle()}
               >
                 {isGeneratingTitle() ? 'Generating...' : 'Generate Title from Content'}
               </DropdownItem>
             </Show>
-            <DropdownItem icon={<BsFileEarmarkText />} onClick={handleCopyAsMarkdown}>
+            <DropdownItem icon={<PhFileTextIcon />} onClick={handleCopyAsMarkdown}>
               Copy as Markdown
             </DropdownItem>
             <Show when={node()?.type === 'book'}>
               <DropdownItem
-                icon={<BsBoxArrowRight />}
+                icon={<PhSignOutIcon />}
                 onClick={() => props.onExtractBook?.(props.treeNode.id)}
               >
                 Export to New Story
@@ -1085,7 +1082,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             <Show when={node()?.type === 'chapter' || node()?.type === 'scene'}>
               <DropdownItem
                 icon={
-                  node()?.isSummarizing ? undefined : node()?.summary ? <BsCheckCircle /> : <BsFileText />
+                  node()?.isSummarizing ? undefined : node()?.summary ? <PhCheckCircleIcon /> : <PhFileTextIcon />
                 }
                 onClick={handleGenerateSummary}
                 disabled={node()?.isSummarizing}
@@ -1096,7 +1093,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                     ? 'Regenerate Summary'
                     : 'Generate Summary'}
               </DropdownItem>
-              <DropdownItem icon={<BsFileEarmarkTextFill />} onClick={handleCopyPreviousContext}>
+              <DropdownItem icon={<PhFileTextIcon weight="fill" />} onClick={handleCopyPreviousContext}>
                 Copy Previous Context
               </DropdownItem>
             </Show>
@@ -1108,26 +1105,26 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             </Show>
             <Show when={node()?.type === 'scene'}>
               <DropdownItem
-                icon={<FaSolidCircleHalfStroke />}
+                icon={<PhCircleHalfIcon weight="fill" />}
                 onClick={() => nodeStore.setIncludeForPrecedingScenes(props.treeNode.id, 1)}
               >
                 Use Summaries Before
               </DropdownItem>
               <DropdownItem
-                icon={<FaRegularCircle />}
+                icon={<PhCircleIcon />}
                 onClick={() => nodeStore.setIncludeForPrecedingScenes(props.treeNode.id, 0)}
               >
                 Exclude All Before
               </DropdownItem>
               <DropdownItem
-                icon={<BsScissors />}
+                icon={<PhScissorsIcon />}
                 onClick={() => props.onSplitScene?.(props.treeNode.id)}
               >
                 Split into Chapters/Scenes
               </DropdownItem>
             </Show>
             <DropdownItem
-              icon={<BsPlusCircle />}
+              icon={<PhPlusCircleIcon />}
               onClick={() => {
                 const n = node()
                 if (n) nodeStore.insertNodeBefore(props.treeNode.id, n.type)
@@ -1136,16 +1133,16 @@ const NodeItem: Component<NodeItemProps> = (props) => {
               Insert {node()?.type === 'book' ? 'Book' : node()?.type === 'arc' ? 'Arc' : node()?.type === 'chapter' ? 'Chapter' : 'Scene'} Before
             </DropdownItem>
             <Show when={canMoveUp()}>
-              <DropdownItem icon={<BsArrowUp />} onClick={handleMoveUp}>
+              <DropdownItem icon={<PhArrowUpIcon />} onClick={handleMoveUp}>
                 Move Up
               </DropdownItem>
             </Show>
             <Show when={canMoveDown()}>
-              <DropdownItem icon={<BsArrowDown />} onClick={handleMoveDown}>
+              <DropdownItem icon={<PhArrowDownIcon />} onClick={handleMoveDown}>
                 Move Down
               </DropdownItem>
             </Show>
-            <DropdownItem icon={<BsTrash />} onClick={handleDelete} danger>
+            <DropdownItem icon={<PhTrashIcon />} onClick={handleDelete} danger>
               Delete
             </DropdownItem>
           </Dropdown>
@@ -1156,7 +1153,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       <Show when={isExpanded() && hasChildren()}>
         <div class={styles.childrenContainer}>
           <For each={props.treeNode.children}>
-            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} onExtractBook={props.onExtractBook} />}
+            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} onExtractBook={props.onExtractBook} onPublishChapter={props.onPublishChapter} />}
           </For>
         </div>
       </Show>
@@ -1179,6 +1176,9 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   const [showContextItemGenerateModal, setShowContextItemGenerateModal] = createSignal(false)
   const [showSplitSceneModal, setShowSplitSceneModal] = createSignal(false)
   const [splitTargetNodeId, setSplitTargetNodeId] = createSignal<string | null>(null)
+  const [showStoryPublishingModal, setShowStoryPublishingModal] = createSignal(false)
+  const [chapterPublishingTargetId, setChapterPublishingTargetId] = createSignal<string | null>(null)
+  const handlePublishChapter = (chapterId: string) => setChapterPublishingTargetId(chapterId)
 
   // LocalStorage key for presets (per-story)
   const getPresetsKey = () => `story-presets-${currentStoryStore.id}`
@@ -1534,15 +1534,46 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
     <TreeDragDropProvider>
       <div class={styles.navigation}>
         <div class={styles.treeContainer} ref={treeContainerRef}>
+          {/* Synthetic story-level row — hosts story-wide actions (publishing) */}
+          <div class={`${styles.nodeItem} ${styles.storyRow}`}>
+            <div class={styles.nodeHeader} style={{ 'padding-left': '4px' }}>
+              <span class={styles.expandLeaf} aria-hidden="true">●</span>
+              <span class={styles.nodeIcon}>
+                <PhBookOpenIcon weight="fill" />
+              </span>
+              <PublishingBadge publishedAt={currentStoryStore.publishedAt} />
+              <span
+                class={styles.nodeTitle}
+                title={currentStoryStore.name || 'Story'}
+              >
+                {currentStoryStore.name || 'Story'}
+              </span>
+              <div class={styles.nodeControls} />
+              <div class={styles.nodeActions}>
+                <button
+                  class={styles.actionButton}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowStoryPublishingModal(true)
+                  }}
+                  title="Story publishing"
+                  aria-label="Story publishing"
+                >
+                  <PhGlobeIcon />
+                </button>
+              </div>
+            </div>
+          </div>
+
           <For each={nodeStore.tree}>
-            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} onExtractBook={handleExtractBook} />}
+            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} onExtractBook={handleExtractBook} onPublishChapter={handlePublishChapter} />}
           </For>
 
           <Show when={nodeStore.tree.length === 0}>
             <div class={styles.emptyState}>
               <p>No books yet</p>
               <button class={styles.addButton} onClick={handleAddBook}>
-                <BsPlusCircle /> Add Book
+                <PhPlusCircleIcon /> Add Book
               </button>
             </div>
           </Show>
@@ -1587,18 +1618,18 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
             <div class={styles.footerButtonsGrid}>
               <div class={styles.footerRow}>
                 <button class={styles.addButton} onClick={handleCopyTreeMarkdown} title="Copy Tree as Markdown">
-                  <BsDiagram3 /> Copy Tree
+                  <PhTreeStructureIcon /> Copy Tree
                 </button>
                 <button class={styles.addButton} onClick={() => setShowCharacterUpdateModal(true)} title="Update Character">
-                  <BsPeople /> Update Char
+                  <PhUsersIcon /> Update Char
                 </button>
                 <button class={styles.addButton} onClick={() => setShowContextItemGenerateModal(true)} title="Generate Context Item">
-                  <BsFileText /> Gen Context
+                  <PhFileTextIcon /> Gen Context
                 </button>
               </div>
               <div class={styles.footerRow}>
                 <button class={styles.addButton} onClick={handleAddBook}>
-                  <BsPlusCircle /> Add Book
+                  <PhPlusCircleIcon /> Add Book
                 </button>
 
                 {/* Preset buttons for includeInFull settings */}
@@ -1612,7 +1643,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
                           onClick={() => togglePreset(slotIndex)}
                           title={hasPreset() ? `Restore preset ${slotIndex + 1}` : `Save current context to preset ${slotIndex + 1}`}
                         >
-                          {hasPreset() ? <BsArrowCounterclockwise /> : <BsSave />}
+                          {hasPreset() ? <PhArrowCounterClockwiseIcon /> : <PhFloppyDiskIcon />}
                           <span>{slotIndex + 1}</span>
                         </button>
                       )
@@ -1639,6 +1670,17 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
         isOpen={showSplitSceneModal()}
         onClose={handleCloseSplitSceneModal}
         targetNodeId={splitTargetNodeId()}
+      />
+
+      <StoryPublishingModal
+        open={showStoryPublishingModal()}
+        onClose={() => setShowStoryPublishingModal(false)}
+      />
+
+      <ChapterPublishingModal
+        open={chapterPublishingTargetId() !== null}
+        chapterId={chapterPublishingTargetId()}
+        onClose={() => setChapterPublishingTargetId(null)}
       />
     </TreeDragDropProvider>
   )

@@ -224,6 +224,14 @@ const App: Component = () => {
       console.log('[loadServerStoryData] Setting last known updated at...')
       currentStoryStore.setLastKnownUpdatedAt(story.updatedAt)
 
+      // Load publishing state (publishedAt + rollup of chapter release dates).
+      // Backend returns ISO strings or nulls; forward straight through.
+      currentStoryStore.loadPublishing({
+        publishedAt: story.publishedAt ?? null,
+        firstChapterReleasedAt: story.firstChapterReleasedAt ?? null,
+        lastChapterReleasedAt: story.lastChapterReleasedAt ?? null,
+      })
+
       // Load story-level AI overrides (provider/model from story become overrides)
       console.log('[loadServerStoryData] Loading AI overrides...')
       const aiOverrides = story.aiOverrides ?? null
@@ -331,6 +339,10 @@ const App: Component = () => {
               order: chapter.sortOrder ?? chapterIndex,
               nodeType: chapter.nodeType || 'story',
               status: chapter.status,
+              // publishedAt drives the Draft/Scheduled/Live indicator in the
+              // chapter tree and publishing modal. Fall back to the legacy
+              // publishedOn field for older exports that pre-date the rename.
+              publishedAt: chapter.publishedAt ?? chapter.publishedOn ?? null,
               expanded: true,
               isOpen: true,
               createdAt: chapter.createdAt,

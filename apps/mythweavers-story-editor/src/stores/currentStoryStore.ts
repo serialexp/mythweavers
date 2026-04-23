@@ -85,6 +85,15 @@ export const currentStoryStore = {
   get aiOverrides(): StoryAIOverrides | null {
     return storyState.story?.aiOverrides ?? null
   },
+  get publishedAt(): string | null {
+    return storyState.story?.publishedAt ?? null
+  },
+  get firstChapterReleasedAt(): string | null {
+    return storyState.story?.firstChapterReleasedAt ?? null
+  },
+  get lastChapterReleasedAt(): string | null {
+    return storyState.story?.lastChapterReleasedAt ?? null
+  },
 
   // Actions
   setName: (name: string, isPlaceholder = false) => {
@@ -187,6 +196,46 @@ export const currentStoryStore = {
     setStoryState('story', 'aiOverrides', overrides ? { ...overrides } : null)
   },
 
+  /**
+   * Load publishing state from a story (called during story load). These
+   * fields don't round-trip through saveService — they're set by server
+   * responses only (either on initial load here, or after the saveService
+   * publishing callbacks below).
+   */
+  loadPublishing: (publishing: {
+    publishedAt?: string | null
+    firstChapterReleasedAt?: string | null
+    lastChapterReleasedAt?: string | null
+  }) => {
+    if (!storyState.story) return
+    setStoryState('story', 'publishedAt', publishing.publishedAt ?? null)
+    setStoryState('story', 'firstChapterReleasedAt', publishing.firstChapterReleasedAt ?? null)
+    setStoryState('story', 'lastChapterReleasedAt', publishing.lastChapterReleasedAt ?? null)
+  },
+
+  /**
+   * Apply a publishedAt change returned by the server after a story
+   * publish/schedule/unpublish. Does NOT persist — saveService already did.
+   */
+  applyServerStoryPublishedAt: (publishedAt: string | null) => {
+    if (!storyState.story) return
+    setStoryState('story', 'publishedAt', publishedAt)
+  },
+
+  /**
+   * Apply release-date recomputation returned by the server after a chapter
+   * publish/schedule/unpublish. Does NOT persist — the chapter mutation is
+   * what changed these, and saveService already did the write.
+   */
+  applyServerReleaseDates: (releaseDates: {
+    firstChapterReleasedAt: string | null
+    lastChapterReleasedAt: string | null
+  }) => {
+    if (!storyState.story) return
+    setStoryState('story', 'firstChapterReleasedAt', releaseDates.firstChapterReleasedAt)
+    setStoryState('story', 'lastChapterReleasedAt', releaseDates.lastChapterReleasedAt)
+  },
+
   /** Set a single AI override for the current story. Pass null to clear. */
   setAIOverride: <K extends keyof StoryAIOverrides>(key: K, value: StoryAIOverrides[K] | null) => {
     if (!storyState.story) return
@@ -268,6 +317,9 @@ export const currentStoryStore = {
       provider: provider || 'ollama',
       model: model || null,
       aiOverrides: null,
+      publishedAt: null,
+      firstChapterReleasedAt: null,
+      lastChapterReleasedAt: null,
     })
 
     // Connect WebSocket for real-time sync (only if server exists)

@@ -169,6 +169,17 @@ saveService.setCallbacks({
   onLastKnownUpdatedAtChange: (timestamp) => {
     currentStoryStore.setLastKnownUpdatedAt(timestamp)
   },
+  onStoryPublishingChanged: (_storyId, publishedAt) => {
+    // Server response already applied publishedAt on the row — mirror it
+    // into currentStoryStore so any subscribed UI re-renders.
+    currentStoryStore.applyServerStoryPublishedAt(publishedAt)
+  },
+  onChapterPublishingChanged: (chapterId, _storyId, publishedAt, releaseDates) => {
+    // Update the chapter node in place, and update the story's release-date
+    // rollup (server recomputes it from min/max across non-deleted chapters).
+    nodeStore.updateNodeNoSave(chapterId, { publishedAt })
+    currentStoryStore.applyServerReleaseDates(releaseDates)
+  },
   getStorageMode: () => currentStoryStore.storageMode ?? null,
 })
 

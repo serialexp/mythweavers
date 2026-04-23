@@ -181,7 +181,13 @@ model Story {
   owner                  User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   importedFromId         String?           @unique // Original story ID from Writer/Story backend migration
   royalRoadId            Int?              @unique
+  /// @deprecated Use `publishedAt` instead. Kept during migration period; will be dropped once all callers are cut over.
   published              Boolean           @default(false)
+  /// When this story became (or will become) publicly visible on the reading frontend.
+  /// null = draft/unpublished. A value in the future = scheduled. A value <= now = live.
+  /// For visibility, this gates ALL descendant chapters: a chapter is only visible if
+  /// its own publishedAt is set AND the parent story's publishedAt is set.
+  publishedAt            DateTime?
   status                 StoryStatus       @default(ONGOING)
   type                   StoryType         @default(ORIGINAL)
   wordsPerWeek           Int?
@@ -343,10 +349,20 @@ model Chapter {
   summary          String?             @db.Text
   arcId            String
   arc              Arc                 @relation(fields: [arcId], references: [id], onDelete: Cascade)
+  /// @deprecated Use `publishedAt` instead. Kept during migration period; will be dropped once all callers are cut over.
   publishedOn      DateTime?
+  /// When this chapter became (or will become) publicly visible on the reading frontend.
+  /// null = draft/unpublished. A value in the future = scheduled. A value <= now = live.
+  /// Visibility also requires the parent Story.publishedAt to be <= now.
+  publishedAt      DateTime?
   sortOrder        Int
   royalRoadId      Int?
   nodeType         String              @default("story") // "story" | "non-story" | "context"
+
+  /// Cached total word count across all non-deleted messages in all non-deleted scenes
+  /// under this chapter. Recalculated on paragraph create/update/delete. Not a source of
+  /// truth — rebuild with `scripts/backfill-chapter-wordcount.ts` if it drifts.
+  wordCount        Int                 @default(0)
 
   // Chapter state (from Story Project Node model)
   status           String?             // Chapter status: draft, needs_work, review, done
@@ -362,6 +378,7 @@ model Chapter {
 
   @@index([arcId])
   @@index([deleted])
+  @@index([publishedAt]) // For daily digest scans: chapters with publishedAt in last 24h
 }
 
 model Scene {

@@ -33,13 +33,13 @@ import { importClaudeChat, importClaudeChatWithBranches } from '../utils/claudeC
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
 import { StoryMetadata, storyManager } from '../utils/storyManager'
 import type { Message } from '../types/core'
-import { BsGear, BsPersonCircle } from 'solid-icons/bs'
 import { AdventureList } from './AdventureList'
 import { AISettingsPanel } from './AISettingsPanel'
 import { ClaudeChatImportModal } from './ClaudeChatImportModal'
 import { NewStoryForm } from './NewStoryForm'
 import { StoryList, StoryListItem } from './StoryList'
 import * as styles from './StoryLandingPage.css'
+import { PhGearIcon, PhUserCircleIcon } from 'solidjs-phosphor'
 
 interface StoryLandingPageProps {
   onSelectStory: (storyId: string) => void
@@ -470,7 +470,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
             onClick={() => setShowAISettings(true)}
             aria-label="AI Settings"
           >
-            <BsGear />
+            <PhGearIcon />
           </IconButton>
 
           <Show
@@ -485,7 +485,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           >
             <Dropdown alignRight trigger={
               <IconButton variant="ghost" aria-label={authStore.user?.username || 'User'}>
-                <BsPersonCircle size={20} />
+                <PhUserCircleIcon size={20} />
               </IconButton>
             }>
               <DropdownItem danger onClick={handleLogout}>

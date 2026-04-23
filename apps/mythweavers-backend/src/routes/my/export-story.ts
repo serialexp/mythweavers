@@ -226,9 +226,11 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
                 name: 'Chapter 1',
                 summary: null,
                 publishedOn: null,
+                publishedAt: null,
                 sortOrder: 0,
                 nodeType: 'story', // Valid: 'story' | 'non-story' | 'context'
                 status: 'DRAFT',
+                wordCount: 0,
                 publishingStatus: [],
                 scenes: [
                   {
@@ -560,9 +562,11 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
               name: chapter.name,
               summary: chapter.summary,
               publishedOn: chapter.publishedOn?.toISOString() ?? null,
+              publishedAt: chapter.publishedAt?.toISOString() ?? null,
               sortOrder: chapter.sortOrder,
               nodeType: chapter.nodeType,
               status: chapter.status,
+              wordCount: chapter.wordCount,
               deleted: chapter.deleted,
               deletedAt: chapter.deletedAt?.toISOString() ?? null,
               publishingStatus: chapter.publishingStatus.map((ps) => ({
@@ -1244,9 +1248,13 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                   publishedOn: chapterData.publishedOn
                     ? new Date(chapterData.publishedOn)
                     : null,
+                  publishedAt: chapterData.publishedAt
+                    ? new Date(chapterData.publishedAt)
+                    : null,
                   sortOrder: chapterData.sortOrder,
                   nodeType: chapterData.nodeType,
                   status: chapterData.status,
+                  wordCount: chapterData.wordCount ?? 0,
                   deleted: chapterData.deleted ?? false,
                   deletedAt: chapterData.deletedAt ? new Date(chapterData.deletedAt) : null,
                   // Don't copy royalRoadId - would cause conflicts
