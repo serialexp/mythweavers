@@ -97,6 +97,7 @@ export const bookCard = style({
 export const bookTitle = style({
   fontSize: tokens.font.size.lg,
   fontWeight: tokens.font.weight.semibold,
+  marginTop: 0,
   marginBottom: tokens.space['3'],
 })
 
@@ -113,7 +114,10 @@ export const arcTitle = style({
 })
 
 export const chapterLink = style({
-  display: 'block',
+  display: 'flex',
+  alignItems: 'baseline',
+  justifyContent: 'space-between',
+  gap: tokens.space['3'],
   padding: tokens.space['2'],
   backgroundColor: tokens.color.bg.raised,
   borderRadius: tokens.radius.default,
@@ -125,6 +129,24 @@ export const chapterLink = style({
     backgroundColor: tokens.color.accent.primary,
     color: tokens.color.text.inverse,
   },
+})
+
+export const chapterLinkName = style({
+  flex: 1,
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+})
+
+export const chapterLinkWords = style({
+  flexShrink: 0,
+  fontSize: tokens.font.size.sm,
+  // currentColor so the label follows the link's text color on hover
+  // (avoids an unreadable secondary-gray on the accent-colored hover bg).
+  color: 'currentColor',
+  opacity: 0.7,
+  fontVariantNumeric: 'tabular-nums',
 })
 
 // Chapter reader styles

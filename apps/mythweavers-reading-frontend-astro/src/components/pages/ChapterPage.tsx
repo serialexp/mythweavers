@@ -17,7 +17,7 @@ export const ChapterPage = (props: ChapterPageProps) => {
   return (
     <Layout initialTheme={props.initialTheme} user={props.user}>
       <div class={pageStyles.pageContainer}>
-        <Card>
+        <Card size="full">
           <CardBody padding="lg">
             <Show when={props.error}>
               <div>{props.error}</div>

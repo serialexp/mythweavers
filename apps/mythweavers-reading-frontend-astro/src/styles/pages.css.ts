@@ -1,12 +1,18 @@
 import { tokens } from '@mythweavers/ui/theme'
 import { style } from '@vanilla-extract/css'
 
-// Page container - centers content with padding (matches story editor)
+// Page container — centered, readable-width column. We cap the column width
+// so the reading pages (story details, chapter content) don't span the full
+// monitor on wide screens. Cards that should fill the column width (most of
+// them) should pass `size="full"`; compact Cards like login forms use their
+// own `size="sm"` and stay centered via `alignItems: center`.
 export const pageContainer = style({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   width: '100%',
+  maxWidth: '1024px',
+  marginInline: 'auto',
   padding: tokens.space['8'],
 })
 

@@ -67,6 +67,7 @@ export interface Chapter {
   name: string
   sortOrder: number
   summary?: string | null
+  wordCount: number
 }
 
 export interface StoryWithStructure extends PublicStory {

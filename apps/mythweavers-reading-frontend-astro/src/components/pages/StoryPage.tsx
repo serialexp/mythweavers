@@ -18,7 +18,7 @@ export const StoryPage = (props: StoryPageProps) => {
   return (
     <Layout initialTheme={props.initialTheme} user={props.user}>
       <div class={pageStyles.pageContainer}>
-        <Card>
+        <Card size="full">
           <CardBody padding="lg">
             <Show when={props.error}>
               <div>{props.error}</div>
@@ -73,7 +73,6 @@ export const StoryPage = (props: StoryPageProps) => {
                       <Prose html={story().summary || 'No summary available'} />
                     </div>
 
-                    <h2 class={pageStyles.sectionTitle}>Chapters</h2>
                     <Show
                       when={story().books?.length}
                       fallback={<div>No chapters available</div>}
@@ -92,7 +91,10 @@ export const StoryPage = (props: StoryPageProps) => {
                                     <For each={arc.chapters}>
                                       {(chapter) => (
                                         <a href={`/story/${props.storyId}/chapter/${chapter.id}`} class={styles.chapterLink}>
-                                          {chapter.name}
+                                          <span class={styles.chapterLinkName}>{chapter.name}</span>
+                                          <Show when={chapter.wordCount > 0}>
+                                            <span class={styles.chapterLinkWords}>{chapter.wordCount.toLocaleString()} words</span>
+                                          </Show>
                                         </a>
                                       )}
                                     </For>
