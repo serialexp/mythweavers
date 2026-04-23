@@ -1,5 +1,4 @@
 import { Button, ListDetailPanel, type ListDetailPanelRef, Stack } from '@mythweavers/ui'
-import { BsArrowLeft, BsCalendar, BsCheck, BsPencil, BsPlus, BsStar, BsStarFill, BsX } from 'solid-icons/bs'
 import { type Component, Show, batch, createMemo, createSignal } from 'solid-js'
 import { calendarStore } from '../stores/calendarStore'
 import { charactersStore } from '../stores/charactersStore'
@@ -13,6 +12,7 @@ import { ImageCropModal } from './ImageCropModal'
 import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { StoryTimePicker } from './StoryTimePicker'
 import { TemplateChangeRequest } from './TemplateChangeRequest'
+import { PhArrowLeftIcon, PhCalendarIcon, PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhStarIcon, PhXIcon } from 'solidjs-phosphor'
 
 export interface CharactersRef {
   addNew: () => void
@@ -215,7 +215,7 @@ export const Characters: Component<CharactersProps> = (props) => {
       <ListDetailPanel
         ref={(r) => (panelRef = r)}
         items={sortedCharacters()}
-        backIcon={<BsArrowLeft />}
+        backIcon={<PhArrowLeftIcon />}
         renderListItem={(character) => (
           <>
             <div class={styles.listItemContent}>
@@ -240,7 +240,7 @@ export const Characters: Component<CharactersProps> = (props) => {
               </div>
             </div>
             <Show when={character.isMainCharacter}>
-              <BsStarFill class={styles.protagonistIcon} />
+              <PhStarIcon weight="fill" class={styles.protagonistIcon} />
             </Show>
           </>
         )}
@@ -250,7 +250,7 @@ export const Characters: Component<CharactersProps> = (props) => {
               <EJSRenderer template={getCharacterDisplayName(char)} mode="inline" />
             </span>
             <Show when={char.isMainCharacter}>
-              <BsStarFill class={styles.protagonistIcon} />
+              <PhStarIcon weight="fill" class={styles.protagonistIcon} />
             </Show>
           </Stack>
         )}
@@ -290,7 +290,7 @@ export const Characters: Component<CharactersProps> = (props) => {
                         onClick={clearEditImage}
                         title="Remove profile image"
                       >
-                        <BsX /> Remove
+                        <PhXIcon /> Remove
                       </button>
                     </Show>
                   </div>
@@ -323,7 +323,7 @@ export const Characters: Component<CharactersProps> = (props) => {
                 <div class={styles.marginTop}>
                   <Show when={!showEditBirthdatePicker()}>
                     <button class={styles.birthdateButton} onClick={() => setShowEditBirthdatePicker(true)}>
-                      <BsCalendar />
+                      <PhCalendarIcon />
                       {editBirthdate() !== undefined
                         ? `Birthdate: ${calendarStore.formatStoryTime(editBirthdate()!)}`
                         : 'Set Birthdate (Optional)'}
@@ -343,10 +343,10 @@ export const Characters: Component<CharactersProps> = (props) => {
                 <ScriptHelpTabs />
                 <Stack direction="horizontal" gap="sm" class={styles.marginTop}>
                   <Button variant="primary" onClick={saveEdit}>
-                    <BsCheck /> Save
+                    <PhCheckIcon /> Save
                   </Button>
                   <Button variant="secondary" onClick={cancelEdit}>
-                    <BsX /> Cancel
+                    <PhXIcon /> Cancel
                   </Button>
                 </Stack>
               </div>
@@ -378,13 +378,13 @@ export const Characters: Component<CharactersProps> = (props) => {
                   variant={char.isMainCharacter ? 'primary' : 'secondary'}
                   onClick={() => charactersStore.updateCharacter(char.id, { isMainCharacter: !char.isMainCharacter })}
                 >
-                  <Show when={char.isMainCharacter} fallback={<BsStar />}>
-                    <BsStarFill />
+                  <Show when={char.isMainCharacter} fallback={<PhStarIcon />}>
+                    <PhStarIcon weight="fill" />
                   </Show>
                   {char.isMainCharacter ? 'Protagonist' : 'Mark as Protagonist'}
                 </Button>
                 <Button variant="secondary" onClick={() => startEditing(char)}>
-                  <BsPencil /> Edit
+                  <PhPencilSimpleIcon /> Edit
                 </Button>
                 <Button
                   variant="danger"
@@ -395,7 +395,7 @@ export const Characters: Component<CharactersProps> = (props) => {
                     }
                   }}
                 >
-                  <BsX /> Delete
+                  <PhXIcon /> Delete
                 </Button>
               </div>
             </div>
@@ -433,7 +433,7 @@ export const Characters: Component<CharactersProps> = (props) => {
                     onClick={clearNewImage}
                     title="Remove profile image"
                   >
-                    <BsX /> Remove
+                    <PhXIcon /> Remove
                   </button>
                 </Show>
               </div>
@@ -466,7 +466,7 @@ export const Characters: Component<CharactersProps> = (props) => {
             <div class={styles.marginTop}>
               <Show when={!showNewBirthdatePicker()}>
                 <button class={styles.birthdateButton} onClick={() => setShowNewBirthdatePicker(true)}>
-                  <BsCalendar />
+                  <PhCalendarIcon />
                   {newCharacterBirthdate() !== undefined
                     ? `Birthdate: ${calendarStore.formatStoryTime(newCharacterBirthdate()!)}`
                     : 'Set Birthdate (Optional)'}
@@ -490,7 +490,7 @@ export const Characters: Component<CharactersProps> = (props) => {
               disabled={!newCharacterName().trim() || !newCharacterDescription().trim()}
               class={styles.marginTop}
             >
-              <BsPlus /> Add Character
+              <PhPlusIcon /> Add Character
             </Button>
           </div>
         )}

@@ -1,20 +1,3 @@
-import {
-  BsArrowRepeat,
-  BsCheckCircle,
-  BsChevronLeft,
-  BsChevronRight,
-  BsCircle,
-  BsClipboard,
-  BsClock,
-  BsFileEarmarkText,
-  BsFileEarmarkTextFill,
-  BsFileText,
-  BsGlobe,
-  BsPencil,
-  BsPeople,
-  BsThreeDotsVertical,
-  BsTrash,
-} from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
@@ -35,6 +18,7 @@ import { ChapterContextManager } from './ChapterContextManager'
 import * as styles from './NodeHeader.css'
 import { NodeStatusMenu } from './NodeStatusMenu'
 import { StoryTimePicker } from './StoryTimePicker'
+import { PhArrowsClockwiseIcon, PhCaretLeftIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleIcon, PhClipboardIcon, PhClockIcon, PhDotsThreeVerticalIcon, PhFileTextIcon, PhGlobeIcon, PhPencilSimpleIcon, PhTrashIcon, PhUsersIcon } from 'solidjs-phosphor'
 
 interface NodeHeaderProps {
   node: StoryNode
@@ -415,13 +399,13 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
   const getStatusIcon = () => {
     switch (props.node.status) {
       case 'done':
-        return <BsCheckCircle color="#22c55e" />
+        return <PhCheckCircleIcon color="#22c55e" />
       case 'review':
-        return <BsFileEarmarkTextFill color="#3b82f6" />
+        return <PhFileTextIcon weight="fill" color="#3b82f6" />
       case 'needs_work':
-        return <BsFileEarmarkText color="#f97316" />
+        return <PhFileTextIcon color="#f97316" />
       default:
-        return <BsCircle color="#94a3b8" />
+        return <PhCircleIcon color="#94a3b8" />
     }
   }
 
@@ -541,7 +525,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
             </Show>
             <Show when={props.node.storyTime !== undefined && props.node.storyTime !== null}>
               <span class={styles.metaItem} title={calendarStore.formatStoryTime(props.node.storyTime!)}>
-                <BsClock />
+                <PhClockIcon />
                 {calendarStore.formatStoryTime(props.node.storyTime!)}
               </span>
             </Show>
@@ -623,7 +607,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
             title={getPreviousSceneTitle()}
             aria-label="Previous scene"
           >
-            <BsChevronLeft />
+            <PhCaretLeftIcon />
           </button>
 
           <button
@@ -633,7 +617,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
             title={getNextSceneTitle()}
             aria-label="Next scene"
           >
-            <BsChevronRight />
+            <PhCaretRightIcon />
           </button>
 
           <button
@@ -645,7 +629,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
             }}
             title="More actions"
           >
-            <BsThreeDotsVertical />
+            <PhDotsThreeVerticalIcon />
           </button>
         </div>
 
@@ -653,19 +637,19 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
           <Show when={showDropdown()}>
             <div ref={dropdownRef} class={styles.dropdown} style={dropdownStyle()}>
               <button class={styles.dropdownButton} onClick={handleEditTitle}>
-                <BsPencil /> Edit Title
+                <PhPencilSimpleIcon /> Edit Title
               </button>
 
               <Show when={props.node.type === 'scene'}>
                 <button class={styles.dropdownButton} onClick={handleEditGoal}>
-                  <BsFileText />
+                  <PhFileTextIcon />
                   {props.node.goal ? 'Edit Goal' : 'Set Goal'}
                 </button>
               </Show>
 
               <Show when={props.node.type === 'scene' && !isEditingTime()}>
                 <button class={styles.dropdownButton} onClick={handleEditTime}>
-                  <BsClock />
+                  <PhClockIcon />
                   {props.node.storyTime !== undefined && props.node.storyTime !== null
                     ? `Edit Time: ${calendarStore.formatStoryTime(props.node.storyTime)}`
                     : 'Set Story Time'}
@@ -675,7 +659,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
 
               <Show when={props.node.type === 'scene'}>
                 <button class={styles.dropdownButton} onClick={handleManageContext}>
-                  <BsPeople /> Manage Active Context
+                  <PhUsersIcon /> Manage Active Context
                 </button>
               </Show>
 
@@ -702,7 +686,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                     setIsSelectingStorylines(true)
                   }}
                 >
-                  <BsGlobe />
+                  <PhGlobeIcon />
                   {activeStorylines().length > 0 ? `Storylines (${activeStorylines().length})` : 'Assign Storylines'}
                 </button>
               </Show>
@@ -748,21 +732,21 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
 
               <Show when={props.node.type === 'scene'}>
                 <button class={styles.dropdownButton} onClick={handleCopyPreviousContext}>
-                  <BsFileEarmarkTextFill /> Copy Previous Context
+                  <PhFileTextIcon weight="fill" /> Copy Previous Context
                 </button>
                 <button class={styles.dropdownButton} onClick={handleCopyAsMarkdown}>
-                  <BsFileEarmarkText /> Copy as Markdown
+                  <PhFileTextIcon /> Copy as Markdown
                 </button>
               </Show>
 
               <Show when={props.node.type === 'scene' || props.node.type === 'chapter'}>
                 <button class={styles.dropdownButton} onClick={handleMassRewrite}>
-                  <BsArrowRepeat /> Mass Rewrite
+                  <PhArrowsClockwiseIcon /> Mass Rewrite
                 </button>
               </Show>
 
               <button class={styles.dropdownButton} onClick={handleCopyNode} disabled>
-                <BsClipboard />
+                <PhClipboardIcon />
                 Copy Node (TODO)
               </button>
 
@@ -791,7 +775,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
                 disabled={props.node.isSummarizing}
               >
                 <Show when={!props.node.isSummarizing}>
-                  <BsFileText />
+                  <PhFileTextIcon />
                 </Show>
                 <Show when={props.node.isSummarizing}>
                   <span class={styles.spinner}>⟳</span>
@@ -802,7 +786,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
               <div class={styles.dropdownDivider} />
 
               <button class={`${styles.dropdownButton} ${styles.deleteButton}`} onClick={handleDelete}>
-                <BsTrash /> Delete Node
+                <PhTrashIcon /> Delete Node
               </button>
             </div>
           </Show>

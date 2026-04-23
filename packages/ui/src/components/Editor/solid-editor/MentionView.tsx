@@ -1,4 +1,4 @@
-import { type NodeViewProps, setPosInfo } from '@writer/solid-editor'
+import { type NodeViewProps, setPosInfo } from '@serialexp/solidjs-editor'
 import type { JSX } from 'solid-js'
 import type { MentionType } from './schema'
 

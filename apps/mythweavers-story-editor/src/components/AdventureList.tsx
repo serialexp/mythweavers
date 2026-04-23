@@ -1,7 +1,6 @@
 import { Component, For, Show, createEffect, createResource, createSignal } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { ActionRow, Button, IconButton, Input, Modal, Spinner, Text } from '@mythweavers/ui'
-import { BsPencil, BsTrash } from 'solid-icons/bs'
 import { deleteMyAdventuresById, getMyAdventures, postMyAdventures, putMyAdventuresById } from '../client/config'
 import { NewAdventureForm, type NewAdventureResult } from './NewAdventureForm'
 import type { PersistedState } from '../hooks/useAdventurePersistence'
@@ -10,6 +9,7 @@ import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
 import type { LLMMessage } from '../types/llm'
 import * as styles from './AdventureList.css'
+import { PhPencilSimpleIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -258,7 +258,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
                           size="sm"
                           onClick={() => startEditing(adventure.id, adventure.name)}
                         >
-                          <BsPencil />
+                          <PhPencilSimpleIcon />
                         </IconButton>
                       </Show>
                       <IconButton
@@ -268,7 +268,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
                         onClick={() => handleDelete(adventure.id)}
                         disabled={deletingId() === adventure.id}
                       >
-                        {deletingId() === adventure.id ? <Spinner size="sm" /> : <BsTrash />}
+                        {deletingId() === adventure.id ? <Spinner size="sm" /> : <PhTrashIcon />}
                       </IconButton>
                     </div>
                   }

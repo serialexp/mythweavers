@@ -1,10 +1,10 @@
 import { Dropdown } from '@mythweavers/ui'
-import { BsChevronDown, BsStarFill } from 'solid-icons/bs'
 import { Component, For, Show, createMemo } from 'solid-js'
 import { charactersStore } from '../stores/charactersStore'
 import type { Character } from '../types/core'
 import { getAvatarInitial, getCharacterDisplayName } from '../utils/character'
 import * as styles from './CharacterSelect.css'
+import { PhCaretDownIcon, PhStarIcon } from 'solidjs-phosphor'
 
 export interface CharacterSelectProps {
   /** Currently selected character ID */
@@ -69,13 +69,13 @@ export const CharacterSelect: Component<CharacterSelectProps> = (props) => {
               <CharacterAvatar character={char()} size={isSmall() ? 'sm' : 'md'} />
               <span class={styles.characterName}>{getCharacterDisplayName(char())}</span>
               <Show when={char().isMainCharacter}>
-                <BsStarFill class={styles.protagonistStar} />
+                <PhStarIcon weight="fill" class={styles.protagonistStar} />
               </Show>
             </>
           )}
         </Show>
       </div>
-      <BsChevronDown class={styles.triggerChevron} />
+      <PhCaretDownIcon class={styles.triggerChevron} />
     </button>
   )
 
@@ -102,7 +102,7 @@ export const CharacterSelect: Component<CharacterSelectProps> = (props) => {
               <CharacterAvatar character={character} size={isSmall() ? 'sm' : 'md'} />
               <span class={styles.characterName}>{getCharacterDisplayName(character)}</span>
               <Show when={character.isMainCharacter}>
-                <BsStarFill class={styles.protagonistStar} />
+                <PhStarIcon weight="fill" class={styles.protagonistStar} />
               </Show>
             </div>
           </button>
@@ -185,13 +185,13 @@ export const CharacterSelectByName: Component<CharacterSelectByNameProps> = (pro
               <CharacterAvatar character={char()} size={isSmall() ? 'sm' : 'md'} />
               <span class={styles.characterName}>{getCharacterDisplayName(char())}</span>
               <Show when={char().isMainCharacter}>
-                <BsStarFill class={styles.protagonistStar} />
+                <PhStarIcon weight="fill" class={styles.protagonistStar} />
               </Show>
             </>
           )}
         </Show>
       </div>
-      <BsChevronDown class={styles.triggerChevron} />
+      <PhCaretDownIcon class={styles.triggerChevron} />
     </button>
   )
 
@@ -210,7 +210,7 @@ export const CharacterSelectByName: Component<CharacterSelectByNameProps> = (pro
                 <CharacterAvatar character={character} size={isSmall() ? 'sm' : 'md'} />
                 <span class={styles.characterName}>{displayName}</span>
                 <Show when={character.isMainCharacter}>
-                  <BsStarFill class={styles.protagonistStar} />
+                  <PhStarIcon weight="fill" class={styles.protagonistStar} />
                 </Show>
               </div>
             </button>

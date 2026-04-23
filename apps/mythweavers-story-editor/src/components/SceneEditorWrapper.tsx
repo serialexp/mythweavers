@@ -1,4 +1,4 @@
-import { paragraphsToText, type Paragraph, type ParagraphInventoryAction } from '@mythweavers/shared'
+import { type Paragraph, type ParagraphInventoryAction, paragraphsToText } from '@mythweavers/shared'
 import { SceneEditor } from '@mythweavers/ui'
 import type { EditorCharacter, EditorScene, InlineMenuConfig } from '@mythweavers/ui'
 import { Component, Show, createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
@@ -11,6 +11,7 @@ import { nodeStore } from '../stores/nodeStore'
 import { generateMessageId } from '../utils/id'
 import { LLMClientFactory } from '../utils/llm'
 import { resolveModel } from '../utils/llm/resolveModel'
+import { buildRewriteUserPrompt, getRewritePreset } from '../utils/llm/rewritePresets'
 import { ParagraphScriptModal } from './ParagraphScriptModal'
 
 interface SceneEditorWrapperProps {
@@ -241,6 +242,18 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
 
   const handleParagraphUpdate = (paragraphId: string, data: Partial<Paragraph>) => {
     console.log('[SceneEditorWrapper] Updating paragraph:', paragraphId, data)
+    const current = editedParagraphs() ?? sourceParagraphs()
+    const idx = current.findIndex((p) => p.id === paragraphId)
+    if (idx === -1) {
+      console.warn('[SceneEditorWrapper] Paragraph not found for update:', paragraphId)
+      return
+    }
+    // Build a new array so Solid picks up the change reactively
+    const next = current.slice()
+    next[idx] = { ...next[idx], ...data }
+    setEditedParagraphs(next)
+    setIsDirty(true)
+    scheduleAutoSave()
   }
 
   const handleEditScript = (paragraphId: string) => {
@@ -282,7 +295,11 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
       const generator = client.generate({
         model: resolved.model,
         messages: [
-          { role: 'system', content: 'You are a translator. Return only the translated text, nothing else. Do not add quotes, explanations, or any other text.' },
+          {
+            role: 'system',
+            content:
+              'You are a translator. Return only the translated text, nothing else. Do not add quotes, explanations, or any other text.',
+          },
           { role: 'user', content: `Translate the following text from ${fromLang} to ${toLang}:\n\n${selectedText}` },
         ],
         metadata: { callType: 'translation' },
@@ -303,16 +320,71 @@ export const SceneEditorWrapper: Component<SceneEditorWrapperProps> = (props) =>
     }
   }
 
-  const inlineMenuConfig = createMemo((): InlineMenuConfig => ({
-    languages: languageStore.languages.map((l) => ({
-      id: l.id,
-      name: l.name,
-      label: l.label,
-    })),
-    primaryLanguageId: languageStore.defaultLanguageId,
-    onTranslate: handleTranslate,
-    isTranslating: isTranslating(),
-  }))
+  // Rewrite state
+  const [isRewriting, setIsRewriting] = createSignal(false)
+
+  const handleRewrite = async (
+    presetId: string,
+    selectedText: string,
+    containingParagraph: string,
+  ): Promise<string> => {
+    // The InlineMenu passes preset IDs as opaque strings; we validate here.
+    const preset = getRewritePreset(presetId)
+    if (!preset) {
+      console.warn('[SceneEditorWrapper] Unknown rewrite preset:', presetId)
+      return ''
+    }
+
+    setIsRewriting(true)
+    try {
+      const resolved = resolveModel('rewrite:selection')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      let result = ''
+
+      const generator = client.generate({
+        model: resolved.model,
+        messages: [
+          { role: 'system', content: preset.system },
+          { role: 'user', content: buildRewriteUserPrompt(selectedText, containingParagraph) },
+        ],
+        metadata: { callType: 'rewrite:selection' },
+      })
+
+      for await (const event of generator) {
+        if (event.type === 'chunk') {
+          result += event.text
+        }
+      }
+
+      // Strip surrounding whitespace and any stray quote wrapping the model
+      // sometimes adds despite instructions.
+      let cleaned = result.trim()
+      if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith('“') && cleaned.endsWith('”'))) {
+        cleaned = cleaned.slice(1, -1).trim()
+      }
+      return cleaned
+    } catch (error) {
+      console.error('[SceneEditorWrapper] Rewrite failed:', error)
+      return ''
+    } finally {
+      setIsRewriting(false)
+    }
+  }
+
+  const inlineMenuConfig = createMemo(
+    (): InlineMenuConfig => ({
+      languages: languageStore.languages.map((l) => ({
+        id: l.id,
+        name: l.name,
+        label: l.label,
+      })),
+      primaryLanguageId: languageStore.defaultLanguageId,
+      onTranslate: handleTranslate,
+      isTranslating: isTranslating(),
+      onRewrite: handleRewrite,
+      isRewriting: isRewriting(),
+    }),
+  )
 
   return (
     <>

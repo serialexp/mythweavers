@@ -1,9 +1,9 @@
 import { Button, FormField, IconButton, Input, Modal, Stack } from '@mythweavers/ui'
-import { BsCalendarEvent, BsCodeSlash } from 'solid-icons/bs'
 import { Component, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { CodeEditor } from './CodeEditor'
 import * as styles from './InsertEventButton.css'
+import { PhCalendarDotIcon, PhCodeIcon } from 'solidjs-phosphor'
 
 interface InsertEventButtonProps {
   afterMessageId?: string | null
@@ -59,7 +59,7 @@ export const InsertEventButton: Component<InsertEventButtonProps> = (props) => {
   return (
     <>
       <IconButton onClick={() => setShowForm(true)} aria-label="Insert event message">
-        <BsCalendarEvent size={18} />
+        <PhCalendarDotIcon size={18} />
       </IconButton>
 
       <Modal
@@ -91,7 +91,7 @@ export const InsertEventButton: Component<InsertEventButtonProps> = (props) => {
           <FormField
             label={
               <span style={{ display: 'flex', 'align-items': 'center', gap: '0.25rem' }}>
-                <BsCodeSlash /> Script (Optional)
+                <PhCodeIcon /> Script (Optional)
               </span>
             }
             hint="JavaScript code to execute when this event is reached"

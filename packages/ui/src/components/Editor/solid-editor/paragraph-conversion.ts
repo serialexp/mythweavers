@@ -1,5 +1,5 @@
 import type { Paragraph } from '@mythweavers/shared'
-import type { Mark, Node } from '@writer/solid-editor'
+import type { Mark, Node } from '@serialexp/solidjs-editor'
 import shortUUID from 'short-uuid'
 import { storySchema } from './schema'
 

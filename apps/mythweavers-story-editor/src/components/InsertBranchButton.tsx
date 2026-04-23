@@ -1,8 +1,8 @@
 import { IconButton } from '@mythweavers/ui'
-import { BsSignpost2 } from 'solid-icons/bs'
 import { Component, Show, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import * as styles from './InsertEventButton.css'
+import { PhSignpostIcon } from 'solidjs-phosphor'
 
 interface InsertBranchButtonProps {
   afterMessageId?: string | null
@@ -35,7 +35,7 @@ export const InsertBranchButton: Component<InsertBranchButtonProps> = (props) =>
   return (
     <>
       <IconButton onClick={() => setShowForm(true)} aria-label="Insert branch point">
-        <BsSignpost2 size={18} />
+        <PhSignpostIcon size={18} />
       </IconButton>
 
       <Show when={showForm()}>

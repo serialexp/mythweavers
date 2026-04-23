@@ -1,6 +1,5 @@
 import { Button, Modal, Spinner } from '@mythweavers/ui'
 import * as Diff from 'diff'
-import { BsCheck2, BsExclamationTriangle, BsX } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { charactersStore } from '../stores/charactersStore'
@@ -19,6 +18,7 @@ import {
   type TokenEstimateResult,
 } from '../utils/templateAI'
 import * as styles from './CharacterUpdateModal.css'
+import { PhCheckIcon, PhWarningIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface CharacterUpdateModalProps {
   isOpen: boolean
@@ -523,7 +523,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
 
         <Show when={!hasContextNodes()}>
           <div class={styles.noContextWarning}>
-            <BsExclamationTriangle />
+            <PhWarningIcon />
             <span>No scenes marked for context. Mark scenes with the circle icons to use as context.</span>
           </div>
         </Show>
@@ -676,7 +676,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
                           onClick={() => handleAcceptResult(result.characterId)}
                           title="Accept changes"
                         >
-                          <BsCheck2 />
+                          <PhCheckIcon />
                         </button>
                         <button
                           type="button"
@@ -684,7 +684,7 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
                           onClick={() => handleRejectResult(result.characterId)}
                           title="Reject changes"
                         >
-                          <BsX />
+                          <PhXIcon />
                         </button>
                       </div>
                     </Show>
@@ -692,14 +692,14 @@ export const CharacterUpdateModal: Component<CharacterUpdateModalProps> = (props
 
                   <Show when={result.error}>
                     <div class={styles.noContextWarning}>
-                      <BsExclamationTriangle />
+                      <PhWarningIcon />
                       <span>{result.error}</span>
                     </div>
                   </Show>
 
                   <Show when={result.validationWarning && !result.error}>
                     <div class={styles.validationWarning}>
-                      <BsExclamationTriangle />
+                      <PhWarningIcon />
                       <span>Template validation warning (may resolve after plot points are created): {result.validationWarning}</span>
                     </div>
                   </Show>

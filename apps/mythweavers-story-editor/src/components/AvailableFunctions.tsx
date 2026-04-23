@@ -1,9 +1,9 @@
 import { Badge, Button, Card, CardBody, Stack } from '@mythweavers/ui'
-import { BsCodeSlash } from 'solid-icons/bs'
 import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import * as styles from './AvailableFunctions.css'
+import { PhCodeIcon } from 'solidjs-phosphor'
 
 export const AvailableFunctions: Component = () => {
   const [showFunctions, setShowFunctions] = createSignal(false)
@@ -65,7 +65,7 @@ export const AvailableFunctions: Component = () => {
         onClick={() => setShowFunctions(!showFunctions())}
         title="Toggle available functions"
       >
-        <BsCodeSlash />
+        <PhCodeIcon />
         <span style={{ 'margin-left': '0.5rem' }}>Available Functions</span>
         <Show when={availableFunctions().length > 0}>
           <span style={{ 'margin-left': '0.5rem' }}>

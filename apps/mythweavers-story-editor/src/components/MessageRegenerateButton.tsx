@@ -1,9 +1,9 @@
 import { Button, ButtonGroup, Dropdown, DropdownItem } from '@mythweavers/ui'
-import { BsChevronDown } from 'solid-icons/bs'
 import { Component, For } from 'solid-js'
 import { JSX } from 'solid-js'
 import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import * as styles from './MessageStyles.css'
+import { PhCaretDownIcon } from 'solidjs-phosphor'
 
 interface MessageRegenerateButtonProps {
   onRegenerate: (maxTokens: number) => void
@@ -50,7 +50,7 @@ export const MessageRegenerateButton: Component<MessageRegenerateButtonProps> = 
             disabled={props.disabled}
             title={`${props.title} - Select token limit`}
           >
-            <BsChevronDown />
+            <PhCaretDownIcon />
           </Button>
         }
       >

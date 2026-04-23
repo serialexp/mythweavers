@@ -15,15 +15,15 @@ export const editorContainer = style({
   lineHeight: tokens.font.lineHeight.relaxed,
 })
 
-// ProseMirror base styles
-globalStyle(`${sceneEditor} .ProseMirror`, {
+// Editor root styles (solid-editor applies `.solidjs-editor` to its contenteditable root)
+globalStyle(`${sceneEditor} .solidjs-editor`, {
   outline: 'none',
   padding: 0,
   margin: 0,
 })
 
 // Paragraph base styles
-globalStyle(`${sceneEditor} .ProseMirror p`, {
+globalStyle(`${sceneEditor} .solidjs-editor p`, {
   margin: 0,
   padding: `${tokens.space['2']} ${tokens.space['4']}`,
   minHeight: '1.6em',
@@ -34,49 +34,38 @@ globalStyle(`${sceneEditor} .ProseMirror p`, {
 })
 
 // Paragraph hover (non-active)
-globalStyle(`${sceneEditor} .ProseMirror p:hover:not(.active-paragraph)`, {
+globalStyle(`${sceneEditor} .solidjs-editor p:hover:not(.active-paragraph)`, {
   backgroundColor: tokens.color.surface.hover,
 })
 
-// Active paragraph
-globalStyle(`${sceneEditor} .ProseMirror p.active-paragraph`, {
-  borderLeftColor: `${tokens.color.accent.primary} !important`,
-  backgroundColor: `${tokens.color.surface.selected} !important`,
-  borderLeftWidth: '4px !important',
-  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tokens.color.accent.primary} 20%, transparent), 0 0 0 1px color-mix(in srgb, ${tokens.color.accent.primary} 10%, transparent) !important`,
-})
-
-// Active paragraph hover
-globalStyle(`${sceneEditor} .ProseMirror p.active-paragraph:hover`, {
-  borderLeftColor: `${tokens.color.accent.primary} !important`,
-  backgroundColor: `${tokens.color.surface.selected} !important`,
-  borderLeftWidth: '4px !important',
-  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tokens.color.accent.primary} 20%, transparent), 0 0 0 1px color-mix(in srgb, ${tokens.color.accent.primary} 10%, transparent) !important`,
+// Active paragraph — subtle background only; keep the state color on the left border
+globalStyle(`${sceneEditor} .solidjs-editor p.active-paragraph`, {
+  backgroundColor: tokens.color.surface.selected,
 })
 
 // Paragraph state indicators
-globalStyle(`${sceneEditor} .ProseMirror p[data-state="draft"]`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-state="draft"]`, {
   borderLeftColor: tokens.color.semantic.warning,
 })
 
-globalStyle(`${sceneEditor} .ProseMirror p[data-state="revise"]`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-state="revise"]`, {
   borderLeftColor: tokens.color.semantic.error,
 })
 
-globalStyle(`${sceneEditor} .ProseMirror p[data-state="ai"]`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-state="ai"]`, {
   borderLeftColor: tokens.color.accent.secondary,
 })
 
-globalStyle(`${sceneEditor} .ProseMirror p[data-state="final"]`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-state="final"]`, {
   borderLeftColor: tokens.color.semantic.success,
 })
 
-globalStyle(`${sceneEditor} .ProseMirror p[data-state="sdt"]`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-state="sdt"]`, {
   borderLeftColor: tokens.color.semantic.info,
 })
 
 // Script indicator - show { } after paragraph content
-globalStyle(`${sceneEditor} .ProseMirror p[data-has-script]::after`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-has-script]::after`, {
   content: '"{ }"',
   display: 'inline-block',
   marginLeft: tokens.space['2'],
@@ -89,7 +78,7 @@ globalStyle(`${sceneEditor} .ProseMirror p[data-has-script]::after`, {
 })
 
 // Inventory indicator - show + after paragraph content
-globalStyle(`${sceneEditor} .ProseMirror p[data-has-inventory]::after`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-has-inventory]::after`, {
   content: '"+"',
   display: 'inline-block',
   marginLeft: tokens.space['2'],
@@ -102,7 +91,7 @@ globalStyle(`${sceneEditor} .ProseMirror p[data-has-inventory]::after`, {
 })
 
 // When both script and inventory exist, show combined indicator
-globalStyle(`${sceneEditor} .ProseMirror p[data-has-script][data-has-inventory]::after`, {
+globalStyle(`${sceneEditor} .solidjs-editor p[data-has-script][data-has-inventory]::after`, {
   content: '"{ } +"',
 })
 
@@ -127,7 +116,6 @@ export const paragraphActionsGroup = style({
   gap: '3px',
   marginRight: tokens.space['3'],
 })
-
 
 // Block Menu
 export const blockMenu = style({
@@ -338,6 +326,52 @@ export const translationSubmenu = style({
   flexWrap: 'wrap',
 })
 
+// Rewrite presets submenu (vertical list — five long labels read better stacked)
+export const rewriteSubmenu = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px',
+  minWidth: '160px',
+})
+
+// Diff popover (replaces inline menu while a rewrite result is awaiting accept/reject)
+export const rewriteDiffPopover = style({
+  backgroundColor: tokens.color.bg.elevated,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+  padding: tokens.space['3'],
+  boxShadow: tokens.shadow.lg,
+  maxWidth: '420px',
+  minWidth: '280px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['2'],
+  fontSize: tokens.font.size.sm,
+  color: tokens.color.text.primary,
+  zIndex: tokens.zIndex.dropdown,
+})
+
+export const rewriteDiffOriginal = style({
+  textDecoration: 'line-through',
+  color: tokens.color.text.muted,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+})
+
+export const rewriteDiffNew = style({
+  color: tokens.color.semantic.success,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  fontWeight: 500,
+})
+
+export const rewriteDiffActions = style({
+  display: 'flex',
+  gap: tokens.space['2'],
+  justifyContent: 'flex-end',
+  marginTop: tokens.space['1'],
+})
+
 // Translation marks
 globalStyle('.translation-mark', {
   backgroundColor: tokens.color.semantic.warningSubtle,
@@ -346,7 +380,7 @@ globalStyle('.translation-mark', {
 })
 
 // Empty paragraph placeholder
-globalStyle(`${sceneEditor} .ProseMirror p:empty::before`, {
+globalStyle(`${sceneEditor} .solidjs-editor p:empty::before`, {
   content: '"Type here..."',
   color: tokens.color.text.muted,
   pointerEvents: 'none',
@@ -354,7 +388,7 @@ globalStyle(`${sceneEditor} .ProseMirror p:empty::before`, {
 })
 
 // Focus styles
-globalStyle(`${sceneEditor} .ProseMirror:focus`, {
+globalStyle(`${sceneEditor} .solidjs-editor:focus`, {
   boxShadow: `0 0 0 2px color-mix(in srgb, ${tokens.color.accent.primary} 15%, transparent)`,
 })
 
@@ -607,6 +641,75 @@ export const paragraphActionsDropdownItem = style({
     '&[data-disabled="true"]': {
       opacity: 0.5,
       cursor: 'not-allowed',
+    },
+  },
+})
+
+// --- Paragraph state picker -------------------------------------------------
+// Clickable hit area over the colored left border of each paragraph. It's
+// purposefully a little wider than the border itself so it's easy to hit.
+export const paragraphStateHitArea = style({
+  position: 'absolute',
+  left: '-8px',
+  top: 0,
+  width: '14px',
+  height: '100%',
+  cursor: 'pointer',
+  zIndex: 2,
+  // Keep invisible — the colored border itself is the visual affordance.
+  background: 'transparent',
+})
+
+// Small floating pill with the four state options. Appears just below/left
+// of the paragraph when the hit area is clicked.
+export const paragraphStatePicker = style({
+  position: 'absolute',
+  left: '-4px',
+  top: '100%',
+  marginTop: tokens.space['1'],
+  zIndex: 20,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['0.5'],
+  padding: tokens.space['1'],
+  backgroundColor: tokens.color.bg.elevated,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+  boxShadow: tokens.shadow.md,
+  // Don't inherit paragraph typography
+  fontSize: tokens.font.size.xs,
+  fontWeight: tokens.font.weight.semibold,
+  fontFamily: tokens.font.family.sans,
+  lineHeight: 1,
+  userSelect: 'none',
+  minWidth: '96px',
+})
+
+export const paragraphStatePickerButton = style({
+  appearance: 'none',
+  border: `1px solid ${tokens.color.border.subtle}`,
+  borderRadius: tokens.radius.sm,
+  height: '26px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  cursor: 'pointer',
+  backgroundColor: tokens.color.surface.default,
+  color: tokens.color.text.primary,
+  padding: `0 ${tokens.space['2']}`,
+  textAlign: 'left',
+  transition: `background-color ${tokens.duration.fast} ${tokens.easing.default}, border-color ${tokens.duration.fast} ${tokens.easing.default}`,
+  selectors: {
+    '&:hover': {
+      backgroundColor: tokens.color.surface.hover,
+    },
+    '&[data-state="draft"]': { borderLeft: `3px solid ${tokens.color.semantic.warning}` },
+    '&[data-state="revise"]': { borderLeft: `3px solid ${tokens.color.semantic.error}` },
+    '&[data-state="ai"]': { borderLeft: `3px solid ${tokens.color.accent.secondary}` },
+    '&[data-state="final"]': { borderLeft: `3px solid ${tokens.color.semantic.success}` },
+    '&[data-active="true"]': {
+      backgroundColor: tokens.color.surface.selected,
+      borderColor: tokens.color.border.strong,
     },
   },
 })

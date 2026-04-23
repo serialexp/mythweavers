@@ -12,7 +12,7 @@ export const editor = style({
   paddingLeft: '80px', // Space for menus
 })
 
-globalStyle(`${editor} .ProseMirror`, {
+globalStyle(`${editor} .solidjs-editor`, {
   padding: '1em',
   border: `1px dotted ${tokens.color.border.default}`,
   outline: 'none',

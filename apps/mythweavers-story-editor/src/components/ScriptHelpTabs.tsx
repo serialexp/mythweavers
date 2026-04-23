@@ -1,9 +1,9 @@
 import { Badge, Card, CardBody, Stack, Tab, TabList, TabPanel, Tabs } from '@mythweavers/ui'
-import { BsChevronDown, BsChevronRight } from 'solid-icons/bs'
 import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import * as styles from './ScriptHelpTabs.css'
+import { PhCaretDownIcon, PhCaretRightIcon } from 'solidjs-phosphor'
 
 export const ScriptHelpTabs: Component = () => {
   const [activeTab, setActiveTab] = createSignal('')
@@ -76,7 +76,7 @@ export const ScriptHelpTabs: Component = () => {
               {/* Basics */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('basics')}>
-                  <span>{expandedSection() === 'basics' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'basics' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   Basics
                 </button>
                 <Show when={expandedSection() === 'basics'}>
@@ -98,7 +98,7 @@ export const ScriptHelpTabs: Component = () => {
               {/* Variables */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('variables')}>
-                  <span>{expandedSection() === 'variables' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'variables' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   How Variables Work
                 </button>
                 <Show when={expandedSection() === 'variables'}>
@@ -120,7 +120,7 @@ export const ScriptHelpTabs: Component = () => {
               {/* Functions */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('functions')}>
-                  <span>{expandedSection() === 'functions' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'functions' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   Using Functions in Templates
                 </button>
                 <Show when={expandedSection() === 'functions'}>
@@ -143,7 +143,7 @@ export const ScriptHelpTabs: Component = () => {
               {/* Examples */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('examples')}>
-                  <span>{expandedSection() === 'examples' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'examples' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   Examples
                 </button>
                 <Show when={expandedSection() === 'examples'}>

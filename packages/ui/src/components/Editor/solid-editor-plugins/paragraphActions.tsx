@@ -1,5 +1,5 @@
 import type { ParagraphState } from '@mythweavers/shared'
-import type { EditorState } from '@writer/solid-editor'
+import type { EditorState } from '@serialexp/solidjs-editor'
 import { type Accessor, type JSX, Show, createEffect, createSignal, onCleanup } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useThemeClass } from '../../../theme/ThemeClassContext'

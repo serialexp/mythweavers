@@ -1,6 +1,6 @@
 import { IconButton } from '@mythweavers/ui'
-import { BsPlus } from 'solid-icons/bs'
 import { Component } from 'solid-js'
+import { PhPlusIcon } from 'solidjs-phosphor'
 
 interface InsertMessageButtonProps {
   onInsert: () => void
@@ -9,7 +9,7 @@ interface InsertMessageButtonProps {
 export const InsertMessageButton: Component<InsertMessageButtonProps> = (props) => {
   return (
     <IconButton onClick={props.onInsert} aria-label="Insert new message here">
-      <BsPlus size={18} />
+      <PhPlusIcon size={18} />
     </IconButton>
   )
 }

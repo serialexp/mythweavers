@@ -1,6 +1,5 @@
 import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
 import * as PIXI from 'pixi.js'
-import { BsArrowLeft, BsCheck, BsPencil, BsPlus, BsTrash, BsX } from 'solid-icons/bs'
 import { Component, Show, batch, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
 import { useFleetManager } from '../hooks/maps/useFleetManager'
 import { useHyperlaneManager } from '../hooks/maps/useHyperlaneManager'
@@ -39,6 +38,7 @@ import { LandmarkDetail } from './maps/LandmarkDetail'
 import { LandmarksList } from './maps/LandmarksList'
 import { MapTimeline } from './maps/MapTimeline'
 import { createFleetMovementsFromPath } from './maps/fleetMovementHandler'
+import { PhArrowLeftIcon, PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 export const Maps: Component = () => {
   const [canvasContainer, setCanvasContainer] = createSignal<HTMLDivElement | undefined>(undefined)
@@ -1694,7 +1694,7 @@ export const Maps: Component = () => {
         items={mapsStore.maps}
         class={styles.mapsPanel}
         onSelectionChange={handleMapSelectionChange}
-        backIcon={<BsArrowLeft />}
+        backIcon={<PhArrowLeftIcon />}
         emptyStateMessage="Select a map or add a new one to get started"
         renderListItem={(map) => (
           <div class={styles.mapListItem}>
@@ -1741,7 +1741,7 @@ export const Maps: Component = () => {
                 onClick={handleAddMap}
                 disabled={!newMapName().trim() || !selectedFile()}
               >
-                <BsPlus /> Add Map
+                <PhPlusIcon /> Add Map
               </button>
               <button class={styles.cancelButton} onClick={() => panelRef?.clearSelection()}>
                 Cancel
@@ -1758,14 +1758,14 @@ export const Maps: Component = () => {
                 onClick={startEditingBorderColor}
                 title="Edit border color template"
               >
-                <BsPencil />
+                <PhPencilSimpleIcon />
               </button>
               <button
                 class={`${styles.iconButton} ${styles.deleteButton}`}
                 onClick={handleDeleteMap}
                 title="Delete map"
               >
-                <BsTrash />
+                <PhTrashIcon />
               </button>
             </div>
           </div>
@@ -1792,10 +1792,10 @@ export const Maps: Component = () => {
                 />
                 <div class={styles.borderColorActions}>
                   <button class={styles.addMapButton} onClick={handleSaveBorderColor}>
-                    <BsCheck /> Save
+                    <PhCheckIcon /> Save
                   </button>
                   <button class={styles.cancelButton} onClick={() => setEditingMapBorderColor(false)}>
-                    <BsX /> Cancel
+                    <PhXIcon /> Cancel
                   </button>
                 </div>
               </div>

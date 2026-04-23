@@ -1,19 +1,4 @@
 import { Button } from '@mythweavers/ui'
-import {
-  BsArrowDownCircle,
-  BsArrowRepeat,
-  BsCheck,
-  BsChevronDown,
-  BsChevronUp,
-  BsClockHistory,
-  BsCodeSlash,
-  BsInfoCircle,
-  BsLightbulb,
-  BsPencil,
-  BsRewindBtnFill,
-  BsX,
-} from 'solid-icons/bs'
-import { ImTarget } from 'solid-icons/im'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import * as styles from './Message.css'
 import { useOllama } from '../hooks/useOllama'
@@ -36,6 +21,7 @@ import { MessageScriptModal } from './MessageScriptModal'
 import { MessageVersionHistory } from './MessageVersionHistory'
 import { SceneEditorWrapper } from './SceneEditorWrapper'
 import { ScriptDataDiff } from './ScriptDataDiff'
+import { PhArrowCircleDownIcon, PhArrowsClockwiseIcon, PhCaretDownIcon, PhCaretUpIcon, PhCheckIcon, PhClockCounterClockwiseIcon, PhCodeIcon, PhInfoIcon, PhLightbulbIcon, PhPencilSimpleIcon, PhRewindIcon, PhTargetIcon, PhXIcon } from 'solidjs-phosphor'
 
 // Helper to compose class names
 const cn = (...classes: (string | false | undefined | null)[]) => classes.filter(Boolean).join(' ')
@@ -617,7 +603,7 @@ export const Message: Component<MessageProps> = (props) => {
             onClick={handlePasteBefore}
             title={`Insert ${uiStore.getCutMessageCount()} cut message${uiStore.getCutMessageCount() > 1 ? 's' : ''} before this message`}
           >
-            <BsArrowDownCircle /> Insert {uiStore.getCutMessageCount()} Message
+            <PhArrowCircleDownIcon /> Insert {uiStore.getCutMessageCount()} Message
             {uiStore.getCutMessageCount() > 1 ? 's' : ''} Before
           </Button>
         </div>
@@ -648,11 +634,11 @@ export const Message: Component<MessageProps> = (props) => {
                 >
                   {isInstructionExpanded() ? (
                     <>
-                      <BsChevronUp /> Show less
+                      <PhCaretUpIcon /> Show less
                     </>
                   ) : (
                     <>
-                      <BsChevronDown /> Show full instruction
+                      <PhCaretDownIcon /> Show full instruction
                     </>
                   )}
                 </Button>
@@ -756,7 +742,7 @@ export const Message: Component<MessageProps> = (props) => {
                   onClick={startEditingInstruction}
                   title="Edit instruction"
                 >
-                  <BsPencil />
+                  <PhPencilSimpleIcon />
                 </Button>
               </Show>
               <Show when={isEditingInstruction()}>
@@ -767,7 +753,7 @@ export const Message: Component<MessageProps> = (props) => {
                   onClick={saveInstructionEdit}
                   title="Save changes (Ctrl+Enter)"
                 >
-                  <BsCheck />
+                  <PhCheckIcon />
                 </Button>
                 <Button
                   variant="danger"
@@ -776,7 +762,7 @@ export const Message: Component<MessageProps> = (props) => {
                   onClick={cancelInstructionEdit}
                   title="Cancel editing (Escape)"
                 >
-                  <BsX />
+                  <PhXIcon />
                 </Button>
               </Show>
             </div>
@@ -797,7 +783,7 @@ export const Message: Component<MessageProps> = (props) => {
                   title="Regenerate this response"
                   icon={
                     <>
-                      <BsRewindBtnFill /> Regenerate Response
+                      <PhRewindIcon weight="fill" /> Regenerate Response
                     </>
                   }
                 />
@@ -836,7 +822,7 @@ export const Message: Component<MessageProps> = (props) => {
                 onClick={toggleExpanded}
                 title="Show full content"
               >
-                <BsChevronDown /> Show full content
+                <PhCaretDownIcon /> Show full content
               </Button>
             </Show>
             {/* Expanded: show editor instead of plain text - always show editor */}
@@ -853,7 +839,7 @@ export const Message: Component<MessageProps> = (props) => {
                   onClick={toggleExpanded}
                   title="Show summary"
                 >
-                  <BsChevronUp /> Show summary
+                  <PhCaretUpIcon /> Show summary
                 </Button>
               </Show>
             </Show>
@@ -867,13 +853,13 @@ export const Message: Component<MessageProps> = (props) => {
                   onClick={toggleThink}
                   title="Show AI thinking"
                 >
-                  <BsLightbulb /> Show thinking
+                  <PhLightbulbIcon /> Show thinking
                 </Button>
               </Show>
               <Show when={props.message.showThink}>
                 <div class={styles.thinkSection}>
                   <div class={styles.thinkTitle}>
-                    <BsLightbulb /> AI Thinking:
+                    <PhLightbulbIcon /> AI Thinking:
                   </div>
                   {props.message.think}
                 </div>
@@ -884,7 +870,7 @@ export const Message: Component<MessageProps> = (props) => {
                   onClick={toggleThink}
                   title="Hide AI thinking"
                 >
-                  <BsChevronUp /> Hide thinking
+                  <PhCaretUpIcon /> Hide thinking
                 </Button>
               </Show>
             </Show>
@@ -942,7 +928,7 @@ export const Message: Component<MessageProps> = (props) => {
         <Show when={showAnalysisDebug()}>
           <div>
             <div>
-              <BsInfoCircle /> Message Debug Data:
+              <PhInfoIcon /> Message Debug Data:
             </div>
             <pre>
               {JSON.stringify(
@@ -1044,7 +1030,7 @@ export const Message: Component<MessageProps> = (props) => {
                   handleRegenerateFromMessage(props.message.id, props.message.instruction!, maxTokens)
                 }
                 title="Regenerate story from this point"
-                icon={<BsRewindBtnFill />}
+                icon={<PhRewindIcon weight="fill" />}
               />
             </Show>
             <Show when={canRegenerateQuery()}>
@@ -1053,7 +1039,7 @@ export const Message: Component<MessageProps> = (props) => {
                   handleRegenerateQuery(props.message.id, props.message.instruction!, maxTokens)
                 }
                 title="Regenerate this query response"
-                icon={<BsArrowRepeat />}
+                icon={<PhArrowsClockwiseIcon />}
               />
             </Show>
             {/* Edit button removed - editor is now always visible for story content */}
@@ -1064,7 +1050,7 @@ export const Message: Component<MessageProps> = (props) => {
                 onClick={handleSetAsTarget}
                 title="Set as target for branch option"
               >
-                <ImTarget size={16} /> Set as Target
+                <PhTargetIcon size={16} /> Set as Target
               </Button>
             </Show>
             <Show when={props.message.role === 'assistant'}>
@@ -1076,7 +1062,7 @@ export const Message: Component<MessageProps> = (props) => {
                   onClick={() => setShowScriptModal(true)}
                   title={props.message.type === 'event' ? 'Edit event script' : 'Edit turn script'}
                 >
-                  <BsCodeSlash />
+                  <PhCodeIcon />
                 </Button>
               </Show>
               <Show when={!props.message.isQuery && props.message.type !== 'event'}>
@@ -1114,7 +1100,7 @@ export const Message: Component<MessageProps> = (props) => {
               onClick={() => setShowVersionHistory(true)}
               title="View version history"
             >
-              <BsClockHistory />
+              <PhClockCounterClockwiseIcon />
             </Button>
             <Button
               variant="danger"
@@ -1123,7 +1109,7 @@ export const Message: Component<MessageProps> = (props) => {
               onClick={() => messagesStore.deleteMessage(props.message.id)}
               title="Delete this message"
             >
-              <BsX />
+              <PhXIcon />
             </Button>
           </div>
         </div>
@@ -1146,7 +1132,7 @@ export const Message: Component<MessageProps> = (props) => {
             onClick={handlePasteAfter}
             title={`Insert ${uiStore.getCutMessageCount()} cut message${uiStore.getCutMessageCount() > 1 ? 's' : ''} after this message`}
           >
-            <BsArrowDownCircle /> Insert {uiStore.getCutMessageCount()} Message
+            <PhArrowCircleDownIcon /> Insert {uiStore.getCutMessageCount()} Message
             {uiStore.getCutMessageCount() > 1 ? 's' : ''} After (End)
           </Button>
         </div>

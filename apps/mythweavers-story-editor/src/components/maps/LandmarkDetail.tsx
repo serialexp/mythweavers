@@ -1,5 +1,3 @@
-import { AiOutlineLoading3Quarters } from 'solid-icons/ai'
-import { BsArrowLeft, BsArrowReturnLeft, BsCheck, BsPencil, BsSearch, BsTrash, BsX } from 'solid-icons/bs'
 import { Accessor, Component, For, Show, createMemo } from 'solid-js'
 import { landmarkStatesStore } from '../../stores/landmarkStatesStore'
 import { mapEditorStore } from '../../stores/mapEditorStore'
@@ -10,6 +8,7 @@ import { EJSCodeEditor } from '../EJSCodeEditor'
 import { EJSRenderer } from '../EJSRenderer'
 import * as styles from '../Maps.css'
 import { PropertyField } from './PropertyField'
+import { PhArrowBendDownLeftIcon, PhArrowLeftIcon, PhCheckIcon, PhCircleNotchIcon, PhMagnifyingGlassIcon, PhPencilSimpleIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface LandmarkDetailProps {
   // Data that comes from parent context
@@ -87,7 +86,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
       {/* Header with back button */}
       <div class={styles.landmarkDetailHeader}>
         <button class={styles.backButton} onClick={props.onBack} title="Back to list">
-          <BsArrowLeft />
+          <PhArrowLeftIcon />
         </button>
         <span class={styles.landmarkDetailTitle}>
           {mapEditorStore.isAddingLandmark ? 'New Landmark' : 'Landmark Details'}
@@ -167,7 +166,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                             onClick={() => handleJumpToStoryTime(allegianceSourceStoryTime()!)}
                             title={`Jump to where this ${stateField.label.toLowerCase()} was set`}
                           >
-                            <BsArrowReturnLeft /> Jump to source
+                            <PhArrowBendDownLeftIcon /> Jump to source
                           </button>
                         </Show>
                       </div>
@@ -208,7 +207,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                       </div>
                       <Show when={mapEditorStore.isSavingAllegiance}>
                         <div class={styles.savingIndicator}>
-                          <AiOutlineLoading3Quarters class="animate-spin" /> Saving...
+                          <PhCircleNotchIcon class="animate-spin" /> Saving...
                         </div>
                       </Show>
                     </div>
@@ -227,7 +226,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                     }
                   }}
                 >
-                  <BsPencil /> Edit
+                  <PhPencilSimpleIcon /> Edit
                 </button>
                 <button
                   class={`${styles.landmarkButton} ${styles.landmarkButtonDelete}`}
@@ -238,11 +237,11 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                     when={!mapEditorStore.isDeleting}
                     fallback={
                       <>
-                        <AiOutlineLoading3Quarters class="animate-spin" /> Deleting...
+                        <PhCircleNotchIcon class="animate-spin" /> Deleting...
                       </>
                     }
                   >
-                    <BsTrash /> Delete
+                    <PhTrashIcon /> Delete
                   </Show>
                 </button>
               </div>
@@ -271,11 +270,11 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                   when={!mapEditorStore.isFetchingLandmarkInfo}
                   fallback={
                     <>
-                      <AiOutlineLoading3Quarters class="animate-spin" /> Searching...
+                      <PhCircleNotchIcon class="animate-spin" /> Searching...
                     </>
                   }
                 >
-                  <BsSearch /> Search for Info
+                  <PhMagnifyingGlassIcon /> Search for Info
                 </Show>
               </button>
             </Show>
@@ -388,15 +387,15 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                   when={!mapEditorStore.isSaving}
                   fallback={
                     <>
-                      <AiOutlineLoading3Quarters class="animate-spin" /> Saving...
+                      <PhCircleNotchIcon class="animate-spin" /> Saving...
                     </>
                   }
                 >
-                  <BsCheck /> Save
+                  <PhCheckIcon /> Save
                 </Show>
               </button>
               <button class={styles.landmarkCancelButton} onClick={() => mapEditorStore.cancelEditing()}>
-                <BsX /> Cancel
+                <PhXIcon /> Cancel
               </button>
             </div>
           </div>

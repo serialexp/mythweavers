@@ -1,5 +1,4 @@
 import { Button, Modal, Spinner } from '@mythweavers/ui'
-import { BsCloudFill, BsCloudUpload, BsFileEarmarkText, BsHddFill } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { authStore } from '../stores/authStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -15,6 +14,7 @@ import {
   parseClaudeChatExport,
 } from '../utils/claudeChatImport'
 import * as styles from './ClaudeChatImportModal.css'
+import { PhCloudArrowUpIcon, PhCloudIcon, PhFileTextIcon, PhHardDriveIcon } from 'solidjs-phosphor'
 
 interface ClaudeChatImportModalProps {
   show: boolean
@@ -172,7 +172,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
       onClose={handleClose}
       title={
         <span style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
-          <BsFileEarmarkText /> Import Claude Chat
+          <PhFileTextIcon /> Import Claude Chat
         </span>
       }
       size="lg"
@@ -189,7 +189,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
               onClick={openFilePicker}
             >
               <div class={styles.dropZoneIcon}>
-                <BsCloudUpload />
+                <PhCloudArrowUpIcon />
               </div>
               <div class={styles.dropZoneText}>Drop your Claude chat export here</div>
               <div class={styles.dropZoneSubtext}>or click to select a JSON file</div>
@@ -372,7 +372,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
                       checked={storageMode() === 'local'}
                       onChange={() => setStorageMode('local')}
                     />
-                    <BsHddFill style={{ 'flex-shrink': '0' }} />
+                    <PhHardDriveIcon weight="fill" style={{ 'flex-shrink': '0' }} />
                     <span>Local Storage</span>
                   </label>
                   <Show
@@ -380,7 +380,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
                     fallback={
                       <label class={`${styles.importOption} ${styles.importOptionDisabled}`}>
                         <input type="radio" name="storage-mode" disabled />
-                        <BsCloudFill style={{ 'flex-shrink': '0' }} />
+                        <PhCloudIcon weight="fill" style={{ 'flex-shrink': '0' }} />
                         <span>Server Storage (unavailable)</span>
                       </label>
                     }
@@ -392,7 +392,7 @@ export const ClaudeChatImportModal: Component<ClaudeChatImportModalProps> = (pro
                         checked={storageMode() === 'server'}
                         onChange={() => setStorageMode('server')}
                       />
-                      <BsCloudFill style={{ 'flex-shrink': '0' }} />
+                      <PhCloudIcon weight="fill" style={{ 'flex-shrink': '0' }} />
                       <span>Server Storage</span>
                     </label>
                   </Show>

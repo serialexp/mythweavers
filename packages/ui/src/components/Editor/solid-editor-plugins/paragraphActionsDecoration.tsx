@@ -1,6 +1,6 @@
 import type { ParagraphState } from '@mythweavers/shared'
-import type { EditorState } from '@writer/solid-editor'
-import { DecorationSet, widget } from '@writer/solid-editor'
+import type { EditorState } from '@serialexp/solidjs-editor'
+import { DecorationSet, widget } from '@serialexp/solidjs-editor'
 import { type Accessor, type JSX, Show } from 'solid-js'
 import { useThemeClass } from '../../../theme/ThemeClassContext'
 import { Button } from '../../Button'
@@ -43,7 +43,6 @@ function hasAnyAction(config: ParagraphActionsConfig): boolean {
     config.onRewrite ||
     config.onRefineStyle ||
     config.onAddSensory ||
-    config.onSetState ||
     config.onToggleInventory ||
     config.onTogglePlotpoint ||
     config.onEditScript ||
@@ -165,20 +164,7 @@ function ParagraphActionButton(props: { paragraphId: string; config: ParagraphAc
           <DropdownDivider />
         </Show>
 
-        {/* State section */}
-        <Show when={props.config.onSetState}>
-          <DropdownItem onClick={() => props.config.onSetState!(props.paragraphId, 'draft')}>
-            D Set as Draft
-          </DropdownItem>
-          <DropdownItem onClick={() => props.config.onSetState!(props.paragraphId, 'revise')}>
-            R Set as Revise
-          </DropdownItem>
-          <DropdownItem onClick={() => props.config.onSetState!(props.paragraphId, 'ai')}>A Set as AI</DropdownItem>
-          <DropdownItem onClick={() => props.config.onSetState!(props.paragraphId, 'final')}>
-            F Set as Final
-          </DropdownItem>
-          <DropdownDivider />
-        </Show>
+        {/* Paragraph state is set by clicking the colored left border on the paragraph itself. */}
 
         {/* Management section */}
         <Show when={props.config.onSplitScene}>

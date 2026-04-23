@@ -1,7 +1,22 @@
-import type { Paragraph, ParagraphInventoryAction } from '@mythweavers/shared'
-import { DecorationSet, InlineContent, type NodeViewProps, WidgetsAt, setPosInfo } from '@writer/solid-editor'
-import { type Accessor, For, type JSX, Show, createEffect } from 'solid-js'
-import { inventoryBadge, inventoryBadgeAdd, inventoryBadgeRemove, inventoryBadgesContainer } from '../scene-editor.css'
+import type { Paragraph, ParagraphInventoryAction, ParagraphState } from '@mythweavers/shared'
+import { DecorationSet, InlineContent, type NodeViewProps, WidgetsAt, setPosInfo } from '@serialexp/solidjs-editor'
+import { type Accessor, For, type JSX, Show, createEffect, createSignal, onCleanup } from 'solid-js'
+import {
+  inventoryBadge,
+  inventoryBadgeAdd,
+  inventoryBadgeRemove,
+  inventoryBadgesContainer,
+  paragraphStateHitArea,
+  paragraphStatePicker,
+  paragraphStatePickerButton,
+} from '../scene-editor.css'
+
+const STATE_OPTIONS: Array<{ id: ParagraphState; label: string; title: string }> = [
+  { id: 'draft', label: 'Draft', title: 'Set as Draft' },
+  { id: 'revise', label: 'Revise', title: 'Set as Revise' },
+  { id: 'ai', label: 'AI', title: 'Set as AI' },
+  { id: 'final', label: 'Final', title: 'Set as Final' },
+]
 
 /**
  * Creates a paragraph nodeView factory that renders paragraphs with
@@ -19,9 +34,13 @@ import { inventoryBadge, inventoryBadgeAdd, inventoryBadgeRemove, inventoryBadge
  * />
  * ```
  */
-export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>): (props: NodeViewProps) => JSX.Element {
+export function createParagraphStateNodeView(
+  paragraphs: Accessor<Paragraph[]>,
+  onSetState?: (paragraphId: string, state: ParagraphState) => void,
+): (props: NodeViewProps) => JSX.Element {
   return function ParagraphStateView(props: NodeViewProps): JSX.Element {
     let elementRef: HTMLParagraphElement | undefined
+    const [pickerOpen, setPickerOpen] = createSignal(false)
 
     const paragraphId = () => props.node.attrs.id as string | null
     const extra = () => props.node.attrs.extra as string | null
@@ -69,12 +88,56 @@ export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>):
       return DecorationSet.create(props.node, inlines)
     }
 
+    // Pick up node-level decoration attrs (e.g. `class: 'active-paragraph'`
+    // from the active-paragraph plugin). The default ParagraphView in the
+    // solid-editor package does this via internal helpers; we replicate it
+    // here so custom NodeViews don't lose node-decoration attributes.
+    const nodeDecoration = () => {
+      if (!props.decorations) return null
+      return props.decorations.findNodeAt(props.pos, props.pos + props.node.nodeSize) ?? null
+    }
+
+    // Merge the base paragraph class with any class coming from a node
+    // decoration. Everything beyond `class` goes through the attrs spread.
+    const decorationClass = () => nodeDecoration()?.attrs.class ?? ''
+    const mergedClass = () => ['solidjs-editor-paragraph', decorationClass()].filter(Boolean).join(' ')
+
     // Keep position info updated reactively
     createEffect(() => {
       if (elementRef) {
         setPosInfo(elementRef, { pos: props.pos, node: props.node })
       }
     })
+
+    // Close the state picker on any click outside it.
+    createEffect(() => {
+      if (!pickerOpen()) return
+      const onDocClick = (e: MouseEvent) => {
+        const target = e.target as HTMLElement | null
+        if (!target?.closest('[data-paragraph-state-picker]')) {
+          setPickerOpen(false)
+        }
+      }
+      // Defer so the click that opened the picker doesn't immediately close it.
+      const t = setTimeout(() => document.addEventListener('mousedown', onDocClick), 0)
+      onCleanup(() => {
+        clearTimeout(t)
+        document.removeEventListener('mousedown', onDocClick)
+      })
+    })
+
+    const handleHitAreaClick = (e: MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setPickerOpen((v) => !v)
+    }
+
+    const applyState = (state: ParagraphState) => {
+      const id = paragraphId()
+      if (!id) return
+      onSetState?.(id, state)
+      setPickerOpen(false)
+    }
 
     return (
       <p
@@ -84,9 +147,47 @@ export function createParagraphStateNodeView(paragraphs: Accessor<Paragraph[]>):
         data-has-inventory={hasInventory() || undefined}
         data-extra={extra() || undefined}
         data-extra-loading={extraLoading() || undefined}
-        class="solid-editor-paragraph"
+        class={mergedClass()}
         ref={(el) => (elementRef = el)}
       >
+        {/* Clickable hit area over the colored left border — opens the state picker */}
+        <Show when={onSetState}>
+          <span
+            class={paragraphStateHitArea}
+            contentEditable={false}
+            data-paragraph-state-picker
+            title="Change paragraph state"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleHitAreaClick}
+          />
+        </Show>
+
+        {/* Floating state picker */}
+        <Show when={onSetState && pickerOpen()}>
+          <span
+            class={paragraphStatePicker}
+            contentEditable={false}
+            data-paragraph-state-picker
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <For each={STATE_OPTIONS}>
+              {(opt) => (
+                <button
+                  type="button"
+                  class={paragraphStatePickerButton}
+                  data-state={opt.id}
+                  data-active={paragraphState() === opt.id ? 'true' : undefined}
+                  title={opt.title}
+                  onClick={() => applyState(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              )}
+            </For>
+          </span>
+        </Show>
+
         {/* Widgets at start of paragraph content (position after opening tag) */}
         <Show when={props.decorations}>
           <WidgetsAt decorations={props.decorations!} pos={props.pos + 1} side="before" />

@@ -1,5 +1,4 @@
 import { Button } from '@mythweavers/ui'
-import { BsArrowDownCircle } from 'solid-icons/bs'
 import { Component, Show } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { uiStore } from '../stores/uiStore'
@@ -9,6 +8,7 @@ import { InsertBranchButton } from './InsertBranchButton'
 import * as styles from './InsertControls.css'
 import { InsertEventButton } from './InsertEventButton'
 import { InsertMessageButton } from './InsertMessageButton'
+import { PhArrowCircleDownIcon } from 'solidjs-phosphor'
 
 interface InsertControlsProps {
   afterMessageId?: string | null // null means insert at beginning
@@ -101,7 +101,7 @@ export const InsertControls: Component<InsertControlsProps> = (props) => {
             return `Paste ${label} here`
           })()}
         >
-          <BsArrowDownCircle size={18} /> Paste
+          <PhArrowCircleDownIcon size={18} /> Paste
           {uiStore.getCutMessageCount() > 1 ? ` ${uiStore.getCutMessageCount()} Messages` : ' Message'}
         </Button>
       </Show>

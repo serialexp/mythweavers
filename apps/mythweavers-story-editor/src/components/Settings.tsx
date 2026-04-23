@@ -1,18 +1,4 @@
 import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
-import {
-  BsArrowUpSquare,
-  BsChatLeftText,
-  BsClock,
-  BsDownload,
-  BsGear,
-  BsKey,
-  BsLayers,
-  BsLink45deg,
-  BsPlug,
-  BsListTask,
-  BsPencilSquare,
-  BsTrash,
-} from 'solid-icons/bs'
 import { type Component, For, type JSX, Show, createMemo, createSignal, onMount } from 'solid-js'
 import { CONTEXT_SIZE_STEP, STORY_FORMATS, STORY_SETTINGS } from '../constants'
 import { calendarStore } from '../stores/calendarStore'
@@ -33,6 +19,7 @@ import { ModelSelector } from './ModelSelector'
 import { ProviderSelector, ApiKeys } from './ProviderModelSelector'
 import * as styles from './Settings.css'
 import { StoryTimePicker } from './StoryTimePicker'
+import { PhArrowSquareUpIcon, PhChatTextIcon, PhClockIcon, PhDownloadSimpleIcon, PhGearIcon, PhKeyIcon, PhLinkIcon, PhListBulletsIcon, PhPencilSimpleLineIcon, PhPlugIcon, PhStackIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 interface SettingsSection {
   id: string
@@ -41,13 +28,13 @@ interface SettingsSection {
 }
 
 const SETTINGS_SECTIONS: SettingsSection[] = [
-  { id: 'api-keys', name: 'API Keys', icon: <BsKey /> },
-  { id: 'models', name: 'Models', icon: <BsLayers /> },
-  { id: 'custom-providers', name: 'Custom Providers', icon: <BsPlug /> },
-  { id: 'story', name: 'Story Settings', icon: <BsPencilSquare /> },
-  { id: 'timeline', name: 'Timeline', icon: <BsClock /> },
-  { id: 'operations', name: 'Bulk Operations', icon: <BsGear /> },
-  { id: 'import-export', name: 'Import / Export', icon: <BsDownload /> },
+  { id: 'api-keys', name: 'API Keys', icon: <PhKeyIcon /> },
+  { id: 'models', name: 'Models', icon: <PhStackIcon /> },
+  { id: 'custom-providers', name: 'Custom Providers', icon: <PhPlugIcon /> },
+  { id: 'story', name: 'Story Settings', icon: <PhPencilSimpleLineIcon /> },
+  { id: 'timeline', name: 'Timeline', icon: <PhClockIcon /> },
+  { id: 'operations', name: 'Bulk Operations', icon: <PhGearIcon /> },
+  { id: 'import-export', name: 'Import / Export', icon: <PhDownloadSimpleIcon /> },
 ]
 
 interface SettingsProps {
@@ -357,7 +344,7 @@ export const Settings: Component<SettingsProps> = (props) => {
                   : "Generate summaries for all story messages that don't have one yet"
           }
         >
-          <BsListTask /> Generate Missing Summaries
+          <PhListBulletsIcon /> Generate Missing Summaries
         </button>
       </div>
 
@@ -370,7 +357,7 @@ export const Settings: Component<SettingsProps> = (props) => {
             class={styles.button}
             title="Copy user instructions to assistant messages for unified story turns"
           >
-            <BsArrowUpSquare /> Migrate {needsMigrationCount()} Instructions
+            <PhArrowSquareUpIcon /> Migrate {needsMigrationCount()} Instructions
           </button>
         </div>
       </Show>
@@ -409,7 +396,7 @@ export const Settings: Component<SettingsProps> = (props) => {
             class={styles.button}
             title="Attach messages without node assignment to the current or last chapter"
           >
-            <BsLink45deg /> Attach {orphanedMessagesCount()} Orphaned Messages
+            <PhLinkIcon /> Attach {orphanedMessagesCount()} Orphaned Messages
           </button>
         </div>
       </Show>
@@ -438,7 +425,7 @@ export const Settings: Component<SettingsProps> = (props) => {
           class={styles.button}
           title="Import a conversation from a Claude chat export"
         >
-          <BsChatLeftText /> Import Claude Chat
+          <PhChatTextIcon /> Import Claude Chat
         </button>
       </div>
 
@@ -450,7 +437,7 @@ export const Settings: Component<SettingsProps> = (props) => {
             class={styles.button}
             title="View and restore recently deleted story turns"
           >
-            <BsTrash /> View Deleted Turns
+            <PhTrashIcon /> View Deleted Turns
           </button>
         </div>
         <div class={styles.settingRow}>
@@ -460,7 +447,7 @@ export const Settings: Component<SettingsProps> = (props) => {
             class={styles.button}
             title="View and restore recently deleted chapters, scenes, etc."
           >
-            <BsTrash /> View Deleted Nodes
+            <PhTrashIcon /> View Deleted Nodes
           </button>
         </div>
       </Show>

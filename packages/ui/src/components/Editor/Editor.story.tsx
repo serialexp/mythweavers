@@ -7,7 +7,7 @@ import {
   type NodeViewProps,
   setPosInfo,
   widget,
-} from '@writer/solid-editor'
+} from '@serialexp/solidjs-editor'
 import shortUUID from 'short-uuid'
 import { createEffect, createSignal } from 'solid-js'
 import { ThemeComparison } from '../../story-utils/ThemeComparison'

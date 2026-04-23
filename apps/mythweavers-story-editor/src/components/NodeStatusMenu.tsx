@@ -1,7 +1,7 @@
-import { BsChevronRight, BsFlag } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createSignal } from 'solid-js'
 import { NodeStatus } from '../types/core'
 import * as styles from './NodeStatusMenu.css'
+import { PhCaretRightIcon, PhFlagIcon } from 'solidjs-phosphor'
 
 export interface StatusOption {
   value: NodeStatus | null
@@ -83,12 +83,12 @@ export const NodeStatusMenu: Component<NodeStatusMenuProps> = (props) => {
         type="button"
       >
         <span class={styles.triggerContent}>
-          <BsFlag />
+          <PhFlagIcon />
           <span>
             {labelPrefix()}: {selectedOption().label}
           </span>
         </span>
-        <BsChevronRight class={`${styles.chevron} ${isOpen() ? styles.chevronOpen : ''}`} />
+        <PhCaretRightIcon class={`${styles.chevron} ${isOpen() ? styles.chevronOpen : ''}`} />
       </button>
       <Show when={isOpen()}>
         <div class={styles.dropdown} onClick={(e) => e.stopPropagation()}>

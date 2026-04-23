@@ -1,11 +1,11 @@
 import { Button, Card, CardBody, IconButton, Input, Modal, Stack } from '@mythweavers/ui'
-import { BsArrowLeft, BsCalendar, BsCheck, BsPlus, BsShuffle, BsX } from 'solid-icons/bs'
 import { Component, Show, createMemo, createSignal } from 'solid-js'
 import { calendarStore } from '../stores/calendarStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { nodeStore } from '../stores/nodeStore'
 import { getTimelineRange } from '../utils/timelineUtils'
 import * as styles from './StoryTimePicker.css'
+import { PhArrowLeftIcon, PhCalendarIcon, PhCheckIcon, PhPlusIcon, PhShuffleIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface StoryTimePickerProps {
   currentTime?: number | null // Story time in minutes (null = not set)
@@ -176,7 +176,7 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
           onClick={handleCopyFromPrevious}
           style={{ 'justify-content': 'flex-start' }}
         >
-          <BsArrowLeft />
+          <PhArrowLeftIcon />
           Copy from Previous: {previousTimePreview()}
         </Button>
       </Show>
@@ -197,7 +197,7 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
               />
               <span class={styles.daysText}>days</span>
               <Button variant="primary" size="sm" onClick={handleIncrementDays} style={{ 'margin-left': 'auto' }}>
-                <BsPlus /> Add
+                <PhPlusIcon /> Add
               </Button>
             </div>
           </Stack>
@@ -264,7 +264,7 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
             placeholder="0"
           />
           <IconButton variant="ghost" size="sm" onClick={randomizeHour} aria-label="Random hour">
-            <BsShuffle />
+            <PhShuffleIcon />
           </IconButton>
         </div>
 
@@ -283,14 +283,14 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
             placeholder="0"
           />
           <IconButton variant="ghost" size="sm" onClick={randomizeMinute} aria-label="Random minute">
-            <BsShuffle />
+            <PhShuffleIcon />
           </IconButton>
         </div>
       </Stack>
 
       <div class={styles.actionRow}>
         <Button variant="primary" onClick={handleSave}>
-          <BsCheck /> Save
+          <PhCheckIcon /> Save
         </Button>
         <Show when={props.currentTime !== null && props.currentTime !== undefined}>
           <Button variant="danger" onClick={handleClear}>
@@ -298,7 +298,7 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
           </Button>
         </Show>
         <Button variant="secondary" onClick={props.onCancel}>
-          <BsX /> Cancel
+          <PhXIcon /> Cancel
         </Button>
       </div>
     </Stack>
@@ -317,7 +317,7 @@ export const StoryTimePicker: Component<StoryTimePickerProps> = (props) => {
       <CardBody>
         <Stack gap="md">
           <div class={styles.cardTitle}>
-            <BsCalendar />
+            <PhCalendarIcon />
             <span>Set Story Time</span>
           </div>
           {content}

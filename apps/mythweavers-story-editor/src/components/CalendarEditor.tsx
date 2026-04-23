@@ -1,9 +1,9 @@
 import { CalendarConfig, CalendarEngine, CalendarSubdivision, HolidayRule, HolidayStep, getSubdivisionPresets } from '@mythweavers/shared'
 import { Button, ButtonGroup, Card, CardBody, Dropdown, DropdownItem, FormField, IconButton, Input, Select, Stack, ToggleButton } from '@mythweavers/ui'
-import { BsChevronDown, BsPlus, BsTrash } from 'solid-icons/bs'
 import { Component, For, Index, Show, createMemo, createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import * as styles from './CalendarEditor.css'
+import { PhCaretDownIcon, PhPlusIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 // Helper component to render subdivisions recursively
 interface SubdivisionEditorProps {
@@ -278,7 +278,7 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
                   Nested Subdivisions
                 </span>
                 <Button variant="primary" size="sm" onClick={() => props.onAddNested(props.path)}>
-                  <BsPlus /> Add Nested
+                  <PhPlusIcon /> Add Nested
                 </Button>
               </Stack>
               <div class={styles.nestedList}>
@@ -300,7 +300,7 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
           <Show when={!sub().subdivisions || sub().subdivisions!.length === 0}>
             <div class={styles.fieldFull}>
               <Button variant="primary" size="sm" onClick={() => props.onAddNested(props.path)}>
-                <BsPlus /> Add Nested Subdivision
+                <PhPlusIcon /> Add Nested Subdivision
               </Button>
             </div>
           </Show>
@@ -308,7 +308,7 @@ const SubdivisionEditor: Component<SubdivisionEditorProps> = (props) => {
       </div>
 
       <IconButton variant="danger" onClick={() => props.onRemove(props.path)} aria-label="Remove subdivision">
-        <BsTrash />
+        <PhTrashIcon />
       </IconButton>
     </div>
   )
@@ -1042,7 +1042,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
                   portal
                   trigger={
                     <Button variant="primary" size="sm">
-                      <BsPlus /> Add Holiday <BsChevronDown />
+                      <PhPlusIcon /> Add Holiday <PhCaretDownIcon />
                     </Button>
                   }
                 >
@@ -1212,7 +1212,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
                               portal
                               trigger={
                                 <Button variant="secondary" size="sm">
-                                  <BsPlus /> Add Step <BsChevronDown />
+                                  <PhPlusIcon /> Add Step <PhCaretDownIcon />
                                 </Button>
                               }
                             >
@@ -1317,7 +1317,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
                                 </Show>
 
                                 <IconButton variant="danger" size="sm" onClick={() => removeStep(index, stepIndex)} aria-label="Remove step">
-                                  <BsTrash />
+                                  <PhTrashIcon />
                                 </IconButton>
                               </div>
                             )}
@@ -1360,7 +1360,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
                     >
                       <span class={styles.holidayRule}>{getHolidayRuleDescription(holiday())}</span>
                       <IconButton variant="danger" onClick={() => removeHoliday(index)} aria-label="Remove holiday">
-                        <BsTrash />
+                        <PhTrashIcon />
                       </IconButton>
                     </Stack>
                   </div>
@@ -1387,7 +1387,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
                   portal
                   trigger={
                     <Button variant="secondary" size="sm">
-                      <BsPlus /> Add Preset <BsChevronDown />
+                      <PhPlusIcon /> Add Preset <PhCaretDownIcon />
                     </Button>
                   }
                 >
@@ -1402,7 +1402,7 @@ export const CalendarEditor: Component<CalendarEditorProps> = (props) => {
                   </For>
                 </Dropdown>
                 <Button variant="primary" size="sm" onClick={addSubdivision}>
-                  <BsPlus /> Add Custom
+                  <PhPlusIcon /> Add Custom
                 </Button>
               </Stack>
             </Stack>

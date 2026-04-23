@@ -1,8 +1,8 @@
 import { IconButton } from '@mythweavers/ui'
-import { BsX } from 'solid-icons/bs'
 import { Component, JSX, Show, onCleanup, onMount } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import * as styles from './OverlayPanel.css'
+import { PhXIcon } from 'solidjs-phosphor'
 
 interface OverlayPanelProps {
   show: boolean
@@ -42,7 +42,7 @@ export const OverlayPanel: Component<OverlayPanelProps> = (props) => {
               <div class={styles.headerActions}>
                 {props.headerAction}
                 <IconButton onClick={props.onClose} aria-label="Close panel" size="md">
-                  <BsX size={24} />
+                  <PhXIcon size={24} />
                 </IconButton>
               </div>
             </div>

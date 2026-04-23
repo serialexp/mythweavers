@@ -1,5 +1,15 @@
 import type { Paragraph } from '@mythweavers/shared'
-import { EditorState, EditorView, type NodeViewMap, type Plugin, history, smartTypography, baseKeymap, macKeymap } from '@writer/solid-editor'
+import {
+  EditorState,
+  EditorView,
+  type NodeViewMap,
+  type Plugin,
+  baseKeymap,
+  history,
+  macKeymap,
+  richClipboard,
+  smartTypography,
+} from '@serialexp/solidjs-editor'
 import { createEffect, createMemo, createSignal } from 'solid-js'
 
 import { editorContainer, sceneEditor } from '../scene-editor.css'
@@ -93,16 +103,30 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
   // Track content version to detect explicit external content pushes
   let lastContentVersion = props.contentVersion ?? 0
 
-  // Create plugins (memoized to avoid recreating on every render)
+  // Create plugins (memoized to avoid recreating on every render).
+  // `richClipboard` handles HTML copy/paste so that pasting from Word /
+  // Google Docs / browsers preserves paragraph structure (and other
+  // formatting supported by the schema) instead of being flattened by the
+  // default plain-text paste handler.
   const editorPlugins = createMemo(
-    () => [history(), smartTypography(), createActiveParagraphPlugin(), createAssignIdPlugin()] as Plugin[],
+    () =>
+      [
+        history(),
+        smartTypography(),
+        richClipboard(),
+        createActiveParagraphPlugin(),
+        createAssignIdPlugin(),
+      ] as Plugin[],
   )
 
   // Create nodeViews with paragraph state rendering
   const nodeViews = createMemo(
     (): NodeViewMap => ({
       mention: MentionView,
-      paragraph: createParagraphStateNodeView(() => props.paragraphs),
+      paragraph: createParagraphStateNodeView(
+        () => props.paragraphs,
+        (id, state) => props.onParagraphAction?.setState?.(id, state),
+      ),
     }),
   )
 
@@ -212,7 +236,7 @@ export function SolidEditorWrapper(props: SolidEditorWrapperProps) {
   }
 
   // Handle custom dispatch for keyboard shortcuts
-  const handleDispatch = (tr: import('@writer/solid-editor').Transaction) => {
+  const handleDispatch = (tr: import('@serialexp/solidjs-editor').Transaction) => {
     const currentState = state()
     if (!currentState) return
 

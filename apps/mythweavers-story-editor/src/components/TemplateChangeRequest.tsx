@@ -1,5 +1,4 @@
 import { Alert, IconButton, Input, Spinner, Stack } from '@mythweavers/ui'
-import { BsArrowRepeat, BsCheckCircle, BsExclamationTriangle } from 'solid-icons/bs'
 import { Component, Show, createMemo, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -9,6 +8,7 @@ import { buildNodeMarkdown } from '../utils/nodeContentExport'
 import { getTemplatePreview } from '../utils/scriptEngine'
 import { generateTemplateChange } from '../utils/templateAI'
 import * as styles from './TemplateChangeRequest.css'
+import { PhArrowsClockwiseIcon, PhCheckCircleIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface TemplateChangeRequestProps {
   currentTemplate: string
@@ -157,7 +157,7 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
 
       <Show when={props.includeStoryContent && !hasContextNodes()}>
         <div class={styles.noContextWarning}>
-          <BsExclamationTriangle />
+          <PhWarningIcon />
           <span>No scenes marked for context. Mark scenes with the circle icons to use as context.</span>
         </div>
       </Show>
@@ -179,7 +179,7 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
           title="Generate new template with AI"
           aria-label="Generate template"
         >
-          <Show when={isLoading()} fallback={<BsArrowRepeat />}>
+          <Show when={isLoading()} fallback={<PhArrowsClockwiseIcon />}>
             <Spinner size="sm" />
           </Show>
         </IconButton>
@@ -187,13 +187,13 @@ export const TemplateChangeRequest: Component<TemplateChangeRequestProps> = (pro
 
       <Show when={error()}>
         <Alert variant="error">
-          <BsExclamationTriangle style={{ 'margin-right': '6px' }} /> {error()}
+          <PhWarningIcon style={{ 'margin-right': '6px' }} /> {error()}
         </Alert>
       </Show>
 
       <Show when={success()}>
         <Alert variant="success">
-          <BsCheckCircle style={{ 'margin-right': '6px' }} /> Template updated successfully!
+          <PhCheckCircleIcon style={{ 'margin-right': '6px' }} /> Template updated successfully!
         </Alert>
       </Show>
     </Stack>

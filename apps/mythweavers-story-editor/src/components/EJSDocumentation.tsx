@@ -1,7 +1,7 @@
 import { Button, Card, CardBody, Stack } from '@mythweavers/ui'
-import { BsChevronDown, BsChevronRight, BsQuestionCircle } from 'solid-icons/bs'
 import { Component, Show, createSignal } from 'solid-js'
 import * as styles from './EJSDocumentation.css'
+import { PhCaretDownIcon, PhCaretRightIcon, PhQuestionIcon } from 'solidjs-phosphor'
 
 export const EJSDocumentation: Component = () => {
   const [showDocs, setShowDocs] = createSignal(false)
@@ -14,7 +14,7 @@ export const EJSDocumentation: Component = () => {
   return (
     <div>
       <Button variant="ghost" size="sm" onClick={() => setShowDocs(!showDocs())} title="Toggle EJS documentation">
-        <BsQuestionCircle />
+        <PhQuestionIcon />
         EJS Script Help
       </Button>
 
@@ -25,7 +25,7 @@ export const EJSDocumentation: Component = () => {
               {/* Basics */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('basics')}>
-                  <span>{expandedSection() === 'basics' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'basics' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   Basics
                 </button>
                 <Show when={expandedSection() === 'basics'}>
@@ -43,7 +43,7 @@ export const EJSDocumentation: Component = () => {
               {/* Variables */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('variables')}>
-                  <span>{expandedSection() === 'variables' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'variables' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   How Variables Work
                 </button>
                 <Show when={expandedSection() === 'variables'}>
@@ -66,7 +66,7 @@ export const EJSDocumentation: Component = () => {
               {/* Functions */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('functions')}>
-                  <span>{expandedSection() === 'functions' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'functions' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   Using Functions in Templates
                 </button>
                 <Show when={expandedSection() === 'functions'}>
@@ -87,7 +87,7 @@ export const EJSDocumentation: Component = () => {
               {/* Examples */}
               <div>
                 <button class={styles.sectionHeader} onClick={() => toggleSection('examples')}>
-                  <span>{expandedSection() === 'examples' ? <BsChevronDown /> : <BsChevronRight />}</span>
+                  <span>{expandedSection() === 'examples' ? <PhCaretDownIcon /> : <PhCaretRightIcon />}</span>
                   Examples
                 </button>
                 <Show when={expandedSection() === 'examples'}>

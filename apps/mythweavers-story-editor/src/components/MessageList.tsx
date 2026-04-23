@@ -1,10 +1,10 @@
 import { IconButton } from '@mythweavers/ui'
-import { BsChevronUp } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
 import MessageListItems from './MessageListItems'
 import * as styles from './MessageList.css'
 import * as viewStyles from './ViewStyles.css'
+import { PhCaretUpIcon } from 'solidjs-phosphor'
 
 interface MessageListProps {
   isLoading: boolean
@@ -396,7 +396,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
               onClick={handleScrollToTop}
               aria-label="Scroll to top"
             >
-              <BsChevronUp />
+              <PhCaretUpIcon />
             </IconButton>
           </div>
         </Show>

@@ -2,7 +2,6 @@
 // ABOUTME: Allows selecting/deselecting entities and copying from previous scene
 
 import { Badge, Button, Modal, Stack } from '@mythweavers/ui'
-import { BsCheck, BsFiles } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createSignal } from 'solid-js'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
@@ -11,6 +10,7 @@ import { Node } from '../types/core'
 import { getAvatarInitial, getCharacterDisplayName } from '../utils/character'
 import { getScenesInStoryOrder } from '../utils/nodeTraversal'
 import * as styles from './ChapterContextManager.css'
+import { PhCheckIcon, PhFilesIcon } from 'solidjs-phosphor'
 
 const getTypeBadgeVariant = (type: string): 'info' | 'success' | 'warning' => {
   return type === 'theme' ? 'info' : type === 'location' ? 'success' : 'warning'
@@ -92,7 +92,7 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
         Cancel
       </Button>
       <Button variant="primary" onClick={handleSave}>
-        <BsCheck /> Save
+        <PhCheckIcon /> Save
       </Button>
     </>
   )
@@ -108,7 +108,7 @@ export const ChapterContextManager: Component<ChapterContextManagerProps> = (pro
       <Stack gap="md" style={{ padding: '1rem' }}>
         <Show when={hasPreviousScene()}>
           <Button variant="secondary" onClick={copyFromPreviousScene}>
-            <BsFiles /> Copy from Previous Scene
+            <PhFilesIcon /> Copy from Previous Scene
           </Button>
         </Show>
 

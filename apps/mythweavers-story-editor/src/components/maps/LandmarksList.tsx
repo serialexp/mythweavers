@@ -1,9 +1,9 @@
-import { BsArrowDown, BsArrowUp } from 'solid-icons/bs'
 import { Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { mapEditorStore } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
 import { EJSRenderer } from '../EJSRenderer'
 import * as styles from '../Maps.css'
+import { PhArrowDownIcon, PhArrowUpIcon } from 'solidjs-phosphor'
 
 // Fixed item height for virtualization (content + padding + border + gap)
 const ITEM_HEIGHT = 40
@@ -89,7 +89,7 @@ export const LandmarksList: Component = () => {
             onClick={() => mapEditorStore.toggleSortOrder()}
             title={mapEditorStore.sortAscending ? 'Sort Z-A' : 'Sort A-Z'}
           >
-            {mapEditorStore.sortAscending ? <BsArrowDown /> : <BsArrowUp />}
+            {mapEditorStore.sortAscending ? <PhArrowDownIcon /> : <PhArrowUpIcon />}
           </button>
         </div>
         <div

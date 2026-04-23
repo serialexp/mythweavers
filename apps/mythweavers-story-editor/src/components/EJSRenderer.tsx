@@ -1,5 +1,4 @@
 import { Alert, Button, Card, CardBody } from '@mythweavers/ui'
-import { BsExclamationTriangle, BsEye, BsEyeSlash } from 'solid-icons/bs'
 import { Component, Show, createMemo, createSignal } from 'solid-js'
 import { useContextMessage } from '../hooks/useContextMessage'
 import { charactersStore } from '../stores/charactersStore'
@@ -8,6 +7,7 @@ import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { getTemplatePreview } from '../utils/scriptEngine'
 import * as styles from './EJSRenderer.css'
+import { PhEyeIcon, PhEyeSlashIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 export type EJSRendererMode = 'inline' | 'preview-toggle' | 'preview-always'
 
@@ -120,8 +120,8 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
             onClick={() => setShowPreview(!showPreview())}
             title={showPreview() ? 'Hide EJS preview' : 'Show EJS preview'}
           >
-            <Show when={showPreview()} fallback={<BsEye />}>
-              <BsEyeSlash />
+            <Show when={showPreview()} fallback={<PhEyeIcon />}>
+              <PhEyeSlashIcon />
             </Show>
             {props.title || 'EJS Preview'}
           </Button>
@@ -131,7 +131,7 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
               <CardBody padding="sm">
                 <Show when={evaluationResult()!.error}>
                   <Alert variant="error" class={styles.alertMargin}>
-                    <BsExclamationTriangle /> {evaluationResult()!.error}
+                    <PhWarningIcon /> {evaluationResult()!.error}
                   </Alert>
                 </Show>
 
@@ -178,7 +178,7 @@ export const EJSRenderer: Component<EJSRendererProps> = (props) => {
 
             <Show when={evaluationResult()?.error}>
               <Alert variant="error" class={styles.alertMargin}>
-                <BsExclamationTriangle /> {evaluationResult()!.error}
+                <PhWarningIcon /> {evaluationResult()!.error}
               </Alert>
             </Show>
 

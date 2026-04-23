@@ -1,6 +1,5 @@
 import { CalendarConfig } from '@mythweavers/shared'
 import { Badge, Button, Card, CardBody, Select, Stack } from '@mythweavers/ui'
-import { BsCheck, BsPencil, BsPlus, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createResource, createSignal } from 'solid-js'
 import {
   deleteMyCalendarsById,
@@ -16,6 +15,7 @@ import { currentStoryStore } from '../stores/currentStoryStore'
 import { Calendar } from '../types/api'
 import { CalendarEditor } from './CalendarEditor'
 import * as styles from './CalendarManagement.css'
+import { PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 // Extended Calendar type that includes isDefault from list response
 type CalendarWithDefault = Calendar & { isDefault: boolean }
@@ -199,7 +199,7 @@ export const CalendarManagement: Component = () => {
           Calendar System
         </h3>
         <Button variant="primary" onClick={() => setShowAddCalendar(!showAddCalendar())}>
-          <BsPlus /> Add Calendar
+          <PhPlusIcon /> Add Calendar
         </Button>
       </Stack>
 
@@ -236,7 +236,7 @@ export const CalendarManagement: Component = () => {
                       onClick={() => startEditing(calendar.id)}
                       title="Edit calendar"
                     >
-                      <BsPencil /> Edit
+                      <PhPencilSimpleIcon /> Edit
                     </Button>
                     <Show when={calendar.id !== defaultCalendarId()}>
                       <Button
@@ -245,7 +245,7 @@ export const CalendarManagement: Component = () => {
                         onClick={() => handleSetDefault(calendar.id)}
                         title="Set as default calendar"
                       >
-                        <BsCheck /> Set Default
+                        <PhCheckIcon /> Set Default
                       </Button>
                     </Show>
                     <Button
@@ -254,7 +254,7 @@ export const CalendarManagement: Component = () => {
                       onClick={() => handleDeleteCalendar(calendar.id)}
                       title="Delete calendar"
                     >
-                      <BsTrash /> Delete
+                      <PhTrashIcon /> Delete
                     </Button>
                   </Stack>
                 </Stack>

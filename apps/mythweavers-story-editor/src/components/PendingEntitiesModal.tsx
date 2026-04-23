@@ -1,10 +1,10 @@
 import { Button, Card, CardBody, Input, Modal, Stack, Textarea } from '@mythweavers/ui'
-import { BsCheck, BsGeoAltFill, BsPersonFill, BsTagFill } from 'solid-icons/bs'
 import { Component, For } from 'solid-js'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { pendingEntitiesStore } from '../stores/pendingEntitiesStore'
 import * as styles from './PendingEntitiesModal.css'
+import { PhCheckIcon, PhMapPinIcon, PhTagIcon, PhUserIcon } from 'solidjs-phosphor'
 
 export const PendingEntitiesModal: Component = () => {
   const handleApprove = (batchId: string) => {
@@ -59,13 +59,13 @@ export const PendingEntitiesModal: Component = () => {
   const getEntityIcon = (type: string) => {
     switch (type) {
       case 'character':
-        return <BsPersonFill />
+        return <PhUserIcon weight="fill" />
       case 'location':
-        return <BsGeoAltFill />
+        return <PhMapPinIcon weight="fill" />
       case 'theme':
-        return <BsTagFill />
+        return <PhTagIcon weight="fill" />
       default:
-        return <BsTagFill />
+        return <PhTagIcon weight="fill" />
     }
   }
 
@@ -124,7 +124,7 @@ export const PendingEntitiesModal: Component = () => {
                   Skip All
                 </Button>
                 <Button onClick={() => handleApprove(batch.id)}>
-                  <BsCheck /> Add Selected
+                  <PhCheckIcon /> Add Selected
                 </Button>
               </Stack>
             </div>

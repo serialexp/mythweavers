@@ -1,5 +1,4 @@
 import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
-import { BsKey, BsLayers, BsPlug } from 'solid-icons/bs'
 import { type Component, type JSX, For, Show, createSignal, onMount } from 'solid-js'
 import { modelsStore } from '../stores/modelsStore'
 import { settingsStore } from '../stores/settingsStore'
@@ -11,6 +10,7 @@ import { ApiKeys } from './ProviderModelSelector'
 import { OverlayPanel } from './OverlayPanel'
 import * as styles from './Settings.css'
 import * as aiStyles from './AISettingsPanel.css'
+import { PhKeyIcon, PhPlugIcon, PhStackIcon } from 'solidjs-phosphor'
 
 interface SettingsSection {
   id: string
@@ -19,9 +19,9 @@ interface SettingsSection {
 }
 
 const AI_SETTINGS_SECTIONS: SettingsSection[] = [
-  { id: 'api-keys', name: 'API Keys', icon: <BsKey /> },
-  { id: 'models', name: 'Models', icon: <BsLayers /> },
-  { id: 'custom-providers', name: 'Custom Providers', icon: <BsPlug /> },
+  { id: 'api-keys', name: 'API Keys', icon: <PhKeyIcon /> },
+  { id: 'models', name: 'Models', icon: <PhStackIcon /> },
+  { id: 'custom-providers', name: 'Custom Providers', icon: <PhPlugIcon /> },
 ]
 
 type SettingsScope = 'global' | 'story'

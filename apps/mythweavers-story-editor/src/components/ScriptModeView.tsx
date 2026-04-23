@@ -1,4 +1,3 @@
-import { BsCodeSlash, BsExclamationTriangle } from 'solid-icons/bs'
 import { For, Show, createMemo } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -7,6 +6,7 @@ import { InsertControls } from './InsertControls'
 import { Message } from './Message'
 import { NodeHeader } from './NodeHeader'
 import * as viewStyles from './ViewStyles.css'
+import { PhCodeIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface ScriptModeViewProps {
   isGenerating: boolean
@@ -41,7 +41,7 @@ export function ScriptModeView(props: ScriptModeViewProps) {
       {/* Show warning if no scene is selected but scenes exist */}
       <Show when={!isSceneSelected() && hasSceneNode()}>
         <div class={viewStyles.infoMessage}>
-          <BsExclamationTriangle class={viewStyles.warningIcon} />
+          <PhWarningIcon class={viewStyles.warningIcon} />
           <div>
             <h3 class={viewStyles.infoMessageTitle}>No Scene Selected</h3>
             <p class={viewStyles.infoMessageText}>Please select a scene from the navigation panel to view script content.</p>
@@ -52,7 +52,7 @@ export function ScriptModeView(props: ScriptModeViewProps) {
       {/* Show special message when no scripts exist */}
       <Show when={scriptMessages().length === 0 && isSceneSelected()}>
         <div class={viewStyles.infoMessage}>
-          <BsCodeSlash class={viewStyles.primaryIcon} />
+          <PhCodeIcon class={viewStyles.primaryIcon} />
           <div>
             <h3 class={viewStyles.infoMessageTitle}>No Messages with Scripts</h3>
             <p class={viewStyles.infoMessageText}>There are no messages with scripts in this chapter.</p>

@@ -1,4 +1,4 @@
-import { Plugin, PluginKey } from '@writer/solid-editor'
+import { Plugin, PluginKey } from '@serialexp/solidjs-editor'
 import shortUUID from 'short-uuid'
 
 const assignIdPluginKey = new PluginKey<null>('assignId')

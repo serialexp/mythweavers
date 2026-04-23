@@ -1,8 +1,8 @@
 import { Button, Modal } from '@mythweavers/ui'
-import { BsArrowRepeat } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { Model } from '../types/core'
 import * as styles from './ModelSelector.css'
+import { PhArrowsClockwiseIcon } from 'solidjs-phosphor'
 
 interface ModelSelectorProps {
   model: string
@@ -45,7 +45,7 @@ export const ModelSelector: Component<ModelSelectorProps> = (props) => {
         disabled={props.isLoadingModels}
         title="Refresh models"
       >
-        <BsArrowRepeat />
+        <PhArrowsClockwiseIcon />
       </Button>
 
       <Modal

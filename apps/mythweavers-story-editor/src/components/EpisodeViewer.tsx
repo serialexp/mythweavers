@@ -1,7 +1,7 @@
 import { Alert, Button, Modal, Select, Spinner, Stack } from '@mythweavers/ui'
-import { BsFilm } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, onMount } from 'solid-js'
 import * as styles from './EpisodeViewer.css'
+import { PhFilmSlateIcon } from 'solidjs-phosphor'
 
 interface Episode {
   id: string
@@ -552,7 +552,7 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
         <div class={styles.dockedContent}>
           <div class={styles.header}>
             <h2 class={styles.headerTitle}>
-              <BsFilm /> Episode Viewer
+              <PhFilmSlateIcon /> Episode Viewer
             </h2>
           </div>
           {innerContent}
@@ -568,7 +568,7 @@ export const EpisodeViewer: Component<EpisodeViewerProps> = (props) => {
       onClose={props.onClose}
       title={
         <>
-          <BsFilm /> Episode Viewer
+          <PhFilmSlateIcon /> Episode Viewer
         </>
       }
       size="xl"

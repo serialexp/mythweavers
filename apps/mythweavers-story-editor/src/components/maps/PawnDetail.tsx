@@ -1,11 +1,10 @@
-import { AiOutlineLoading3Quarters } from 'solid-icons/ai'
-import { BsArrowLeft, BsCheck, BsPencil, BsTrash, BsX } from 'solid-icons/bs'
 import { Accessor, Component, For, Show, createMemo } from 'solid-js'
 import { mapEditorStore } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
 import { Fleet } from '../../types/core'
 import { getActiveMovement } from '../../utils/fleetUtils'
 import * as styles from '../Maps.css'
+import { PhArrowLeftIcon, PhCheckIcon, PhCircleNotchIcon, PhPencilSimpleIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface PawnDetailProps {
   // Data that comes from parent context
@@ -40,7 +39,7 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
       {/* Header with back button */}
       <div class={styles.landmarkDetailHeader}>
         <button class={styles.backButton} onClick={props.onBack} title="Back to list">
-          <BsArrowLeft />
+          <PhArrowLeftIcon />
         </button>
         <span class={styles.landmarkDetailTitle}>
           {mapEditorStore.isAddingPawn ? 'New Pawn' : 'Pawn Details'}
@@ -91,7 +90,7 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
                     }
                   }}
                 >
-                  <BsPencil /> Edit
+                  <PhPencilSimpleIcon /> Edit
                 </button>
                 <Show when={activeMovement()}>
                   <button
@@ -103,11 +102,11 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
                       when={!mapEditorStore.isDeletingMovement}
                       fallback={
                         <>
-                          <AiOutlineLoading3Quarters class="animate-spin" /> Canceling...
+                          <PhCircleNotchIcon class="animate-spin" /> Canceling...
                         </>
                       }
                     >
-                      <BsX /> Cancel Movement
+                      <PhXIcon /> Cancel Movement
                     </Show>
                   </button>
                 </Show>
@@ -120,11 +119,11 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
                     when={!mapEditorStore.isDeleting}
                     fallback={
                       <>
-                        <AiOutlineLoading3Quarters class="animate-spin" /> Deleting...
+                        <PhCircleNotchIcon class="animate-spin" /> Deleting...
                       </>
                     }
                   >
-                    <BsTrash /> Delete Pawn
+                    <PhTrashIcon /> Delete Pawn
                   </Show>
                 </button>
               </div>
@@ -270,15 +269,15 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
                   when={!mapEditorStore.isSaving}
                   fallback={
                     <>
-                      <AiOutlineLoading3Quarters class="animate-spin" /> Saving...
+                      <PhCircleNotchIcon class="animate-spin" /> Saving...
                     </>
                   }
                 >
-                  <BsCheck /> Save
+                  <PhCheckIcon /> Save
                 </Show>
               </button>
               <button class={styles.landmarkCancelButton} onClick={() => mapEditorStore.cancelEditing()}>
-                <BsX /> Cancel
+                <PhXIcon /> Cancel
               </button>
             </div>
           </div>

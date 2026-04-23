@@ -1,5 +1,4 @@
 import { Button, ButtonGroup, IconButton, Textarea, ToggleButton } from '@mythweavers/ui'
-import { BsEye, BsStopFill, BsX } from 'solid-icons/bs'
 import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
@@ -9,6 +8,7 @@ import { settingsStore } from '../stores/settingsStore'
 import { viewModeStore } from '../stores/viewModeStore'
 import * as styles from './StoryInput.css'
 import { TokenSelector } from './TokenSelector'
+import { PhEyeIcon, PhStopIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface StoryInputProps {
   isLoading: boolean
@@ -88,11 +88,11 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
               size="sm"
               disabled={props.isLoading || !isWritableNodeSelected()}
             >
-              <BsEye />
+              <PhEyeIcon />
             </IconButton>
             <Show when={messagesStore.input}>
               <IconButton onClick={messagesStore.clearInput} aria-label="Clear input" variant="secondary" size="sm">
-                <BsX />
+                <PhXIcon />
               </IconButton>
             </Show>
           </div>
@@ -172,7 +172,7 @@ export const StoryInput: Component<StoryInputProps> = (props) => {
           </div>
           <Show when={props.isLoading || props.isAnalyzing}>
             <Button variant="danger" size="sm" onClick={props.onAbort}>
-              <BsStopFill /> Stop
+              <PhStopIcon weight="fill" /> Stop
             </Button>
           </Show>
           <Button

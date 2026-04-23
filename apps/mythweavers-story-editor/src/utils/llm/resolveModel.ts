@@ -7,18 +7,14 @@ import type { LLMProvider } from '../../types/llm'
  */
 export type GenerationCategory = 'writing' | 'analysis' | 'rewriting' | 'meta'
 
-export const GENERATION_CATEGORIES: Record<
-  GenerationCategory,
-  { label: string; description: string }
-> = {
+export const GENERATION_CATEGORIES: Record<GenerationCategory, { label: string; description: string }> = {
   writing: {
     label: 'Writing',
     description: 'Story generation, adventure narration — creative output',
   },
   analysis: {
     label: 'Analysis',
-    description:
-      'Director notes, world trajectory, summaries, scene splitting — reasoning tasks',
+    description: 'Director notes, world trajectory, summaries, scene splitting — reasoning tasks',
   },
   rewriting: {
     label: 'Rewriting',
@@ -55,6 +51,7 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   'rewrite:single': 'rewriting',
   'rewrite:message': 'rewriting',
   'rewrite:mass': 'rewriting',
+  'rewrite:selection': 'rewriting',
   'cliche:refine': 'rewriting',
   translation: 'rewriting',
 

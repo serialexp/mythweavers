@@ -43,6 +43,12 @@ import {
   postMyLandmarksByLandmarkIdStates,
   postMyMessagesByMessageIdPlotPointStates,
   deleteMyMessagesByMessageIdPlotPointStatesByKey,
+  patchMyStoriesByStoryIdPublishing,
+  postMyStoriesByStoryIdPublishNow,
+  postMyStoriesByStoryIdUnpublish,
+  patchMyChaptersByChapterIdPublishing,
+  postMyChaptersByChapterIdPublishNow,
+  postMyChaptersByChapterIdUnpublish,
   getApiBaseUrl,
 } from '../client/config'
 import { VersionConflictError } from '../types/api'
@@ -346,6 +352,31 @@ interface StorySettingsOperation extends SaveOperationBase {
   }>
 }
 
+// Publishing operations. These wrap the dedicated /my/stories/:id/publishing
+// and /my/chapters/:id/publishing endpoints (plus their publish-now /
+// unpublish shortcuts). They go through the save queue so any pending
+// content writes drain first — you should never publish partial edits.
+//
+// The `mode` discriminates which underlying endpoint to call; `publishedAt`
+// is only meaningful for mode === 'schedule'.
+interface StoryPublishingOperation extends SaveOperationBase {
+  type: 'story-publishing'
+  entityType: 'story-publishing'
+  data:
+    | { mode: 'publish-now' }
+    | { mode: 'unpublish' }
+    | { mode: 'schedule'; publishedAt: string }
+}
+
+interface ChapterPublishingOperation extends SaveOperationBase {
+  type: 'chapter-publishing'
+  entityType: 'chapter-publishing'
+  data:
+    | { mode: 'publish-now' }
+    | { mode: 'unpublish' }
+    | { mode: 'schedule'; publishedAt: string }
+}
+
 // Discriminated union of all save operations
 type SaveOperation =
   | MessageInsertOperation
@@ -382,6 +413,8 @@ type SaveOperation =
   | HyperlaneUpdateOperation
   | HyperlaneDeleteOperation
   | StorySettingsOperation
+  | StoryPublishingOperation
+  | ChapterPublishingOperation
 
 // Helper type to extract operation type string
 type SaveOperationType = SaveOperation['type']
@@ -410,6 +443,16 @@ export class SaveService {
   private onOperationFailed?: (operation: SaveOperation, error: Error) => void
   private onMessageCreated?: (messageId: string, data: { currentMessageRevisionId: string }) => void
   private onLastKnownUpdatedAtChange?: (timestamp: string) => void
+  private onStoryPublishingChanged?: (storyId: string, publishedAt: string | null) => void
+  private onChapterPublishingChanged?: (
+    chapterId: string,
+    storyId: string,
+    publishedAt: string | null,
+    releaseDates: {
+      firstChapterReleasedAt: string | null
+      lastChapterReleasedAt: string | null
+    },
+  ) => void
   private getStorageMode?: () => 'local' | 'server' | null
 
   // Set callbacks for UI updates
@@ -421,6 +464,16 @@ export class SaveService {
     onOperationFailed?: (operation: SaveOperation, error: Error) => void
     onMessageCreated?: (messageId: string, data: { currentMessageRevisionId: string }) => void
     onLastKnownUpdatedAtChange?: (timestamp: string) => void
+    onStoryPublishingChanged?: (storyId: string, publishedAt: string | null) => void
+    onChapterPublishingChanged?: (
+      chapterId: string,
+      storyId: string,
+      publishedAt: string | null,
+      releaseDates: {
+        firstChapterReleasedAt: string | null
+        lastChapterReleasedAt: string | null
+      },
+    ) => void
     getStorageMode?: () => 'local' | 'server' | null
   }) {
     this.onSaveStatusChange = callbacks.onSaveStatusChange
@@ -430,6 +483,8 @@ export class SaveService {
     this.onOperationFailed = callbacks.onOperationFailed
     this.onMessageCreated = callbacks.onMessageCreated
     this.onLastKnownUpdatedAtChange = callbacks.onLastKnownUpdatedAtChange
+    this.onStoryPublishingChanged = callbacks.onStoryPublishingChanged
+    this.onChapterPublishingChanged = callbacks.onChapterPublishingChanged
     this.getStorageMode = callbacks.getStorageMode
   }
 
@@ -1326,6 +1381,72 @@ export class SaveService {
         break
       }
 
+      case 'story-publishing': {
+        let publishedAt: string | null = null
+        if (operation.data.mode === 'publish-now') {
+          const res = await postMyStoriesByStoryIdPublishNow({
+            path: { storyId },
+          })
+          if (res.error) throw new Error((res.error as any).error || 'Failed to publish story')
+          publishedAt = res.data?.publishedAt ?? null
+        } else if (operation.data.mode === 'unpublish') {
+          const res = await postMyStoriesByStoryIdUnpublish({
+            path: { storyId },
+          })
+          if (res.error) throw new Error((res.error as any).error || 'Failed to unpublish story')
+          publishedAt = res.data?.publishedAt ?? null
+        } else {
+          // schedule
+          const res = await patchMyStoriesByStoryIdPublishing({
+            path: { storyId },
+            body: { publishedAt: operation.data.publishedAt },
+          })
+          if (res.error) throw new Error((res.error as any).error || 'Failed to schedule story')
+          publishedAt = res.data?.publishedAt ?? null
+        }
+        this.onStoryPublishingChanged?.(storyId, publishedAt)
+        break
+      }
+
+      case 'chapter-publishing': {
+        const chapterId = entityId
+        let response: {
+          publishedAt?: string | null
+          firstChapterReleasedAt?: string | null
+          lastChapterReleasedAt?: string | null
+        } = {}
+        if (operation.data.mode === 'publish-now') {
+          const res = await postMyChaptersByChapterIdPublishNow({
+            path: { chapterId },
+          })
+          if (res.error) throw new Error((res.error as any).error || 'Failed to publish chapter')
+          response = res.data ?? {}
+        } else if (operation.data.mode === 'unpublish') {
+          const res = await postMyChaptersByChapterIdUnpublish({
+            path: { chapterId },
+          })
+          if (res.error) throw new Error((res.error as any).error || 'Failed to unpublish chapter')
+          response = res.data ?? {}
+        } else {
+          const res = await patchMyChaptersByChapterIdPublishing({
+            path: { chapterId },
+            body: { publishedAt: operation.data.publishedAt },
+          })
+          if (res.error) throw new Error((res.error as any).error || 'Failed to schedule chapter')
+          response = res.data ?? {}
+        }
+        this.onChapterPublishingChanged?.(
+          chapterId,
+          storyId,
+          response.publishedAt ?? null,
+          {
+            firstChapterReleasedAt: response.firstChapterReleasedAt ?? null,
+            lastChapterReleasedAt: response.lastChapterReleasedAt ?? null,
+          },
+        )
+        break
+      }
+
       default: {
         // Exhaustive check - this should never be reached
         const _exhaustive: never = operation
@@ -1693,6 +1814,44 @@ export class SaveService {
     })
   }
 
+  // Publishing operations — all return the queue-drain promise so callers
+  // (modals) can await completion and close / show a spinner. The queue
+  // deduplicates by (entityType, entityId), so using a fixed entityId per
+  // story/chapter means rapid repeat clicks collapse to the latest intent.
+
+  saveStoryPublishing(
+    storyId: string,
+    data:
+      | { mode: 'publish-now' }
+      | { mode: 'unpublish' }
+      | { mode: 'schedule'; publishedAt: string },
+  ): Promise<void> {
+    return this.queueSave({
+      type: 'story-publishing',
+      entityType: 'story-publishing',
+      entityId: storyId,
+      storyId,
+      data,
+    })
+  }
+
+  saveChapterPublishing(
+    storyId: string,
+    chapterId: string,
+    data:
+      | { mode: 'publish-now' }
+      | { mode: 'unpublish' }
+      | { mode: 'schedule'; publishedAt: string },
+  ): Promise<void> {
+    return this.queueSave({
+      type: 'chapter-publishing',
+      entityType: 'chapter-publishing',
+      entityId: chapterId,
+      storyId,
+      data,
+    })
+  }
+
   // Fleet operations
   createFleet(storyId: string, mapId: string, fleet: Fleet) {
     this.queueSave({
@@ -1950,23 +2109,34 @@ export class SaveService {
       }
     }
 
-    // Updates and deletes still run in parallel (they are individual operations)
-    const updatePromises = toUpdate.map((para) =>
-      patchMyParagraphsById({
+    // Updates and deletes still run in parallel (they are individual operations).
+    // Build a minimal PATCH body per paragraph — only send fields that actually
+    // changed (state flips shouldn't re-send the entire paragraph body).
+    const updatePromises = toUpdate.map((para) => {
+      const original = originalMap.get(para.id)!
+      const body: {
+        body?: string
+        contentSchema?: string | null
+        state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT'
+        sortOrder?: number
+      } = {}
+      if (original.body !== para.body) body.body = para.body
+      if (original.contentSchema !== para.contentSchema) body.contentSchema = para.contentSchema
+      if (original.state !== para.state) body.state = toApiState(para.state)
+      const newIdx = newParagraphs.findIndex((p) => p.id === para.id)
+      const origIdx = originalParagraphs.findIndex((p) => p.id === para.id)
+      if (newIdx !== origIdx) body.sortOrder = newIdx
+
+      return patchMyParagraphsById({
         path: { id: para.id },
-        body: {
-          body: para.body,
-          contentSchema: para.contentSchema,
-          state: toApiState(para.state),
-          sortOrder: newParagraphs.findIndex((p) => p.id === para.id),
-        },
+        body,
       })
         .then(() => ({ success: true, id: para.id }))
         .catch((error) => {
           console.error(`[SaveService.saveParagraphs] Failed to update paragraph ${para.id}:`, error)
           return { success: false, id: para.id, error }
         })
-    )
+    })
 
     const deletePromises = toDelete.map((id) =>
       deleteMyParagraphsById({

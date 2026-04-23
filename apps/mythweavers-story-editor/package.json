@@ -58,8 +58,8 @@
     "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.14.0",
     "solid-dnd-directive": "^0.2.0",
-    "solid-icons": "^1.1.0",
-    "solid-js": "^1.9.9"
+    "solid-js": "^1.9.9",
+    "solidjs-phosphor": "^2.1.5"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.88.0",

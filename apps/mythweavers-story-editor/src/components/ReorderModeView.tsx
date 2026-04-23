@@ -1,4 +1,3 @@
-import { BsArrowsMove, BsCheck, BsChevronDown, BsChevronUp, BsScissors, BsTrash, BsX } from 'solid-icons/bs'
 import { For, Show, createEffect, createMemo, createSignal } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { currentStoryStore } from '../stores/currentStoryStore'
@@ -9,6 +8,7 @@ import { viewModeStore } from '../stores/viewModeStore'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
 import { InsertControls } from './InsertControls'
 import * as styles from './ReorderModeView.css'
+import { PhArrowsOutCardinalIcon, PhCaretDownIcon, PhCaretUpIcon, PhCheckIcon, PhScissorsIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface ReorderModeViewProps {
   isGenerating: boolean
@@ -269,19 +269,19 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
     <>
       <div class={styles.reorderModeHeader}>
         <h3 class={styles.reorderTitle}>
-          <BsArrowsMove /> Reorder Messages
+          <PhArrowsOutCardinalIcon /> Reorder Messages
         </h3>
         <div class={styles.reorderActions}>
           <Show when={selectedCount() > 0}>
             <button class={styles.discardButton} onClick={discardSelected}>
-              <BsTrash /> Discard Selected ({selectedCount()})
+              <PhTrashIcon /> Discard Selected ({selectedCount()})
             </button>
           </Show>
           <button class={styles.cancelButton} onClick={cancelReorder}>
-            <BsX /> Cancel
+            <PhXIcon /> Cancel
           </button>
           <button class={styles.saveButton} onClick={saveReorder} disabled={!hasReorderChanges()}>
-            <BsCheck /> Save Order
+            <PhCheckIcon /> Save Order
           </button>
         </div>
       </div>
@@ -337,7 +337,7 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
                       : 'Cut this message to move it elsewhere (Ctrl/Cmd+Click to multi-select)'
                   })()}
                 >
-                  <BsScissors />
+                  <PhScissorsIcon />
                 </button>
                 <button
                   class={styles.moveButton}
@@ -348,7 +348,7 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
                   disabled={index() === 0}
                   title="Move up"
                 >
-                  <BsChevronUp />
+                  <PhCaretUpIcon />
                 </button>
                 <button
                   class={styles.moveButton}
@@ -359,7 +359,7 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
                   disabled={index() === reorderItems().length - 1}
                   title="Move down"
                 >
-                  <BsChevronDown />
+                  <PhCaretDownIcon />
                 </button>
               </div>
             </li>

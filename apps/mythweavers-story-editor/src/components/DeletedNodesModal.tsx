@@ -1,5 +1,4 @@
 import { Badge, Button, Card, CardBody, Modal, Spinner, Stack } from '@mythweavers/ui'
-import { BsArrowClockwise, BsBook, BsFolder2, BsFileText, BsLayers, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createResource, createSignal } from 'solid-js'
 import {
   getMyStoriesByIdDeletedNodes,
@@ -10,6 +9,7 @@ import {
 } from '../client/config'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import * as styles from './DeletedNodesModal.css'
+import { PhArrowClockwiseIcon, PhBookIcon, PhFileTextIcon, PhFolderIcon, PhStackIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 interface DeletedNodesModalProps {
   show: boolean
@@ -32,11 +32,11 @@ const nodeTypeLabels: Record<DeletedNode['type'], string> = {
   scene: 'Scene',
 }
 
-const nodeTypeIcons: Record<DeletedNode['type'], typeof BsBook> = {
-  book: BsBook,
-  arc: BsFolder2,
-  chapter: BsFileText,
-  scene: BsLayers,
+const nodeTypeIcons: Record<DeletedNode['type'], typeof PhBookIcon> = {
+  book: PhBookIcon,
+  arc: PhFolderIcon,
+  chapter: PhFileTextIcon,
+  scene: PhStackIcon,
 }
 
 const nodeTypeVariants: Record<DeletedNode['type'], 'primary' | 'secondary' | 'default'> = {
@@ -100,7 +100,7 @@ export const DeletedNodesModal: Component<DeletedNodesModalProps> = (props) => {
       onClose={props.onClose}
       title={
         <span style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
-          <BsTrash /> Deleted Story Nodes
+          <PhTrashIcon /> Deleted Story Nodes
         </span>
       }
       size="lg"
@@ -147,7 +147,7 @@ export const DeletedNodesModal: Component<DeletedNodesModalProps> = (props) => {
                             disabled={restoringId() === node.id}
                             title="Restore this node and all its contents"
                           >
-                            <BsArrowClockwise />
+                            <PhArrowClockwiseIcon />
                             {restoringId() === node.id ? 'Restoring...' : 'Restore'}
                           </Button>
                         </div>

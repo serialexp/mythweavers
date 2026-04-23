@@ -1,5 +1,4 @@
 import { Badge, Button, Card, CardBody, Modal, Spinner, Stack } from '@mythweavers/ui'
-import { BsArrowClockwise, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createResource, createSignal } from 'solid-js'
 import {
   getMyStoriesByIdDeletedMessages,
@@ -7,6 +6,7 @@ import {
 } from '../client/config'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import * as styles from './DeletedTurnsModal.css'
+import { PhArrowClockwiseIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 interface DeletedTurnsModalProps {
   show: boolean
@@ -64,7 +64,7 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
       onClose={props.onClose}
       title={
         <span style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
-          <BsTrash /> Deleted Story Turns
+          <PhTrashIcon /> Deleted Story Turns
         </span>
       }
       size="lg"
@@ -101,7 +101,7 @@ export const DeletedTurnsModal: Component<DeletedTurnsModalProps> = (props) => {
                           disabled={restoringId() === message.id}
                           title="Restore this message"
                         >
-                          <BsArrowClockwise />
+                          <PhArrowClockwiseIcon />
                           {restoringId() === message.id ? 'Restoring...' : 'Restore'}
                         </Button>
                       </div>

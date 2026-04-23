@@ -1,7 +1,7 @@
 import { Button } from '@mythweavers/ui'
-import { BsCheck, BsChevronDown, BsEraser } from 'solid-icons/bs'
 import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import * as styles from './RegenerateButton.css'
+import { PhCaretDownIcon, PhCheckIcon, PhEraserIcon } from 'solidjs-phosphor'
 
 interface RegenerateButtonProps {
   onRegenerate: (maxTokens: number) => void | Promise<void>
@@ -68,7 +68,7 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
         title="Regenerate the last response with current input"
         class={styles.mainButton}
       >
-        <BsEraser /> Regenerate
+        <PhEraserIcon /> Regenerate
       </Button>
       <Button
         onClick={() => setShowPopover(!showPopover())}
@@ -76,7 +76,7 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
         title="Select response length"
         class={styles.dropdownButton}
       >
-        <BsChevronDown />
+        <PhCaretDownIcon />
       </Button>
 
       <Show when={showPopover()}>
@@ -94,7 +94,7 @@ export const RegenerateButton: Component<RegenerateButtonProps> = (props) => {
                   <div style={{ 'font-size': '12px', opacity: '0.7' }}>{option.description}</div>
                 </div>
                 <Show when={selectedTokens() === option.value}>
-                  <BsCheck size={16} />
+                  <PhCheckIcon size={16} />
                 </Show>
               </button>
             )}

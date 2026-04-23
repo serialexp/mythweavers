@@ -1,4 +1,3 @@
-import { BsChevronLeft, BsChevronRight, BsZoomIn, BsZoomOut } from 'solid-icons/bs'
 import { Component, Show, createMemo, createSignal } from 'solid-js'
 import { calendarStore } from '../../stores/calendarStore'
 import { currentStoryStore } from '../../stores/currentStoryStore'
@@ -15,6 +14,7 @@ import {
   storyTimeToSliderPosition,
 } from '../../utils/timelineUtils'
 import * as styles from '../Maps.css'
+import { PhCaretLeftIcon, PhCaretRightIcon, PhMagnifyingGlassMinusIcon, PhMagnifyingGlassPlusIcon } from 'solidjs-phosphor'
 
 type ZoomLevel = 'full' | 'year' | 'month' | 'week'
 
@@ -387,7 +387,7 @@ export const MapTimeline: Component = () => {
             disabled={isAtStart()}
             title="Previous step"
           >
-            <BsChevronLeft />
+            <PhCaretLeftIcon />
           </button>
 
           <div class={styles.timelineSliderContainer}>
@@ -443,7 +443,7 @@ export const MapTimeline: Component = () => {
             disabled={isAtEnd()}
             title="Next step"
           >
-            <BsChevronRight />
+            <PhCaretRightIcon />
           </button>
         </div>
 
@@ -471,7 +471,7 @@ export const MapTimeline: Component = () => {
               disabled={zoomLevel() === 'full'}
               title="Zoom out"
             >
-              <BsZoomOut />
+              <PhMagnifyingGlassMinusIcon />
             </button>
             <span class={styles.zoomLabel}>{zoomLabel()}</span>
             <button
@@ -480,7 +480,7 @@ export const MapTimeline: Component = () => {
               disabled={zoomLevel() === 'week'}
               title="Zoom in"
             >
-              <BsZoomIn />
+              <PhMagnifyingGlassPlusIcon />
             </button>
           </div>
 

@@ -1,6 +1,4 @@
 import { Button, IconButton, Input, Stack, Textarea } from '@mythweavers/ui'
-import { BsArrowRight, BsCheckCircle, BsCircle, BsPencil, BsPlus, BsSignpostSplit, BsTrash } from 'solid-icons/bs'
-import { ImTarget } from 'solid-icons/im'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
@@ -9,6 +7,7 @@ import { uiStore } from '../stores/uiStore'
 import { BranchOption, Message } from '../types/core'
 import { generateMessageId } from '../utils/id'
 import * as styles from './BranchMessage.css'
+import { PhArrowRightIcon, PhCheckCircleIcon, PhCircleIcon, PhPencilSimpleIcon, PhPlusIcon, PhSignpostIcon, PhTargetIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 interface BranchMessageProps {
   message: Message
@@ -116,7 +115,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
   return (
     <div>
       <div class={styles.branchTitle}>
-        <span class={styles.branchTitleIcon}><BsSignpostSplit size={18} /></span>
+        <span class={styles.branchTitleIcon}><PhSignpostIcon size={18} /></span>
         {props.message.content}
       </div>
 
@@ -160,7 +159,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                   aria-label={isSelected() ? 'Selected' : 'Click to select this option'}
                   class={isSelected() ? styles.selectButtonSelected : styles.selectButtonDefault}
                 >
-                  {isSelected() ? <BsCheckCircle size={20} /> : <BsCircle size={20} />}
+                  {isSelected() ? <PhCheckCircleIcon size={20} /> : <PhCircleIcon size={20} />}
                 </IconButton>
 
                 <div class={styles.optionContent}>
@@ -231,7 +230,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                     onClick={() => handleStartEditLabel(option)}
                     aria-label="Edit option text"
                   >
-                    <BsPencil size={16} />
+                    <PhPencilSimpleIcon size={16} />
                   </IconButton>
                 </Show>
 
@@ -241,7 +240,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                   onClick={() => handleStartTargeting(option.id)}
                   aria-label="Set target message"
                 >
-                  <ImTarget size={16} />
+                  <PhTargetIcon size={16} />
                 </IconButton>
 
                 <Show when={hasTarget}>
@@ -252,7 +251,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                     aria-label="Go to target message"
                     class={styles.goToTargetButton}
                   >
-                    <BsArrowRight size={18} />
+                    <PhArrowRightIcon size={18} />
                   </IconButton>
                 </Show>
 
@@ -262,7 +261,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
                   onClick={() => handleDeleteOption(option.id)}
                   aria-label="Delete option"
                 >
-                  <BsTrash size={18} />
+                  <PhTrashIcon size={18} />
                 </IconButton>
               </div>
             )
@@ -275,7 +274,7 @@ export const BranchMessage: Component<BranchMessageProps> = (props) => {
         onClick={handleAddOption}
         class={styles.addOptionButton}
       >
-        <BsPlus size={20} /> Add Option
+        <PhPlusIcon size={20} /> Add Option
       </Button>
     </div>
   )

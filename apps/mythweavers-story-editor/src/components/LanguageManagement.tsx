@@ -1,5 +1,4 @@
 import { Badge, Button, Card, CardBody, Input, Stack } from '@mythweavers/ui'
-import { BsCheck, BsPencil, BsPlus, BsStar, BsStarFill, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import {
   deleteMyLanguagesById,
@@ -10,6 +9,7 @@ import {
 import { languageStore, type StoryLanguage } from '../stores/languageStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import * as styles from './LanguageManagement.css'
+import { PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhStarIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 export const LanguageManagement: Component = () => {
   const [showAddForm, setShowAddForm] = createSignal(false)
@@ -117,7 +117,7 @@ export const LanguageManagement: Component = () => {
       <Stack direction="horizontal" class={styles.headerRow}>
         <h3 class={styles.sectionTitle}>Languages</h3>
         <Button variant="primary" size="sm" onClick={() => setShowAddForm(true)} disabled={showAddForm()}>
-          <BsPlus /> Add Language
+          <PhPlusIcon /> Add Language
         </Button>
       </Stack>
 
@@ -147,7 +147,7 @@ export const LanguageManagement: Component = () => {
               </div>
               <Stack direction="horizontal" gap="sm">
                 <Button variant="primary" size="sm" onClick={handleAdd} disabled={isLoading() || !newName().trim() || !newLabel().trim()}>
-                  <BsCheck /> Add
+                  <PhCheckIcon /> Add
                 </Button>
                 <Button
                   variant="ghost"
@@ -202,7 +202,7 @@ export const LanguageManagement: Component = () => {
                       </div>
                       <Stack direction="horizontal" gap="sm">
                         <Button variant="primary" size="sm" onClick={() => handleUpdate(lang.id)} disabled={isLoading()}>
-                          <BsCheck /> Save
+                          <PhCheckIcon /> Save
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
                           Cancel
@@ -229,7 +229,7 @@ export const LanguageManagement: Component = () => {
                       disabled={isLoading() || lang.isDefault}
                       title={lang.isDefault ? 'Primary language' : 'Set as primary language'}
                     >
-                      {lang.isDefault ? <BsStarFill /> : <BsStar />}
+                      {lang.isDefault ? <PhStarIcon weight="fill" /> : <PhStarIcon />}
                     </Button>
                     <Button
                       variant="ghost"
@@ -239,7 +239,7 @@ export const LanguageManagement: Component = () => {
                       disabled={isLoading()}
                       title="Edit language"
                     >
-                      <BsPencil />
+                      <PhPencilSimpleIcon />
                     </Button>
                     <Button
                       variant="ghost"
@@ -249,7 +249,7 @@ export const LanguageManagement: Component = () => {
                       disabled={isLoading()}
                       title="Delete language"
                       >
-                        <BsTrash />
+                        <PhTrashIcon />
                       </Button>
                   </Stack>
                 </Show>

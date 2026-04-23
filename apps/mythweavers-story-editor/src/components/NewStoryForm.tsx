@@ -1,9 +1,9 @@
 import { Button, FormField, Input, Stack } from '@mythweavers/ui'
 import { useNavigate } from '@solidjs/router'
-import { BsCloudFill, BsExclamationTriangle, BsHddFill } from 'solid-icons/bs'
 import { Component, Show, createSignal } from 'solid-js'
 import { authStore } from '../stores/authStore'
 import * as styles from './NewStoryForm.css'
+import { PhCloudIcon, PhHardDriveIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface NewStoryFormProps {
   serverAvailable: boolean
@@ -53,7 +53,7 @@ export const NewStoryForm: Component<NewStoryFormProps> = (props) => {
                 onChange={() => setStorageMode('local')}
                 class={styles.radio}
               />
-              <BsHddFill class={styles.icon} />
+              <PhHardDriveIcon weight="fill" class={styles.icon} />
               <div>
                 <div class={styles.optionTitle}>Local Storage</div>
                 <div class={styles.optionDescription}>Save to your browser's local storage</div>
@@ -68,7 +68,7 @@ export const NewStoryForm: Component<NewStoryFormProps> = (props) => {
                     when={!isAuthenticated()}
                     fallback={
                       <>
-                        <BsCloudFill class={styles.icon} />
+                        <PhCloudIcon weight="fill" class={styles.icon} />
                         <div>
                           <div class={styles.optionTitle}>Server Storage</div>
                           <div class={styles.optionDescription}>Server storage unavailable</div>
@@ -76,7 +76,7 @@ export const NewStoryForm: Component<NewStoryFormProps> = (props) => {
                       </>
                     }
                   >
-                    <BsExclamationTriangle class={styles.warningIcon} />
+                    <PhWarningIcon class={styles.warningIcon} />
                     <div style={{ flex: '1' }}>
                       <div class={styles.optionTitle}>Server Storage</div>
                       <div class={styles.optionDescription}>Sign in required for server storage</div>
@@ -106,7 +106,7 @@ export const NewStoryForm: Component<NewStoryFormProps> = (props) => {
                   onChange={() => setStorageMode('server')}
                   class={styles.radio}
                 />
-                <BsCloudFill class={styles.icon} />
+                <PhCloudIcon weight="fill" class={styles.icon} />
                 <div>
                   <div class={styles.optionTitle}>Server Storage</div>
                   <div class={styles.optionDescription}>Save to the server (requires connection)</div>

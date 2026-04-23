@@ -1,10 +1,9 @@
-import { BsArrowLeft, BsCheck, BsPencil, BsTrash, BsX } from 'solid-icons/bs'
-import { AiOutlineLoading3Quarters } from 'solid-icons/ai'
 import { Accessor, Component, For, Show, createMemo } from 'solid-js'
 import { mapEditorStore } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
 import { Hyperlane, Landmark } from '../../types/core'
 import * as styles from '../Maps.css'
+import { PhArrowLeftIcon, PhCheckIcon, PhCircleNotchIcon, PhPencilSimpleIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 export interface PathDetailProps {
   // Data that comes from parent context
@@ -45,7 +44,7 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
       {/* Header with back button */}
       <div class={styles.landmarkDetailHeader}>
         <button class={styles.backButton} onClick={props.onBack} title="Back to list">
-          <BsArrowLeft />
+          <PhArrowLeftIcon />
         </button>
         <span class={styles.landmarkDetailTitle}>Path Details</span>
       </div>
@@ -118,7 +117,7 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
                     }
                   }}
                 >
-                  <BsPencil /> Edit
+                  <PhPencilSimpleIcon /> Edit
                 </button>
                 <button
                   class={`${styles.landmarkButton} ${styles.landmarkButtonDelete}`}
@@ -129,11 +128,11 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
                     when={!mapEditorStore.isDeleting}
                     fallback={
                       <>
-                        <AiOutlineLoading3Quarters class="animate-spin" /> Deleting...
+                        <PhCircleNotchIcon class="animate-spin" /> Deleting...
                       </>
                     }
                   >
-                    <BsTrash /> Delete
+                    <PhTrashIcon /> Delete
                   </Show>
                 </button>
               </div>
@@ -172,15 +171,15 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
                   when={!mapEditorStore.isSaving}
                   fallback={
                     <>
-                      <AiOutlineLoading3Quarters class="animate-spin" /> Saving...
+                      <PhCircleNotchIcon class="animate-spin" /> Saving...
                     </>
                   }
                 >
-                  <BsCheck /> Save
+                  <PhCheckIcon /> Save
                 </Show>
               </button>
               <button class={styles.landmarkCancelButton} onClick={() => mapEditorStore.cancelEditing()}>
-                <BsX /> Cancel
+                <PhXIcon /> Cancel
               </button>
             </div>
           </div>

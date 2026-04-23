@@ -1,9 +1,9 @@
 import { Button, IconButton, Modal, Stack } from '@mythweavers/ui'
-import { BsExclamationTriangle, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createSignal } from 'solid-js'
 import { storage } from '../utils/storage'
 import { storyManager } from '../utils/storyManager'
 import * as styles from './StorageFullModal.css'
+import { PhTrashIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface StorageFullModalProps {
   isOpen: boolean
@@ -81,7 +81,7 @@ export const StorageFullModal: Component<StorageFullModalProps> = (props) => {
       <Stack gap="md">
         {/* Warning Icon */}
         <div class={styles.warningIconContainer}>
-          <BsExclamationTriangle size={48} color="#f59e0b" />
+          <PhWarningIcon size={48} color="#f59e0b" />
         </div>
 
         {/* Message */}
@@ -120,7 +120,7 @@ export const StorageFullModal: Component<StorageFullModalProps> = (props) => {
                     onClick={() => handleDeleteStory(story.id)}
                     aria-label="Delete this story"
                   >
-                    <BsTrash />
+                    <PhTrashIcon />
                   </IconButton>
                 </div>
               )}

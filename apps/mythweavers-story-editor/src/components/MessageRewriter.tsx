@@ -1,6 +1,5 @@
 import { Button, Card, CardBody, Input, Modal, Spinner, Stack, Textarea } from '@mythweavers/ui'
 import * as Diff from 'diff'
-import { BsCheck2, BsX } from 'solid-icons/bs'
 import { For, Show, createMemo, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
@@ -9,6 +8,7 @@ import { LLMClientFactory, type LLMMessage } from '../utils/llm'
 import { resolveModel } from '../utils/llm/resolveModel'
 import { buildDiffRewritePrompt, processLLMDiffResponse } from '@mythweavers/shared'
 import * as styles from './MessageRewriter.css'
+import { PhCheckIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface RewriteResult {
   messageId: string
@@ -249,7 +249,7 @@ export function MessageRewriter(props: MessageRewriterProps) {
                           onClick={() => handleAcceptResult(result.messageId)}
                           title="Accept changes"
                         >
-                          <BsCheck2 />
+                          <PhCheckIcon />
                         </button>
                         <button
                           type="button"
@@ -257,7 +257,7 @@ export function MessageRewriter(props: MessageRewriterProps) {
                           onClick={() => handleRejectResult(result.messageId)}
                           title="Reject changes"
                         >
-                          <BsX />
+                          <PhXIcon />
                         </button>
                       </div>
                     </Show>

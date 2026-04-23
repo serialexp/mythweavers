@@ -1,9 +1,9 @@
 import { ActionRow, Badge, IconButton, Input, Spinner } from '@mythweavers/ui'
-import { BsCloudFill, BsDownload, BsExclamationTriangle, BsFilePdf, BsHddFill, BsPencil, BsServer, BsTrash } from 'solid-icons/bs'
 import { Component, For, Show, createSignal } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { storyManager } from '../utils/storyManager'
 import * as styles from './StoryList.css'
+import { PhCloudIcon, PhDownloadSimpleIcon, PhFilePdfIcon, PhHardDriveIcon, PhHardDrivesIcon, PhPencilSimpleIcon, PhTrashIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 export interface StoryListItem {
   id: string
@@ -147,13 +147,19 @@ export const StoryList: Component<StoryListProps> = (props) => {
                     onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}
                   >
                     {story.type === 'server' ? (
-                      <BsCloudFill class={styles.storyTypeIcon} title="Server story" />
+                      <span title="Server story" style={{ display: 'inline-flex' }}>
+                        <PhCloudIcon weight="fill" class={styles.storyTypeIcon} />
+                      </span>
                     ) : (
-                      <BsHddFill class={styles.storyTypeIcon} title="Local story" />
+                      <span title="Local story" style={{ display: 'inline-flex' }}>
+                        <PhHardDriveIcon weight="fill" class={styles.storyTypeIcon} />
+                      </span>
                     )}
                     <span>{story.name}</span>
                     {story.hasLocalDifferences && (
-                      <BsExclamationTriangle class={styles.warningIcon} title="Local version differs from server" />
+                      <span title="Local version differs from server" style={{ display: 'inline-flex' }}>
+                        <PhWarningIcon class={styles.warningIcon} />
+                      </span>
                     )}
                     {story.isCurrentStory && (
                       <Badge variant="success" size="sm">
@@ -179,7 +185,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                       size="sm"
                       onClick={() => startEditing(story.id, story.name)}
                     >
-                      <BsPencil />
+                      <PhPencilSimpleIcon />
                     </IconButton>
                   </Show>
 
@@ -190,7 +196,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                       size="sm"
                       onClick={() => props.onLoadStory(story.id, 'local')}
                     >
-                      <BsHddFill />
+                      <PhHardDriveIcon weight="fill" />
                     </IconButton>
                   </Show>
 
@@ -206,7 +212,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                       onClick={() => props.onSyncToServer!(story.id)}
                       disabled={props.syncing === story.id}
                     >
-                      {props.syncing === story.id ? <Spinner size="sm" /> : <BsServer />}
+                      {props.syncing === story.id ? <Spinner size="sm" /> : <PhHardDrivesIcon />}
                     </IconButton>
                   </Show>
 
@@ -217,7 +223,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                       size="sm"
                       onClick={() => props.onExportPdf!(story.id)}
                     >
-                      <BsFilePdf />
+                      <PhFilePdfIcon />
                     </IconButton>
                   </Show>
 
@@ -228,7 +234,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                       size="sm"
                       onClick={() => props.onExportZip!(story.id)}
                     >
-                      <BsDownload />
+                      <PhDownloadSimpleIcon />
                     </IconButton>
                   </Show>
 
@@ -244,7 +250,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                       }}
                       disabled={story.isCurrentStory}
                     >
-                      <BsTrash />
+                      <PhTrashIcon />
                     </IconButton>
                   </Show>
                 </div>

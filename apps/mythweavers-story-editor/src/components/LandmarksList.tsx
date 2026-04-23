@@ -1,8 +1,8 @@
 import { Button, Stack } from '@mythweavers/ui'
-import { BsArrowDown, BsArrowUp } from 'solid-icons/bs'
 import { Component, For, Show, createMemo } from 'solid-js'
 import type { Landmark } from '../types/core'
 import * as styles from './LandmarksList.css'
+import { PhArrowDownIcon, PhArrowUpIcon } from 'solidjs-phosphor'
 
 interface LandmarksListProps {
   landmarks: Landmark[]
@@ -30,7 +30,7 @@ export const LandmarksList: Component<LandmarksListProps> = (props) => {
       <Stack direction="horizontal" justify="between" align="center" class={styles.header}>
         <span>Landmarks ({props.landmarks.length})</span>
         <Button size="sm" variant="secondary" onClick={props.onToggleSort}>
-          {props.sortAscending ? <BsArrowDown /> : <BsArrowUp />} Sort
+          {props.sortAscending ? <PhArrowDownIcon /> : <PhArrowUpIcon />} Sort
         </Button>
       </Stack>
 

@@ -9,7 +9,6 @@ import {
   TabList,
   Tabs,
 } from '@mythweavers/ui'
-import { BsArrowLeft, BsCheck, BsPencil, BsPlus, BsX } from 'solid-icons/bs'
 import { type Component, Show, batch, createMemo, createSignal } from 'solid-js'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import type { ContextItem } from '../types/core'
@@ -19,6 +18,7 @@ import { EJSCodeEditor } from './EJSCodeEditor'
 import { EJSRenderer } from './EJSRenderer'
 import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { TemplateChangeRequest } from './TemplateChangeRequest'
+import { PhArrowLeftIcon, PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhXIcon } from 'solidjs-phosphor'
 
 export interface ContextItemsRef {
   addNew: () => void
@@ -139,7 +139,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
       <ListDetailPanel
         ref={(r) => (panelRef = r)}
         items={filteredContextItems()}
-        backIcon={<BsArrowLeft />}
+        backIcon={<PhArrowLeftIcon />}
         listHeader={
           <Tabs
             activeTab={selectedTab()}
@@ -186,7 +186,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 <EJSRenderer template={item.name} mode="inline" />
               </span>
               <Button size="sm" onClick={() => startEditing(item)}>
-                <BsPencil /> Edit
+                <PhPencilSimpleIcon /> Edit
               </Button>
               <Button
                 size="sm"
@@ -198,7 +198,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                   }
                 }}
               >
-                <BsX />
+                <PhXIcon />
               </Button>
             </Stack>
           </Show>
@@ -277,7 +277,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                     disabled={!editName().trim() || !editDescription().trim()}
                     style={{ flex: '1' }}
                   >
-                    <BsCheck /> Save Changes
+                    <PhCheckIcon /> Save Changes
                   </Button>
                   <Button variant="secondary" onClick={cancelEdit}>
                     Cancel
@@ -382,7 +382,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 disabled={!newItemName().trim() || !newItemDescription().trim()}
                 style={{ flex: '1' }}
               >
-                <BsPlus /> Add Context Item
+                <PhPlusIcon /> Add Context Item
               </Button>
               <Button variant="secondary" onClick={() => panelRef?.clearSelection()}>
                 Cancel

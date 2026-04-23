@@ -1,6 +1,5 @@
 import { Button, Modal, Spinner, Textarea } from '@mythweavers/ui'
 import * as Diff from 'diff'
-import { BsChevronDown, BsChevronRight } from 'solid-icons/bs'
 import { For, Show, createMemo, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
@@ -11,6 +10,7 @@ import { LLMClientFactory, type LLMMessage } from '../utils/llm'
 import { resolveModel } from '../utils/llm/resolveModel'
 import { buildDiffRewritePrompt, processLLMDiffResponse } from '@mythweavers/shared'
 import * as styles from './SingleRewriteDialog.css'
+import { PhCaretDownIcon, PhCaretRightIcon } from 'solidjs-phosphor'
 
 interface RewriteResult {
   originalContent: string
@@ -411,7 +411,7 @@ export function SingleRewriteDialog() {
                                   }}
                                   title={isExpanded() ? 'Collapse' : 'Expand to see content'}
                                 >
-                                  {isExpanded() ? <BsChevronDown /> : <BsChevronRight />}
+                                  {isExpanded() ? <PhCaretDownIcon /> : <PhCaretRightIcon />}
                                 </button>
                               </div>
 

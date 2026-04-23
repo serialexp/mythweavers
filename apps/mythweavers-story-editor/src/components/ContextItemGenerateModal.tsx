@@ -1,6 +1,5 @@
 import { Button, Modal, Spinner } from '@mythweavers/ui'
 import * as Diff from 'diff'
-import { BsExclamationTriangle } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import type { ContextItem } from '../types/core'
@@ -12,6 +11,7 @@ import {
   type TokenEstimateResult,
 } from '../utils/templateAI'
 import * as styles from './ContextItemGenerateModal.css'
+import { PhWarningIcon } from 'solidjs-phosphor'
 
 type ContextItemType = 'theme' | 'location' | 'plot'
 
@@ -273,7 +273,7 @@ export const ContextItemGenerateModal: Component<ContextItemGenerateModalProps> 
 
         <Show when={!hasContextNodes()}>
           <div class={styles.noContextWarning}>
-            <BsExclamationTriangle />
+            <PhWarningIcon />
             <span>No nodes marked for context. Mark nodes with the circle icons to use as source content.</span>
           </div>
         </Show>
@@ -400,7 +400,7 @@ export const ContextItemGenerateModal: Component<ContextItemGenerateModalProps> 
         {/* Error Display */}
         <Show when={error()}>
           <div class={styles.noContextWarning}>
-            <BsExclamationTriangle />
+            <PhWarningIcon />
             <span>{error()}</span>
           </div>
         </Show>

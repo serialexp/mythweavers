@@ -1,5 +1,4 @@
 import { Button, Modal, Spinner } from '@mythweavers/ui'
-import { BsBook, BsExclamationTriangle, BsFileEarmarkText } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
 import { nodeStore } from '../stores/nodeStore'
 import { generateSceneSplit, type ProposedStructure } from '../utils/llm/splitScene'
@@ -12,6 +11,7 @@ import {
 } from '../utils/sceneSplitUtils'
 import { estimateTokensFromText } from '../utils/templateAI'
 import * as styles from './SplitSceneModal.css'
+import { PhBookIcon, PhFileTextIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 type SplitPointType = 'none' | 'scene' | 'chapter'
 
@@ -377,7 +377,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
         {/* Error Display */}
         <Show when={error()}>
           <div class={styles.errorBox}>
-            <BsExclamationTriangle />
+            <PhWarningIcon />
             <span>{error()}</span>
           </div>
         </Show>
@@ -408,7 +408,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
           {/* Warning for single message */}
           <Show when={contentStats() && contentStats()!.messageCount === 1}>
             <div class={styles.warningBox}>
-              <BsExclamationTriangle />
+              <PhWarningIcon />
               <span>This scene has only one message. Splitting may not be meaningful.</span>
             </div>
           </Show>
@@ -416,7 +416,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
           {/* No content warning */}
           <Show when={contentStats() && contentStats()!.messageCount === 0}>
             <div class={styles.warningBox}>
-              <BsExclamationTriangle />
+              <PhWarningIcon />
               <span>This scene has no messages to split.</span>
             </div>
           </Show>
@@ -460,7 +460,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
               {(chapter) => (
                 <div class={styles.chapterNode}>
                   <div class={styles.chapterTitle}>
-                    <BsBook class={styles.chapterIcon} />
+                    <PhBookIcon class={styles.chapterIcon} />
                     {chapter.title}
                   </div>
                   <div class={styles.scenesContainer}>
@@ -468,7 +468,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
                       {(scene) => (
                         <div class={styles.sceneNode}>
                           <div class={styles.sceneTitle}>
-                            <BsFileEarmarkText class={styles.sceneIcon} />
+                            <PhFileTextIcon class={styles.sceneIcon} />
                             {scene.title}
                           </div>
                           <div class={styles.messageAssignments}>

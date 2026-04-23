@@ -1,4 +1,4 @@
-import { DecorationSet, Plugin, PluginKey, node as nodeDecoration } from '@writer/solid-editor'
+import { DecorationSet, Plugin, PluginKey, node as nodeDecoration } from '@serialexp/solidjs-editor'
 import { getParagraphIdAtPos, getParagraphRange } from '../solid-editor/paragraph-conversion'
 
 const activeParagraphPluginKey = new PluginKey<ActiveParagraphState>('activeParagraph')

@@ -1,9 +1,9 @@
 import { Badge, Button, Modal, Spinner } from '@mythweavers/ui'
-import { BsArrowCounterclockwise, BsArrowRepeat, BsClockHistory, BsPencil } from 'solid-icons/bs'
 import { Component, For, Show, createEffect, createSignal, on } from 'solid-js'
 import { getMyMessagesByMessageIdRevisions, patchMyParagraphsById } from '../client/config'
 import { messagesStore } from '../stores/messagesStore'
 import * as styles from './MessageVersionHistory.css'
+import { PhArrowCounterClockwiseIcon, PhArrowsClockwiseIcon, PhClockCounterClockwiseIcon, PhPencilSimpleIcon } from 'solidjs-phosphor'
 
 interface MessageVersionHistoryProps {
   messageId: string
@@ -127,13 +127,13 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
   const getVersionIcon = (type: string) => {
     switch (type) {
       case 'initial':
-        return <BsClockHistory />
+        return <PhClockCounterClockwiseIcon />
       case 'edit':
       case 'cli_edit':
       case 'rewrite':
-        return <BsPencil />
+        return <PhPencilSimpleIcon />
       default:
-        return <BsArrowRepeat />
+        return <PhArrowsClockwiseIcon />
     }
   }
 
@@ -234,7 +234,7 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
       onClose={props.onClose}
       title={
         <div class={styles.titleRow}>
-          <BsClockHistory />
+          <PhClockCounterClockwiseIcon />
           <span>Version History</span>
         </div>
       }
@@ -296,7 +296,7 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
                   onClick={restoreMessageRevision}
                   disabled={restoring()}
                 >
-                  <BsArrowCounterclockwise /> Restore This Version
+                  <PhArrowCounterClockwiseIcon /> Restore This Version
                 </Button>
               </Show>
             </div>
@@ -379,7 +379,7 @@ export const MessageVersionHistory: Component<MessageVersionHistoryProps> = (pro
                                 onClick={() => restoreParagraphRevision(paragraph.id, displayed()!.body)}
                                 disabled={restoring()}
                               >
-                                <BsArrowCounterclockwise /> Restore this paragraph
+                                <PhArrowCounterClockwiseIcon /> Restore this paragraph
                               </Button>
                             </div>
                           </Show>

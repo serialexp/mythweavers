@@ -1,4 +1,4 @@
-import { Schema, type SchemaSpec } from '@writer/solid-editor'
+import { Schema, type SchemaSpec } from '@serialexp/solidjs-editor'
 
 /**
  * Mention types for different entity categories

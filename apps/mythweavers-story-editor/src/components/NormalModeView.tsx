@@ -1,4 +1,3 @@
-import { BsExclamationTriangle } from 'solid-icons/bs'
 import { For, Show, createMemo } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -9,6 +8,7 @@ import { Message } from './Message'
 import { NodeHeader } from './NodeHeader'
 import { TargetingBanner } from './TargetingBanner'
 import * as viewStyles from './ViewStyles.css'
+import { PhWarningIcon } from 'solidjs-phosphor'
 
 interface NormalModeViewProps {
   isGenerating: boolean
@@ -45,7 +45,7 @@ export function NormalModeView(props: NormalModeViewProps) {
       {/* Show warning if no scene is selected but scenes exist */}
       <Show when={!isSceneSelected() && hasSceneNode()}>
         <div class={viewStyles.infoMessage}>
-          <BsExclamationTriangle class={viewStyles.warningIcon} />
+          <PhWarningIcon class={viewStyles.warningIcon} />
           <div>
             <h3 class={viewStyles.infoMessageTitle}>No Scene Selected</h3>
             <p class={viewStyles.infoMessageText}>Please select a scene from the navigation panel to view and generate story content.</p>

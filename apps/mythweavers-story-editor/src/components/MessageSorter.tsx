@@ -1,10 +1,10 @@
 import { Button, Modal, Stack } from '@mythweavers/ui'
-import { BsArrowsMove, BsChevronDown, BsChevronUp } from 'solid-icons/bs'
 import { Component, For, JSX, createEffect, createSignal } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import * as styles from './MessageSorter.css'
+import { PhArrowsOutCardinalIcon, PhCaretDownIcon, PhCaretUpIcon } from 'solidjs-phosphor'
 
 interface MessageSorterProps {
   isOpen: boolean
@@ -228,7 +228,7 @@ export const MessageSorter: Component<MessageSorterProps> = (props) => {
       onClose={props.onClose}
       title={
         <>
-          <BsArrowsMove /> Reorder Messages
+          <PhArrowsOutCardinalIcon /> Reorder Messages
         </>
       }
       size="lg"
@@ -264,7 +264,7 @@ export const MessageSorter: Component<MessageSorterProps> = (props) => {
                     disabled={index() === 0}
                     title="Move up"
                   >
-                    <BsChevronUp />
+                    <PhCaretUpIcon />
                   </button>
                   <button
                     style={{
@@ -279,7 +279,7 @@ export const MessageSorter: Component<MessageSorterProps> = (props) => {
                     disabled={index() === items().length - 1}
                     title="Move down"
                   >
-                    <BsChevronDown />
+                    <PhCaretDownIcon />
                   </button>
                 </Stack>
               </li>

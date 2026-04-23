@@ -1,10 +1,10 @@
 import { ToggleButton } from '@mythweavers/ui'
 import { Component, For, Show } from 'solid-js'
-import { BsCursor, BsGeoAlt, BsPerson, BsShare } from 'solid-icons/bs'
 import { mapEditorStore, type CreationMode, type OverlayMethod } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
 import { DEFAULT_PROPERTY_SCHEMA } from '../../types/core'
 import * as styles from '../Maps.css'
+import { PhCursorIcon, PhMapPinIcon, PhShareIcon, PhUserIcon } from 'solidjs-phosphor'
 
 // Get allegiance options from schema
 const getAllegianceOptions = () => {
@@ -36,7 +36,7 @@ export const MapToolbar: Component<MapToolbarProps> = (props) => {
           onClick={() => handleModeClick('select')}
           title="Select and pan"
         >
-          <BsCursor />
+          <PhCursorIcon />
           Select
         </ToggleButton>
         <ToggleButton
@@ -45,7 +45,7 @@ export const MapToolbar: Component<MapToolbarProps> = (props) => {
           onClick={() => handleModeClick('landmark')}
           title="Click map to add landmarks"
         >
-          <BsGeoAlt />
+          <PhMapPinIcon />
           Add Landmark
         </ToggleButton>
         <ToggleButton
@@ -54,7 +54,7 @@ export const MapToolbar: Component<MapToolbarProps> = (props) => {
           onClick={() => handleModeClick('pawn')}
           title="Click map to add pawns"
         >
-          <BsPerson />
+          <PhUserIcon />
           Add Pawn
         </ToggleButton>
         <ToggleButton
@@ -63,7 +63,7 @@ export const MapToolbar: Component<MapToolbarProps> = (props) => {
           onClick={() => handleModeClick('path')}
           title="Click landmarks to create paths"
         >
-          <BsShare />
+          <PhShareIcon />
           Add Path
         </ToggleButton>
       </div>
