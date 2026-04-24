@@ -67,6 +67,7 @@ import stripeWebhookRoutes from './routes/webhooks/stripe.js'
 import wsRoutes from './routes/ws.js'
 import { prisma } from './lib/prisma.js'
 import { startCostSyncScheduler, stopCostSyncScheduler } from './lib/cost-sync-scheduler.js'
+import { startWorker as startRoyalRoadWorker, stopWorker as stopRoyalRoadWorker } from './workers/royal-road.js'
 import adminLlmRoutes from './routes/admin/llm.js'
 import adminUsersRoutes from './routes/admin/users.js'
 import publicStoriesRoutes from './routes/stories/public.js'
@@ -351,6 +352,9 @@ try {
 
   // Start background cost sync scheduler
   startCostSyncScheduler(server.log)
+
+  // Start Royal Road publishing worker (no-op unless ROYAL_ROAD_WORKER_ENABLED=true)
+  startRoyalRoadWorker(server.log)
 } catch (err) {
   server.log.error(err)
   process.exit(1)
@@ -362,6 +366,7 @@ signals.forEach((signal) => {
   process.on(signal, async () => {
     server.log.info(`Received ${signal}, closing server...`)
     stopCostSyncScheduler()
+    stopRoyalRoadWorker()
     await server.close()
     process.exit(0)
   })
