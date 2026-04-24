@@ -37,6 +37,8 @@ enum PublishingPlatform {
 
 enum PublishingStatus {
   DRAFT
+  SCHEDULED
+  PUBLISHING
   PUBLISHED
   FAILED
 }
@@ -99,6 +101,7 @@ model User {
   storyReadStatuses StoryReadStatus[]
   balanceLedger     BalanceLedger[]
   llmUsageLogs      LlmUsageLog[]
+  royalRoadAccount  RoyalRoadAccount?
 
   @@index([email])
   @@index([username])
@@ -181,6 +184,9 @@ model Story {
   owner                  User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   importedFromId         String?           @unique // Original story ID from Writer/Story backend migration
   royalRoadId            Int?              @unique
+  /// When true, chapters with publishedAt <= now are auto-published to Royal Road by
+  /// the RR publishing worker. Requires a connected RoyalRoadAccount on the owner.
+  royalRoadPublishingEnabled Boolean       @default(false)
   /// @deprecated Use `publishedAt` instead. Kept during migration period; will be dropped once all callers are cut over.
   published              Boolean           @default(false)
   /// When this story became (or will become) publicly visible on the reading frontend.
@@ -568,20 +574,50 @@ model ParagraphEmbedding {
 // ============================================================================
 
 model ChapterPublishing {
-  id           String             @id @default(cuid())
-  chapterId    String
-  chapter      Chapter            @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  platform     PublishingPlatform
-  status       PublishingStatus   @default(DRAFT)
-  platformId   String?
-  publishedAt  DateTime?
-  lastAttempt  DateTime?
-  errorMessage String?            @db.Text
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id            String             @id @default(cuid())
+  chapterId     String
+  chapter       Chapter            @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  platform      PublishingPlatform
+  status        PublishingStatus   @default(DRAFT)
+  platformId    String?
+  publishedAt   DateTime?
+  lastAttempt   DateTime?
+  errorMessage  String?            @db.Text
+  /// Number of publish attempts made since the last success. Used for exponential backoff.
+  attempts      Int                @default(0)
+  /// When the worker may next attempt this row. Null = eligible immediately (after status check).
+  nextAttemptAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   @@unique([chapterId, platform])
   @@unique([platform, platformId])
+  @@index([status, nextAttemptAt])
+}
+
+// ============================================================================
+// ROYAL ROAD INTEGRATION
+// ============================================================================
+
+/// Per-user Royal Road credentials and Playwright session cache.
+/// Password is encrypted at rest with AES-GCM (key: env ROYAL_ROAD_ENC_KEY).
+/// storageStateJson caches the Playwright storage state between runs so the
+/// worker can skip the login form when cookies are still valid.
+model RoyalRoadAccount {
+  id                  String    @id @default(cuid())
+  userId              Int       @unique
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email               String
+  /// AES-GCM ciphertext. Format: base64(iv || ciphertext || authTag).
+  encryptedPassword   String    @db.Text
+  /// Playwright storage state (cookies + localStorage) serialized as JSON.
+  storageStateJson    Json?
+  /// Last time we successfully logged in (via form or reused storageState).
+  lastLoginAt         DateTime?
+  /// Last auth-related error (wrong password, captcha, etc.). Cleared on successful login.
+  lastError           String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 }
 
 // ============================================================================
