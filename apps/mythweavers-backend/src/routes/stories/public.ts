@@ -482,6 +482,7 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         params: storyIdParamSchema,
         response: {
           200: getPublicStoryResponseSchema,
+          304: z.null().meta({ description: 'Not Modified (ETag match)' }),
           404: errorSchema,
           500: errorSchema,
         },
@@ -541,6 +542,7 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         params: storyIdParamSchema,
         response: {
           200: getPublicStoryWithStructureResponseSchema,
+          304: z.null().meta({ description: 'Not Modified (ETag match)' }),
           404: errorSchema,
           500: errorSchema,
         },
@@ -640,6 +642,7 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         params: chapterIdParamSchema,
         response: {
           200: getChapterContentResponseSchema,
+          304: z.null().meta({ description: 'Not Modified (ETag match)' }),
           404: errorSchema,
           500: errorSchema,
         },
