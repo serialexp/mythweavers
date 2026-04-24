@@ -1,5 +1,9 @@
 # TODO
 
+## Open PRs / branches in flight
+
+- **Royal Road publishing port** — branch `feat/royal-road-publishing` pushed to `origin`, ready to open PR at https://github.com/serialexp/mythweavers/pull/new/feat/royal-road-publishing. Five commits: schema+crypto+account routes, Playwright serializer+client, worker+remaining routes, regenerated OpenAPI clients, editor UI MVP (publishing panel). Before deploy: generate `ROYAL_ROAD_ENC_KEY` with `openssl rand -base64 32`, install Firefox in the worker container (`npx playwright install firefox --with-deps`), set `ROYAL_ROAD_WORKER_ENABLED=true`. Deferred to follow-ups: chapter link/unlink UI, manual sync button, live status polling. Pre-existing unrelated typecheck errors in `src/pages/adventure/*` + `src/stores/adventureStore.ts` from commit `decbfa8` were flagged but not fixed. If Bart asks "what was that Royal Road thing Claude did?" — this is it.
+
 ## Publishing feature — deferred items
 
 Tracked while implementing the `publishedAt` + daily digest flow (see `CURRENT_TASK.md`).
