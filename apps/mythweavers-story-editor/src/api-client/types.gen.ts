@@ -1041,6 +1041,10 @@ export type PostMyStoriesResponses = {
              */
             royalRoadId: number | null;
             /**
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
+            /**
              * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
@@ -1346,6 +1350,10 @@ export type GetMyStoriesByIdResponses = {
              * Royal Road story ID for publishing
              */
             royalRoadId: number | null;
+            /**
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
             /**
              * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
@@ -1692,6 +1700,10 @@ export type PatchMyStoriesByIdResponses = {
              */
             royalRoadId: number | null;
             /**
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
+            /**
              * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
@@ -1930,6 +1942,10 @@ export type GetMyStoriesByIdExportResponses = {
              * Royal Road story ID for publishing
              */
             royalRoadId: number | null;
+            /**
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
             /**
              * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
@@ -4350,6 +4366,10 @@ export type GetMyArcsByArcIdChaptersResponses = {
              */
             royalRoadId: number | null;
             /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
+            /**
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
@@ -4512,6 +4532,10 @@ export type PostMyArcsByArcIdChaptersResponses = {
              * Royal Road chapter ID
              */
             royalRoadId: number | null;
+            /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
             /**
              * Node type (story content, non-story, or context)
              */
@@ -4709,6 +4733,10 @@ export type GetMyChaptersByIdResponses = {
              */
             royalRoadId: number | null;
             /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
+            /**
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
@@ -4875,6 +4903,10 @@ export type PatchMyChaptersByIdResponses = {
              * Royal Road chapter ID
              */
             royalRoadId: number | null;
+            /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
             /**
              * Node type (story content, non-story, or context)
              */
@@ -15878,6 +15910,731 @@ export type PostMyChaptersByChapterIdUnpublishResponses = {
 };
 
 export type PostMyChaptersByChapterIdUnpublishResponse = PostMyChaptersByChapterIdUnpublishResponses[keyof PostMyChaptersByChapterIdUnpublishResponses];
+
+export type DeleteMyRoyalRoadAccountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/royal-road/account';
+};
+
+export type DeleteMyRoyalRoadAccountErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyRoyalRoadAccountError = DeleteMyRoyalRoadAccountErrors[keyof DeleteMyRoyalRoadAccountErrors];
+
+export type DeleteMyRoyalRoadAccountResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyRoyalRoadAccountResponse = DeleteMyRoyalRoadAccountResponses[keyof DeleteMyRoyalRoadAccountResponses];
+
+export type GetMyRoyalRoadAccountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/royal-road/account';
+};
+
+export type GetMyRoyalRoadAccountErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyRoyalRoadAccountError = GetMyRoyalRoadAccountErrors[keyof GetMyRoyalRoadAccountErrors];
+
+export type GetMyRoyalRoadAccountResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Whether a Royal Road account is currently linked to this user.
+         */
+        connected: boolean;
+        /**
+         * Email address used for the Royal Road login. Null when disconnected.
+         */
+        email: string | null;
+        /**
+         * ISO timestamp of the last successful Royal Road login performed by the worker.
+         */
+        lastLoginAt: string | null;
+        /**
+         * Most recent authentication error (wrong password, captcha, etc.). Cleared after a successful login. Null when there is no outstanding error.
+         */
+        lastError: string | null;
+    };
+};
+
+export type GetMyRoyalRoadAccountResponse = GetMyRoyalRoadAccountResponses[keyof GetMyRoyalRoadAccountResponses];
+
+export type PostMyRoyalRoadAccountData = {
+    body: {
+        /**
+         * Royal Road login email.
+         */
+        email: string;
+        /**
+         * Royal Road login password. Stored encrypted at rest (AES-GCM) and never returned by any endpoint.
+         */
+        password: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/royal-road/account';
+};
+
+export type PostMyRoyalRoadAccountErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadAccountError = PostMyRoyalRoadAccountErrors[keyof PostMyRoyalRoadAccountErrors];
+
+export type PostMyRoyalRoadAccountResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Whether a Royal Road account is currently linked to this user.
+         */
+        connected: boolean;
+        /**
+         * Email address used for the Royal Road login. Null when disconnected.
+         */
+        email: string | null;
+        /**
+         * ISO timestamp of the last successful Royal Road login performed by the worker.
+         */
+        lastLoginAt: string | null;
+        /**
+         * Most recent authentication error (wrong password, captcha, etc.). Cleared after a successful login. Null when there is no outstanding error.
+         */
+        lastError: string | null;
+    };
+};
+
+export type PostMyRoyalRoadAccountResponse = PostMyRoyalRoadAccountResponses[keyof PostMyRoyalRoadAccountResponses];
+
+export type GetMyRoyalRoadStoriesByStoryIdData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}';
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdError = GetMyRoyalRoadStoriesByStoryIdErrors[keyof GetMyRoyalRoadStoriesByStoryIdErrors];
+
+export type GetMyRoyalRoadStoriesByStoryIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        storyId: string;
+        royalRoadId: number | null;
+        publishingEnabled: boolean;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdResponse = GetMyRoyalRoadStoriesByStoryIdResponses[keyof GetMyRoyalRoadStoriesByStoryIdResponses];
+
+export type PatchMyRoyalRoadStoriesByStoryIdData = {
+    body: {
+        /**
+         * Numeric Royal Road story id. Set once after you create the story shell on royalroad.com; pass null to clear the link.
+         */
+        royalRoadId?: number | null;
+        /**
+         * When true, the publishing worker will push chapters with publishedAt <= now to Royal Road. Requires a connected Royal Road account and a royalRoadId on the story.
+         */
+        publishingEnabled?: boolean;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}';
+};
+
+export type PatchMyRoyalRoadStoriesByStoryIdErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyRoyalRoadStoriesByStoryIdError = PatchMyRoyalRoadStoriesByStoryIdErrors[keyof PatchMyRoyalRoadStoriesByStoryIdErrors];
+
+export type PatchMyRoyalRoadStoriesByStoryIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        storyId: string;
+        royalRoadId: number | null;
+        publishingEnabled: boolean;
+    };
+};
+
+export type PatchMyRoyalRoadStoriesByStoryIdResponse = PatchMyRoyalRoadStoriesByStoryIdResponses[keyof PatchMyRoyalRoadStoriesByStoryIdResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkData = {
+    body: {
+        /**
+         * Numeric Royal Road chapter id to link to this chapter.
+         */
+        royalRoadId: number;
+    };
+    path: {
+        storyId: string;
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/chapters/{chapterId}/link';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkError = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkErrors[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponse = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponses[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkData = {
+    body?: never;
+    path: {
+        storyId: string;
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/chapters/{chapterId}/unlink';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkError = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkErrors[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponse = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponses[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponses];
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/publishing-status';
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusError = GetMyRoyalRoadStoriesByStoryIdPublishingStatusErrors[keyof GetMyRoyalRoadStoriesByStoryIdPublishingStatusErrors];
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        rows: Array<{
+            chapterId: string;
+            chapterName: string;
+            chapterRoyalRoadId: number | null;
+            status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED' | null;
+            platformId: string | null;
+            publishedAt: string | null;
+            lastAttempt: string | null;
+            errorMessage: string | null;
+            attempts: number;
+            nextAttemptAt: string | null;
+        }>;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponse = GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponses[keyof GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryData = {
+    body?: never;
+    path: {
+        storyId: string;
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/chapters/{chapterId}/retry';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryError = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryErrors[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponse = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponses[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncData = {
+    body: {
+        /**
+         * Client-provided list of chapters already manually published on Royal Road. Each entry backfills a PUBLISHED ChapterPublishing row if missing, and sets the chapter’s royalRoadId. Existing PUBLISHING/FAILED rows are left untouched so the worker can continue with them.
+         */
+        chapters: Array<{
+            chapterId: string;
+            royalRoadId: number;
+        }>;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/sync';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncError = PostMyRoyalRoadStoriesByStoryIdSyncErrors[keyof PostMyRoyalRoadStoriesByStoryIdSyncErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        synced: number;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncResponse = PostMyRoyalRoadStoriesByStoryIdSyncResponses[keyof PostMyRoyalRoadStoriesByStoryIdSyncResponses];
 
 export type GetMyStoriesByStoryIdPdfData = {
     body?: never;

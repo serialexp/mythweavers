@@ -196,6 +196,50 @@ export type GetAuthSessionResponses = {
             email: string;
             username: string;
         };
+        preferences?: {
+            provider?: string;
+            model?: string;
+            maxTokens?: number;
+            thinkingBudget?: number;
+            contextSize?: number;
+            openrouterApiKey?: string;
+            anthropicApiKey?: string;
+            openaiApiKey?: string;
+            cloudflareApiKey?: string;
+            cloudflareEndpoint?: string;
+            customProviders?: Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }>;
+            categoryOverrides?: {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            };
+            encryptedSecrets?: {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            };
+            [key: string]: unknown | string | number | Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }> | {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            } | {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            } | undefined;
+        };
     };
 };
 
@@ -993,9 +1037,17 @@ export type PostMyStoriesResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
+            /**
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1051,13 +1103,17 @@ export type PostMyStoriesResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -1287,9 +1343,17 @@ export type GetMyStoriesByIdResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
+            /**
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1345,13 +1409,17 @@ export type GetMyStoriesByIdResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -1512,6 +1580,10 @@ export type PatchMyStoriesByIdData = {
          * Branch choices JSON object
          */
         branchChoices?: unknown | null;
+        /**
+         * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences.
+         */
+        aiOverrides?: unknown | null;
     };
     path: {
         /**
@@ -1612,9 +1684,17 @@ export type PatchMyStoriesByIdResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
+            /**
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1670,13 +1750,17 @@ export type PatchMyStoriesByIdResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -1839,9 +1923,17 @@ export type GetMyStoriesByIdExportResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Whether the story is published
+             * Whether scheduled chapters for this story should be auto-published to Royal Road
+             */
+            royalRoadPublishingEnabled: boolean;
+            /**
+             * [Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             published: boolean;
+            /**
+             * When this story becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live.
+             */
+            publishedAt: string | null;
             /**
              * Story publication status
              */
@@ -1897,13 +1989,17 @@ export type GetMyStoriesByIdExportResponses = {
              */
             provider: string;
             /**
-             * LLM model
+             * LLM model (legacy — prefer aiOverrides)
              */
             model: string | null;
             /**
              * Custom base URL for OpenAI-compatible APIs
              */
             openaiEndpoint: string | null;
+            /**
+             * Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
+             */
+            aiOverrides: unknown | null;
             /**
              * Cover background color
              */
@@ -2010,7 +2106,9 @@ export type GetMyStoriesByIdExportResponses = {
                     deleted: boolean;
                     deletedAt: string | null;
                     publishedOn: string | null;
+                    publishedAt: string | null;
                     royalRoadId: number | null;
+                    wordCount: number;
                     createdAt: string;
                     updatedAt: string;
                     scenes: Array<{
@@ -4208,9 +4306,13 @@ export type GetMyArcsByArcIdChaptersResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -4219,6 +4321,10 @@ export type GetMyArcsByArcIdChaptersResponses = {
              * Royal Road chapter ID
              */
             royalRoadId: number | null;
+            /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
             /**
              * Node type (story content, non-story, or context)
              */
@@ -4367,9 +4473,13 @@ export type PostMyArcsByArcIdChaptersResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -4378,6 +4488,10 @@ export type PostMyArcsByArcIdChaptersResponses = {
              * Royal Road chapter ID
              */
             royalRoadId: number | null;
+            /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
             /**
              * Node type (story content, non-story, or context)
              */
@@ -4559,9 +4673,13 @@ export type GetMyChaptersByIdResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -4570,6 +4688,10 @@ export type GetMyChaptersByIdResponses = {
              * Royal Road chapter ID
              */
             royalRoadId: number | null;
+            /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
             /**
              * Node type (story content, non-story, or context)
              */
@@ -4722,9 +4844,13 @@ export type PatchMyChaptersByIdResponses = {
              */
             arcId: string;
             /**
-             * Publication date
+             * [Legacy] Publication date. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.
              */
             publishedOn: string | null;
+            /**
+             * When this chapter becomes publicly visible on the reader (ISO-8601). null = unpublished/draft. Future = scheduled. Past = live. Visibility also requires the parent story to be published.
+             */
+            publishedAt: string | null;
             /**
              * Sort order within arc
              */
@@ -4733,6 +4859,10 @@ export type PatchMyChaptersByIdResponses = {
              * Royal Road chapter ID
              */
             royalRoadId: number | null;
+            /**
+             * Cached word count for this chapter (sum of scene paragraphs)
+             */
+            wordCount: number;
             /**
              * Node type (story content, non-story, or context)
              */
@@ -15242,6 +15372,1226 @@ export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses = {
 
 export type DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponse = DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses[keyof DeleteMyMessagesByMessageIdPlotPointStatesByKeyResponses];
 
+export type PatchMyStoriesByStoryIdPublishingData = {
+    body: {
+        /**
+         * ISO-8601 timestamp at which this entity becomes publicly visible. null = unpublished/draft. A future value = scheduled. A past value = live.
+         */
+        publishedAt: string | null;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/publishing';
+};
+
+export type PatchMyStoriesByStoryIdPublishingErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyStoriesByStoryIdPublishingError = PatchMyStoriesByStoryIdPublishingErrors[keyof PatchMyStoriesByStoryIdPublishingErrors];
+
+export type PatchMyStoriesByStoryIdPublishingResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+    };
+};
+
+export type PatchMyStoriesByStoryIdPublishingResponse = PatchMyStoriesByStoryIdPublishingResponses[keyof PatchMyStoriesByStoryIdPublishingResponses];
+
+export type PostMyStoriesByStoryIdPublishNowData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/publish-now';
+};
+
+export type PostMyStoriesByStoryIdPublishNowErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdPublishNowError = PostMyStoriesByStoryIdPublishNowErrors[keyof PostMyStoriesByStoryIdPublishNowErrors];
+
+export type PostMyStoriesByStoryIdPublishNowResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+    };
+};
+
+export type PostMyStoriesByStoryIdPublishNowResponse = PostMyStoriesByStoryIdPublishNowResponses[keyof PostMyStoriesByStoryIdPublishNowResponses];
+
+export type PostMyStoriesByStoryIdUnpublishData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/unpublish';
+};
+
+export type PostMyStoriesByStoryIdUnpublishErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyStoriesByStoryIdUnpublishError = PostMyStoriesByStoryIdUnpublishErrors[keyof PostMyStoriesByStoryIdUnpublishErrors];
+
+export type PostMyStoriesByStoryIdUnpublishResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+    };
+};
+
+export type PostMyStoriesByStoryIdUnpublishResponse = PostMyStoriesByStoryIdUnpublishResponses[keyof PostMyStoriesByStoryIdUnpublishResponses];
+
+export type PatchMyChaptersByChapterIdPublishingData = {
+    body: {
+        /**
+         * ISO-8601 timestamp at which this entity becomes publicly visible. null = unpublished/draft. A future value = scheduled. A past value = live.
+         */
+        publishedAt: string | null;
+    };
+    path: {
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/chapters/{chapterId}/publishing';
+};
+
+export type PatchMyChaptersByChapterIdPublishingErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyChaptersByChapterIdPublishingError = PatchMyChaptersByChapterIdPublishingErrors[keyof PatchMyChaptersByChapterIdPublishingErrors];
+
+export type PatchMyChaptersByChapterIdPublishingResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        chapterId: string;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+        /**
+         * Recomputed earliest publishedAt across the parent story's non-deleted chapters.
+         */
+        firstChapterReleasedAt: string | null;
+        /**
+         * Recomputed latest publishedAt across the parent story's non-deleted chapters.
+         */
+        lastChapterReleasedAt: string | null;
+    };
+};
+
+export type PatchMyChaptersByChapterIdPublishingResponse = PatchMyChaptersByChapterIdPublishingResponses[keyof PatchMyChaptersByChapterIdPublishingResponses];
+
+export type PostMyChaptersByChapterIdPublishNowData = {
+    body?: never;
+    path: {
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/chapters/{chapterId}/publish-now';
+};
+
+export type PostMyChaptersByChapterIdPublishNowErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyChaptersByChapterIdPublishNowError = PostMyChaptersByChapterIdPublishNowErrors[keyof PostMyChaptersByChapterIdPublishNowErrors];
+
+export type PostMyChaptersByChapterIdPublishNowResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        chapterId: string;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+        /**
+         * Recomputed earliest publishedAt across the parent story's non-deleted chapters.
+         */
+        firstChapterReleasedAt: string | null;
+        /**
+         * Recomputed latest publishedAt across the parent story's non-deleted chapters.
+         */
+        lastChapterReleasedAt: string | null;
+    };
+};
+
+export type PostMyChaptersByChapterIdPublishNowResponse = PostMyChaptersByChapterIdPublishNowResponses[keyof PostMyChaptersByChapterIdPublishNowResponses];
+
+export type PostMyChaptersByChapterIdUnpublishData = {
+    body?: never;
+    path: {
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/chapters/{chapterId}/unpublish';
+};
+
+export type PostMyChaptersByChapterIdUnpublishErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyChaptersByChapterIdUnpublishError = PostMyChaptersByChapterIdUnpublishErrors[keyof PostMyChaptersByChapterIdUnpublishErrors];
+
+export type PostMyChaptersByChapterIdUnpublishResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        chapterId: string;
+        storyId: string;
+        /**
+         * The new publishedAt value (ISO-8601) or null if unpublished.
+         */
+        publishedAt: string | null;
+        /**
+         * Recomputed earliest publishedAt across the parent story's non-deleted chapters.
+         */
+        firstChapterReleasedAt: string | null;
+        /**
+         * Recomputed latest publishedAt across the parent story's non-deleted chapters.
+         */
+        lastChapterReleasedAt: string | null;
+    };
+};
+
+export type PostMyChaptersByChapterIdUnpublishResponse = PostMyChaptersByChapterIdUnpublishResponses[keyof PostMyChaptersByChapterIdUnpublishResponses];
+
+export type DeleteMyRoyalRoadAccountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/royal-road/account';
+};
+
+export type DeleteMyRoyalRoadAccountErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyRoyalRoadAccountError = DeleteMyRoyalRoadAccountErrors[keyof DeleteMyRoyalRoadAccountErrors];
+
+export type DeleteMyRoyalRoadAccountResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyRoyalRoadAccountResponse = DeleteMyRoyalRoadAccountResponses[keyof DeleteMyRoyalRoadAccountResponses];
+
+export type GetMyRoyalRoadAccountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/royal-road/account';
+};
+
+export type GetMyRoyalRoadAccountErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyRoyalRoadAccountError = GetMyRoyalRoadAccountErrors[keyof GetMyRoyalRoadAccountErrors];
+
+export type GetMyRoyalRoadAccountResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Whether a Royal Road account is currently linked to this user.
+         */
+        connected: boolean;
+        /**
+         * Email address used for the Royal Road login. Null when disconnected.
+         */
+        email: string | null;
+        /**
+         * ISO timestamp of the last successful Royal Road login performed by the worker.
+         */
+        lastLoginAt: string | null;
+        /**
+         * Most recent authentication error (wrong password, captcha, etc.). Cleared after a successful login. Null when there is no outstanding error.
+         */
+        lastError: string | null;
+    };
+};
+
+export type GetMyRoyalRoadAccountResponse = GetMyRoyalRoadAccountResponses[keyof GetMyRoyalRoadAccountResponses];
+
+export type PostMyRoyalRoadAccountData = {
+    body: {
+        /**
+         * Royal Road login email.
+         */
+        email: string;
+        /**
+         * Royal Road login password. Stored encrypted at rest (AES-GCM) and never returned by any endpoint.
+         */
+        password: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/royal-road/account';
+};
+
+export type PostMyRoyalRoadAccountErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadAccountError = PostMyRoyalRoadAccountErrors[keyof PostMyRoyalRoadAccountErrors];
+
+export type PostMyRoyalRoadAccountResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Whether a Royal Road account is currently linked to this user.
+         */
+        connected: boolean;
+        /**
+         * Email address used for the Royal Road login. Null when disconnected.
+         */
+        email: string | null;
+        /**
+         * ISO timestamp of the last successful Royal Road login performed by the worker.
+         */
+        lastLoginAt: string | null;
+        /**
+         * Most recent authentication error (wrong password, captcha, etc.). Cleared after a successful login. Null when there is no outstanding error.
+         */
+        lastError: string | null;
+    };
+};
+
+export type PostMyRoyalRoadAccountResponse = PostMyRoyalRoadAccountResponses[keyof PostMyRoyalRoadAccountResponses];
+
+export type GetMyRoyalRoadStoriesByStoryIdData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}';
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdError = GetMyRoyalRoadStoriesByStoryIdErrors[keyof GetMyRoyalRoadStoriesByStoryIdErrors];
+
+export type GetMyRoyalRoadStoriesByStoryIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        storyId: string;
+        royalRoadId: number | null;
+        publishingEnabled: boolean;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdResponse = GetMyRoyalRoadStoriesByStoryIdResponses[keyof GetMyRoyalRoadStoriesByStoryIdResponses];
+
+export type PatchMyRoyalRoadStoriesByStoryIdData = {
+    body: {
+        /**
+         * Numeric Royal Road story id. Set once after you create the story shell on royalroad.com; pass null to clear the link.
+         */
+        royalRoadId?: number | null;
+        /**
+         * When true, the publishing worker will push chapters with publishedAt <= now to Royal Road. Requires a connected Royal Road account and a royalRoadId on the story.
+         */
+        publishingEnabled?: boolean;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}';
+};
+
+export type PatchMyRoyalRoadStoriesByStoryIdErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyRoyalRoadStoriesByStoryIdError = PatchMyRoyalRoadStoriesByStoryIdErrors[keyof PatchMyRoyalRoadStoriesByStoryIdErrors];
+
+export type PatchMyRoyalRoadStoriesByStoryIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        storyId: string;
+        royalRoadId: number | null;
+        publishingEnabled: boolean;
+    };
+};
+
+export type PatchMyRoyalRoadStoriesByStoryIdResponse = PatchMyRoyalRoadStoriesByStoryIdResponses[keyof PatchMyRoyalRoadStoriesByStoryIdResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkData = {
+    body: {
+        /**
+         * Numeric Royal Road chapter id to link to this chapter.
+         */
+        royalRoadId: number;
+    };
+    path: {
+        storyId: string;
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/chapters/{chapterId}/link';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkError = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkErrors[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponse = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponses[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdLinkResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkData = {
+    body?: never;
+    path: {
+        storyId: string;
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/chapters/{chapterId}/unlink';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkError = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkErrors[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponse = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponses[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdUnlinkResponses];
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/publishing-status';
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusError = GetMyRoyalRoadStoriesByStoryIdPublishingStatusErrors[keyof GetMyRoyalRoadStoriesByStoryIdPublishingStatusErrors];
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        rows: Array<{
+            chapterId: string;
+            chapterName: string;
+            chapterRoyalRoadId: number | null;
+            status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED' | null;
+            platformId: string | null;
+            publishedAt: string | null;
+            lastAttempt: string | null;
+            errorMessage: string | null;
+            attempts: number;
+            nextAttemptAt: string | null;
+        }>;
+    };
+};
+
+export type GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponse = GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponses[keyof GetMyRoyalRoadStoriesByStoryIdPublishingStatusResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryData = {
+    body?: never;
+    path: {
+        storyId: string;
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/chapters/{chapterId}/retry';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryError = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryErrors[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponse = PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponses[keyof PostMyRoyalRoadStoriesByStoryIdChaptersByChapterIdRetryResponses];
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncData = {
+    body: {
+        /**
+         * Client-provided list of chapters already manually published on Royal Road. Each entry backfills a PUBLISHED ChapterPublishing row if missing, and sets the chapter’s royalRoadId. Existing PUBLISHING/FAILED rows are left untouched so the worker can continue with them.
+         */
+        chapters: Array<{
+            chapterId: string;
+            royalRoadId: number;
+        }>;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/royal-road/stories/{storyId}/sync';
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncError = PostMyRoyalRoadStoriesByStoryIdSyncErrors[keyof PostMyRoyalRoadStoriesByStoryIdSyncErrors];
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        synced: number;
+    };
+};
+
+export type PostMyRoyalRoadStoriesByStoryIdSyncResponse = PostMyRoyalRoadStoriesByStoryIdSyncResponses[keyof PostMyRoyalRoadStoriesByStoryIdSyncResponses];
+
 export type GetMyStoriesByStoryIdPdfData = {
     body?: never;
     path: {
@@ -15440,6 +16790,425 @@ export type PostMyStoriesImportZipResponses = {
 
 export type PostMyStoriesImportZipResponse = PostMyStoriesImportZipResponses[keyof PostMyStoriesImportZipResponses];
 
+export type GetMyBalanceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/balance';
+};
+
+export type GetMyBalanceErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyBalanceError = GetMyBalanceErrors[keyof GetMyBalanceErrors];
+
+export type GetMyBalanceResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * User balance as string (Decimal)
+         */
+        balance: string;
+    };
+};
+
+export type GetMyBalanceResponse = GetMyBalanceResponses[keyof GetMyBalanceResponses];
+
+export type PostMyBalanceTopupData = {
+    body: {
+        /**
+         * Amount in USD to top up
+         */
+        amount: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/balance/topup';
+};
+
+export type PostMyBalanceTopupErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    503: {
+        error: string;
+    };
+};
+
+export type PostMyBalanceTopupError = PostMyBalanceTopupErrors[keyof PostMyBalanceTopupErrors];
+
+export type PostMyBalanceTopupResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Stripe PaymentIntent client secret for the Payment Element
+         */
+        clientSecret: string;
+    };
+};
+
+export type PostMyBalanceTopupResponse = PostMyBalanceTopupResponses[keyof PostMyBalanceTopupResponses];
+
+export type GetMyPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/preferences';
+};
+
+export type GetMyPreferencesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyPreferencesError = GetMyPreferencesErrors[keyof GetMyPreferencesErrors];
+
+export type GetMyPreferencesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        preferences: {
+            provider?: string;
+            model?: string;
+            maxTokens?: number;
+            thinkingBudget?: number;
+            contextSize?: number;
+            openrouterApiKey?: string;
+            anthropicApiKey?: string;
+            openaiApiKey?: string;
+            cloudflareApiKey?: string;
+            cloudflareEndpoint?: string;
+            customProviders?: Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }>;
+            categoryOverrides?: {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            };
+            encryptedSecrets?: {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            };
+            [key: string]: unknown | string | number | Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }> | {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            } | {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            } | undefined;
+        };
+    };
+};
+
+export type GetMyPreferencesResponse = GetMyPreferencesResponses[keyof GetMyPreferencesResponses];
+
+export type PutMyPreferencesData = {
+    body: {
+        provider?: string;
+        model?: string;
+        maxTokens?: number;
+        thinkingBudget?: number;
+        contextSize?: number;
+        openrouterApiKey?: string;
+        anthropicApiKey?: string;
+        openaiApiKey?: string;
+        cloudflareApiKey?: string;
+        cloudflareEndpoint?: string;
+        customProviders?: Array<{
+            id: string;
+            name: string;
+            endpoint: string;
+            apiKey: string;
+        }>;
+        categoryOverrides?: {
+            [key: string]: {
+                provider: string;
+                model: string;
+            };
+        };
+        encryptedSecrets?: {
+            salt: string;
+            iv: string;
+            ciphertext: string;
+        };
+        [key: string]: unknown | string | number | Array<{
+            id: string;
+            name: string;
+            endpoint: string;
+            apiKey: string;
+        }> | {
+            [key: string]: {
+                provider: string;
+                model: string;
+            };
+        } | {
+            salt: string;
+            iv: string;
+            ciphertext: string;
+        } | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/preferences';
+};
+
+export type PutMyPreferencesErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type PutMyPreferencesError = PutMyPreferencesErrors[keyof PutMyPreferencesErrors];
+
+export type PutMyPreferencesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        preferences: {
+            provider?: string;
+            model?: string;
+            maxTokens?: number;
+            thinkingBudget?: number;
+            contextSize?: number;
+            openrouterApiKey?: string;
+            anthropicApiKey?: string;
+            openaiApiKey?: string;
+            cloudflareApiKey?: string;
+            cloudflareEndpoint?: string;
+            customProviders?: Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }>;
+            categoryOverrides?: {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            };
+            encryptedSecrets?: {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            };
+            [key: string]: unknown | string | number | Array<{
+                id: string;
+                name: string;
+                endpoint: string;
+                apiKey: string;
+            }> | {
+                [key: string]: {
+                    provider: string;
+                    model: string;
+                };
+            } | {
+                salt: string;
+                iv: string;
+                ciphertext: string;
+            } | undefined;
+        };
+    };
+};
+
+export type PutMyPreferencesResponse = PutMyPreferencesResponses[keyof PutMyPreferencesResponses];
+
+export type GetMyBalanceUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+        type?: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'ADJUSTMENT';
+        /**
+         * ISO 8601 lower bound for createdAt
+         */
+        since?: string;
+    };
+    url: '/my/balance/usage';
+};
+
+export type GetMyBalanceUsageErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyBalanceUsageError = GetMyBalanceUsageErrors[keyof GetMyBalanceUsageErrors];
+
+export type GetMyBalanceUsageResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        entries: Array<{
+            id: string;
+            type: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'ADJUSTMENT';
+            /**
+             * Signed amount as Decimal string
+             */
+            amount: string;
+            /**
+             * Running balance after this entry
+             */
+            balanceAfter: string;
+            description: string;
+            /**
+             * ISO 8601 timestamp
+             */
+            createdAt: string;
+            llmUsage: {
+                modelId: string;
+                providerName: string;
+                promptTokens: number;
+                completionTokens: number;
+                cacheCreationTokens: number;
+                cacheReadTokens: number;
+                /**
+                 * Cost as Decimal string
+                 */
+                cost: string;
+                durationMs: number | null;
+                aborted: boolean;
+            } | null;
+        }>;
+        pagination: {
+            page: number;
+            pageSize: number;
+            total: number;
+            totalPages: number;
+        };
+        summary: {
+            /**
+             * Total LLM spending as Decimal string
+             */
+            totalSpent: string;
+            /**
+             * Total top-ups as Decimal string
+             */
+            totalTopUps: string;
+            /**
+             * Number of LLM generations
+             */
+            generationCount: number;
+        };
+    };
+};
+
+export type GetMyBalanceUsageResponse = GetMyBalanceUsageResponses[keyof GetMyBalanceUsageResponses];
+
+export type GetMyBalanceUsageModelBreakdownData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * ISO 8601 lower bound for createdAt
+         */
+        since?: string;
+    };
+    url: '/my/balance/usage/model-breakdown';
+};
+
+export type GetMyBalanceUsageModelBreakdownErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+};
+
+export type GetMyBalanceUsageModelBreakdownError = GetMyBalanceUsageModelBreakdownErrors[keyof GetMyBalanceUsageModelBreakdownErrors];
+
+export type GetMyBalanceUsageModelBreakdownResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        models: Array<{
+            modelId: string;
+            /**
+             * Cost of regular (non-cache) input tokens
+             */
+            inputCost: number;
+            /**
+             * Cost of output/completion tokens
+             */
+            outputCost: number;
+            /**
+             * Cost of cache-read tokens
+             */
+            cacheReadCost: number;
+            /**
+             * Cost of cache-write tokens
+             */
+            cacheWriteCost: number;
+            /**
+             * Sum of all cost components
+             */
+            totalCost: number;
+            /**
+             * Number of generations for this model
+             */
+            generationCount: number;
+        }>;
+        /**
+         * Sum of all model costs
+         */
+        grandTotal: number;
+    };
+};
+
+export type GetMyBalanceUsageModelBreakdownResponse = GetMyBalanceUsageModelBreakdownResponses[keyof GetMyBalanceUsageModelBreakdownResponses];
+
 export type GetMyLlmModelsData = {
     body?: never;
     path?: never;
@@ -15528,6 +17297,41 @@ export type PostMyLlmGenerateErrors = {
 };
 
 export type PostMyLlmGenerateError = PostMyLlmGenerateErrors[keyof PostMyLlmGenerateErrors];
+
+export type PostWebhooksStripeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/webhooks/stripe';
+};
+
+export type PostWebhooksStripeErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    503: {
+        error: string;
+    };
+};
+
+export type PostWebhooksStripeError = PostWebhooksStripeErrors[keyof PostWebhooksStripeErrors];
+
+export type PostWebhooksStripeResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        received: true;
+    };
+};
+
+export type PostWebhooksStripeResponse = PostWebhooksStripeResponses[keyof PostWebhooksStripeResponses];
 
 export type GetAdminLlmProvidersData = {
     body?: never;
@@ -16182,6 +17986,281 @@ export type PutAdminLlmModelsByIdResponses = {
 
 export type PutAdminLlmModelsByIdResponse = PutAdminLlmModelsByIdResponses[keyof PutAdminLlmModelsByIdResponses];
 
+export type GetAdminLlmProvidersByProviderIdBalanceData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/balance';
+};
+
+export type GetAdminLlmProvidersByProviderIdBalanceErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdBalanceError = GetAdminLlmProvidersByProviderIdBalanceErrors[keyof GetAdminLlmProvidersByProviderIdBalanceErrors];
+
+export type GetAdminLlmProvidersByProviderIdBalanceResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        balance: {
+            providerId: string;
+            /**
+             * Sum of top-ups in USD
+             */
+            totalTopUps: string;
+            /**
+             * Sum of synced costs in USD
+             */
+            totalCosts: string;
+            /**
+             * top-ups minus costs
+             */
+            balance: string;
+        };
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdBalanceResponse = GetAdminLlmProvidersByProviderIdBalanceResponses[keyof GetAdminLlmProvidersByProviderIdBalanceResponses];
+
+export type GetAdminLlmProvidersByProviderIdTransactionsData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: {
+        /**
+         * Page number
+         */
+        page?: number;
+        /**
+         * Items per page
+         */
+        pageSize?: number;
+    };
+    url: '/admin/llm/providers/{providerId}/transactions';
+};
+
+export type GetAdminLlmProvidersByProviderIdTransactionsErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdTransactionsError = GetAdminLlmProvidersByProviderIdTransactionsErrors[keyof GetAdminLlmProvidersByProviderIdTransactionsErrors];
+
+export type GetAdminLlmProvidersByProviderIdTransactionsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        transactions: Array<{
+            id: string;
+            providerId: string;
+            type: 'TOP_UP' | 'COST_SYNC';
+            /**
+             * Amount in USD as decimal string
+             */
+            amount: string;
+            /**
+             * ISO date string
+             */
+            date: string;
+            notes: string | null;
+            syncKey: string | null;
+            createdAt: string;
+        }>;
+        pagination: {
+            page: number;
+            pageSize: number;
+            total: number;
+        };
+    };
+};
+
+export type GetAdminLlmProvidersByProviderIdTransactionsResponse = GetAdminLlmProvidersByProviderIdTransactionsResponses[keyof GetAdminLlmProvidersByProviderIdTransactionsResponses];
+
+export type PostAdminLlmProvidersByProviderIdTopUpData = {
+    body: {
+        /**
+         * Top-up amount in USD
+         */
+        amount: number;
+        /**
+         * Effective date (ISO string). Defaults to now.
+         */
+        date?: string;
+        /**
+         * Optional note
+         */
+        notes?: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/top-up';
+};
+
+export type PostAdminLlmProvidersByProviderIdTopUpErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdTopUpError = PostAdminLlmProvidersByProviderIdTopUpErrors[keyof PostAdminLlmProvidersByProviderIdTopUpErrors];
+
+export type PostAdminLlmProvidersByProviderIdTopUpResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        transaction: {
+            id: string;
+            providerId: string;
+            type: 'TOP_UP' | 'COST_SYNC';
+            /**
+             * Amount in USD as decimal string
+             */
+            amount: string;
+            /**
+             * ISO date string
+             */
+            date: string;
+            notes: string | null;
+            syncKey: string | null;
+            createdAt: string;
+        };
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdTopUpResponse = PostAdminLlmProvidersByProviderIdTopUpResponses[keyof PostAdminLlmProvidersByProviderIdTopUpResponses];
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsData = {
+    body: {
+        /**
+         * Start date for cost sync (YYYY-MM-DD)
+         */
+        startDate: string;
+        /**
+         * End date for cost sync (YYYY-MM-DD)
+         */
+        endDate: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/admin/llm/providers/{providerId}/sync-costs';
+};
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    502: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsError = PostAdminLlmProvidersByProviderIdSyncCostsErrors[keyof PostAdminLlmProvidersByProviderIdSyncCostsErrors];
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Number of new cost records created
+         */
+        synced: number;
+        /**
+         * Number of existing records updated
+         */
+        updated: number;
+        /**
+         * Total cost for the period in USD
+         */
+        totalCost: string;
+    };
+};
+
+export type PostAdminLlmProvidersByProviderIdSyncCostsResponse = PostAdminLlmProvidersByProviderIdSyncCostsResponses[keyof PostAdminLlmProvidersByProviderIdSyncCostsResponses];
+
 export type GetAdminLlmProvidersByProviderIdDiscoverData = {
     body?: never;
     path: {
@@ -16251,6 +18330,82 @@ export type GetAdminLlmProvidersByProviderIdDiscoverResponses = {
 };
 
 export type GetAdminLlmProvidersByProviderIdDiscoverResponse = GetAdminLlmProvidersByProviderIdDiscoverResponses[keyof GetAdminLlmProvidersByProviderIdDiscoverResponses];
+
+export type PostAdminLlmModelsLookupPricingData = {
+    body: {
+        /**
+         * Model IDs to look up pricing for
+         */
+        modelIds: Array<string>;
+        /**
+         * Provider name to help narrow the search
+         */
+        providerName?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/llm/models/lookup-pricing';
+};
+
+export type PostAdminLlmModelsLookupPricingErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    502: {
+        error: string;
+    };
+};
+
+export type PostAdminLlmModelsLookupPricingError = PostAdminLlmModelsLookupPricingErrors[keyof PostAdminLlmModelsLookupPricingErrors];
+
+export type PostAdminLlmModelsLookupPricingResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        results: Array<{
+            modelId: string;
+            /**
+             * Cost per million input tokens (what we pay)
+             */
+            costInput: number | null;
+            /**
+             * Cost per million output tokens (what we pay)
+             */
+            costOutput: number | null;
+            /**
+             * Cost per million cached read tokens
+             */
+            costCacheRead: number | null;
+            /**
+             * Cost per million cached write tokens
+             */
+            costCacheWrite: number | null;
+            /**
+             * Context window size in tokens
+             */
+            contextLength: number | null;
+            /**
+             * URL or description of where pricing was found
+             */
+            source: string | null;
+        }>;
+    };
+};
+
+export type PostAdminLlmModelsLookupPricingResponse = PostAdminLlmModelsLookupPricingResponses[keyof PostAdminLlmModelsLookupPricingResponses];
 
 export type GetAdminUsersData = {
     body?: never;
@@ -16624,6 +18779,18 @@ export type GetStoriesResponses = {
              */
             pages: number | null;
             /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -16751,6 +18918,18 @@ export type GetStoriesByIdResponses = {
              */
             pages: number | null;
             /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -16860,6 +19039,18 @@ export type GetStoriesByIdStructureResponses = {
              */
             pages: number | null;
             /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
              * Creation timestamp
              */
             createdAt: string;
@@ -16910,6 +19101,14 @@ export type GetStoriesByIdStructureResponses = {
                          * Chapter summary
                          */
                         summary: string | null;
+                        /**
+                         * When this chapter became publicly visible (ISO-8601). Always set for public responses.
+                         */
+                        publishedAt: string;
+                        /**
+                         * Cached total word count for this chapter
+                         */
+                        wordCount: number;
                     }>;
                 }>;
             }>;
@@ -16985,11 +19184,15 @@ export type GetStoriesByIdChaptersByChapterIdResponses = {
              */
             content: string;
             /**
-             * ID of the previous chapter
+             * When this chapter became publicly visible (ISO-8601).
+             */
+            publishedAt: string;
+            /**
+             * ID of the previous visible chapter
              */
             previousChapterId: string | null;
             /**
-             * ID of the next chapter
+             * ID of the next visible chapter
              */
             nextChapterId: string | null;
         };
