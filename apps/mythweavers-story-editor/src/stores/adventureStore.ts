@@ -28,9 +28,6 @@ interface AdventureState {
   lastFailedAction: string | null | undefined
   error: string | null
 
-  // Director agent
-  isDirectorRunning: boolean
-
   // Compaction
   compactingKeys: Record<string, boolean>
 
@@ -40,16 +37,11 @@ interface AdventureState {
   knobValues: Record<string, string>
   knobLocks: Record<string, boolean>
 
-  // Feature toggles
-  worldMomentumEnabled: boolean
-  directorDueNextTurn: boolean
-
   // Nonsense check
   nonsenseWarning: string | null
 
   // UI state
   playerInput: string
-  expandedTrajectories: Record<number, boolean>
   showStoryPanel: boolean
   showMenu: boolean
   showKnobs: boolean
@@ -84,8 +76,6 @@ const [state, setState] = createStore<AdventureState>({
   lastFailedAction: undefined,
   error: null,
 
-  isDirectorRunning: false,
-
   compactingKeys: {},
 
   isGeneratingSetting: false,
@@ -93,13 +83,9 @@ const [state, setState] = createStore<AdventureState>({
   knobValues: defaultKnobValues(),
   knobLocks: defaultKnobLocks(),
 
-  worldMomentumEnabled: true,
-  directorDueNextTurn: false,
-
   nonsenseWarning: null,
 
   playerInput: '',
-  expandedTrajectories: {},
   showStoryPanel: false,
   showMenu: false,
   showKnobs: false,
@@ -150,10 +136,6 @@ export const adventureStore = {
     return state.error
   },
 
-  get isDirectorRunning() {
-    return state.isDirectorRunning
-  },
-
   get compactingKeys() {
     return state.compactingKeys
   },
@@ -175,21 +157,12 @@ export const adventureStore = {
     return state.knobLocks
   },
 
-  get worldMomentumEnabled() {
-    return state.worldMomentumEnabled
-  },
-  get directorDueNextTurn() {
-    return state.directorDueNextTurn
-  },
   get nonsenseWarning() {
     return state.nonsenseWarning
   },
 
   get playerInput() {
     return state.playerInput
-  },
-  get expandedTrajectories() {
-    return state.expandedTrajectories
   },
   get showStoryPanel() {
     return state.showStoryPanel
@@ -245,10 +218,6 @@ export const adventureStore = {
     setState('error', v)
   },
 
-  setIsDirectorRunning(v: boolean) {
-    setState('isDirectorRunning', v)
-  },
-
   setCompactingKey(key: string, v: boolean) {
     if (v) {
       setState('compactingKeys', key, true)
@@ -267,16 +236,6 @@ export const adventureStore = {
     setState('knobValues', reconcile(v))
   },
 
-  setWorldMomentumEnabled(v: boolean) {
-    setState('worldMomentumEnabled', v)
-    // When re-enabling momentum, force the director to run on the next turn
-    if (v) {
-      setState('directorDueNextTurn', true)
-    }
-  },
-  setDirectorDueNextTurn(v: boolean) {
-    setState('directorDueNextTurn', v)
-  },
   setNonsenseWarning(v: string | null) {
     setState('nonsenseWarning', v)
   },
@@ -298,14 +257,6 @@ export const adventureStore = {
   },
 
   // --- Complex actions ---
-
-  toggleTrajectory(index: number) {
-    setState('expandedTrajectories', index, !state.expandedTrajectories[index])
-  },
-
-  isTrajectoryExpanded(index: number): boolean {
-    return !!state.expandedTrajectories[index]
-  },
 
   setKnobValue(knobId: string, value: string) {
     setState('knobValues', knobId, value)
@@ -371,7 +322,6 @@ export const adventureStore = {
       compactions: { ...state.compactions },
       directive: state.directive,
       worldBible: state.worldBible,
-      worldMomentumEnabled: state.worldMomentumEnabled,
       ...(action ? { pendingAction: action } : {}),
     }
   },
@@ -420,12 +370,10 @@ export const adventureStore = {
           : undefined,
         error: null,
 
-        isDirectorRunning: false,
-
         isGeneratingSetting: false,
         settingGenFailed: false,
 
-        worldMomentumEnabled: saved?.worldMomentumEnabled ?? true,
+        nonsenseWarning: null,
 
         playerInput: '',
         showStoryPanel: false,
@@ -437,7 +385,6 @@ export const adventureStore = {
       setState('turns', reconcile(saved?.turns ?? []))
       setState('compactions', reconcile(saved?.compactions ?? {}))
       setState('compactingKeys', reconcile({}))
-      setState('expandedTrajectories', reconcile({}))
       setState('knobValues', reconcile(defaultKnobValues()))
       setState('knobLocks', reconcile(defaultKnobLocks()))
     })
@@ -460,12 +407,10 @@ export const adventureStore = {
         lastFailedAction: undefined,
         error: null,
 
-        isDirectorRunning: false,
-
         isGeneratingSetting: false,
         settingGenFailed: false,
 
-        worldMomentumEnabled: true,
+        nonsenseWarning: null,
 
         playerInput: '',
         showStoryPanel: false,
@@ -476,7 +421,6 @@ export const adventureStore = {
       setState('turns', reconcile([]))
       setState('compactions', reconcile({}))
       setState('compactingKeys', reconcile({}))
-      setState('expandedTrajectories', reconcile({}))
       setState('knobValues', reconcile(defaultKnobValues()))
       setState('knobLocks', reconcile(defaultKnobLocks()))
     })

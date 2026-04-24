@@ -98,16 +98,6 @@ export const modelInfo = style({
   borderRadius: tokens.radius.sm,
 })
 
-const pulseAnimation = keyframes({
-  '0%, 100%': { opacity: 1 },
-  '50%': { opacity: 0.4 },
-})
-
-export const directorIndicator = style({
-  animation: `${pulseAnimation} 2s ease-in-out infinite`,
-  cursor: 'default',
-})
-
 // cacheDots styles live in LlmCacheDots.css.ts
 
 // Compaction block
@@ -236,27 +226,6 @@ export const nonsenseWarningActions = style({
   gap: tokens.space['2'],
 })
 
-export const deathScreen = style({
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: tokens.space['3'],
-  padding: `${tokens.space['8']} ${tokens.space['4']}`,
-  textAlign: 'center',
-  animation: `${fadeIn} 0.5s ease-out`,
-})
-
-export const deathIcon = style({
-  fontSize: '3rem',
-  lineHeight: 1,
-})
-
-export const deathActions = style({
-  display: 'flex',
-  gap: tokens.space['3'],
-  marginTop: tokens.space['2'],
-})
-
 export const playerAction = style({
   display: 'flex',
   alignItems: 'flex-start',
@@ -345,38 +314,6 @@ export const narrativeParagraph = style({
       marginBottom: 0,
     },
   },
-})
-
-export const worldTrajectory = style({
-  marginTop: tokens.space['3'],
-  padding: `${tokens.space['2']} ${tokens.space['3']}`,
-  backgroundColor: tokens.color.bg.raised,
-  borderRadius: tokens.radius.sm,
-  borderLeft: `3px solid ${tokens.color.semantic.warning}`,
-  fontSize: '0.85rem',
-  color: tokens.color.text.muted,
-  cursor: 'pointer',
-  userSelect: 'none',
-  transition: `background-color ${tokens.duration.fast} ${tokens.easing.default}`,
-
-  ':hover': {
-    backgroundColor: tokens.color.surface.hover,
-  },
-})
-
-export const worldTrajectoryLabel = style({
-  fontWeight: 600,
-  color: tokens.color.semantic.warning,
-  fontSize: '0.8rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  marginBottom: tokens.space['1'],
-})
-
-export const worldTrajectoryContent = style({
-  lineHeight: 1.5,
-  color: tokens.color.text.secondary,
-  whiteSpace: 'pre-wrap',
 })
 
 // Streaming
@@ -756,26 +693,6 @@ export const directiveHint = style({
   lineHeight: 1.4,
 })
 
-export const directorNotesContent = style({
-  fontSize: '0.85rem',
-  lineHeight: 1.6,
-  color: tokens.color.text.secondary,
-  whiteSpace: 'pre-wrap',
-  padding: `${tokens.space['2']} ${tokens.space['3']}`,
-  backgroundColor: tokens.color.bg.base,
-  border: `1px solid ${tokens.color.border.default}`,
-  borderRadius: tokens.radius.md,
-  maxHeight: '300px',
-  overflowY: 'auto',
-  width: '100%',
-  fontFamily: 'inherit',
-  resize: 'vertical',
-  boxSizing: 'border-box',
-  ':focus': {
-    outline: 'none',
-    borderColor: tokens.color.border.focus,
-  },
-})
 
 export const headerDirectivePanel = style({
   padding: `${tokens.space['2']} ${tokens.space['4']}`,

@@ -10,16 +10,13 @@ import {
   SETTING_GEN_PROMPT,
   pickRandom,
   buildNarrativeMessages,
-  buildTrajectoryMessages,
-  buildDirectorMessages,
   buildNonsenseCheckMessages,
   buildRevisionMessages,
-  buildMomentumResolutionMessages,
   buildCompactionMessages,
   getCompactionRanges,
   cleanNarrative,
-  parseTrajectory,
-  sanitizeDirectorNotes,
+  rollSteering,
+  type SteeringBucket,
 } from './prompts'
 
 // --- Engine interface & context ---
@@ -33,7 +30,6 @@ export interface AdventureEngine {
   handleRegenerate: () => void
   handleEditAndRegenerate: (newAction: string) => void
   handleReviseNarrative: () => void
-  handleRegenerateDirector: () => void
   handleRewindTo: (turnIndex: number) => void
   handleReset: () => void
   handleGenerateSetting: () => Promise<void>
@@ -64,14 +60,6 @@ export function createAdventureEngine(
   let storyAreaRef: HTMLDivElement | undefined
   let inputRef: HTMLTextAreaElement | undefined
   let abortController: AbortController | null = null
-
-  // Cache the last momentum resolution so retries don't re-run it.
-  // Keyed by turnCount + playerAction — if either changes, the cache is stale.
-  let cachedMomentum: {
-    turnCount: number
-    playerAction: string
-    resolved: string | null
-  } | null = null
 
   onCleanup(() => {
     abortController?.abort()
@@ -125,97 +113,25 @@ export function createAdventureEngine(
     adventureStore.setPendingAction(playerAction)
     persistNow()
 
+    // Roll steering for this turn (opening turn has no player action and no
+    // steering — the first narrative is just establishment).
+    const steering: SteeringBucket | undefined =
+      playerAction !== null ? rollSteering() : undefined
+    if (steering) {
+      console.log(`[Steering] Rolled: ${steering}`)
+    }
+
     abortController = new AbortController()
 
     try {
-      // --- Step 0: Resolve momentum against player action ---
-      // When world momentum is enabled and there's a previous turn with trajectory,
-      // run a lightweight reasoning call to filter/adjust momentum items based on
-      // what the player actually did, instead of dumping raw momentum into the narrative.
-      // The result is cached so retries (same turn + same action) skip the LLM call.
-      let resolvedMomentum: string | null | undefined
-      const lastTurn = adventureStore.turns.length > 0
-        ? adventureStore.turns[adventureStore.turns.length - 1]
-        : null
-      const turnCount = adventureStore.turns.length
-
-      if (
-        adventureStore.worldMomentumEnabled &&
-        playerAction !== null &&
-        lastTurn?.worldTrajectory
-      ) {
-        // Check cache — reuse if same turn count and player action
-        if (
-          cachedMomentum &&
-          cachedMomentum.turnCount === turnCount &&
-          cachedMomentum.playerAction === playerAction
-        ) {
-          resolvedMomentum = cachedMomentum.resolved
-          console.log('[Momentum] Using cached resolution')
-        } else {
-          adventureStore.setStreamingContent('⏳ Resolving world momentum...')
-
-          const momentumMessages = buildMomentumResolutionMessages(
-            lastTurn.narrative,
-            lastTurn.worldTrajectory,
-            playerAction,
-          )
-
-          const momentumResolved = resolveModel('adventure-momentum')
-          const momentumClient = LLMClientFactory.getClient(momentumResolved.provider)
-
-          let momentumAccumulated = ''
-          const momentumResponse = momentumClient.generate({
-            model: momentumResolved.model,
-            messages: momentumMessages,
-            max_tokens: 1024,
-            signal: abortController.signal,
-            metadata: { callType: 'adventure-momentum' },
-          })
-
-          for await (const event of momentumResponse) {
-            if (event.type === 'chunk') {
-              momentumAccumulated += event.text
-            }
-          }
-
-          const cleaned = momentumAccumulated
-            .replace(/<think>[\s\S]*?<\/think>/g, '')
-            .trim()
-
-          if (cleaned === 'NONE' || !cleaned) {
-            resolvedMomentum = null
-            console.log('[Momentum] All momentum invalidated by player action')
-          } else {
-            resolvedMomentum = cleaned
-            console.log('[Momentum] Resolved momentum:\n', cleaned)
-          }
-
-          // Cache for retries
-          cachedMomentum = { turnCount, playerAction, resolved: resolvedMomentum }
-        }
-
-        // Show the resolution result briefly before narrative starts streaming
-        if (resolvedMomentum === null) {
-          adventureStore.setStreamingContent('⏳ World pauses for your move...')
-        } else if (resolvedMomentum) {
-          // Show a trimmed preview of what survived
-          const bulletCount = resolvedMomentum.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('•')).length
-          const label = bulletCount > 0
-            ? `⏳ ${bulletCount} world event${bulletCount > 1 ? 's' : ''} in motion...`
-            : '⏳ World momentum resolved...'
-          adventureStore.setStreamingContent(label)
-        }
-      }
-
-      // --- Step 1: Stream narrative ---
+      // --- Stream narrative (single LLM call per turn) ---
       const narrativeMessages = buildNarrativeMessages(
         adventureStore.turns,
         adventureStore.settingDescription,
         playerAction,
+        steering,
         adventureStore.directive,
         adventureStore.compactions,
-        resolvedMomentum,
         adventureStore.worldBible,
       )
 
@@ -268,100 +184,23 @@ export function createAdventureEngine(
       }
 
       // If the model returned nothing (or only whitespace / thinking tags),
-      // skip all downstream calls — there's nothing to analyse.
+      // skip downstream checks — there's nothing to analyse.
       if (!narrative) {
         adventureStore.setStreamingContent('')
         adventureStore.setError('The model returned an empty response. Try again or switch models.')
         adventureStore.setLastFailedAction(playerAction)
-        // Restore the action to the input so the user can edit and resubmit
         if (playerAction) adventureStore.setPlayerInput(playerAction)
         return
       }
 
-      // --- Step 1.5: Consistency check loop ---
+      // --- Consistency check (nonsense) ---
       const checkedNarrative = await runNarrativeChecks(narrative, playerAction)
-
-      let directorNotes: string | undefined
-      let worldTrajectory = ''
-      let dead = false
-
-      if (adventureStore.worldMomentumEnabled) {
-        // Director and trajectory are non-fatal — if they fail, we still
-        // finalize the turn with the narrative we already have.
-        try {
-          // --- Step 2: Run director agent every 5 turns, or immediately if flagged ---
-          const turnIndex = adventureStore.turns.length
-          const shouldRunDirector = turnIndex % 5 === 0 || adventureStore.directorDueNextTurn
-
-          if (shouldRunDirector) {
-            adventureStore.setDirectorDueNextTurn(false)
-            adventureStore.setStreamingContent(
-              `${checkedNarrative}\n\n⏳ Updating the world...`,
-            )
-            directorNotes = await runDirector({ playerAction, narrative: checkedNarrative })
-          }
-
-          // --- Step 3: Generate world trajectory using fresh director notes ---
-          adventureStore.setStreamingContent(
-            `${checkedNarrative}\n\n⏳ Reading the world...`,
-          )
-
-          const trajectoryMessages = buildTrajectoryMessages(
-            adventureStore.turns,
-            checkedNarrative,
-            playerAction,
-            directorNotes,
-            { directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription, worldBible: adventureStore.worldBible },
-          )
-
-          const trajectoryResolved = resolveModel('adventure-trajectory')
-          const trajectoryClient = LLMClientFactory.getClient(
-            trajectoryResolved.provider,
-          )
-
-          let trajectoryAccumulated = ''
-          const trajectoryResponse = trajectoryClient.generate({
-            model: trajectoryResolved.model,
-            messages: trajectoryMessages,
-            max_tokens: effectiveSettings.maxTokens,
-            thinking_budget: effectiveSettings.thinkingBudget
-              ? Math.min(
-                  effectiveSettings.thinkingBudget,
-                  Math.floor(effectiveSettings.maxTokens / 2),
-                )
-              : undefined,
-            signal: abortController.signal,
-            metadata: { callType: 'adventure-trajectory' },
-          })
-
-          for await (const event of trajectoryResponse) {
-            if (event.type === 'chunk') {
-              trajectoryAccumulated += event.text
-            }
-          }
-
-          const parsed = parseTrajectory(trajectoryAccumulated)
-          worldTrajectory = parsed.trajectory
-          dead = parsed.dead
-        } catch (momentumErr) {
-          // Re-throw aborts so the outer handler can deal with them
-          if (momentumErr instanceof DOMException && momentumErr.name === 'AbortError') {
-            throw momentumErr
-          }
-          // Non-abort errors: log and continue without trajectory
-          console.warn('[Momentum] Director/trajectory failed, finalizing turn without trajectory:', momentumErr)
-          // Schedule director for next turn since we missed this one
-          adventureStore.setDirectorDueNextTurn(true)
-        }
-      }
 
       // Batch-finalize: clear streaming and add turn in one render frame
       adventureStore.finalizeTurn({
         playerAction,
         narrative: checkedNarrative,
-        worldTrajectory,
-        ...(dead ? { dead: true } : {}),
-        ...(directorNotes ? { directorNotes } : {}),
+        ...(steering ? { steering } : {}),
       })
       persist()
 
@@ -369,11 +208,9 @@ export function createAdventureEngine(
       runPendingCompactions()
 
       // Focus input for next action
-      if (!dead) {
-        requestAnimationFrame(() => {
-          inputRef?.focus()
-        })
-      }
+      requestAnimationFrame(() => {
+        inputRef?.focus()
+      })
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         // User aborted — if we have partial narrative content, save it
@@ -383,7 +220,7 @@ export function createAdventureEngine(
           adventureStore.finalizeAbort({
             playerAction,
             narrative,
-            worldTrajectory: '(Interrupted)',
+            ...(steering ? { steering } : {}),
           })
           persist()
         } else {
@@ -403,60 +240,6 @@ export function createAdventureEngine(
       adventureStore.setStreamingContent('')
       adventureStore.setPendingAction(null)
       abortController = null
-    }
-  }
-
-  // --- Director agent (background) ---
-
-  async function runDirector(
-    currentTurn?: { playerAction: string | null; narrative: string },
-  ): Promise<string | undefined> {
-    if (adventureStore.isDirectorRunning) return undefined
-
-    adventureStore.setIsDirectorRunning(true)
-
-    try {
-      const directorResolved = resolveModel('adventure-director')
-      const client = LLMClientFactory.getClient(directorResolved.provider)
-      const messages = buildDirectorMessages(adventureStore.turns, currentTurn, adventureStore.directive, adventureStore.compactions, adventureStore.settingDescription, adventureStore.worldBible)
-
-      let accumulated = ''
-      const response = client.generate({
-        model: directorResolved.model,
-        messages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
-          ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
-            )
-          : undefined,
-        metadata: { callType: 'adventure-director' },
-      })
-
-      for await (const event of response) {
-        if (event.type === 'chunk') {
-          accumulated += event.text
-        }
-      }
-
-      // Clean up thinking tags
-      const rawResponse = accumulated
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        .trim()
-
-      if (!rawResponse) return undefined
-
-      // Always full notes — sanitize in case the model misbehaves
-      const sanitizedNotes = sanitizeDirectorNotes(rawResponse)
-      console.log('[Director] Notes:\n', sanitizedNotes)
-      return sanitizedNotes
-    } catch (err) {
-      // Director failures are silent — they don't affect the player experience
-      console.warn('Director agent error:', err)
-      return undefined
-    } finally {
-      adventureStore.setIsDirectorRunning(false)
     }
   }
 
@@ -521,7 +304,7 @@ export function createAdventureEngine(
     }
   }
 
-  // --- Narrative quality checks (consistency + nonsense, run in parallel) ---
+  // --- Narrative quality checks (nonsense only) ---
 
   /** Run a single check agent and return its issues (empty string = passed) */
   async function runSingleCheck(
@@ -585,7 +368,6 @@ export function createAdventureEngine(
       `${narrative}\n\n⏳ Checking narrative...`,
     )
 
-    // Only check physical/logical sense — no full-history consistency check
     const nonsenseIssues = await runSingleCheck(
       'Nonsense',
       buildNonsenseCheckMessages(
@@ -629,6 +411,7 @@ export function createAdventureEngine(
         lastTurn.playerAction,
         lastTurn.narrative,
         nonsenseIssues,
+        lastTurn.steering,
         adventureStore.directive,
         adventureStore.compactions,
         adventureStore.worldBible,
@@ -763,95 +546,6 @@ export function createAdventureEngine(
     adventureStore.removeLastTurn()
     persist()
     generate(newAction)
-  }
-
-  async function handleRegenerateDirector() {
-    if (adventureStore.isGenerating || adventureStore.isDirectorRunning) return
-    if (adventureStore.turns.length === 0) return
-
-    const turns = adventureStore.turns
-    const lastTurn = turns[turns.length - 1]
-
-    // Build a view of turns *without* the last turn's director notes,
-    // so runDirector uses the previous turn's notes as the starting point
-    // (same as if we were generating this turn fresh).
-    const turnsWithoutLastDirector = turns.map((t, i) =>
-      i === turns.length - 1 ? { ...t, directorNotes: undefined } : t,
-    )
-
-    // Temporarily swap turns so runDirector/buildDirectorMessages sees the right state
-    const originalTurns = [...turns]
-    adventureStore.setTurns(turnsWithoutLastDirector)
-
-    try {
-      adventureStore.setIsGenerating(true)
-
-      // Step 1: Regenerate director notes
-      const directorNotes = await runDirector({
-        playerAction: lastTurn.playerAction,
-        narrative: lastTurn.narrative,
-      })
-
-      // Restore turns and apply new director notes
-      adventureStore.setTurns(originalTurns)
-      if (directorNotes) {
-        adventureStore.updateLastTurn({ directorNotes })
-      }
-
-      // Step 2: Regenerate trajectory using fresh director notes,
-      // passing the old trajectory as rejected so the model produces something different
-      const trajectoryMessages = buildTrajectoryMessages(
-        // All turns except the last (buildTrajectoryMessages adds current turn itself)
-        turns.slice(0, -1),
-        lastTurn.narrative,
-        lastTurn.playerAction,
-        directorNotes,
-        { rejectedTrajectory: lastTurn.worldTrajectory, directive: adventureStore.directive, compactions: adventureStore.compactions, settingDescription: adventureStore.settingDescription, worldBible: adventureStore.worldBible },
-      )
-
-      const trajectoryResolved = resolveModel('adventure-trajectory')
-      const trajectoryClient = LLMClientFactory.getClient(
-        trajectoryResolved.provider,
-      )
-
-      let trajectoryAccumulated = ''
-      const trajectoryResponse = trajectoryClient.generate({
-        model: trajectoryResolved.model,
-        messages: trajectoryMessages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
-          ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
-            )
-          : undefined,
-        metadata: { callType: 'adventure-trajectory' },
-      })
-
-      for await (const event of trajectoryResponse) {
-        if (event.type === 'chunk') {
-          trajectoryAccumulated += event.text
-        }
-      }
-
-      const { trajectory: worldTrajectory, dead } =
-        parseTrajectory(trajectoryAccumulated)
-
-      adventureStore.updateLastTurn({
-        worldTrajectory,
-        ...(dead ? { dead: true } : { dead: undefined }),
-      })
-      persist()
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to regenerate director'
-      adventureStore.setError(message)
-      console.error('Director regeneration error:', err)
-      // Restore original turns on error
-      adventureStore.setTurns(originalTurns)
-    } finally {
-      adventureStore.setIsGenerating(false)
-    }
   }
 
   function handleRewindTo(turnIndex: number) {
@@ -999,7 +693,6 @@ export function createAdventureEngine(
     handleRegenerate,
     handleEditAndRegenerate,
     handleReviseNarrative,
-    handleRegenerateDirector,
     handleRewindTo,
     handleReset,
     handleGenerateSetting,

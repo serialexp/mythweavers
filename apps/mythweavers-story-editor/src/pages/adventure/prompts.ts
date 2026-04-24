@@ -53,6 +53,47 @@ export function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
+// --- Steering roll ---
+
+export type SteeringBucket = 'well' | 'steady' | 'worse' | 'hell'
+
+// Weights: 15% well / 50% steady / 25% worse / 10% hell.
+// Biased toward "steady" so the world is mostly neutral, extremes are memorable.
+const STEERING_WEIGHTS: ReadonlyArray<readonly [SteeringBucket, number]> = [
+  ['well', 0.15],
+  ['steady', 0.50],
+  ['worse', 0.25],
+  ['hell', 0.10],
+]
+
+/** Roll a hidden steering bucket for the next agent turn. */
+export function rollSteering(): SteeringBucket {
+  const r = Math.random()
+  let acc = 0
+  for (const [bucket, weight] of STEERING_WEIGHTS) {
+    acc += weight
+    if (r < acc) return bucket
+  }
+  return 'steady'
+}
+
+/**
+ * Prose guidance for the narrative call, given a steering bucket.
+ * Inlined into the narrative system message. Hidden from the player.
+ */
+export function steeringGuidance(b: SteeringBucket): string {
+  switch (b) {
+    case 'well':
+      return `STEERING (hidden from player): Fortune favors the protagonist this turn. Their action succeeds cleanly — perhaps a little beyond what they hoped for. NPCs and the environment break the protagonist's way: a gamble pays off, an ally appears, a door opens. Do NOT be saccharine; keep it earned and grounded in the world. No deus ex machina.`
+    case 'steady':
+      return `STEERING (hidden from player): The world is neutral this turn. Resolve the action honestly — neither lucky nor punishing. NPCs act in character based on their established personalities. Nothing dramatic tips the scales in either direction.`
+    case 'worse':
+      return `STEERING (hidden from player): Things lean against the protagonist this turn. Their action meets friction — partial success at best, or a complication lands alongside it. NPCs press their own interests, and someone nearby is in a worse mood than yesterday. No cliffhanger unless the scene earns it.`
+    case 'hell':
+      return `STEERING (hidden from player): Things go wrong this turn. The action fails, backfires, or is overtaken by events outside the protagonist's control. An NPC moves against them, or the environment turns hostile. Stay inside the world's logic — this is bad luck and bad timing, not authorial cruelty. Consequences should feel plausible given what's been established.`
+  }
+}
+
 // --- Prompt constants ---
 
 export const SETTING_GEN_PROMPT = `You are a world-builder creating a setting for an interactive adventure. Given the following parameters, craft a vivid, specific setting description in 2-4 sentences. Describe the world and the immediate situation — do NOT describe or mention the protagonist. Focus on atmosphere, sensory details, and an interesting situation that invites exploration.
@@ -64,58 +105,31 @@ Be creative and specific — don't just restate the parameters. Invent names, pl
 Respond with ONLY the setting description, no other text.`
 
 // Shared system prompt — identical first message for all calls enables provider-side caching
-export const BASE_SYSTEM_PROMPT = `You are a collaborative storyteller running an interactive adventure. You create vivid, engaging fiction that responds to the player's choices while maintaining a living, breathing world that continues to evolve independently of the player.
+export const BASE_SYSTEM_PROMPT = `You are a collaborative storyteller running an interactive adventure. You create vivid, engaging fiction that responds to the player's choices. The world is alive — NPCs have their own personalities and motivations — but the story follows the player, not its own independent agenda.
 
 The story is told in second person ("you"), present tense. The player controls only the protagonist. You control all NPCs, the environment, and world events.`
 
 export const CORE_DIRECTIVE = `The player's input describes their INTENT, not exact words or actions. Interpret it as the general direction or tone they want to take. Only treat text in "quotes" as literal dialogue or exact phrasing. Everything else is shorthand for what the protagonist is trying to do — translate it into natural, in-character behavior.
 
-The player's action is always the starting point of each turn — resolve it first and honestly. After that, the world continues: NPCs follow their own agendas, situations develop on their own timelines, and opportunities pass if not seized. World momentum that conflicts with or was pre-empted by the player's action simply doesn't happen this turn.`
+The player's action is the starting point of each turn. Resolve it first and honestly, then let the world react to it in the same narrative — do not wait for another turn to show consequences.`
 
-// Role-specific instructions appended AFTER the shared conversation history
+// Role-specific instruction for the single per-turn narrative call.
 export const NARRATIVE_INSTRUCTION = `YOUR ROLE THIS TURN: Write the story narrative.
 
-Write ONLY the story narrative — no metadata, no trajectory, no XML tags.
+Write ONLY the story narrative — no metadata, no headings, no XML tags.
 
-- Resolve the player's action FIRST. What they did happens. Then layer in world momentum only where it still makes sense — drop any momentum the player's action pre-empted or made irrelevant.
-- Show, don't tell. Vivid sensory details, dialogue, action.
-- Player input is intent, not literal text. Translate it into natural in-character actions and dialogue. Only text in "quotes" should be used verbatim.
-- 3-6 paragraphs. Not every turn needs a cliffhanger.
-- End with an open prompt for the protagonist's next action. No numbered options.
-- Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
-- Everything must be physically plausible. Ignore any momentum that isn't (e.g. NPC on foot catching a vehicle).`
-
-export const TRAJECTORY_INSTRUCTION = `YOUR ROLE THIS TURN: Determine the world's momentum in 1-3 bullet points.
-
-Each bullet: one NPC intention/action or environmental change, one sentence. These are fed to the narrative agent, which will decide what actually happens based on the player's next action.
+STRUCTURE OF A TURN (one continuous narrative, not labeled sections):
+1. FIRST, resolve the player's action. What they attempted happens — colored by the steering guidance below. Show it in-scene with sensory detail and dialogue, not summary.
+2. THEN, in the same narrative, let the world react. NPCs present in the scene act in character (drawing on their established personalities from the World Bible and prior turns). The environment responds. Something small moves forward — a reply, a gesture, a shift in the situation — so the scene never hangs waiting for the next player input.
 
 RULES:
-- Include CONDITIONS when an NPC action depends on the player's response. E.g. "If the player doesn't start digging, the scarred man strikes them with the wrench." / "The guard draws his weapon; if the player surrenders, he cuffs them instead of shooting."
-- Unconditional events (environmental changes, NPC-to-NPC actions) need no condition.
-- At least one bullet must be something the protagonist could plausibly notice or encounter.
-- No dramatic framing — plain, factual statements.
-- Only mention established NPCs and elements.
-- BE SPECIFIC. Name concrete objects and actions. Say "a pistol" not "a small, dark object."
-- Everything must be physically plausible. If an NPC lacks the means, position, or opportunity, it doesn't happen.
-
-DEATH DETECTION:
-Add [DEAD] at the end ONLY if the protagonist is explicitly dead in the narrative — heart stopped, killed, a corpse. Not injured, dying, unconscious, or in danger. If any doubt, do NOT add [DEAD].
-
-Respond with bullet points, optionally [DEAD]. No other text.`
-
-export const DIRECTOR_INSTRUCTION = `YOUR ROLE: Provide director notes — hidden behind-the-scenes intelligence the player never sees.
-
-Match the story's established tone and scope. Everything must be physically plausible within the established world. Keep it broad — don't over-plan. The story will go wherever the player takes it.
-
-Use EXACTLY these two sections (100-200 words total):
-
-## PROTAGONIST
-Consistency reference sheet: appearance, personality, skills, relationships, key facts. NOT a situation recap. Max 2 paragraphs.
-
-## THE WEEK AHEAD
-In the broadest possible terms, what does the next week look like for the protagonist? Not a plot outline — just the general shape of things: are they settling in somewhere, on the move, under pressure, drifting, recovering? One paragraph, kept vague and open-ended.
-
-Respond with ONLY your director notes.`
+- Show, don't tell. Vivid sensory details, dialogue, action.
+- Player input is intent, not literal text. Translate it into natural in-character actions and dialogue. Only text in "quotes" should be used verbatim.
+- 3-6 paragraphs total across both halves of the turn.
+- End with an open prompt for the protagonist's next action. No numbered options.
+- Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
+- Everything must be physically plausible within the established world.
+- NPCs must act consistently with their established personalities. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.`
 
 export const NONSENSE_CHECK_INSTRUCTION = `YOUR ROLE: Check ONLY the text above for things that don't make sense.
 
@@ -136,42 +150,6 @@ INCONSISTENT
 1. [One sentence explaining what's nonsensical and why]
 2. ...
 Maximum 5 items.`
-
-// --- Momentum resolution ---
-
-export const MOMENTUM_RESOLUTION_INSTRUCTION = `You are resolving world momentum against a player action. Given the pending world momentum (bullet points describing what NPCs and the environment were about to do) and the player's action, determine which momentum items still apply, which are pre-empted or invalidated, and which need adjustment.
-
-RULES:
-- If the player's action directly prevents, interrupts, or makes a momentum item impossible, DROP it entirely.
-- If the player's action changes the conditions of a momentum item (e.g. a conditional "if the player doesn't X" but the player DID X), RESOLVE the condition and rewrite accordingly.
-- If a momentum item is completely unrelated to the player's action, KEEP it unchanged.
-- If the player's action partially affects a momentum item, ADJUST it to reflect the new situation.
-
-RESPONSE FORMAT:
-Output ONLY the surviving/adjusted bullet points, one per line. If ALL momentum is invalidated, respond with exactly: NONE
-
-Do not explain your reasoning. Do not add new momentum items. Do not add any other text.`
-
-/**
- * Build messages for the momentum resolution call.
- * This is a lightweight call — no shared history, just the immediate context.
- */
-export function buildMomentumResolutionMessages(
-  lastNarrative: string,
-  rawMomentum: string,
-  playerAction: string,
-): LLMMessage[] {
-  return [
-    {
-      role: 'system',
-      content: MOMENTUM_RESOLUTION_INSTRUCTION,
-    },
-    {
-      role: 'user',
-      content: `LAST NARRATIVE (context for what just happened):\n${lastNarrative}\n\nPENDING WORLD MOMENTUM:\n${rawMomentum}\n\nPLAYER'S ACTION:\n${playerAction}`,
-    },
-  ]
-}
 
 // --- Compaction ---
 
@@ -254,10 +232,6 @@ export function buildCompactionMessages(
 
 // --- Prompt construction helpers ---
 
-function formatMomentumContext(trajectory: string, action: string): string {
-  return `My action: ${action}\n\n[WORLD MOMENTUM — NPC intentions and environmental changes that were in motion BEFORE the player acted. Apply only what still makes sense AFTER resolving the player's action: ${trajectory}]`
-}
-
 /** Append the user directive as the final user message if present. */
 function appendDirective(messages: LLMMessage[], directive?: string): void {
   const trimmed = directive?.trim()
@@ -270,14 +244,14 @@ function appendDirective(messages: LLMMessage[], directive?: string): void {
 }
 
 /**
- * Build the shared conversation history prefix — identical for all three
- * LLM calls (narrative, trajectory, director) to maximise provider-side caching.
+ * Build the shared conversation history prefix — identical for all calls
+ * that need the story-so-far, to maximise provider-side caching.
  *
  * Older turns beyond VERBATIM_TURN_COUNT are replaced by compaction summaries
  * when available, dramatically reducing context size for long adventures.
  *
  * @param settingDescription - The adventure's world/setting prompt. Included in
- *   the opening turn so all consumers (director, trajectory, narrative) see it.
+ *   the opening turn so downstream consumers see it.
  */
 export function buildSharedHistory(
   turns: AdventureTurn[],
@@ -350,14 +324,10 @@ function addTurnToMessages(
   const turn = turns[i]
 
   if (turn.playerAction) {
-    const prevTurn = i > 0 ? turns[i - 1] : null
-    const userContent = prevTurn?.worldTrajectory
-      ? formatMomentumContext(prevTurn.worldTrajectory, turn.playerAction)
-      : turn.playerAction
-    messages.push({ role: 'user', content: userContent })
+    messages.push({ role: 'user', content: turn.playerAction })
   } else if (i === 0) {
     // Include the setting description in the opening turn so all consumers
-    // (director, trajectory, narrative) see the world context.
+    // see the world context.
     const openingContent = settingDescription
       ? `Begin the adventure.\n\n${settingDescription}`
       : 'Begin the adventure.'
@@ -380,36 +350,27 @@ export function buildNarrativeMessages(
   turns: AdventureTurn[],
   settingDescription: string,
   playerAction: string | null,
+  steering: SteeringBucket | undefined,
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
-  resolvedMomentum?: string | null,
   worldBible?: string,
 ): LLMMessage[] {
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
   const isOpeningTurn = turns.length === 0 && playerAction === null
 
-  const protagonistInfo = getLatestProtagonistInfo(turns)
-  const protagonistSection = protagonistInfo
-    ? `<protagonist_reference>\n${protagonistInfo}\n</protagonist_reference>\n\n`
-    : ''
-
+  // Role instruction + core directive + steering guidance (if any) in one
+  // system message that lives AFTER the cacheable history — the steering
+  // text changes every turn, so it must not be inside the cached prefix.
+  const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
   messages.push({
     role: 'system',
-    content: `${protagonistSection}${NARRATIVE_INSTRUCTION}\n\n${CORE_DIRECTIVE}`,
+    content: `${NARRATIVE_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
   })
 
   // Final user message
   if (playerAction !== null) {
-    // Use pre-resolved momentum when available (momentum resolution step ran),
-    // otherwise fall back to the raw trajectory from the last turn.
-    const momentum = resolvedMomentum !== undefined
-      ? resolvedMomentum
-      : (turns.length > 0 ? turns[turns.length - 1]?.worldTrajectory : null)
-    const userContent = momentum
-      ? formatMomentumContext(momentum, playerAction)
-      : playerAction
-    messages.push({ role: 'user', content: userContent })
+    messages.push({ role: 'user', content: playerAction })
   } else if (isOpeningTurn) {
     messages.push({
       role: 'user',
@@ -418,107 +379,6 @@ export function buildNarrativeMessages(
 The opening should introduce the protagonist through action and detail — show what they look like, how they carry themselves, and hint at their personality through their behavior or inner thoughts. Don't state traits outright; reveal them through the scene.
 
 ${settingDescription}`,
-    })
-  }
-
-  appendDirective(messages, turnDirective)
-
-  return messages
-}
-
-export function buildTrajectoryMessages(
-  turns: AdventureTurn[],
-  latestNarrative: string,
-  playerAction: string | null,
-  currentDirectorNotes?: string,
-  options?: { rejectedTrajectory?: string; directive?: string; compactions?: Record<string, AdventureCompaction>; settingDescription?: string; worldBible?: string },
-): LLMMessage[] {
-  // Shared history + the just-completed turn's narrative
-  const messages = buildSharedHistory(turns, options?.compactions, options?.settingDescription, options?.worldBible)
-
-  // Append the current turn as if it already happened (so trajectory sees it)
-  if (playerAction !== null) {
-    const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null
-    const userContent = lastTurn?.worldTrajectory
-      ? formatMomentumContext(lastTurn.worldTrajectory, playerAction)
-      : playerAction
-    messages.push({ role: 'user', content: userContent })
-  }
-  messages.push({
-    role: 'assistant',
-    content: latestNarrative,
-    cache_control: { type: 'ephemeral', ttl: '1h' },
-  })
-
-  // Use fresh director notes from this turn if available, fall back to previous turns
-  const directorNotes = currentDirectorNotes
-    ?? [...turns].reverse().find((t) => t.directorNotes)?.directorNotes
-
-  const directorSection = directorNotes
-    ? `\n\n<director_notes context="use these to inform the trajectory — what's REALLY happening behind the scenes">\n${directorNotes}\n</director_notes>`
-    : ''
-
-  // Show the last turn's trajectory so the model knows what already happened
-  // and can advance or move on rather than repeating
-  const lastTurnTrajectory = turns.length > 0
-    ? turns[turns.length - 1]?.worldTrajectory
-    : undefined
-
-  const previousSection = lastTurnTrajectory
-    ? `\n\nLAST TURN'S WORLD MOMENTUM (for reference — advance these, resolve them, or move on to new developments; do NOT repeat them):\n"${lastTurnTrajectory}"`
-    : ''
-
-  const rejectionSection = options?.rejectedTrajectory
-    ? `\n\nYour PREVIOUS attempt at world momentum was rejected:\n"${options.rejectedTrajectory}"\n\nGenerate DIFFERENT momentum — focus on other NPCs, other events, or different aspects of the world. Do not repeat or rephrase the rejected output.`
-    : ''
-
-  messages.push({
-    role: 'user',
-    content: `${TRAJECTORY_INSTRUCTION}${directorSection}${previousSection}${rejectionSection}\n\nWhat happens next in the world if the player does nothing?`,
-  })
-
-  appendDirective(messages, options?.directive)
-
-  return messages
-}
-
-export function buildDirectorMessages(
-  turns: AdventureTurn[],
-  currentTurn?: { playerAction: string | null; narrative: string },
-  turnDirective?: string,
-  compactions?: Record<string, AdventureCompaction>,
-  settingDescription?: string,
-  worldBible?: string,
-): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
-
-  // Append the current (not-yet-finalized) turn so the director sees it
-  if (currentTurn) {
-    if (currentTurn.playerAction !== null) {
-      const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null
-      const userContent = lastTurn?.worldTrajectory
-        ? formatMomentumContext(lastTurn.worldTrajectory, currentTurn.playerAction)
-        : currentTurn.playerAction
-      messages.push({ role: 'user', content: userContent })
-    }
-    messages.push({ role: 'assistant', content: currentTurn.narrative })
-  }
-
-  // Always generate full notes from scratch — previous notes provided as context only
-  const lastDirectorNotes = [...turns]
-    .reverse()
-    .find((t) => t.directorNotes)?.directorNotes
-
-  if (lastDirectorNotes) {
-    const sanitized = sanitizeDirectorNotes(lastDirectorNotes)
-    messages.push({
-      role: 'user',
-      content: `${DIRECTOR_INSTRUCTION}\n\nHere are the previous turn's director notes for context — use them as a starting point, updating or rewriting sections as needed based on what happened this turn. Write complete, fresh notes (not a diff).\n\nPREVIOUS DIRECTOR NOTES:\n${sanitized}`,
-    })
-  } else {
-    messages.push({
-      role: 'user',
-      content: `${DIRECTOR_INSTRUCTION}\n\nBased on the story so far, provide your initial director notes. Start with ## PROTAGONIST (describing the protagonist's appearance, traits, and established facts), then ## THE WEEK AHEAD. Use these exact headings.`,
     })
   }
 
@@ -555,30 +415,23 @@ export function buildRevisionMessages(
   playerAction: string | null,
   originalNarrative: string,
   inconsistencies: string,
+  steering: SteeringBucket | undefined,
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
 ): LLMMessage[] {
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
-  const revisionProtagonistInfo = getLatestProtagonistInfo(turns)
-  const revisionProtagonistSection = revisionProtagonistInfo
-    ? `<protagonist_reference>\n${revisionProtagonistInfo}\n</protagonist_reference>\n\n`
-    : ''
-
+  const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
   messages.push({
     role: 'system',
-    content: `${revisionProtagonistSection}${NARRATIVE_INSTRUCTION}\n\n${CORE_DIRECTIVE}`,
+    content: `${NARRATIVE_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
   })
 
   const isOpeningTurn = turns.length === 0 && playerAction === null
 
   if (playerAction !== null) {
-    const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null
-    const userContent = lastTurn?.worldTrajectory
-      ? formatMomentumContext(lastTurn.worldTrajectory, playerAction)
-      : playerAction
-    messages.push({ role: 'user', content: userContent })
+    messages.push({ role: 'user', content: playerAction })
   } else if (isOpeningTurn) {
     messages.push({
       role: 'user',
@@ -610,52 +463,6 @@ Please rewrite the narrative, fixing ONLY the listed inconsistencies. Keep the s
   return messages
 }
 
-// --- Director notes sanitisation ---
-
-/**
- * Clean up corrupted director notes before they are used.
- *
- * Fixes two known corruption patterns:
- * 1. "| " pipe prefixes on lines (leaked from formatWithLineNumbers via bad diffs)
- * 2. Orphaned content before the first section header (## PROTAGONIST)
- */
-export function sanitizeDirectorNotes(notes: string): string {
-  // Strip pipe prefixes: "| some text" → "some text"
-  let cleaned = notes.replace(/^\| /gm, '')
-
-  // Remove orphaned content before the first ## heading
-  const firstHeading = cleaned.indexOf('## ')
-  if (firstHeading > 0) {
-    cleaned = cleaned.substring(firstHeading)
-  }
-
-  // Collapse runs of 3+ blank lines into 2
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
-
-  return cleaned.trim()
-}
-
-/** Extract the ## PROTAGONIST section from director notes. */
-export function extractProtagonistInfo(directorNotes: string): string | undefined {
-  const match = directorNotes.match(/##\s*PROTAGONIST\s*\n([\s\S]*?)(?=\n##\s|\n*$)/)
-  return match?.[1]?.trim() || undefined
-}
-
-/**
- * Find the most recent protagonist info from director notes in the turn history.
- * Returns undefined if no director notes exist yet.
- */
-export function getLatestProtagonistInfo(turns: AdventureTurn[]): string | undefined {
-  for (let i = turns.length - 1; i >= 0; i--) {
-    const notes = turns[i].directorNotes
-    if (notes) {
-      const info = extractProtagonistInfo(notes)
-      if (info) return info
-    }
-  }
-  return undefined
-}
-
 // --- Parse helpers ---
 
 export function cleanNarrative(raw: string): string {
@@ -664,14 +471,4 @@ export function cleanNarrative(raw: string): string {
     .replace(/<\/?narrative>/g, '')
     .replace(/<think>[\s\S]*?<\/think>/g, '')
     .trim()
-}
-
-export function parseTrajectory(raw: string): {
-  trajectory: string
-  dead: boolean
-} {
-  const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-  const dead = /\[DEAD\]/i.test(cleaned)
-  const trajectory = cleaned.replace(/\[DEAD\]/gi, '').trim()
-  return { trajectory, dead }
 }

@@ -14,7 +14,7 @@ export const GENERATION_CATEGORIES: Record<GenerationCategory, { label: string; 
   },
   analysis: {
     label: 'Analysis',
-    description: 'Director notes, world trajectory, summaries, scene splitting — reasoning tasks',
+    description: 'Nonsense checks, summaries, scene splitting — reasoning tasks',
   },
   rewriting: {
     label: 'Rewriting',
@@ -34,11 +34,8 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   adventure: 'writing',
 
   // Analysis
-  'adventure-momentum': 'analysis',
   'adventure-nonsense': 'analysis',
   'adventure-revision': 'rewriting',
-  'adventure-director': 'analysis',
-  'adventure-trajectory': 'analysis',
   'adventure-compaction': 'writing',
   'cliche:critique': 'analysis',
   'summary:node': 'analysis',

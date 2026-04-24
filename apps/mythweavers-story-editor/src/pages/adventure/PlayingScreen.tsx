@@ -7,16 +7,8 @@ import * as styles from '../AdventurePage.css'
 
 // --- Render helpers ---
 
-function renderNarrative(text: string, dead?: boolean) {
-  const displayText = dead
-    ? text
-        .replace(
-          /\n+\s*(?:what do you do\??|what will you do\??|what's your (?:next )?move\??|how do you (?:respond|react)\??)\.?\s*$/i,
-          '',
-        )
-        .trim()
-    : text
-  const paragraphs = displayText.split('\n\n').filter((p) => p.trim())
+function renderNarrative(text: string) {
+  const paragraphs = text.split('\n\n').filter((p) => p.trim())
   return (
     <div class={styles.narrative}>
       <For each={paragraphs}>
@@ -188,7 +180,7 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
         />
       </Show>
 
-      {renderNarrative(turn().narrative, turn().dead)}
+      {renderNarrative(turn().narrative)}
 
       {/* Empty/failed generation — offer retry on the last turn */}
       <Show
@@ -218,23 +210,6 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
       </Show>
 
       <div class={styles.turnFooter}>
-        <Show when={turn().worldTrajectory}>
-          <div
-            class={styles.worldTrajectory}
-            onClick={() => adventureStore.toggleTrajectory(index)}
-          >
-            <div class={styles.worldTrajectoryLabel}>
-              {adventureStore.isTrajectoryExpanded(index) ? '▾' : '▸'}{' '}
-              World Momentum
-            </div>
-            <Show when={adventureStore.isTrajectoryExpanded(index)}>
-              <div class={styles.worldTrajectoryContent}>
-                {turn().worldTrajectory}
-              </div>
-            </Show>
-          </div>
-        </Show>
-
         <Show
           when={
             !adventureStore.isGenerating &&
@@ -319,11 +294,6 @@ const CompactionBlock: Component<{ range: CompactionRange }> = (props) => {
 
 export const PlayingScreen: Component = () => {
   const engine = useEngine()
-
-  const isDead = () => {
-    const t = adventureStore.turns
-    return t.length > 0 && t[t.length - 1].dead
-  }
 
   const ranges = createMemo(() => getCompactionRanges(adventureStore.turns.length))
 
@@ -414,40 +384,6 @@ export const PlayingScreen: Component = () => {
             </div>
           </Show>
 
-          {/* Death screen */}
-          <Show when={isDead()}>
-            <div class={styles.deathScreen}>
-              <div class={styles.deathIcon}>💀</div>
-              <Text size="lg" weight="bold">
-                You have perished
-              </Text>
-              <Text color="secondary">
-                Your adventure ended after {adventureStore.turns.length} turn
-                {adventureStore.turns.length !== 1 ? 's' : ''}.
-              </Text>
-              <div class={styles.deathActions}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    engine.handleRewindTo(
-                      Math.max(0, adventureStore.turns.length - 2),
-                    )
-                  }
-                >
-                  ↩ Rewind one turn
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={engine.handleReset}
-                >
-                  New Adventure
-                </Button>
-              </div>
-            </div>
-          </Show>
-
           {/* Streaming content for current generation */}
           <Show when={adventureStore.isGenerating}>
             <div class={styles.turn}>
@@ -494,8 +430,7 @@ export const PlayingScreen: Component = () => {
         </button>
       </Show>
 
-      <Show when={!isDead()}>
-        <div class={styles.inputArea}>
+      <div class={styles.inputArea}>
           <div class={styles.inputWrapper}>
             <textarea
               ref={engine.setInputRef}
@@ -541,7 +476,6 @@ export const PlayingScreen: Component = () => {
             </Show>
           </div>
         </div>
-      </Show>
     </>
   )
 }

@@ -5,15 +5,15 @@ import {
   postMyAdventures,
   putMyAdventuresById,
 } from '../client/config'
+import type { SteeringBucket } from '../pages/adventure/prompts'
 
 // --- Types ---
 
 export interface AdventureTurn {
   playerAction: string | null
   narrative: string
-  worldTrajectory: string
-  directorNotes?: string
-  dead?: boolean
+  /** Hidden steering roll applied to this turn. Undefined for the opening turn. */
+  steering?: SteeringBucket
 }
 
 export interface AdventureCompaction {
@@ -33,7 +33,6 @@ export interface PersistedState {
   directive?: string
   worldBible?: string
   pendingAction?: string | null
-  worldMomentumEnabled?: boolean
 }
 
 // --- localStorage helpers (offline / crash recovery) ---
