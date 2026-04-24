@@ -24,6 +24,7 @@ import { ContextItemGenerateModal } from './ContextItemGenerateModal'
 import { NodeStatusMenu } from './NodeStatusMenu'
 import { PublishingBadge } from './PublishingBadge'
 import { SplitSceneModal } from './SplitSceneModal'
+import { RoyalRoadPublishingPanel } from './RoyalRoadPublishingPanel'
 import { StoryPublishingModal } from './StoryPublishingModal'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
@@ -1177,6 +1178,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   const [showSplitSceneModal, setShowSplitSceneModal] = createSignal(false)
   const [splitTargetNodeId, setSplitTargetNodeId] = createSignal<string | null>(null)
   const [showStoryPublishingModal, setShowStoryPublishingModal] = createSignal(false)
+  const [showRoyalRoadPanel, setShowRoyalRoadPanel] = createSignal(false)
   const [chapterPublishingTargetId, setChapterPublishingTargetId] = createSignal<string | null>(null)
   const handlePublishChapter = (chapterId: string) => setChapterPublishingTargetId(chapterId)
 
@@ -1561,6 +1563,17 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
                 >
                   <PhGlobeIcon />
                 </button>
+                <button
+                  class={styles.actionButton}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowRoyalRoadPanel(true)
+                  }}
+                  title="Royal Road publishing"
+                  aria-label="Royal Road publishing"
+                >
+                  <PhBookIcon />
+                </button>
               </div>
             </div>
           </div>
@@ -1675,6 +1688,11 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
       <StoryPublishingModal
         open={showStoryPublishingModal()}
         onClose={() => setShowStoryPublishingModal(false)}
+      />
+
+      <RoyalRoadPublishingPanel
+        open={showRoyalRoadPanel()}
+        onClose={() => setShowRoyalRoadPanel(false)}
       />
 
       <ChapterPublishingModal
