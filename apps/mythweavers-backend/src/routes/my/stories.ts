@@ -84,6 +84,10 @@ const storySchema = z.strictObject({
     description: 'Royal Road story ID for publishing',
     example: 12345,
   }),
+  royalRoadPublishingEnabled: z.boolean().meta({
+    description: 'Whether scheduled chapters for this story should be auto-published to Royal Road',
+    example: false,
+  }),
   published: z.boolean().meta({
     description:
       '[Legacy] Whether the story is published. Kept in sync with publishedAt during the transition; prefer publishedAt for new code.',
