@@ -3,16 +3,22 @@ import type { CommandContext, KeyBindings } from '../keymap'
 import { keydownHandler } from '../keymap'
 import { Fragment, type ResolvedPos, Slice } from '../model'
 import { type EditorProps, EditorState, Selection as EditorSelection, TextSelection, Transaction } from '../state'
+import { splitBlock } from '../commands/editing'
 import { canJoin, liftTarget } from '../transform'
+import { BlockSelector } from './BlockSelector'
 import { DebugOverlay } from './DebugOverlay'
+import { BlockDragDropProvider, SortableDocView, isDragging } from './DragDrop'
 import { createDecorationManager } from './DecorationManager'
 import { NodeView, type NodeViewMap } from './NodeView'
-import { EditorContext, type EditorViewContext } from './context'
+import { EditorContext, type EditorViewContext, useEditor } from './context'
 import { DecorationSet } from './decoration'
 import { type PropViewRef, callPropHandlers, collectDecorations, isEditable } from './propHelpers'
-import { selectionFromDOM, selectionToDOM } from './selection'
+import { buildNodeIndex, domFromPos, getNodeId, pruneReverseMap, selectionFromDOM, selectionToDOM } from './selection'
+import type { SelectedBlock } from './context'
 
-export interface EditorViewProps {
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+export interface EditorProviderProps {
   /** The editor state */
   state: EditorState
   /** Callback when the state changes */
@@ -23,8 +29,8 @@ export interface EditorViewProps {
   editable?: boolean
   /** Custom node views */
   nodeViews?: NodeViewMap
-  /** Additional class name for the editor */
-  class?: string
+  /** Enable block-level drag-and-drop reordering */
+  blockDragDrop?: boolean
   /** Placeholder text when empty */
   placeholder?: string
   /** Auto-focus on mount */
@@ -37,22 +43,59 @@ export interface EditorViewProps {
    */
   props?: EditorProps
   /**
+   * Transaction recorder for the debug overlay.
+   * Create one with `createTransactionRecorder()` and call
+   * `recorder.record(tr)` in your dispatch path.
+   */
+  recorder?: import('./DebugOverlay').TransactionRecorder
+  /** Callback when editor focus changes */
+  onFocusChange?: (focused: boolean) => void
+  /** Children rendered inside the EditorContext — toolbars, breadcrumbs, etc. */
+  children?: JSX.Element
+}
+
+export interface EditorContentProps {
+  /** Additional class name for the editor content area */
+  class?: string
+  /**
    * Show debug overlay with cursor position and document structure.
    * Can be true for default position or specify position.
    */
   debug?: boolean | 'top-right' | 'bottom-right' | 'top-left' | 'bottom-left'
-  /** Callback when editor focus changes */
-  onFocusChange?: (focused: boolean) => void
+  /**
+   * Show block selector handles on the left edge of ancestor blocks
+   * at the current cursor position.
+   */
+  blockSelector?: boolean
 }
 
+/** Convenience props for EditorView (combines Provider + Content) */
+export interface EditorViewProps extends EditorProviderProps, EditorContentProps {}
+
+// ─── EditorProvider ───────────────────────────────────────────────────────────
+
 /**
- * The main editor view component.
- * Renders a ProseMirror-like document with SolidJS reactivity.
+ * Sets up the editor context: state management, dispatch, decorations,
+ * block selection, and all the internal wiring. Renders `children` inside
+ * the EditorContext.Provider so they can use `useEditor()`.
+ *
+ * Use with `<EditorContent />` to render the actual contenteditable area.
+ *
+ * ```tsx
+ * <EditorProvider state={state()} dispatchTransaction={dispatch}>
+ *   <MyToolbar />
+ *   <EditorContent class="my-editor" />
+ * </EditorProvider>
+ * ```
  */
-export function EditorView(props: EditorViewProps): JSX.Element {
+export function EditorProvider(props: EditorProviderProps): JSX.Element {
   let containerRef: HTMLDivElement | undefined
   const [focused, setFocused] = createSignal(false)
-  const [state, setState] = createSignal(props.state)
+
+  // Internal state signal — only used in uncontrolled mode (no dispatchTransaction).
+  const [internalState, setInternalState] = createSignal(props.state)
+
+  const state = () => (props.dispatchTransaction ? props.state : internalState())
 
   // Decoration manager for tracked decorations
   const decorationManager = createDecorationManager()
@@ -65,10 +108,9 @@ export function EditorView(props: EditorViewProps): JSX.Element {
   let selectionSyncVersion = 0
 
   // Set updatingSelection = true synchronously when state changes
-  // This blocks selectionchange events that fire during DOM updates
   createEffect(
     on(
-      () => props.state,
+      state,
       () => {
         updatingSelection = true
       },
@@ -76,31 +118,34 @@ export function EditorView(props: EditorViewProps): JSX.Element {
     ),
   )
 
-  // Sync state from props
-  createEffect(() => {
-    setState(props.state)
-  })
-
-  // Default dispatch function - also maps tracked decorations
+  // Default dispatch function
   const dispatch = (tr: Transaction) => {
-    // Block selectionchange events during dispatch and render cycle
-    // This prevents stale DOM selection from overwriting our model selection
     updatingSelection = true
-
-    // Map tracked decorations through the transaction
     decorationManager.mapThrough(tr)
 
     if (props.dispatchTransaction) {
       props.dispatchTransaction(tr)
     } else {
-      const newState = state().apply(tr)
-      setState(newState)
+      const newState = internalState().apply(tr)
+      setInternalState(newState)
       props.onStateChange?.(newState)
     }
-    // Note: updatingSelection will be reset by the RAF in the selection sync effect
+
+    // Prune stale entries from the reverse DOM map on document changes
+    if (tr.docChanged) {
+      const activeIds = new Set<string>()
+      const newDoc = (props.dispatchTransaction ? props.state : internalState()).doc
+      newDoc.descendants((node) => { activeIds.add(node.id); return undefined })
+      pruneReverseMap(activeIds)
+    }
+
+    // Clear block selection override when the cursor moves
+    if (tr.selectionSet) {
+      setOverrideBlockId(null)
+    }
   }
 
-  // Handle selecting a node by position range (for click-to-select on inline nodes)
+  // Handle selecting a node by position range
   const handleSelectNode = (from: number, to: number) => {
     const currentState = state()
     try {
@@ -114,177 +159,365 @@ export function EditorView(props: EditorViewProps): JSX.Element {
     }
   }
 
-  // Create context value
+  // ─── Block selection ──────────────────────────────────────────────
+  const [overrideBlockId, setOverrideBlockId] = createSignal<string | null>(null)
+
+  const blockAncestors = createMemo((): SelectedBlock[] => {
+    const currentState = state()
+    const { $from } = currentState.selection
+    const ancestors: SelectedBlock[] = []
+    for (let d = 1; d <= $from.depth; d++) {
+      const node = $from.node(d)
+      if (node.isBlock) {
+        ancestors.push({
+          nodeId: node.id,
+          pos: $from.before(d),
+          depth: d,
+          typeName: node.type.name,
+        })
+      }
+    }
+    return ancestors
+  })
+
+  const selectedBlock = createMemo((): SelectedBlock | null => {
+    const ancestors = blockAncestors()
+    if (ancestors.length === 0) return null
+    const override = overrideBlockId()
+    if (override) {
+      const found = ancestors.find((a) => a.nodeId === override)
+      if (found) return found
+    }
+    return ancestors[ancestors.length - 1]
+  })
+
+  const selectBlock = (nodeId: string | null) => {
+    setOverrideBlockId(nodeId)
+  }
+
+  // ─── Context value ────────────────────────────────────────────────
+
+  // The context stores functions that the EditorContent component will call
+  // to register its container ref and event handlers. This avoids prop drilling
+  // while keeping the contenteditable div as a separate component.
+  const [contentRef, setContentRef] = createSignal<HTMLDivElement | null>(null)
+  const [wrapperRef, setWrapperRef] = createSignal<HTMLDivElement | null>(null)
+
+  // Alias: containerRef is the contenteditable div (set by EditorContent)
+  // We use a derived getter so all existing code that reads containerRef works.
+  const getContainerRef = () => contentRef()
+
+  /**
+   * Find document position at screen coordinates. Returns `{ pos, inside }`
+   * where `inside` is the position of the deepest node containing the point,
+   * useful for determining which cell a click landed in (merged cells etc.).
+   */
+  const posAtCoordsWithInside = (x: number, y: number): { pos: number; inside: number } | null => {
+    const ref = getContainerRef()
+    if (!ref) return null
+    let range: Range | null = null
+    if (document.caretPositionFromPoint) {
+      const cp = document.caretPositionFromPoint(x, y)
+      if (cp) { range = document.createRange(); range.setStart(cp.offsetNode, cp.offset); range.collapse(true) }
+    } else if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(x, y)
+    }
+    if (!range || !ref.contains(range.startContainer)) return null
+    const sel = selectionFromDOM(state().doc, {
+      anchorNode: range.startContainer, anchorOffset: range.startOffset,
+      focusNode: range.startContainer, focusOffset: range.startOffset,
+      isCollapsed: true, rangeCount: 1, getRangeAt: () => range!,
+    } as unknown as globalThis.Selection)
+    const pos = sel ? sel.from : null
+    if (pos === null) return null
+
+    // Compute `inside`: walk from the hit DOM node up toward the editor root,
+    // finding the deepest block node that contains the point.
+    let inside = -1
+    const index = buildNodeIndex(state().doc)
+    let domNode: globalThis.Node | null = range.startContainer
+    while (domNode && domNode !== ref) {
+      const nodeId = getNodeId(domNode)
+      if (nodeId) {
+        const entry = index.get(nodeId)
+        if (entry && entry.node.isBlock) {
+          inside = entry.pos
+          break
+        }
+      }
+      domNode = domNode.parentNode
+    }
+    return { pos, inside }
+  }
+
+  /**
+   * Check whether the cursor is at the visual edge of a textblock in the
+   * given direction. Uses model-based checks (parentOffset). This is a
+   * simplified version that doesn't handle bidi text but is correct for
+   * LTR content and sufficient for table navigation.
+   */
+  const endOfTextblock = (dir: 'up' | 'down' | 'left' | 'right'): boolean => {
+    const currentState = state()
+    const sel = currentState.selection
+    if (!(sel instanceof TextSelection)) return false
+    const { $head } = sel
+    if (!$head.parent.isTextblock) return false
+
+    if (dir === 'left' || dir === 'up') {
+      return $head.parentOffset === 0
+    }
+    // dir === 'right' || dir === 'down'
+    return $head.parentOffset === $head.parent.content.size
+  }
+
   const contextValue: EditorViewContext = {
     state: () => state(),
     dispatch,
-    dom: () => containerRef ?? null,
+    dom: () => getContainerRef() ?? null,
     hasFocus: focused,
-    focus: () => containerRef?.focus(),
+    focus: () => getContainerRef()?.focus(),
     addDecoration: (dec) => decorationManager.add(dec),
     addDecorations: (decs) => decorationManager.addAll(decs),
     decorations: decorationManager,
+    selectedBlock,
+    selectBlock,
+    blockAncestors,
+    posAtCoords: (coords) => posAtCoordsWithInside(coords.left, coords.top),
+    endOfTextblock: (dir) => endOfTextblock(dir),
+    root: typeof document !== 'undefined' ? document : (undefined as unknown as Document),
+    wrapperDom: () => wrapperRef(),
   }
 
-  // Create view reference for plugin prop handlers
-  // This is a stable object that provides current state
-  const getViewRef = (): PropViewRef => ({
-    state: state(),
+  // Expose internals needed by EditorContent via context
+  // We use a separate internal context to avoid polluting the public API.
+  const internalValue: EditorInternals = {
+    state,
     dispatch,
-    dom: containerRef ?? null,
-    focus: () => containerRef?.focus(),
-  })
+    focused,
+    setFocused,
+    setContentRef,
+    setWrapperRef,
+    handleSelectNode,
+    decorationManager,
+    updatingSelection: () => updatingSelection,
+    setUpdatingSelection: (v) => { updatingSelection = v },
+    composing: () => composing,
+    setComposing: (v) => { composing = v },
+    selectionSyncVersion: () => selectionSyncVersion,
+    incrementSyncVersion: () => ++selectionSyncVersion,
+    nodeViews: () => props.nodeViews,
+    editable: () => props.editable,
+    placeholder: () => props.placeholder,
+    autoFocus: () => props.autoFocus,
+    keymap: () => props.keymap,
+    editorProps: () => props.props,
+    recorder: () => props.recorder,
+    onFocusChange: () => props.onFocusChange,
+    blockDragDrop: () => props.blockDragDrop,
+  }
+
+  return (
+    <EditorContext.Provider value={contextValue}>
+      <EditorInternalsContext.Provider value={internalValue}>
+        <Show when={props.blockDragDrop} fallback={props.children}>
+          <BlockDragDropProvider state={state} dispatch={dispatch}>
+            {props.children}
+          </BlockDragDropProvider>
+        </Show>
+      </EditorInternalsContext.Provider>
+    </EditorContext.Provider>
+  )
+}
+
+// ─── Internal context (not public API) ────────────────────────────────────────
+
+interface EditorInternals {
+  state: () => EditorState
+  dispatch: (tr: Transaction) => void
+  focused: () => boolean
+  setFocused: (v: boolean) => void
+  setContentRef: (el: HTMLDivElement | null) => void
+  setWrapperRef: (el: HTMLDivElement | null) => void
+  handleSelectNode: (from: number, to: number) => void
+  decorationManager: ReturnType<typeof createDecorationManager>
+  updatingSelection: () => boolean
+  setUpdatingSelection: (v: boolean) => void
+  composing: () => boolean
+  setComposing: (v: boolean) => void
+  selectionSyncVersion: () => number
+  incrementSyncVersion: () => number
+  nodeViews: () => NodeViewMap | undefined
+  editable: () => boolean | undefined
+  placeholder: () => string | undefined
+  autoFocus: () => boolean | undefined
+  keymap: () => KeyBindings | undefined
+  editorProps: () => EditorProps | undefined
+  recorder: () => import('./DebugOverlay').TransactionRecorder | undefined
+  onFocusChange: () => ((focused: boolean) => void) | undefined
+  blockDragDrop: () => boolean | undefined
+}
+
+import { createContext, useContext } from 'solid-js'
+
+const EditorInternalsContext = createContext<EditorInternals>()
+
+function useInternals(): EditorInternals {
+  const ctx = useContext(EditorInternalsContext)
+  if (!ctx) throw new Error('EditorContent must be used within an EditorProvider')
+  return ctx
+}
+
+// ─── EditorContent ────────────────────────────────────────────────────────────
+
+/**
+ * The contenteditable area of the editor. Must be used inside an `<EditorProvider>`.
+ * Renders the document, handles input, selection sync, and optional overlays.
+ */
+export function EditorContent(props: EditorContentProps): JSX.Element {
+  let containerRef: HTMLDivElement | undefined
+  const int = useInternals()
+  const editor = useEditor()
 
   // Compute whether editor is editable
   const computedEditable = createMemo(() => {
-    // Direct prop takes precedence
-    if (props.editable === false) return false
-    // Then check plugin/view props (default to true)
-    return isEditable(state(), props.props, true)
+    if (int.editable() === false) return false
+    return isEditable(int.state(), int.editorProps(), true)
+  })
+
+  // When blockDragDrop is enabled, inject SortableDocView as the doc nodeView
+  const effectiveNodeViews = createMemo(() => {
+    const nv = int.nodeViews()
+    if (int.blockDragDrop()) {
+      return { ...nv, doc: SortableDocView }
+    }
+    return nv
   })
 
   // Collect decorations from all plugins and tracked decorations
   const decorations = createMemo(() => {
-    const currentState = state()
+    const currentState = int.state()
+    const pluginDecorations = collectDecorations(currentState, int.editorProps())
+    const trackedDecorations = int.decorationManager.getDecorationSet(currentState.doc)
 
-    // Get plugin decorations
-    const pluginDecorations = collectDecorations(currentState, props.props)
-
-    // Get tracked decorations (this is reactive via the manager's signal)
-    const trackedDecorations = decorationManager.getDecorationSet(currentState.doc)
-
-    // Merge them together
-    if (pluginDecorations.isEmpty && trackedDecorations.isEmpty) {
-      return DecorationSet.empty
-    }
-    if (pluginDecorations.isEmpty) {
-      return trackedDecorations
-    }
-    if (trackedDecorations.isEmpty) {
-      return pluginDecorations
-    }
-
-    // Merge both sets
+    if (pluginDecorations.isEmpty && trackedDecorations.isEmpty) return DecorationSet.empty
+    if (pluginDecorations.isEmpty) return trackedDecorations
+    if (trackedDecorations.isEmpty) return pluginDecorations
     return pluginDecorations.add(currentState.doc, trackedDecorations.find())
   })
 
-  // Check for unrendered widgets after render cycle (development warning)
+  // Check for unrendered widgets after render cycle
   createEffect(() => {
     const decs = decorations()
-    // Use queueMicrotask to check after the render cycle completes
-    queueMicrotask(() => {
-      decs.checkUnrenderedWidgets()
-    })
+    queueMicrotask(() => { decs.checkUnrenderedWidgets() })
   })
 
-  // Handle DOM selection changes
+  // Create view reference for plugin prop handlers
+  const getViewRef = (): PropViewRef => ({
+    state: int.state(),
+    dispatch: int.dispatch,
+    dom: containerRef ?? null,
+    focus: () => containerRef?.focus(),
+    posAtCoords: editor.posAtCoords,
+    endOfTextblock: editor.endOfTextblock,
+    root: editor.root,
+  })
+
+  // ─── Selection sync ──────────────────────────────────────────────
+
   const handleSelectionChange = () => {
-    if (updatingSelection || composing || !containerRef) return
+    if (int.updatingSelection() || int.composing() || isDragging() || !containerRef) return
 
     const domSelection = document.getSelection()
     if (!domSelection || domSelection.rangeCount === 0) return
 
-    // Check if selection is within our editor
     const range = domSelection.getRangeAt(0)
     const ancestor = range.commonAncestorContainer
-    // Guard against invalid selection during DOM mutations - the ancestor may not
-    // be a valid Node if SolidJS is in the middle of a reactive DOM update
     if (!ancestor || !(ancestor instanceof Node)) return
     try {
       if (!containerRef.contains(ancestor)) return
     } catch {
-      // Selection may reference removed DOM nodes during reactive updates
       return
     }
 
-    const currentState = state()
+    const currentState = int.state()
     const selection = selectionFromDOM(currentState.doc, domSelection)
     if (!selection) return
 
-    // Only dispatch if selection actually changed
     if (!selection.eq(currentState.selection)) {
-      console.log('[selectionchange] DOM→Model:', {
-        from: selection.from,
-        to: selection.to,
-        currentModel: { from: currentState.selection.from, to: currentState.selection.to },
-        domAnchor: { node: domSelection.anchorNode?.nodeName, offset: domSelection.anchorOffset },
+      int.recorder()?.recordSelection({
+        trigger: 'selectionchange',
+        dom: {
+          anchorNodeName: domSelection.anchorNode?.nodeName ?? '?',
+          anchorOffset: domSelection.anchorOffset,
+          focusNodeName: domSelection.focusNode?.nodeName ?? '?',
+          focusOffset: domSelection.focusOffset,
+          anchorText: domSelection.anchorNode?.nodeType === 3 ? domSelection.anchorNode.textContent?.slice(0, 40) : undefined,
+          focusText: domSelection.focusNode?.nodeType === 3 ? domSelection.focusNode.textContent?.slice(0, 40) : undefined,
+        },
+        modelFrom: selection.from,
+        modelTo: selection.to,
+        previousModel: { from: currentState.selection.from, to: currentState.selection.to },
+        dispatched: true,
+        summary: `DOM(${domSelection.anchorOffset})→model(${selection.from})`,
       })
-      updatingSelection = true
+
+      int.setUpdatingSelection(true)
       const tr = currentState.tr().setSelection(selection)
-      dispatch(tr)
-      // Don't reset updatingSelection here - the selection sync effect will reset it
-      // after it restores the selection to the DOM
+      int.dispatch(tr)
     }
   }
 
   // Update DOM selection when model selection changes
   createEffect(() => {
-    const currentState = state()
+    const currentState = int.state()
     if (!containerRef) return
 
-    // Increment version - only the latest RAF should run
-    const version = ++selectionSyncVersion
-    console.log(
-      '[effect] Scheduled RAF version:',
-      version,
-      'for selection:',
-      currentState.selection.from,
-      '-',
-      currentState.selection.to,
-    )
+    const version = int.incrementSyncVersion()
 
-    // Defer to next frame to ensure DOM is updated
-    // Set flag to prevent selectionchange handler from re-dispatching
     requestAnimationFrame(() => {
-      // Skip if a newer sync was scheduled (prevents race condition)
-      if (version !== selectionSyncVersion) {
-        console.log('[RAF] Skipping stale version:', version, '(current:', selectionSyncVersion, ')')
-        return
-      }
-
+      if (version !== int.selectionSyncVersion()) return
       if (!containerRef) {
-        updatingSelection = false
+        int.setUpdatingSelection(false)
         return
       }
 
-      // Always sync model to DOM - don't try to read DOM selection here
-      // because after SolidJS re-render, the browser's Selection may be stale/invalid
-      console.log('[RAF] Syncing Model→DOM:', currentState.selection.from, '-', currentState.selection.to)
-      // Log actual model structure for debugging
-      const pos = currentState.selection.from
-      try {
-        const $pos = currentState.doc.resolve(pos)
-        const parent = $pos.parent
-        console.log('[RAF] Model at pos', pos, '- parent:', parent.type.name, 'offset:', $pos.parentOffset)
-        // Log all inline content in parent
-        const inlineContent: string[] = []
-        parent.forEach((node, offset) => {
-          if (node.isText) {
-            inlineContent.push(`TEXT@${offset}:"${node.text}"`)
-          } else {
-            inlineContent.push(`${node.type.name}@${offset}(size=${node.nodeSize})`)
-          }
-        })
-        console.log('[RAF] Model content:', inlineContent.join(' | '))
-      } catch (e) {
-        console.log('[RAF] Could not resolve pos:', e)
-      }
-      updatingSelection = true
-      const success = selectionToDOM(containerRef, currentState.selection)
-      console.log('[RAF] Sync result:', success)
+      int.setUpdatingSelection(true)
+      selectionToDOM(containerRef, currentState.selection, currentState.doc)
 
-      // Keep flag true briefly to ignore the selectionchange event caused by selectionToDOM
-      setTimeout(() => {
-        updatingSelection = false
-      }, 0)
+      if (int.recorder()?.recording()) {
+        const domResult = domFromPos(containerRef, currentState.selection.from, currentState.doc)
+        int.recorder()!.recordSelection({
+          trigger: 'sync-to-dom',
+          dom: {
+            anchorNodeName: domResult?.node.nodeName ?? '?',
+            anchorOffset: domResult?.offset ?? -1,
+            focusNodeName: domResult?.node.nodeName ?? '?',
+            focusOffset: domResult?.offset ?? -1,
+            anchorText: domResult?.node.nodeType === 3 ? domResult.node.textContent?.slice(0, 40) : undefined,
+          },
+          modelFrom: currentState.selection.from,
+          modelTo: currentState.selection.to,
+          previousModel: { from: currentState.selection.from, to: currentState.selection.to },
+          dispatched: false,
+          reverseMap: domResult ? {
+            pos: currentState.selection.from,
+            nodeName: domResult.node.nodeName,
+            offset: domResult.offset,
+            text: domResult.node.nodeType === 3 ? domResult.node.textContent?.slice(0, 40) : undefined,
+          } : undefined,
+          summary: `model(${currentState.selection.from})→DOM(${domResult?.offset ?? '?'})`,
+        })
+      }
+
+      setTimeout(() => { int.setUpdatingSelection(false) }, 0)
     })
   })
 
-  // Handle text input (beforeinput event)
+  // ─── Input handling ──────────────────────────────────────────────
+
   const handleBeforeInput = (event: InputEvent) => {
     if (!containerRef) return
-
-    const currentState = state()
+    const currentState = int.state()
     const { inputType, data } = event
 
     switch (inputType) {
@@ -293,548 +526,339 @@ export function EditorView(props: EditorViewProps): JSX.Element {
         if (data) {
           event.preventDefault()
           const { from, to } = currentState.selection
-          // Log text around the insertion point
-          const textBefore = currentState.doc.textBetween(Math.max(0, from - 5), from, '')
-          const textAfter = currentState.doc.textBetween(to, Math.min(currentState.doc.content.size, to + 10), '')
-          console.log('[insertText] Inserting', JSON.stringify(data), 'at selection:', from, '-', to)
-          console.log(`[insertText] Context: "...${textBefore}|${textAfter}..."`)
-
-          // Try plugin handleTextInput props first
-          if (callPropHandlers(currentState, props.props, 'handleTextInput', getViewRef(), from, to, data)) {
-            return
-          }
-
-          // Default text insertion
+          if (callPropHandlers(currentState, int.editorProps(), 'handleTextInput', getViewRef(), from, to, data)) return
           const tr = currentState.tr()
           tr.replaceSelectionWith(currentState.schema.text(data), true)
-          // Log text after insertion
-          const newTextAround = tr.doc.textBetween(Math.max(0, from - 5), Math.min(tr.doc.content.size, from + 10), '')
-          console.log(`[insertText] After insert: "...${newTextAround}..."`)
-          console.log('[insertText] New selection:', tr.selection.from, '-', tr.selection.to)
-          dispatch(tr)
+          int.dispatch(tr)
         }
         break
-
       case 'insertParagraph':
       case 'insertLineBreak':
         event.preventDefault()
-        // Split the current block or insert a hard break
-        handleEnter(currentState)
+        splitBlock(currentState, int.dispatch)
         break
-
       case 'deleteContentBackward':
         event.preventDefault()
         handleBackspace(currentState)
         break
-
       case 'deleteContentForward':
         event.preventDefault()
         handleDelete(currentState)
         break
-
       case 'deleteWordBackward':
         event.preventDefault()
         handleDeleteWord(currentState, -1)
         break
-
       case 'deleteWordForward':
         event.preventDefault()
         handleDeleteWord(currentState, 1)
         break
-
       case 'deleteSoftLineBackward':
       case 'deleteHardLineBackward':
         event.preventDefault()
         handleDeleteLine(currentState, -1)
         break
-
       case 'deleteSoftLineForward':
       case 'deleteHardLineForward':
         event.preventDefault()
         handleDeleteLine(currentState, 1)
         break
-
-      // Composition events are handled separately
       case 'insertCompositionText':
-        // Let the browser handle it during composition
         break
-
       default:
-        // For unhandled input types, prevent default to avoid DOM corruption
-        // console.log("Unhandled inputType:", inputType)
         break
     }
   }
 
-  // Handle Enter key
-  const handleEnter = (currentState: EditorState) => {
-    const { $from, $to } = currentState.selection
-    const tr = currentState.tr()
-
-    if (currentState.selection.empty) {
-      // Check if we're in a textblock
-      if ($from.parent.isTextblock) {
-        // Split the paragraph
-        const depth = $from.depth
-        const _after = $from.after(depth)
-        const _before = $from.before(depth)
-
-        // Create new paragraph
-        const paragraph = currentState.schema.nodes.paragraph?.create()
-        if (paragraph) {
-          tr.split($from.pos)
-        }
-      }
-    } else {
-      // Delete selection first, then split
-      tr.deleteSelection()
-      // For now, just delete - proper split logic would go here
-    }
-
-    dispatch(tr)
-  }
-
-  // Handle Backspace
   const handleBackspace = (currentState: EditorState) => {
     const { $from, empty } = currentState.selection
     const tr = currentState.tr()
 
-    if (!empty) {
-      // Selection exists - just delete it
-      tr.deleteSelection()
-      dispatch(tr)
-      return
-    }
-
-    // Nothing to delete at the very start
+    if (!empty) { tr.deleteSelection(); int.dispatch(tr); return }
     if ($from.pos === 0) return
 
-    // Check if we're at the start of a textblock
     if ($from.parentOffset === 0 && $from.parent.isTextblock) {
-      // Try to find a cut point before this block
       const $cut = findCutBefore($from)
-
       if ($cut) {
         const before = $cut.nodeBefore
         const after = $cut.nodeAfter
-
-        // Try to join with the previous block if possible
         if (before && after && canJoin(currentState.doc, $cut.pos)) {
-          tr.join($cut.pos)
-          dispatch(tr)
-          return
+          tr.join($cut.pos); int.dispatch(tr); return
         }
-
-        // If current block is empty and there's a previous textblock, delete current block
         if ($from.parent.content.size === 0 && before?.isTextblock) {
-          // Delete the empty paragraph
           tr.delete($from.before($from.depth), $from.after($from.depth))
-          // Find a valid selection in the previous block
           const $newPos = tr.doc.resolve(Math.max(0, $cut.pos - 1))
           const sel = EditorSelection.findFrom($newPos, -1, true)
           if (sel) tr.setSelection(sel)
-          dispatch(tr)
-          return
+          int.dispatch(tr); return
         }
       }
-
-      // Try to lift the content if we can't join
       const range = $from.blockRange()
       if (range) {
         const target = liftTarget(range)
-        if (target != null) {
-          tr.lift(range, target)
-          dispatch(tr)
-          return
-        }
+        if (target != null) { tr.lift(range, target); int.dispatch(tr); return }
       }
-
-      // Nothing we can do at the start of this block
       return
     }
 
-    // Not at start of textblock - safe to delete character before cursor
-    // But we need to be careful about node boundaries
     const nodeBefore = $from.nodeBefore
     if (nodeBefore) {
-      // There's content before in the same parent
-      if (nodeBefore.isText) {
-        // Delete one character
-        tr.delete($from.pos - 1, $from.pos)
-      } else {
-        // Delete the whole inline node (like an image or emoji)
-        tr.delete($from.pos - nodeBefore.nodeSize, $from.pos)
-      }
-      dispatch(tr)
+      if (nodeBefore.isText) tr.delete($from.pos - 1, $from.pos)
+      else tr.delete($from.pos - nodeBefore.nodeSize, $from.pos)
+      int.dispatch(tr)
     }
   }
 
-  /**
-   * Find the cut point before a position - the boundary between the current
-   * block and what's before it.
-   */
   function findCutBefore($pos: ResolvedPos): ResolvedPos | null {
-    // Walk up the tree looking for a place where we have a sibling before us
     for (let i = $pos.depth - 1; i >= 0; i--) {
-      if ($pos.index(i) > 0) {
-        // There's a sibling before at this depth
-        return $pos.doc.resolve($pos.before(i + 1))
-      }
+      if ($pos.index(i) > 0) return $pos.doc.resolve($pos.before(i + 1))
     }
     return null
   }
 
-  // Handle Delete
   const handleDelete = (currentState: EditorState) => {
     const { $from, $to, empty } = currentState.selection
     const tr = currentState.tr()
 
-    if (!empty) {
-      // Selection exists - just delete it
-      tr.deleteSelection()
-      dispatch(tr)
-      return
-    }
-
-    // Nothing to delete at the very end
+    if (!empty) { tr.deleteSelection(); int.dispatch(tr); return }
     if ($to.pos >= currentState.doc.content.size) return
 
-    // Check if we're at the end of a textblock
     const atBlockEnd = $to.parentOffset === $to.parent.content.size && $to.parent.isTextblock
-
     if (atBlockEnd) {
-      // Try to find a cut point after this block
       const $cut = findCutAfter($to)
-
       if ($cut) {
         const before = $cut.nodeBefore
         const after = $cut.nodeAfter
-
-        // Try to join with the next block if possible
         if (before && after && canJoin(currentState.doc, $cut.pos)) {
-          tr.join($cut.pos)
-          dispatch(tr)
-          return
+          tr.join($cut.pos); int.dispatch(tr); return
         }
-
-        // If next block is empty, delete it
         if (after?.isTextblock && after.content.size === 0) {
-          tr.delete($cut.pos, $cut.pos + after.nodeSize)
-          dispatch(tr)
-          return
+          tr.delete($cut.pos, $cut.pos + after.nodeSize); int.dispatch(tr); return
         }
       }
-
-      // Nothing we can do at the end of this block
       return
     }
 
-    // Not at end of textblock - safe to delete character after cursor
     const nodeAfter = $to.nodeAfter
     if (nodeAfter) {
-      if (nodeAfter.isText) {
-        // Delete one character
-        tr.delete($to.pos, $to.pos + 1)
-      } else {
-        // Delete the whole inline node
-        tr.delete($to.pos, $to.pos + nodeAfter.nodeSize)
-      }
-      dispatch(tr)
+      if (nodeAfter.isText) tr.delete($to.pos, $to.pos + 1)
+      else tr.delete($to.pos, $to.pos + nodeAfter.nodeSize)
+      int.dispatch(tr)
     }
   }
 
-  /**
-   * Find the cut point after a position - the boundary between the current
-   * block and what's after it.
-   */
   function findCutAfter($pos: ResolvedPos): ResolvedPos | null {
-    // Walk up the tree looking for a place where we have a sibling after us
     for (let i = $pos.depth - 1; i >= 0; i--) {
       const parent = $pos.node(i)
-      if ($pos.index(i) + 1 < parent.childCount) {
-        // There's a sibling after at this depth
-        return $pos.doc.resolve($pos.after(i + 1))
-      }
+      if ($pos.index(i) + 1 < parent.childCount) return $pos.doc.resolve($pos.after(i + 1))
     }
     return null
   }
 
-  // Handle Delete Word
   const handleDeleteWord = (currentState: EditorState, dir: number) => {
-    const { $from, $to, empty } = currentState.selection
+    const { $from, empty } = currentState.selection
     const tr = currentState.tr()
-
-    if (!empty) {
-      tr.deleteSelection()
-    } else {
-      // Simple word deletion - just delete to word boundary
-      // Full implementation would use proper word boundary detection
+    if (!empty) { tr.deleteSelection() } else {
       const text = $from.parent.textContent
       const offset = $from.parentOffset
-
       if (dir < 0) {
-        // Delete backward to word boundary
         let start = offset
         while (start > 0 && /\s/.test(text[start - 1])) start--
         while (start > 0 && /\S/.test(text[start - 1])) start--
-        const deleteFrom = $from.pos - (offset - start)
-        tr.delete(deleteFrom, $from.pos)
+        tr.delete($from.pos - (offset - start), $from.pos)
       } else {
-        // Delete forward to word boundary
         let end = offset
         while (end < text.length && /\S/.test(text[end])) end++
         while (end < text.length && /\s/.test(text[end])) end++
-        const deleteTo = $from.pos + (end - offset)
-        tr.delete($from.pos, deleteTo)
+        tr.delete($from.pos, $from.pos + (end - offset))
       }
     }
-
-    dispatch(tr)
+    int.dispatch(tr)
   }
 
-  // Handle Delete Line
   const handleDeleteLine = (currentState: EditorState, dir: number) => {
     const { $from } = currentState.selection
     const tr = currentState.tr()
-
-    if (dir < 0) {
-      // Delete from line start to cursor
-      const lineStart = $from.pos - $from.parentOffset
-      tr.delete(lineStart, $from.pos)
-    } else {
-      // Delete from cursor to line end
-      const lineEnd = $from.pos + ($from.parent.content.size - $from.parentOffset)
-      tr.delete($from.pos, lineEnd)
-    }
-
-    dispatch(tr)
+    if (dir < 0) tr.delete($from.pos - $from.parentOffset, $from.pos)
+    else tr.delete($from.pos, $from.pos + ($from.parent.content.size - $from.parentOffset))
+    int.dispatch(tr)
   }
 
-  // Handle composition events
-  const handleCompositionStart = () => {
-    composing = true
-  }
-
+  const handleCompositionStart = () => { int.setComposing(true) }
   const handleCompositionEnd = (event: CompositionEvent) => {
-    composing = false
-    // Handle the composed text
+    int.setComposing(false)
     if (event.data && containerRef) {
-      const currentState = state()
-      const tr = currentState.tr()
-      tr.replaceSelectionWith(currentState.schema.text(event.data), true)
-      dispatch(tr)
+      const tr = int.state().tr()
+      tr.replaceSelectionWith(int.state().schema.text(event.data), true)
+      int.dispatch(tr)
     }
   }
 
-  // Handle copy event
+  /**
+   * Call handleDOMEvents handlers from view props and all plugins for a
+   * given event type. Returns true if any handler handled the event.
+   */
+  const callDOMEventHandlers = (eventName: string, event: Event): boolean => {
+    const viewRef = getViewRef()
+    // Check view props first
+    const viewHandler = int.editorProps()?.handleDOMEvents?.[eventName]
+    if (viewHandler) {
+      const result = viewHandler(viewRef, event)
+      if (result === true) return true
+    }
+    // Check plugin handlers
+    for (const plugin of int.state().plugins) {
+      const handler = plugin.spec.props?.handleDOMEvents?.[eventName]
+      if (handler) {
+        const result = handler(viewRef, event)
+        if (result === true) return true
+      }
+    }
+    return false
+  }
+
   const handleCopy = (event: ClipboardEvent) => {
-    const currentState = state()
+    if (callDOMEventHandlers('copy', event)) return
+    const currentState = int.state()
     const { from, to, empty } = currentState.selection
-    if (empty) return // Nothing to copy
-
-    // Get text between selection, with double newlines between paragraphs
-    const text = currentState.doc.textBetween(from, to, '\n\n')
-    event.clipboardData?.setData('text/plain', text)
+    if (empty) return
+    event.clipboardData?.setData('text/plain', currentState.doc.textBetween(from, to, '\n\n'))
     event.preventDefault()
   }
 
-  // Handle cut event
   const handleCut = (event: ClipboardEvent) => {
-    handleCopy(event)
-    const currentState = state()
-    if (!currentState.selection.empty) {
-      const tr = currentState.tr()
-      tr.deleteSelection()
-      dispatch(tr)
-    }
+    if (callDOMEventHandlers('cut', event)) return
+    // Default cut: copy as plain text, then delete selection
+    const currentState = int.state()
+    const { from, to, empty } = currentState.selection
+    if (empty) return
+    event.clipboardData?.setData('text/plain', currentState.doc.textBetween(from, to, '\n\n'))
+    event.preventDefault()
+    const tr = currentState.tr(); tr.deleteSelection(); int.dispatch(tr)
   }
 
-  // Handle paste event
   const handlePaste = (event: ClipboardEvent) => {
+    if (callDOMEventHandlers('paste', event)) return
     event.preventDefault()
+    // Default paste: plain text only
     const text = event.clipboardData?.getData('text/plain')
     if (!text) return
-
-    const currentState = state()
+    const currentState = int.state()
     const tr = currentState.tr()
-
-    // Split on double newlines to create paragraphs
     const paragraphs = text.split(/\n\n+/)
-
     if (paragraphs.length === 1) {
-      // Single paragraph - just insert text
       tr.replaceSelectionWith(currentState.schema.text(text), true)
     } else {
-      // Multiple paragraphs - create paragraph nodes
       const paragraphType = currentState.schema.nodes.paragraph
-      if (!paragraphType) {
-        // Fallback: insert as plain text
-        tr.replaceSelectionWith(currentState.schema.text(text), true)
-      } else {
+      if (!paragraphType) { tr.replaceSelectionWith(currentState.schema.text(text), true) }
+      else {
         const nodes = paragraphs.map((content) =>
-          paragraphType.create(null, content ? currentState.schema.text(content) : null),
-        )
-        const fragment = Fragment.from(nodes)
-        // Use openStart=1, openEnd=1 to properly split the current paragraph:
-        // - First paragraph's content joins with text before cursor
-        // - Last paragraph's content joins with text after cursor
-        tr.replaceSelection(new Slice(fragment, 1, 1))
+          paragraphType.create(null, content ? currentState.schema.text(content) : null))
+        tr.replaceSelection(new Slice(Fragment.from(nodes), 1, 1))
       }
     }
-
-    dispatch(tr)
+    int.dispatch(tr)
   }
 
-  // Create keymap context getter for the keydown handler
+  // ─── Keyboard ────────────────────────────────────────────────────
+
   const getKeymapContext = (): CommandContext | null => {
     if (!containerRef) return null
-    return {
-      state: state(),
-      dispatch,
-      dom: containerRef,
-      focus: () => containerRef?.focus(),
-    }
+    return { state: int.state(), dispatch: int.dispatch, dom: containerRef, focus: () => containerRef?.focus() }
   }
 
-  // Create keymap handler if keymap is provided
-  const keymapHandler = props.keymap ? keydownHandler(props.keymap, getKeymapContext) : null
+  const keymapHandler = int.keymap() ? keydownHandler(int.keymap()!, getKeymapContext) : null
 
-  // Handle keyboard events (for shortcuts)
   const handleKeyDown = (event: KeyboardEvent) => {
-    // First, try the keymap
-    if (keymapHandler?.(event)) {
-      event.preventDefault()
-      return
+    if (keymapHandler?.(event)) { event.preventDefault(); return }
+    if (callPropHandlers(int.state(), int.editorProps(), 'handleKeyDown', getViewRef(), event)) {
+      event.preventDefault(); return
     }
-
-    // Then, try plugin handleKeyDown props
-    if (callPropHandlers(state(), props.props, 'handleKeyDown', getViewRef(), event)) {
-      event.preventDefault()
-      return
-    }
-
-    // Handle Tab key (not handled by keymap by default)
-    if (event.key === 'Tab') {
-      event.preventDefault()
-      // Could insert tab character or indent
-    }
+    if (event.key === 'Tab') event.preventDefault()
   }
 
-  // Get document position from a point (for click handling)
+  // ─── Click handling ──────────────────────────────────────────────
+
   const posAtCoords = (x: number, y: number): number | null => {
     if (!containerRef) return null
-
-    // Use caretPositionFromPoint or caretRangeFromPoint
     let range: Range | null = null
-
     if (document.caretPositionFromPoint) {
       const pos = document.caretPositionFromPoint(x, y)
-      if (pos) {
-        range = document.createRange()
-        range.setStart(pos.offsetNode, pos.offset)
-        range.collapse(true)
-      }
+      if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true) }
     } else if (document.caretRangeFromPoint) {
       range = document.caretRangeFromPoint(x, y)
     }
-
-    if (!range || !containerRef.contains(range.startContainer)) {
-      return null
-    }
-
-    // Convert DOM position to document position
-    // Create a minimal selection-like object for posAtCoords
-    const sel = selectionFromDOM(state().doc, {
-      anchorNode: range.startContainer,
-      anchorOffset: range.startOffset,
-      focusNode: range.startContainer,
-      focusOffset: range.startOffset,
-      isCollapsed: true,
-      rangeCount: 1,
-      getRangeAt: () => range!,
+    if (!range || !containerRef.contains(range.startContainer)) return null
+    const sel = selectionFromDOM(int.state().doc, {
+      anchorNode: range.startContainer, anchorOffset: range.startOffset,
+      focusNode: range.startContainer, focusOffset: range.startOffset,
+      isCollapsed: true, rangeCount: 1, getRangeAt: () => range!,
     } as unknown as Selection)
-
     return sel ? sel.from : null
   }
 
-  // Handle click events
   const handleClick = (event: MouseEvent) => {
     const pos = posAtCoords(event.clientX, event.clientY)
     if (pos !== null) {
-      if (callPropHandlers(state(), props.props, 'handleClick', getViewRef(), pos, event)) {
-        event.preventDefault()
-      }
+      if (callPropHandlers(int.state(), int.editorProps(), 'handleClick', getViewRef(), pos, event)) event.preventDefault()
     }
   }
 
-  // Handle double-click events
   const handleDblClick = (event: MouseEvent) => {
     const pos = posAtCoords(event.clientX, event.clientY)
     if (pos !== null) {
-      if (callPropHandlers(state(), props.props, 'handleDoubleClick', getViewRef(), pos, event)) {
-        event.preventDefault()
-      }
+      if (callPropHandlers(int.state(), int.editorProps(), 'handleDoubleClick', getViewRef(), pos, event)) event.preventDefault()
     }
   }
 
-  // Track clicks for triple-click detection
   let lastClickTime = 0
   let lastClickPos: number | null = null
   let clickCount = 0
 
   const handleMouseDown = (event: MouseEvent) => {
+    // Let plugins (e.g. table editing) intercept mousedown first
+    if (callDOMEventHandlers('mousedown', event)) return
+
     const now = Date.now()
     const pos = posAtCoords(event.clientX, event.clientY)
-
-    // Detect triple-click (three clicks within 500ms at same position)
     if (now - lastClickTime < 500 && pos !== null && pos === lastClickPos) {
       clickCount++
       if (clickCount >= 3) {
-        if (callPropHandlers(state(), props.props, 'handleTripleClick', getViewRef(), pos, event)) {
-          event.preventDefault()
-        }
+        if (callPropHandlers(int.state(), int.editorProps(), 'handleTripleClick', getViewRef(), pos, event)) event.preventDefault()
         clickCount = 0
       }
-    } else {
-      clickCount = 1
-    }
-
+    } else { clickCount = 1 }
     lastClickTime = now
     lastClickPos = pos
   }
 
-  // Handle focus
-  const handleFocus = () => {
-    setFocused(true)
-    props.onFocusChange?.(true)
-  }
+  // ─── Focus ───────────────────────────────────────────────────────
 
-  const handleBlur = () => {
-    setFocused(false)
-    props.onFocusChange?.(false)
-  }
+  const handleFocus = () => { int.setFocused(true); int.onFocusChange()?.(true) }
+  const handleBlur = () => { int.setFocused(false); int.onFocusChange()?.(false) }
 
-  // Setup event listeners
+  // ─── Lifecycle ───────────────────────────────────────────────────
+
   onMount(() => {
     document.addEventListener('selectionchange', handleSelectionChange)
-
-    if (props.autoFocus && containerRef) {
-      containerRef.focus()
-    }
+    if (int.autoFocus() && containerRef) containerRef.focus()
   })
 
   onCleanup(() => {
-    document.removeEventListener('selectionchange', handleSelectionChange)
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('selectionchange', handleSelectionChange)
+    }
   })
 
-  // Compute placeholder visibility
+  // Register the content ref with the provider
+  onMount(() => { if (containerRef) int.setContentRef(containerRef) })
+  onCleanup(() => { int.setContentRef(null) })
+
+  // ─── Computed ────────────────────────────────────────────────────
+
   const showPlaceholder = () => {
-    const currentState = state()
-    return (
-      props.placeholder &&
-      currentState.doc.content.size === 2 && // Just opening and closing tags
-      currentState.doc.textContent === ''
-    )
+    const currentState = int.state()
+    return int.placeholder() && currentState.doc.content.size === 2 && currentState.doc.textContent === ''
   }
 
   const debugPosition = () => {
@@ -843,64 +867,100 @@ export function EditorView(props: EditorViewProps): JSX.Element {
     return undefined
   }
 
+  // ─── Render ──────────────────────────────────────────────────────
+
   return (
-    <EditorContext.Provider value={contextValue}>
-      <div style={{ position: 'relative' }} class="solid-editor-wrapper">
-        <div
-          ref={containerRef}
-          class={`solid-editor ${props.class ?? ''} ${focused() ? 'solid-editor-focused' : ''}`}
-          contentEditable={computedEditable()}
-          role="textbox"
-          aria-multiline="true"
-          aria-readonly={!computedEditable()}
-          spellcheck={true}
-          onBeforeInput={handleBeforeInput}
-          onKeyDown={handleKeyDown}
-          onClick={handleClick}
-          onDblClick={handleDblClick}
-          onMouseDown={handleMouseDown}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
-          onCopy={handleCopy}
-          onCut={handleCut}
-          onPaste={handlePaste}
-          style={{
-            position: 'relative',
-            outline: 'none',
-            'white-space': 'pre-wrap',
-            'word-wrap': 'break-word',
-          }}
-        >
-          <NodeView
-            node={state().doc}
-            pos={0}
-            nodeViews={props.nodeViews}
-            decorations={decorations()}
-            selection={state().selection}
-            onSelectNode={handleSelectNode}
-          />
-          {showPlaceholder() && (
-            <div
-              class="solid-editor-placeholder"
-              style={{
-                position: 'absolute',
-                top: '0',
-                left: '0',
-                'pointer-events': 'none',
-                opacity: '0.5',
-              }}
-            >
-              {props.placeholder}
-            </div>
-          )}
-        </div>
-        <Show when={props.debug}>
-          <DebugOverlay state={state()} position={debugPosition()} />
-        </Show>
+    <div style={{ position: 'relative' }} class="solidjs-editor-wrapper" ref={(el) => int.setWrapperRef(el)}>
+      <div
+        ref={(el) => { containerRef = el }}
+        class={`solidjs-editor ${props.class ?? ''} ${int.focused() ? 'solidjs-editor-focused' : ''}`}
+        contentEditable={computedEditable()}
+        role="textbox"
+        aria-multiline="true"
+        aria-readonly={!computedEditable()}
+        spellcheck={true}
+        onBeforeInput={handleBeforeInput}
+        onKeyDown={handleKeyDown}
+        onClick={handleClick}
+        onDblClick={handleDblClick}
+        onMouseDown={handleMouseDown}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
+        onCopy={handleCopy}
+        onCut={handleCut}
+        onPaste={handlePaste}
+        style={{
+          position: 'relative',
+          outline: 'none',
+          'white-space': 'pre-wrap',
+          'word-wrap': 'break-word',
+        }}
+      >
+        <NodeView
+          node={int.state().doc}
+          pos={0}
+          nodeViews={effectiveNodeViews()}
+          decorations={decorations()}
+          selection={int.state().selection}
+          onSelectNode={int.handleSelectNode}
+        />
+        {showPlaceholder() && (
+          <div
+            class="solidjs-editor-placeholder"
+            style={{ position: 'absolute', top: '0', left: '0', 'pointer-events': 'none', opacity: '0.5' }}
+          >
+            {int.placeholder()}
+          </div>
+        )}
       </div>
-    </EditorContext.Provider>
+      <Show when={props.blockSelector}>
+        <BlockSelector />
+      </Show>
+      <Show when={props.debug}>
+        <DebugOverlay state={int.state()} position={debugPosition()} recorder={int.recorder()} />
+      </Show>
+    </div>
+  )
+}
+
+// ─── EditorView (convenience wrapper) ─────────────────────────────────────────
+
+/**
+ * Convenience component that combines EditorProvider + EditorContent.
+ * For simple use cases where you don't need a toolbar inside the editor context.
+ *
+ * For toolbars that need `useEditor()`, use the Provider/Content split instead:
+ * ```tsx
+ * <EditorProvider state={state()} dispatchTransaction={dispatch}>
+ *   <MyToolbar />
+ *   <EditorContent class="my-editor" />
+ * </EditorProvider>
+ * ```
+ */
+export function EditorView(props: EditorViewProps): JSX.Element {
+  return (
+    <EditorProvider
+      state={props.state}
+      onStateChange={props.onStateChange}
+      dispatchTransaction={props.dispatchTransaction}
+      editable={props.editable}
+      nodeViews={props.nodeViews}
+      blockDragDrop={props.blockDragDrop}
+      placeholder={props.placeholder}
+      autoFocus={props.autoFocus}
+      keymap={props.keymap}
+      props={props.props}
+      recorder={props.recorder}
+      onFocusChange={props.onFocusChange}
+    >
+      <EditorContent
+        class={props.class}
+        debug={props.debug}
+        blockSelector={props.blockSelector}
+      />
+    </EditorProvider>
   )
 }
 

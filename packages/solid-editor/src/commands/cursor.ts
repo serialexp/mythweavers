@@ -1,5 +1,5 @@
 /**
- * Cursor movement commands for solid-editor
+ * Cursor movement commands for solidjs-editor
  *
  * These commands handle arrow key navigation and related cursor movements.
  * They follow the ProseMirror command signature: (state, dispatch?, view?) => boolean
@@ -9,10 +9,10 @@ import type { CommandContext } from '../keymap'
 import type { Node as DocNode, ResolvedPos } from '../model'
 import type { EditorState, Transaction } from '../state'
 import { Selection, TextSelection } from '../state/selection'
+import { domFromPos, posFromDOM } from '../view/selection'
 
 // DOM node type constants
 const TEXT_NODE = 3
-const ELEMENT_NODE = 1
 
 /**
  * Command type - same as keymap Command
@@ -416,7 +416,7 @@ export const selectDown: Command = (state, dispatch, view) => {
  */
 function moveVertically(doc: DocNode, $pos: ResolvedPos, dir: -1 | 1, dom: HTMLElement): ResolvedPos | null {
   // Get the DOM position for the current cursor
-  const domPos = getDOMPosition(dom, $pos.pos)
+  const domPos = domFromPos(dom, $pos.pos, doc)
   if (!domPos) return null
 
   // Get the bounding rect for the current position
@@ -451,79 +451,120 @@ function moveVertically(doc: DocNode, $pos: ResolvedPos, dir: -1 | 1, dom: HTMLE
 }
 
 /**
- * Get DOM position (node + offset) for a document position.
- */
-function getDOMPosition(dom: HTMLElement, pos: number): { node: globalThis.Node; offset: number } | null {
-  // Walk through the DOM to find the node with the given position
-  // This uses the data-pos attributes set by the view layer
-  const walker = document.createTreeWalker(dom, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT)
-
-  let currentPos = 0
-  let node: globalThis.Node | null = walker.nextNode()
-
-  while (node) {
-    if (node.nodeType === TEXT_NODE) {
-      const textLength = (node as Text).length
-      if (currentPos + textLength >= pos) {
-        return { node, offset: pos - currentPos }
-      }
-      currentPos += textLength
-    } else if (node.nodeType === ELEMENT_NODE) {
-      const el = node as HTMLElement
-      const posAttr = el.getAttribute('data-pos')
-      if (posAttr !== null) {
-        const nodePos = Number.parseInt(posAttr, 10)
-        if (!Number.isNaN(nodePos)) {
-          // Check if pos is within this element
-          const sizeAttr = el.getAttribute('data-size')
-          if (sizeAttr) {
-            const nodeSize = Number.parseInt(sizeAttr, 10)
-            if (pos >= nodePos && pos < nodePos + nodeSize) {
-              // Position is within this node, continue into children
-            }
-          }
-        }
-      }
-    }
-    node = walker.nextNode()
-  }
-
-  return null
-}
-
-/**
  * Get the bounding rectangle at a DOM position.
+ *
+ * Element-anchored collapsed ranges produce unreliable rects across browsers
+ * (often (0,0,0,0)), so we resolve element+offset to a text-node anchor first
+ * whenever possible — text-anchored collapsed ranges reliably report the
+ * caret rect.
  */
 function getRectAtDOMPosition(node: globalThis.Node, offset: number): DOMRect | null {
+  let anchorNode: globalThis.Node = node
+  let anchorOffset = offset
+
+  if (anchorNode.nodeType !== TEXT_NODE) {
+    const resolved = resolveToTextAnchor(anchorNode, anchorOffset)
+    if (resolved) {
+      anchorNode = resolved.node
+      anchorOffset = resolved.offset
+    }
+  }
+
   try {
     const range = document.createRange()
-    if (node.nodeType === TEXT_NODE) {
-      const text = node as Text
-      // Clamp offset to valid range
-      const safeOffset = Math.min(offset, text.length)
-      range.setStart(node, safeOffset)
-      range.setEnd(node, safeOffset)
+    if (anchorNode.nodeType === TEXT_NODE) {
+      const text = anchorNode as Text
+      const safeOffset = Math.min(Math.max(anchorOffset, 0), text.length)
+      range.setStart(anchorNode, safeOffset)
+      range.setEnd(anchorNode, safeOffset)
     } else {
-      range.setStart(node, 0)
-      range.setEnd(node, 0)
+      // No text descendant to anchor against — use the element itself as a
+      // best-effort fallback (e.g. an empty paragraph's <br>).
+      const clampedOffset = Math.min(Math.max(anchorOffset, 0), anchorNode.childNodes.length)
+      range.setStart(anchorNode, clampedOffset)
+      range.setEnd(anchorNode, clampedOffset)
     }
 
     const rects = range.getClientRects()
-    if (rects.length > 0) {
-      return rects[0]
+    if (rects.length > 0) return rects[0]
+
+    const bounding = range.getBoundingClientRect()
+    if (bounding.width > 0 || bounding.height > 0 || bounding.top !== 0 || bounding.left !== 0) {
+      return bounding
     }
 
-    // Fallback to bounding client rect
-    return range.getBoundingClientRect()
+    // Last-resort fallback: the element's own bounding rect.
+    if (anchorNode.nodeType !== TEXT_NODE) {
+      return (anchorNode as Element).getBoundingClientRect()
+    }
+    return bounding
   } catch {
     return null
   }
 }
 
 /**
+ * Resolve an element+child-offset position to a text node + offset pointing
+ * at the same caret location. Used to get reliable caret rects from ranges.
+ *
+ * If the offset points to a text child, use that directly. If it points to an
+ * element child, descend to its first text descendant. If it's past the last
+ * child, use the end of the previous/last text descendant.
+ */
+function resolveToTextAnchor(
+  element: globalThis.Node,
+  offset: number,
+): { node: Text; offset: number } | null {
+  const children = element.childNodes
+  if (children.length === 0) return null
+
+  if (offset < children.length) {
+    const child = children[offset]
+    if (child.nodeType === TEXT_NODE) return { node: child as Text, offset: 0 }
+    const first = firstTextDescendant(child)
+    if (first) return { node: first, offset: 0 }
+    // Element child has no text — try end of previous child instead.
+    if (offset > 0) {
+      const prev = children[offset - 1]
+      if (prev.nodeType === TEXT_NODE) return { node: prev as Text, offset: (prev as Text).length }
+      const last = lastTextDescendant(prev)
+      if (last) return { node: last, offset: last.length }
+    }
+    return null
+  }
+
+  // Offset is past the last child — anchor at end of last text descendant.
+  const lastChild = children[children.length - 1]
+  if (lastChild.nodeType === TEXT_NODE) {
+    return { node: lastChild as Text, offset: (lastChild as Text).length }
+  }
+  const last = lastTextDescendant(lastChild)
+  if (last) return { node: last, offset: last.length }
+  return null
+}
+
+function firstTextDescendant(node: globalThis.Node): Text | null {
+  if (node.nodeType === TEXT_NODE) return node as Text
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+  return walker.nextNode() as Text | null
+}
+
+function lastTextDescendant(node: globalThis.Node): Text | null {
+  if (node.nodeType === TEXT_NODE) return node as Text
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+  let result: Text | null = null
+  let current = walker.nextNode()
+  while (current) {
+    result = current as Text
+    current = walker.nextNode()
+  }
+  return result
+}
+
+/**
  * Find document position from screen coordinates.
  */
-function posAtCoords(dom: HTMLElement, x: number, y: number, _doc: DocNode): number | null {
+function posAtCoords(dom: HTMLElement, x: number, y: number, doc: DocNode): number | null {
   // Use caretPositionFromPoint or caretRangeFromPoint
   let range: Range | null = null
 
@@ -542,72 +583,8 @@ function posAtCoords(dom: HTMLElement, x: number, y: number, _doc: DocNode): num
     return null
   }
 
-  // Convert DOM position to document position by walking the tree
-  return posFromDOMOffset(dom, range.startContainer, range.startOffset)
-}
-
-/**
- * Convert a DOM node/offset to a document position.
- */
-function posFromDOMOffset(root: HTMLElement, node: globalThis.Node, offset: number): number | null {
-  // Find the closest element with data-pos
-  let current: globalThis.Node | null = node
-  while (current && current !== root) {
-    if (current.nodeType === ELEMENT_NODE) {
-      const el = current as HTMLElement
-      const posAttr = el.getAttribute('data-pos')
-      if (posAttr !== null) {
-        const basePos = Number.parseInt(posAttr, 10)
-        if (!Number.isNaN(basePos)) {
-          // Calculate offset within this element
-          const textOffset = getTextOffsetBefore(el, node, offset)
-          return basePos + textOffset
-        }
-      }
-    }
-    current = current.parentNode
-  }
-
-  // Fallback: count text from start
-  return countTextBefore(root, node, offset)
-}
-
-/**
- * Get text offset before a given DOM position within an element.
- */
-function getTextOffsetBefore(container: HTMLElement, targetNode: globalThis.Node, targetOffset: number): number {
-  let offset = 0
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  let node = walker.nextNode()
-
-  while (node) {
-    if (node === targetNode) {
-      return offset + targetOffset
-    }
-    offset += (node as Text).length
-    node = walker.nextNode()
-  }
-
-  return offset
-}
-
-/**
- * Count all text before a given DOM position.
- */
-function countTextBefore(root: HTMLElement, targetNode: globalThis.Node, targetOffset: number): number {
-  let count = 0
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  let node = walker.nextNode()
-
-  while (node) {
-    if (node === targetNode) {
-      return count + targetOffset
-    }
-    count += (node as Text).length
-    node = walker.nextNode()
-  }
-
-  return count
+  // Delegate to the authoritative DOM→model mapper (accounts for block tokens).
+  return posFromDOM(doc, range.startContainer, range.startOffset)
 }
 
 // ============================================================================

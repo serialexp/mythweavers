@@ -1,4 +1,4 @@
-import { Fragment, Mark, MarkType, Node, NodeRange, NodeType, Slice } from '../model'
+import { Fragment, Mark, MarkType, Node, NodeRange, NodeType, Slice, generateNodeId } from '../model'
 import type { Attrs } from '../model/types'
 import { Mapping } from './map'
 import { AddMarkStep, RemoveMarkStep } from './mark_step'
@@ -263,8 +263,8 @@ export class Transform {
 
     const gapStart = $from.before(depth + 1)
     const gapEnd = $to.after(depth + 1)
-    const start = gapStart
-    const end = gapEnd
+    let start = gapStart
+    let end = gapEnd
 
     let before = Fragment.empty
     let openStart = 0
@@ -274,7 +274,7 @@ export class Transform {
         before = Fragment.from($from.node(d).copy(before))
         openStart++
       } else {
-        start - 1
+        start--
       }
     }
 
@@ -283,10 +283,14 @@ export class Transform {
     for (let d = depth, splitting = false; d > target; d--) {
       if (splitting || $to.after(d + 1) < $to.end(d)) {
         splitting = true
-        after = Fragment.from($to.node(d).copy(after))
+        // The "after" half of a lift is a new node — give it a fresh ID,
+        // just like split() does, to avoid duplicates with the "before" half.
+        const afterNode = $to.node(d).copy(after)
+        ;(afterNode as { id: string }).id = generateNodeId()
+        after = Fragment.from(afterNode)
         openEnd++
       } else {
-        end + 1
+        end++
       }
     }
 
@@ -411,7 +415,18 @@ export class Transform {
     for (let d = $pos.depth, e = $pos.depth - depth, i = depth - 1; d > e; d--, i--) {
       before = Fragment.from($pos.node(d).copy(before))
       const typeAfter = typesAfter?.[i]
-      after = Fragment.from(typeAfter ? typeAfter.type.create(typeAfter.attrs, after) : $pos.node(d).copy(after))
+      // The "after" half of a split is a new node — give it a fresh ID.
+      // When typeAfter is specified, create() already generates a new ID.
+      // When copying the original node's type, copy() preserves the ID,
+      // so we assign a fresh one to avoid duplicate IDs in the document.
+      let afterNode: Node
+      if (typeAfter) {
+        afterNode = typeAfter.type.create(typeAfter.attrs, after)
+      } else {
+        afterNode = $pos.node(d).copy(after)
+        ;(afterNode as { id: string }).id = generateNodeId()
+      }
+      after = Fragment.from(afterNode)
     }
 
     return this.step(new ReplaceStep(pos, pos, new Slice(before.append(after), depth, depth)))

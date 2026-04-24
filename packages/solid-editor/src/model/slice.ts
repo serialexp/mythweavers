@@ -1,5 +1,5 @@
 import { Fragment } from './fragment'
-import type { Node, TextNode } from './node'
+import { type Node, type TextNode, generateNodeId } from './node'
 import { ResolvedPos } from './resolvedpos'
 import type { Schema } from './schema'
 
@@ -221,6 +221,38 @@ function close(node: Node, content: Fragment): Node {
   return node.copy(content)
 }
 
+/**
+ * Collect all node IDs in a subtree into a Set.
+ */
+function collectNodeIds(node: Node): Set<string> {
+  const ids = new Set<string>()
+  ids.add(node.id)
+  if (!node.isLeaf) {
+    node.forEach((child) => {
+      for (const id of collectNodeIds(child)) {
+        ids.add(id)
+      }
+    })
+  }
+  return ids
+}
+
+/**
+ * Walk a node tree and assign fresh IDs to any nodes whose current ID
+ * appears in the given set. This is used after splitting a parent node
+ * to ensure the "after" half has unique IDs at every depth.
+ */
+function deduplicateNodeIds(node: Node, usedIds: Set<string>): void {
+  if (usedIds.has(node.id)) {
+    ;(node as { id: string }).id = generateNodeId()
+  }
+  if (!node.isLeaf) {
+    node.forEach((child) => {
+      deduplicateNodeIds(child, usedIds)
+    })
+  }
+}
+
 function replaceThreeWay(
   $from: ResolvedPos,
   $start: ResolvedPos,
@@ -238,12 +270,23 @@ function replaceThreeWay(
     checkJoin(openStart, openEnd)
     addNode(close(openStart, replaceThreeWay($from, $start, $end, $to, depth + 1)), content)
   } else {
+    let closedStartIds: Set<string> | null = null
     if (openStart) {
-      addNode(close(openStart, replaceTwoWay($from, $start, depth + 1)), content)
+      const closedStart = close(openStart, replaceTwoWay($from, $start, depth + 1))
+      closedStartIds = collectNodeIds(closedStart)
+      addNode(closedStart, content)
     }
     addRange($start, $end, depth, content)
     if (openEnd) {
-      addNode(close(openEnd, replaceTwoWay($end, $to, depth + 1)), content)
+      const closedEnd = close(openEnd, replaceTwoWay($end, $to, depth + 1))
+      // When a node is split by a replace operation, both halves inherit
+      // the same IDs from the original nodes (via copy()). The second half
+      // needs fresh IDs at every depth so that keyed reconciliation
+      // (KeyedFor) and the global node-ID maps can distinguish them.
+      if (closedStartIds) {
+        deduplicateNodeIds(closedEnd, closedStartIds)
+      }
+      addNode(closedEnd, content)
     }
   }
 

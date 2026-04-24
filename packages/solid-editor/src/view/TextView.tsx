@@ -1,8 +1,8 @@
-import { For, Index, type JSX } from 'solid-js'
+import { For, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import type { Mark, Node as PMNode } from '../model'
 import { DecorationSet, type InlineDecoration, type SpanDecoration } from './decoration'
-import { setPosInfo } from './selection'
+import { registerNodeId } from './selection'
 
 export interface TextViewProps {
   /** The text node to render */
@@ -94,6 +94,8 @@ function renderMark(mark: Mark, children: JSX.Element): JSX.Element {
       return <sub>{children}</sub>
     case 'superscript':
       return <sup>{children}</sup>
+    case 'highlight':
+      return <mark style={attrs.color ? { "background-color": attrs.color as string } : undefined}>{children}</mark>
     case 'translation':
       return (
         <abbr
@@ -372,7 +374,7 @@ function InlineAtomView(props: InlineAtomViewProps): JSX.Element {
     // For now, render as a span placeholder
     // Full implementation would parse the DOM spec
     return (
-      <span {...getAttrs()} ref={(el) => setPosInfo(el, { pos: props.pos, node: props.node })}>
+      <span {...getAttrs()} ref={(el) => registerNodeId(el, props.node.id)}>
         {props.node.textContent || '\u200B'}
       </span>
     )
@@ -380,7 +382,7 @@ function InlineAtomView(props: InlineAtomViewProps): JSX.Element {
 
   // Default: render as empty span
   return (
-    <span {...getAttrs()} ref={(el) => setPosInfo(el, { pos: props.pos, node: props.node })}>
+    <span {...getAttrs()} ref={(el) => registerNodeId(el, props.node.id)}>
       {'\u200B'}
     </span>
   )

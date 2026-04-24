@@ -1,5 +1,5 @@
 {
-  "name": "@writer/solid-editor",
+  "name": "@serialexp/solidjs-editor",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -40,6 +40,8 @@
     "test:browser:run": "vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
+    "@serialexp/solidjs-dnd": "^0.1.0",
+    "nanoid": "^5.1.7",
     "solid-js": "^1.9.5"
   },
   "devDependencies": {

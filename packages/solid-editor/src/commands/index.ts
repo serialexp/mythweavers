@@ -1,5 +1,5 @@
 /**
- * Commands module for solid-editor
+ * Commands module for solidjs-editor
  *
  * Exports all available commands that can be bound to keys or called programmatically.
  */
@@ -41,7 +41,14 @@ export {
   joinForward,
   deleteBackward,
   deleteForward,
+  insertHardBreak,
 } from './editing'
+
+// Mark commands
+export { toggleMark, markActive } from './marks'
+
+// List commands
+export { wrapInList, liftListItem, sinkListItem, splitListItem } from './list'
 
 // Re-export Command type from cursor (renamed to avoid conflict with keymap)
 export type { Command as CursorCommand } from './cursor'
@@ -75,7 +82,7 @@ import {
   selectWordLeft,
   selectWordRight,
 } from './cursor'
-import { splitBlock } from './editing'
+import { insertHardBreak, splitBlock } from './editing'
 
 /**
  * Base keymap with cursor movement and selection commands.
@@ -123,6 +130,7 @@ export const baseKeymap: KeyBindings = {
 
   // Block editing
   Enter: splitBlock,
+  'Shift-Enter': insertHardBreak,
 
   // History (undo/redo)
   'Mod-z': undo,

@@ -1092,6 +1092,12 @@ importers:
 
   packages/solid-editor:
     dependencies:
+      '@serialexp/solidjs-dnd':
+        specifier: ^0.1.0
+        version: 0.1.0(solid-js@1.9.10)
+      nanoid:
+        specifier: ^5.1.7
+        version: 5.1.9
       solid-js:
         specifier: ^1.9.5
         version: 1.9.10
@@ -1121,8 +1127,8 @@ importers:
   packages/ui:
     dependencies:
       '@serialexp/solidjs-editor':
-        specifier: link:../../../solid-editor
-        version: link:../../../solid-editor
+        specifier: workspace:*
+        version: link:../solid-editor
       '@vanilla-extract/css':
         specifier: ^1.17.1
         version: 1.17.1(babel-plugin-macros@3.1.0)
@@ -3685,6 +3691,11 @@ packages:
   '@scalar/types@0.5.1':
     resolution: {integrity: sha512-+BSZlfDc5tqFnB+MEJ16o5x86PkKfRK4UYgEv9T5LYmaGmStZF110GoYNbUW6lWRmjFzdPyqS8S7Tijwqd7hXA==}
     engines: {node: '>=20'}
+
+  '@serialexp/solidjs-dnd@0.1.0':
+    resolution: {integrity: sha512-lql3uYuw+xn+OhTc/ULU03mkQ9tjPXYQGEM2ijBUI+YDxChglYJEv+qfiwTm6pF0BVG3vB/jPHb5wpbTPmVKyw==}
+    peerDependencies:
+      solid-js: ^1.9.0
 
   '@shikijs/core@1.29.2':
     resolution: {integrity: sha512-vju0lY9r27jJfOY4Z7+Rt/nIOjzJpZ3y+nYpqtUZInVoXQ/TJZcfGnNOGnKjFdVZb8qexiCuSlZRKcGfhhTTZQ==}
@@ -8148,6 +8159,11 @@ packages:
 
   nanoid@5.1.5:
     resolution: {integrity: sha512-Ir/+ZpE9fDsNH0hQ3C68uyThDXzYcim2EqcZ8zn8Chtt1iylPT9xXJB0kPCnqzgcEGikO9RxSrh63MsmVCU7Fw==}
+    engines: {node: ^18 || >=20}
+    hasBin: true
+
+  nanoid@5.1.9:
+    resolution: {integrity: sha512-ZUvP7KeBLe3OZ1ypw6dI/TzYJuvHP77IM4Ry73waSQTLn8/g8rpdjfyVAh7t1/+FjBtG4lCP42MEbDxOsRpBMw==}
     engines: {node: ^18 || >=20}
     hasBin: true
 
@@ -13432,6 +13448,10 @@ snapshots:
       nanoid: 5.1.5
       type-fest: 5.0.0
       zod: 4.1.11
+
+  '@serialexp/solidjs-dnd@0.1.0(solid-js@1.9.10)':
+    dependencies:
+      solid-js: 1.9.10
 
   '@shikijs/core@1.29.2':
     dependencies:
@@ -19099,6 +19119,8 @@ snapshots:
   nanoid@3.3.11: {}
 
   nanoid@5.1.5: {}
+
+  nanoid@5.1.9: {}
 
   negotiator@0.6.3: {}
 

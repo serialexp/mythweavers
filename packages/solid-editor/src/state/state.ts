@@ -105,7 +105,7 @@ export class EditorState {
         const plugin = this.plugins[i]
         if (plugin.spec.appendTransaction) {
           const n = plugin.spec.appendTransaction.call(plugin, trs, this, newState)
-          if (n?.docChanged) {
+          if (n && (n.docChanged || n.selectionSet)) {
             trs.push(n)
             newState = newState.applyInner(n)
             haveNew = true

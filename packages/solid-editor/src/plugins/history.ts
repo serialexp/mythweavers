@@ -1,5 +1,5 @@
 /**
- * History plugin for solid-editor
+ * History plugin for solidjs-editor
  *
  * Provides undo/redo functionality with support for:
  * - Transaction grouping by time and adjacency

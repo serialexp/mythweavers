@@ -1,5 +1,5 @@
 /**
- * Editing commands for solid-editor
+ * Editing commands for solidjs-editor
  *
  * Commands for structural editing: splitting blocks, joining blocks, etc.
  */
@@ -15,8 +15,22 @@ import { canJoin, canSplit } from '../transform'
 export type Command = (state: EditorState, dispatch?: (tr: Transaction) => void, view?: CommandContext) => boolean
 
 /**
+ * Find the default block type for a position after `index` children
+ * in the node at the given depth of `$pos`.
+ */
+function defaultBlockAt($pos: ResolvedPos, depth: number): import('../model').NodeType | null {
+  const parent = $pos.node(depth)
+  const indexAfter = $pos.indexAfter(depth)
+  const match = parent.contentMatchAt(indexAfter)
+  return match.defaultType()
+}
+
+/**
  * Split the parent block at the cursor position.
- * When Enter is pressed, this creates a new paragraph.
+ *
+ * When splitting at the end of a textblock (e.g. a heading), the new block
+ * is created as the parent's default block type (typically a paragraph)
+ * rather than duplicating the current block type.
  *
  * If there's a selection, it deletes the selection first, then splits.
  */
@@ -35,7 +49,10 @@ export const splitBlock: Command = (state, dispatch) => {
 
       // Only split if we're in a textblock
       if ($pos.parent.isTextblock && canSplit(tr.doc, mappedPos)) {
-        tr.split(mappedPos)
+        const atEnd = $pos.parentOffset === $pos.parent.content.size
+        const deflt = atEnd ? defaultBlockAt($pos, $pos.depth - 1) : undefined
+        const typeAfter = deflt && deflt !== $pos.parent.type ? deflt : undefined
+        tr.split(mappedPos, 1, typeAfter ? [{ type: typeAfter }] : undefined)
       }
 
       dispatch(tr)
@@ -51,9 +68,16 @@ export const splitBlock: Command = (state, dispatch) => {
 
   if (dispatch) {
     const tr = state.tr()
-    tr.split($from.pos)
 
-    // Position cursor at start of new paragraph
+    // When at the end of a non-paragraph textblock (like a heading),
+    // create the parent's default block type (paragraph) instead of
+    // duplicating the heading.
+    const atEnd = $from.parentOffset === $from.parent.content.size
+    const deflt = atEnd ? defaultBlockAt($from, $from.depth - 1) : undefined
+    const typeAfter = deflt && deflt !== $from.parent.type ? deflt : undefined
+    tr.split($from.pos, 1, typeAfter ? [{ type: typeAfter }] : undefined)
+
+    // Position cursor at start of new block
     // After split at depth 1, the position shifts by 2 (closing + opening tags)
     const newPos = $from.pos + 2
     const sel = TextSelection.create(tr.doc, newPos)
@@ -249,6 +273,28 @@ export const deleteForward: Command = (state, dispatch) => {
   if (dispatch) {
     const tr = state.tr()
     tr.delete($to.pos, $to.pos + 1)
+    dispatch(tr)
+  }
+  return true
+}
+
+/**
+ * Insert a hard break (<br>) at the cursor position.
+ *
+ * If the schema has a `hard_break` node type and it's allowed at the cursor
+ * position, inserts one. Preserves any stored marks across the break.
+ */
+export const insertHardBreak: Command = (state, dispatch) => {
+  const hbType = state.schema.nodes.hard_break
+  if (!hbType) return false
+
+  if (dispatch) {
+    const tr = state.tr()
+    tr.replaceSelectionWith(hbType.create())
+    // Preserve stored marks (or current marks at cursor) so that typing
+    // after the break continues with the same formatting.
+    const marks = state.storedMarks ?? state.selection.$from.marks()
+    tr.setStoredMarks(marks)
     dispatch(tr)
   }
   return true

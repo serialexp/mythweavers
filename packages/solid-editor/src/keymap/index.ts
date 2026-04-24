@@ -1,5 +1,5 @@
 /**
- * Keymap module for solid-editor
+ * Keymap module for solidjs-editor
  *
  * Compatible with ProseMirror's keymap API:
  * - Same command signature: (state, dispatch?, view?) => boolean
@@ -270,7 +270,7 @@ export function keydownHandler(
 }
 
 /**
- * Create a keymap that can be used with solid-editor.
+ * Create a keymap that can be used with solidjs-editor.
  *
  * Returns an object with the handler and bindings that can be integrated
  * into the editor view.

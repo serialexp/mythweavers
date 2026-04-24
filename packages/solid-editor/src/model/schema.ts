@@ -6,6 +6,9 @@ import type { Attrs } from './types'
 /**
  * Simplified content matching - parses content expressions and validates children.
  * This is a simplified version of ProseMirror's ContentMatch state machine.
+ *
+ * Tracks a `matched` count so that `matchType()` returns an advanced state
+ * where `validEnd` reflects that required children have been satisfied.
  */
 export class ContentMatch {
   private readonly allowedTypes: Set<string> = new Set()
@@ -13,32 +16,32 @@ export class ContentMatch {
   private readonly minCount: number
   private readonly maxCount: number // -1 for unlimited
   private readonly isEmpty: boolean
+  /** Number of children already matched (for state-machine tracking). */
+  private readonly matched: number
 
   constructor(
     private readonly expr: string,
     private readonly schema: Schema,
   ) {
     this.isEmpty = !expr
+    this.matched = 0
     if (this.isEmpty) {
       this.minCount = 0
       this.maxCount = 0
       return
     }
 
-    // Parse simple expressions like "block+", "inline*", "text*", "paragraph block*"
-    // Split by space for sequences
-    const parts = expr.split(/\s+/).filter(Boolean)
+    // Parse content expressions like "block+", "inline*", "text*", "paragraph block*"
+    // Also handles alternation groups like "(table_cell | table_header)*"
+    //
+    // Strategy: first expand alternation groups into individual names,
+    // then process each name+quantifier pair as before.
+    const expanded = this.expandExpr(expr)
 
     let min = 0
     let max = 0
 
-    for (const part of parts) {
-      // Extract type/group name and quantifier
-      const match = part.match(/^(\w+)([+*?]?)$/)
-      if (!match) continue
-
-      const [, name, quantifier] = match
-
+    for (const { name, quantifier } of expanded) {
       // Check if it's a specific type or a group
       if (schema.nodes[name]) {
         this.allowedTypes.add(name)
@@ -67,6 +70,53 @@ export class ContentMatch {
 
     this.minCount = min
     this.maxCount = max
+  }
+
+  /**
+   * Expand a content expression into a flat list of {name, quantifier} pairs.
+   * Handles both simple expressions ("block+ inline*") and alternation groups
+   * ("(table_cell | table_header)*").
+   */
+  private expandExpr(expr: string): { name: string; quantifier: string }[] {
+    const result: { name: string; quantifier: string }[] = []
+
+    // Match either: (name1 | name2 | ...)<quantifier> or name<quantifier>
+    const tokenRegex = /\(([^)]+)\)([+*?]?)|(\w+)([+*?]?)/g
+    let m: RegExpExecArray | null
+
+    while ((m = tokenRegex.exec(expr)) !== null) {
+      if (m[1]) {
+        // Alternation group: "(name1 | name2 | ...)<quantifier>"
+        const alternatives = m[1].split(/\s*\|\s*/).filter(Boolean)
+        const quantifier = m[2] || ''
+        for (const alt of alternatives) {
+          result.push({ name: alt.trim(), quantifier })
+        }
+      } else if (m[3]) {
+        // Simple name: "name<quantifier>"
+        result.push({ name: m[3], quantifier: m[4] || '' })
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Create an advanced copy of this match with an incremented matched count.
+   * Shares all parsed data (allowedTypes, allowedGroups, etc.) with the original.
+   */
+  private _advance(): ContentMatch {
+    const clone = Object.create(ContentMatch.prototype) as ContentMatch
+    // Copy all properties from this instance
+    ;(clone as any).allowedTypes = this.allowedTypes
+    ;(clone as any).allowedGroups = this.allowedGroups
+    ;(clone as any).minCount = this.minCount
+    ;(clone as any).maxCount = this.maxCount
+    ;(clone as any).isEmpty = this.isEmpty
+    ;(clone as any).expr = this.expr
+    ;(clone as any).schema = this.schema
+    ;(clone as any).matched = this.matched + 1
+    return clone
   }
 
   /** Check if a node type is allowed as a child. */
@@ -100,15 +150,15 @@ export class ContentMatch {
 
   /** True if this match state represents a valid end state. */
   get validEnd(): boolean {
-    return this.minCount === 0
+    return this.matched >= this.minCount
   }
 
   /**
-   * Try to match a node type. Returns this match (simplified - we don't
-   * have a state machine, so we just check if the type is allowed).
+   * Try to match a node type. Returns an advanced match state if the
+   * type is allowed, or null if not.
    */
   matchType(type: NodeType): ContentMatch | null {
-    return this.allowsType(type) ? this : null
+    return this.allowsType(type) ? this._advance() : null
   }
 
   /**
@@ -429,6 +479,8 @@ export class NodeType {
 
   /**
    * Like create, but tries to fill in required content.
+   * If the given content is not valid, attempts to add default children
+   * to satisfy the content expression's minimum count.
    */
   createAndFill(
     attrs: Attrs | null = null,
@@ -436,11 +488,30 @@ export class NodeType {
     marks?: readonly Mark[],
   ): Node | null {
     const computedAttrs = this.computeAttrs(attrs)
-    const fragment = Fragment.from(content)
-    // Simplified: just return the node if content is valid
+    let fragment = Fragment.from(content)
+
+    // If content is already valid, use it directly
     if (this.validContent(fragment)) {
       return new Node(this, computedAttrs, fragment, Mark.setFrom(marks))
     }
+
+    // Try to fill in required content using default types
+    if (this.contentMatch) {
+      const defaultType = this.contentMatch.defaultType()
+      if (defaultType) {
+        // Add default children until minimum count is satisfied
+        const minCount = (this.contentMatch as any).minCount as number
+        while (fragment.childCount < minCount) {
+          const child = defaultType.createAndFill()
+          if (!child) break
+          fragment = fragment.append(Fragment.from(child))
+        }
+        if (this.validContent(fragment)) {
+          return new Node(this, computedAttrs, fragment, Mark.setFrom(marks))
+        }
+      }
+    }
+
     return null
   }
 

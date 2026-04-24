@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid'
 import { compareDeep } from './compareDeep'
 import { Fragment } from './fragment'
 import { Mark } from './mark'
@@ -8,9 +9,19 @@ import type { Attrs } from './types'
 
 const emptyAttrs: Attrs = Object.create(null)
 
+/**
+ * Generate a unique node ID. Uses nanoid with a short length (10 chars)
+ * which gives ~17 trillion combinations — more than enough to avoid
+ * collisions within any single document or editing session.
+ */
+export function generateNodeId(): string {
+  return nanoid(10)
+}
+
 /** JSON representation of a node. */
 export interface NodeJSON {
   type: string
+  id?: string
   attrs?: Attrs
   content?: NodeJSON[]
   marks?: { type: string; attrs?: Attrs }[]
@@ -32,6 +43,14 @@ export class Node {
   /** For text nodes, this contains the node's text content. */
   readonly text: string | undefined
 
+  /**
+   * Unique identifier for this node. Persists across edits that preserve
+   * the node's identity (copy, mark changes, cut, etc.) and is included
+   * in JSON serialization. Used by the view layer for efficient DOM
+   * reconciliation — nodes that represent the "same thing" keep the same ID.
+   */
+  readonly id: string
+
   constructor(
     /** The type of node that this is. */
     readonly type: NodeType,
@@ -40,8 +59,11 @@ export class Node {
     content?: Fragment | null,
     /** The marks applied to this node. */
     readonly marks: readonly Mark[] = Mark.none,
+    /** Optional ID to assign. If omitted, a new unique ID is generated. */
+    id?: string,
   ) {
     this.content = content || Fragment.empty
+    this.id = id ?? generateNodeId()
   }
 
   /**
@@ -138,15 +160,15 @@ export class Node {
     )
   }
 
-  /** Create a new node with the same markup, containing the given content. */
+  /** Create a new node with the same markup and identity, containing the given content. */
   copy(content: Fragment | null = null): Node {
     if (content === this.content) return this
-    return new Node(this.type, this.attrs, content, this.marks)
+    return new Node(this.type, this.attrs, content, this.marks, this.id)
   }
 
-  /** Create a copy of this node with the given set of marks. */
+  /** Create a copy of this node with the given set of marks, preserving identity. */
   mark(marks: readonly Mark[]): Node {
-    return marks === this.marks ? this : new Node(this.type, this.attrs, this.content, marks)
+    return marks === this.marks ? this : new Node(this.type, this.attrs, this.content, marks, this.id)
   }
 
   /** Create a copy of this node with only the content between the given positions. */
@@ -186,16 +208,29 @@ export class Node {
    * node's content valid.
    */
   canReplace(
-    _from: number,
-    _to: number,
+    from: number,
+    to: number,
     replacement: Fragment = Fragment.empty,
     start = 0,
     end = replacement.childCount,
   ): boolean {
-    // Simplified validation - just check marks
+    // Check that each replacement child is allowed by the content expression
     for (let i = start; i < end; i++) {
-      if (!this.type.allowsMarks(replacement.child(i).marks)) return false
+      const child = replacement.child(i)
+      if (!this.type.contentMatch?.allowsType(child.type)) return false
+      if (!this.type.allowsMarks(child.marks)) return false
     }
+
+    // Validate the combined result maintains content constraints (min/max counts)
+    const beforeCount = from
+    const afterCount = this.childCount - to
+    const replCount = end - start
+    const totalCount = beforeCount + replCount + afterCount
+
+    if (totalCount < (this.type.contentMatch as any).minCount) return false
+    const maxCount = (this.type.contentMatch as any).maxCount
+    if (maxCount !== -1 && totalCount > maxCount) return false
+
     return true
   }
 
@@ -339,11 +374,12 @@ export class Node {
   /** Return a JSON-serializable representation of this node. */
   toJSON(): {
     type: string
+    id?: string
     attrs?: Attrs
     content?: ReturnType<Node['toJSON']>[]
     marks?: ReturnType<Mark['toJSON']>[]
   } {
-    const obj: ReturnType<Node['toJSON']> = { type: this.type.name }
+    const obj: ReturnType<Node['toJSON']> = { type: this.type.name, id: this.id }
     for (const _ in this.attrs) {
       obj.attrs = this.attrs
       break
@@ -369,11 +405,15 @@ export class Node {
 
     if (json.type === 'text') {
       if (typeof json.text !== 'string') throw new RangeError('Invalid text node in JSON')
-      return schema.text(json.text, marks)
+      const textNode = schema.text(json.text, marks)
+      if (json.id) (textNode as { id: string }).id = json.id
+      return textNode
     }
 
     const content = Fragment.fromJSON(schema, json.content)
     const node = schema.nodeType(json.type).create(json.attrs, content, marks)
+    // Restore persisted ID if present, otherwise keep the fresh one from create()
+    if (json.id) (node as { id: string }).id = json.id
     return node
   }
 }
@@ -386,8 +426,8 @@ export class Node {
 export class TextNode extends Node {
   declare readonly text: string
 
-  constructor(type: NodeType, attrs: Attrs, content: string, marks?: readonly Mark[]) {
-    super(type, attrs, null, marks)
+  constructor(type: NodeType, attrs: Attrs, content: string, marks?: readonly Mark[], id?: string) {
+    super(type, attrs, null, marks, id)
     if (!content) throw new RangeError('Empty text nodes are not allowed')
     ;(this as { text: string }).text = content
   }
@@ -410,13 +450,13 @@ export class TextNode extends Node {
   }
 
   override mark(marks: readonly Mark[]): TextNode {
-    return marks === this.marks ? this : new TextNode(this.type, this.attrs, this.text, marks)
+    return marks === this.marks ? this : new TextNode(this.type, this.attrs, this.text, marks, this.id)
   }
 
-  /** Create a copy of this text node with different text. */
+  /** Create a copy of this text node with different text, preserving identity. */
   withText(text: string): TextNode {
     if (text === this.text) return this
-    return new TextNode(this.type, this.attrs, text, this.marks)
+    return new TextNode(this.type, this.attrs, text, this.marks, this.id)
   }
 
   override cut(from = 0, to = this.text.length): TextNode {

@@ -10,6 +10,9 @@ export interface PropViewRef {
   dispatch: (tr: any) => void
   dom: HTMLElement | null
   focus: () => void
+  posAtCoords?: (coords: { left: number; top: number }) => { pos: number; inside: number } | null
+  endOfTextblock?: (dir: 'up' | 'down' | 'left' | 'right') => boolean
+  root?: Document | ShadowRoot
 }
 
 /**

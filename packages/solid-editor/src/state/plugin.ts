@@ -3,11 +3,17 @@ import type { EditorState } from './state'
 import type { Transaction } from './transaction'
 
 // Forward reference for EditorView - actual type imported at runtime would cause circular deps
-interface EditorViewRef {
+export interface EditorViewRef {
   state: EditorState
   dispatch: (tr: Transaction) => void
   dom: HTMLElement | null
   focus: () => void
+  /** Find the document position at screen coordinates. */
+  posAtCoords?: (coords: { left: number; top: number }) => { pos: number; inside: number } | null
+  /** Check if cursor is at the visual edge of a textblock. */
+  endOfTextblock?: (dir: 'up' | 'down' | 'left' | 'right') => boolean
+  /** The root node for event listeners (document or shadow root). */
+  root?: Document | ShadowRoot
 }
 
 /**

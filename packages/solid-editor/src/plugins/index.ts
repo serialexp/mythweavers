@@ -1,5 +1,5 @@
 /**
- * Plugins for solid-editor
+ * Plugins for solidjs-editor
  */
 
 export {
@@ -24,5 +24,18 @@ export {
   emDash,
   ellipsis,
   smartTypography,
+  // Markdown-style structural rules
+  blockTypeRule,
+  wrapRule,
+  nodeRule,
+  headingRule,
+  horizontalRuleRule,
+  codeBlockRule,
+  blockquoteRule,
+  // List rules
+  bulletListRule,
+  orderedListRule,
   type InputRule,
 } from './inputRules'
+
+export { richClipboard } from './clipboard'

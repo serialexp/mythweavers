@@ -105,7 +105,11 @@ export function canSplit(
   const $pos = doc.resolve(pos)
   const base = $pos.depth - depth
 
-  const innerType = typesAfter?.length ? typesAfter[0] : { type: $pos.parent.type, attrs: $pos.parent.attrs }
+  // innerType is the type of the innermost node that will be created by the split.
+  // typesAfter goes from outermost to innermost, so we need the LAST element.
+  const innerType = typesAfter?.length
+    ? typesAfter[typesAfter.length - 1]
+    : { type: $pos.parent.type, attrs: $pos.parent.attrs }
 
   if (
     base < 0 ||

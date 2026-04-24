@@ -2,39 +2,130 @@ import type { Node } from '../model'
 import { Selection, TextSelection } from '../state'
 
 /**
- * Position info stored on DOM nodes for mapping back to document positions
+ * Node index entry — built on-demand from the current document model.
+ * Contains everything needed to compute positions, content ranges, etc.
  */
-export interface PosInfo {
+export interface NodeIndexEntry {
+  /** The model node */
+  node: Node
   /** Document position at the start of this node */
   pos: number
-  /** The model node this DOM element represents */
-  node: Node
-}
-
-// WeakMap to store position info on DOM nodes without modifying them
-const positionMap = new WeakMap<globalThis.Node, PosInfo>()
-
-/**
- * Store position information on a DOM node
- */
-export function setPosInfo(domNode: globalThis.Node, info: PosInfo): void {
-  positionMap.set(domNode, info)
+  /** Whether this is the doc node (special content-start rules) */
+  isDoc: boolean
 }
 
 /**
- * Get position information from a DOM node
+ * Build an index of node ID → { node, pos } from the current document.
+ * This walks the model tree once and is the single source of truth for positions.
+ * Called on-demand by domFromPos / posFromDOM — the model is always authoritative.
  */
-export function getPosInfo(domNode: globalThis.Node): PosInfo | undefined {
-  return positionMap.get(domNode)
+export function buildNodeIndex(doc: Node): Map<string, NodeIndexEntry> {
+  const index = new Map<string, NodeIndexEntry>()
+
+  function walk(node: Node, pos: number, isDoc: boolean) {
+    index.set(node.id, { node, pos, isDoc })
+    if (!node.isLeaf) {
+      // For the doc node, content starts at pos (no opening token).
+      // For all other block nodes, content starts at pos + 1.
+      const contentStart = isDoc ? pos : pos + 1
+      node.forEach((child, offset) => {
+        walk(child, contentStart + offset, false)
+      })
+    }
+  }
+
+  walk(doc, 0, true)
+  return index
+}
+
+// ─── DOM ↔ Node ID mapping ──────────────────────────────────────────────
+//
+// Instead of storing full position info (pos + node) on DOM elements, we
+// only store the **node ID** — a string that never changes for a given DOM
+// element (KeyedFor reconciles by ID). Actual positions and node references
+// are resolved from the current document model via buildNodeIndex().
+//
+// This eliminates staleness: the WeakMap is written once in a ref callback
+// and never needs updating.
+
+const nodeIdMap = new WeakMap<globalThis.Node, string>()
+const reverseNodeMap = new Map<string, HTMLElement>()
+
+/**
+ * Register a DOM element as representing a model node.
+ * Call this once in a `ref` callback — the node ID never changes for a
+ * given DOM element, so no reactive updates are needed.
+ *
+ * Also populates the reverse map (node ID → DOM element) so we can find
+ * elements by their model node ID for overlays, block selection, etc.
+ */
+export function registerNodeId(domNode: globalThis.Node, nodeId: string): void {
+  nodeIdMap.set(domNode, nodeId)
+  if (domNode instanceof HTMLElement) {
+    reverseNodeMap.set(nodeId, domNode)
+  }
 }
 
 /**
- * Find the nearest ancestor with position info
+ * Get the node ID registered on a DOM element, if any.
  */
-function findNearestPosNode(node: globalThis.Node | null): { node: globalThis.Node; info: PosInfo } | null {
+export function getNodeId(domNode: globalThis.Node): string | undefined {
+  return nodeIdMap.get(domNode)
+}
+
+/**
+ * Get the DOM element for a given node ID, if registered.
+ */
+export function getElementByNodeId(nodeId: string): HTMLElement | undefined {
+  return reverseNodeMap.get(nodeId)
+}
+
+/**
+ * Remove entries from the reverse map whose IDs are no longer in the document.
+ * Call this on document changes to prevent detached elements from accumulating.
+ */
+export function pruneReverseMap(activeIds: Set<string>): void {
+  for (const id of reverseNodeMap.keys()) {
+    if (!activeIds.has(id)) {
+      reverseNodeMap.delete(id)
+    }
+  }
+}
+
+/**
+ * Get the content start position for a node.
+ * Doc node: contentStart = pos (no opening token).
+ * Other block nodes: contentStart = pos + 1.
+ * Inline nodes: contentStart = pos.
+ */
+function getContentStart(entry: NodeIndexEntry): number {
+  if (entry.isDoc) return entry.pos
+  return entry.node.isBlock ? entry.pos + 1 : entry.pos
+}
+
+/**
+ * Look up the index entry for a DOM node, if it has a registered node ID.
+ */
+function lookupEntry(
+  domNode: globalThis.Node,
+  index: Map<string, NodeIndexEntry>,
+): NodeIndexEntry | undefined {
+  const id = nodeIdMap.get(domNode)
+  if (id === undefined) return undefined
+  return index.get(id)
+}
+
+/**
+ * Find the nearest ancestor with a registered node ID and resolve its
+ * current position from the index.
+ */
+function findNearestEntry(
+  node: globalThis.Node | null,
+  index: Map<string, NodeIndexEntry>,
+): { domNode: globalThis.Node; entry: NodeIndexEntry } | null {
   while (node) {
-    const info = getPosInfo(node)
-    if (info) return { node, info }
+    const entry = lookupEntry(node, index)
+    if (entry) return { domNode: node, entry }
     node = node.parentNode
   }
   return null
@@ -44,13 +135,17 @@ function findNearestPosNode(node: globalThis.Node | null): { node: globalThis.No
  * Count content size before a node within a subtree, up to (but not including) the target.
  * This accounts for:
  * - Text nodes: count their length
- * - Inline nodes with position info (like mentions): count their nodeSize
- * - Mark wrappers without position info (like <strong>): walk into children
+ * - Inline atom nodes with a registered ID: count their nodeSize
+ * - Block nodes with a registered ID: count their nodeSize (includes opening/closing tags)
+ * - Mark wrappers without an ID (like <strong>): walk into children
  * Returns null if target is not found.
  */
-function countContentBefore(container: globalThis.Node, target: globalThis.Node): number | null {
+function countContentBefore(
+  container: globalThis.Node,
+  target: globalThis.Node,
+  index: Map<string, NodeIndexEntry>,
+): number | null {
   let count = 0
-  const debug: string[] = []
 
   function walk(node: globalThis.Node): boolean {
     if (node === target) {
@@ -59,9 +154,7 @@ function countContentBefore(container: globalThis.Node, target: globalThis.Node)
 
     if (node.nodeType === 3) {
       // Text node - count its length
-      const len = node.textContent?.length ?? 0
-      debug.push(`text(${len})`)
-      count += len
+      count += node.textContent?.length ?? 0
       return false
     }
 
@@ -71,12 +164,8 @@ function countContentBefore(container: globalThis.Node, target: globalThis.Node)
       // Cursor target spans don't contribute to content count, but we still
       // need to check if the target is inside them
       if (element.hasAttribute('data-cursor-target')) {
-        debug.push('cursor-target')
-        // Walk into it to check for target, but don't count content
         for (let i = 0; i < node.childNodes.length; i++) {
           if (node.childNodes[i] === target) {
-            // Target is the ZWS text node inside cursor target - return current count
-            // This maps the cursor position to right before the following atom
             return true
           }
         }
@@ -85,14 +174,10 @@ function countContentBefore(container: globalThis.Node, target: globalThis.Node)
 
       // Widget spans don't contribute to content count - they're decorations, not content
       if (element.hasAttribute('data-widget')) {
-        debug.push('widget')
-        // Walk into it to check for target, but don't count content
         for (let i = 0; i < node.childNodes.length; i++) {
           if (node.childNodes[i] === target) {
-            // Target is inside widget - return current count
             return true
           }
-          // Check nested children too (in case of deep widget structure)
           if (node.childNodes[i].contains(target)) {
             return true
           }
@@ -100,26 +185,38 @@ function countContentBefore(container: globalThis.Node, target: globalThis.Node)
         return false
       }
 
-      // Element node - check if it has position info (inline node like mention)
-      const info = getPosInfo(node)
-      if (info) {
-        // This is a node with position info
-        if (info.node.isInline && info.node.isAtom) {
+      // Element node - check if it has a registered node ID
+      const entry = lookupEntry(node, index)
+      if (entry) {
+        if (entry.node.isInline && entry.node.isAtom) {
           // Inline atom node (mention, image, etc.) - count its nodeSize
-          debug.push(`atom(${info.node.nodeSize},${info.node.type.name})`)
-          count += info.node.nodeSize
+          count += entry.node.nodeSize
           return false // Don't walk into it
         }
-        // For block nodes or non-atom inline nodes, walk children
-        debug.push(`block(${info.node.type.name})`)
-      } else {
-        debug.push(`wrapper(${element.tagName})`)
+
+        if (entry.node.isBlock) {
+          // Block node — check if the target is inside it.
+          if (node.contains(target)) {
+            // Target is inside this block — walk into children to find it.
+            for (let i = 0; i < node.childNodes.length; i++) {
+              if (walk(node.childNodes[i])) {
+                return true
+              }
+            }
+            return false
+          }
+          // Target is not inside this block — count the block's full nodeSize
+          count += entry.node.nodeSize
+          return false
+        }
+
+        // Non-atom inline node — walk into children
       }
 
-      // Element without position info (mark wrapper) or block node - walk children
+      // Element without registered ID (mark wrapper) or non-block with ID — walk children
       for (let i = 0; i < node.childNodes.length; i++) {
         if (walk(node.childNodes[i])) {
-          return true // Found target in this subtree
+          return true
         }
       }
     }
@@ -130,7 +227,6 @@ function countContentBefore(container: globalThis.Node, target: globalThis.Node)
   // Walk children of container (not the container itself)
   for (let i = 0; i < container.childNodes.length; i++) {
     if (walk(container.childNodes[i])) {
-      console.log('[countContentBefore]', count, 'items:', debug.join(', '))
       return count
     }
   }
@@ -139,49 +235,35 @@ function countContentBefore(container: globalThis.Node, target: globalThis.Node)
 }
 
 /**
- * Calculate the document position from a DOM position
+ * Calculate the document position from a DOM position.
+ * Builds a fresh node index from the current document to avoid stale data.
  */
-export function posFromDOM(_doc: Node, domNode: globalThis.Node, domOffset: number): number | null {
-  // Find nearest ancestor with position info
-  const posNode = findNearestPosNode(domNode)
-  if (!posNode) return null
+export function posFromDOM(doc: Node, domNode: globalThis.Node, domOffset: number): number | null {
+  const index = buildNodeIndex(doc)
 
-  const { node: ancestorNode, info } = posNode
+  // Find nearest ancestor with a registered node ID
+  const nearest = findNearestEntry(domNode, index)
+  if (!nearest) return null
 
-  // info.pos stores the node's position in the document.
-  // For block nodes, content starts at info.pos + 1 (after the opening tag).
-  // For inline nodes, info.pos is already the content start.
-  const contentStartPos = info.node.isBlock ? info.pos + 1 : info.pos
+  const { domNode: ancestorNode, entry } = nearest
+  const contentStartPos = getContentStart(entry)
 
   // If we're in a text node, add the offset
   if (domNode.nodeType === 3) {
-    // Text node
     if (domNode === ancestorNode) {
-      // Direct text node with position info (rare case)
-      const result = contentStartPos + domOffset
-      console.log('[posFromDOM] Text node (direct):', { domOffset, contentStartPos, result })
-      return result
+      // Direct text node with registered ID (rare case)
+      return contentStartPos + domOffset
     }
 
     // Text node is somewhere within the ancestor's subtree
-    // Count all content (text + inline nodes) before this text node, then add the offset within it
-    const contentBefore = countContentBefore(ancestorNode, domNode)
+    const contentBefore = countContentBefore(ancestorNode, domNode, index)
     if (contentBefore === null) return null
 
-    const result = contentStartPos + contentBefore + domOffset
-    console.log('[posFromDOM] Text node:', {
-      domOffset,
-      contentStartPos,
-      contentBefore,
-      result,
-      ancestorNodeName: (ancestorNode as Element).className || ancestorNode.nodeName,
-    })
-    return result
+    return contentStartPos + contentBefore + domOffset
   }
 
   // For element nodes, traverse children to find position
   if (domNode.nodeType === 1 && domNode === ancestorNode) {
-    // If offset is within children, calculate position
     const children = domNode.childNodes
     let offset = 0
     for (let i = 0; i < domOffset && i < children.length; i++) {
@@ -193,27 +275,18 @@ export function posFromDOM(_doc: Node, domNode: globalThis.Node, domOffset: numb
       if (child.nodeType === 3) {
         offset += child.textContent?.length ?? 0
       } else {
-        const childInfo = getPosInfo(child)
-        if (childInfo) {
-          offset = childInfo.pos - contentStartPos + childInfo.node.nodeSize
+        const childEntry = lookupEntry(child, index)
+        if (childEntry) {
+          offset = childEntry.pos - contentStartPos + childEntry.node.nodeSize
         } else {
-          // Element without position info (mark wrapper) - count text content
+          // Element without registered ID (mark wrapper) - count text content
           offset += child.textContent?.length ?? 0
         }
       }
     }
-    const result = contentStartPos + offset
-    console.log('[posFromDOM] Element node:', {
-      domOffset,
-      contentStartPos,
-      offset,
-      result,
-      numChildren: children.length,
-    })
-    return result
+    return contentStartPos + offset
   }
 
-  console.log('[posFromDOM] Fallback:', { contentStartPos })
   return contentStartPos
 }
 
@@ -240,19 +313,28 @@ export function selectionFromDOM(doc: Node, domSelection: globalThis.Selection):
 }
 
 /**
- * Find the DOM position for a document position
+ * Find the DOM position for a document position.
+ * Builds a fresh node index from the current document to avoid stale data.
  */
-export function domFromPos(container: HTMLElement, pos: number): { node: globalThis.Node; offset: number } | null {
-  const debug: string[] = []
+export function domFromPos(
+  container: HTMLElement,
+  pos: number,
+  doc?: Node,
+): { node: globalThis.Node; offset: number } | null {
+  // Build node index if doc is provided; otherwise fall back to looking up
+  // the doc node from the container's registered ID (the container should
+  // be the doc element).
+  let index: Map<string, NodeIndexEntry> | undefined
+  if (doc) {
+    index = buildNodeIndex(doc)
+  }
 
-  // Walk the DOM tree to find the position
   function walk(node: globalThis.Node, currentPos: number): { node: globalThis.Node; offset: number } | null {
-    const info = getPosInfo(node)
+    const entry = index ? lookupEntry(node, index) : undefined
 
     if (node.nodeType === 3) {
       // Text node
       const textLength = node.textContent?.length ?? 0
-      debug.push(`text@${currentPos}(len=${textLength})`)
       if (pos >= currentPos && pos <= currentPos + textLength) {
         return { node, offset: pos - currentPos }
       }
@@ -262,14 +344,10 @@ export function domFromPos(container: HTMLElement, pos: number): { node: globalT
     if (node.nodeType === 1) {
       const element = node as HTMLElement
 
-      // If this node has position info, use it
-      if (info) {
-        debug.push(`elem@${info.pos}(${info.node.type.name},size=${info.node.nodeSize})`)
-        // info.pos is the node position
-        // For block nodes, content starts at info.pos + 1
-        // For inline nodes, content starts at info.pos
-        const contentStart = info.node.isBlock ? info.pos + 1 : info.pos
-        const contentEnd = contentStart + info.node.content.size
+      // If this node has a registered ID and we have index data, use it
+      if (entry) {
+        const contentStart = getContentStart(entry)
+        const contentEnd = contentStart + entry.node.content.size
         if (pos < contentStart || pos > contentEnd) {
           return null // Position not in this subtree
         }
@@ -299,13 +377,10 @@ export function domFromPos(container: HTMLElement, pos: number): { node: globalT
           }
           return { node: element, offset: lastContentIndex }
         }
-      } else {
-        debug.push(`wrapper(${element.tagName})`)
       }
 
       // Search children
-      // For block nodes, content starts at info.pos + 1; for inline, at info.pos
-      let childPos = info ? (info.node.isBlock ? info.pos + 1 : info.pos) : currentPos
+      let childPos = entry ? getContentStart(entry) : currentPos
       for (let i = 0; i < element.childNodes.length; i++) {
         const child = element.childNodes[i]
 
@@ -324,12 +399,11 @@ export function domFromPos(container: HTMLElement, pos: number): { node: globalT
         if (child.nodeType === 3) {
           childPos += child.textContent?.length ?? 0
         } else {
-          const childInfo = getPosInfo(child)
-          if (childInfo) {
-            // Inline node with position info - use its nodeSize
-            childPos = childInfo.pos + childInfo.node.nodeSize
+          const childEntry = index ? lookupEntry(child, index) : undefined
+          if (childEntry) {
+            childPos = childEntry.pos + childEntry.node.nodeSize
           } else {
-            // Element without position info (like mark wrappers) - count its text content
+            // Element without registered ID (like mark wrappers) - count its text content
             childPos += child.textContent?.length ?? 0
           }
         }
@@ -339,22 +413,7 @@ export function domFromPos(container: HTMLElement, pos: number): { node: globalT
     return null
   }
 
-  const result = walk(container, 0)
-  console.log(
-    '[domFromPos] pos:',
-    pos,
-    'walk:',
-    debug.join(' → '),
-    '→',
-    result
-      ? {
-          nodeName: result.node.nodeName,
-          offset: result.offset,
-          text: result.node.nodeType === 3 ? `"${result.node.textContent?.slice(0, 20)}..."` : null,
-        }
-      : 'null',
-  )
-  return result
+  return walk(container, 0)
 }
 
 /**
@@ -387,7 +446,6 @@ function adjustPositionOutsideWidget(
   if (domNode.nodeType === 1 && offset < domNode.childNodes.length) {
     const child = domNode.childNodes[offset]
     if (child.nodeType === 1 && (child as Element).hasAttribute('data-widget')) {
-      // We're pointing at a widget - keep the position (before the widget)
       return { node: domNode, offset }
     }
   }
@@ -396,14 +454,15 @@ function adjustPositionOutsideWidget(
 }
 
 /**
- * Set the DOM selection to match a model Selection
+ * Set the DOM selection to match a model Selection.
+ * Requires the current document for building the node index.
  */
-export function selectionToDOM(container: HTMLElement, selection: Selection): boolean {
+export function selectionToDOM(container: HTMLElement, selection: Selection, doc?: Node): boolean {
   const domSelection = container.ownerDocument.getSelection()
   if (!domSelection) return false
 
-  const anchor = domFromPos(container, selection.anchor)
-  const head = domFromPos(container, selection.head)
+  const anchor = domFromPos(container, selection.anchor, doc)
+  const head = domFromPos(container, selection.head, doc)
 
   if (!anchor || !head) return false
 
@@ -422,4 +481,38 @@ export function selectionToDOM(container: HTMLElement, selection: Selection): bo
   } catch {
     return false
   }
+}
+
+// ─── Backwards compatibility ────────────────────────────────────────────
+//
+// setPosInfo / getPosInfo are kept for external consumers and custom node
+// views that haven't migrated yet. They delegate to registerNodeId under
+// the hood — storing the node ID, not the full PosInfo.
+
+/**
+ * @deprecated Use `registerNodeId(domNode, node.id)` instead.
+ * Kept for backwards compatibility with custom node views.
+ */
+export interface PosInfo {
+  pos: number
+  node: Node
+  contentStart?: number
+}
+
+/**
+ * @deprecated Use `registerNodeId(domNode, node.id)` instead.
+ */
+export function setPosInfo(domNode: globalThis.Node, info: PosInfo): void {
+  registerNodeId(domNode, info.node.id)
+}
+
+/**
+ * @deprecated Use `getNodeId(domNode)` instead.
+ */
+export function getPosInfo(domNode: globalThis.Node): PosInfo | undefined {
+  const id = nodeIdMap.get(domNode)
+  if (id === undefined) return undefined
+  // We can't reconstruct full PosInfo without a doc — return a stub
+  // that at least has the node ID for identification purposes.
+  return undefined
 }

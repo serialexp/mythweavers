@@ -15,4 +15,5 @@ export {
   type PluginSpec,
   type PluginView,
   type StateField,
+  type EditorViewRef,
 } from './plugin'
