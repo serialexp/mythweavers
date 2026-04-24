@@ -55,6 +55,11 @@ const publicStorySchema = z.strictObject({
     description: 'Cover font family',
     example: 'Georgia',
   }),
+  coverArtUrl: z.string().nullable().meta({
+    description:
+      "Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.",
+    example: '/files/1/2025/12/cover.png',
+  }),
   pages: z.number().nullable().meta({
     description: 'Estimated page count',
     example: 120,
@@ -140,6 +145,7 @@ function formatPublicStory(story: any) {
     coverColor: story.coverColor,
     coverTextColor: story.coverTextColor,
     coverFontFamily: story.coverFontFamily,
+    coverArtUrl: story.coverArtFile?.path ?? null,
     pages: story.pages,
     publishedAt: story.publishedAt.toISOString(),
     firstChapterReleasedAt: story.firstChapterReleasedAt
@@ -441,6 +447,7 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 username: true,
               },
             },
+            coverArtFile: true,
           },
         })
 
@@ -505,6 +512,7 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 username: true,
               },
             },
+            coverArtFile: true,
           },
         })
 
@@ -565,6 +573,7 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 username: true,
               },
             },
+            coverArtFile: true,
             books: {
               include: {
                 arcs: {

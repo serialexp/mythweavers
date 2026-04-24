@@ -74,6 +74,7 @@ export const StoryManager: Component = () => {
         fingerprint: story.fingerprint,
         localFingerprint,
         hasLocalDifferences,
+        coverArtUrl: story.coverArtUrl ?? null,
       }
     })
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import type { FastifyInstance } from 'fastify'
+import { prisma } from '../src/lib/prisma.js'
 import { buildApp, cleanDatabase } from './helpers.js'
 
 describe('Story Endpoints', () => {
@@ -550,6 +551,74 @@ describe('Story Endpoints', () => {
       expect(response.statusCode).toBe(401)
       const body = response.json()
       expect(body.error).toBe('Authentication required')
+    })
+
+    test('should set and clear coverArtFileId and expose coverArtUrl', async () => {
+      // Create a story
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { name: 'Cover Story' },
+      })
+      const storyId = createResponse.json().story.id
+      expect(createResponse.json().story.coverArtFileId).toBe(null)
+      expect(createResponse.json().story.coverArtUrl).toBe(null)
+
+      // Create a file row directly
+      const file = await prisma.file.create({
+        data: {
+          ownerId: userId,
+          localPath: '/tmp/fake.png',
+          r2Key: null,
+          visibility: 'private',
+          path: '/files/1/2025/12/fake.png',
+          sha256: 'deadbeef',
+          width: 100,
+          height: 100,
+          bytes: 1024,
+          mimeType: 'image/png',
+        },
+      })
+
+      // Assign the cover
+      const setResponse = await app.inject({
+        method: 'PATCH',
+        url: `/my/stories/${storyId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { coverArtFileId: file.id },
+      })
+      expect(setResponse.statusCode).toBe(200)
+      expect(setResponse.json().story.coverArtFileId).toBe(file.id)
+      expect(setResponse.json().story.coverArtUrl).toBe(file.path)
+
+      // Verify GET also includes the URL
+      const getResponse = await app.inject({
+        method: 'GET',
+        url: `/my/stories/${storyId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+      expect(getResponse.json().story.coverArtUrl).toBe(file.path)
+
+      // Verify list also includes the URL
+      const listResponse = await app.inject({
+        method: 'GET',
+        url: '/my/stories',
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+      const listed = listResponse.json().stories.find((s: { id: string }) => s.id === storyId)
+      expect(listed.coverArtUrl).toBe(file.path)
+
+      // Clear the cover
+      const clearResponse = await app.inject({
+        method: 'PATCH',
+        url: `/my/stories/${storyId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { coverArtFileId: null },
+      })
+      expect(clearResponse.statusCode).toBe(200)
+      expect(clearResponse.json().story.coverArtFileId).toBe(null)
+      expect(clearResponse.json().story.coverArtUrl).toBe(null)
     })
   })
 

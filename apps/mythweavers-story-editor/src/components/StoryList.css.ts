@@ -46,3 +46,25 @@ export const currentStoryBorder = style({
   borderRadius: tokens.radius.sm,
   outline: `2px solid ${tokens.color.accent.primary}`,
 })
+
+export const rowInner = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['3'],
+})
+
+export const thumbnail = style({
+  flexShrink: 0,
+  width: '40px',
+  height: '60px',
+  borderRadius: tokens.radius.sm,
+  objectFit: 'cover',
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  backgroundColor: tokens.color.bg.raised,
+})
+
+export const titleWithThumb = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['3'],
+})

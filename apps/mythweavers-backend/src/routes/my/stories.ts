@@ -56,6 +56,10 @@ const storyListItemSchema = z.strictObject({
     description: 'Number of messages in story',
     example: 100,
   }),
+  coverArtUrl: z.string().nullable().meta({
+    description: 'Cover art URL path (from the associated file, if any)',
+    example: '/files/1/2025/12/cover.jpg',
+  }),
 })
 
 // Full story response schema (what we return to the client)
@@ -119,6 +123,10 @@ const storySchema = z.strictObject({
   coverArtFileId: z.string().nullable().meta({
     description: 'Cover art file ID',
     example: 'clx1234567890',
+  }),
+  coverArtUrl: z.string().nullable().meta({
+    description: 'Cover art URL path (from the associated file, if any)',
+    example: '/files/1/2025/12/cover.jpg',
   }),
   defaultPerspective: perspectiveSchema.nullable(),
   defaultTense: tenseSchema.nullable(),
@@ -318,6 +326,10 @@ const updateStoryBodySchema = z.strictObject({
   openaiEndpoint: z.string().nullable().optional().meta({
     description: 'Custom base URL for OpenAI-compatible APIs',
     example: 'https://api.openai.com',
+  }),
+  coverArtFileId: z.string().nullable().optional().meta({
+    description: 'Cover art file ID (null to remove cover)',
+    example: 'clx1234567890',
   }),
   coverColor: z.string().optional(),
   coverTextColor: z.string().optional(),
@@ -612,8 +624,10 @@ const exportStoryResponseSchema = z.strictObject({
 
 // Helper to format story for response
 function formatStory(story: any) {
+  const { coverArtFile, ...rest } = story
   return {
-    ...story,
+    ...rest,
+    coverArtUrl: coverArtFile?.path ?? null,
     publishedAt: story.publishedAt ? story.publishedAt.toISOString() : null,
     firstChapterReleasedAt: story.firstChapterReleasedAt
       ? story.firstChapterReleasedAt.toISOString()
@@ -729,6 +743,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             characterCount: bigint
             chapterCount: bigint
             messageCount: bigint
+            coverArtUrl: string | null
           }>
         >`
           SELECT
@@ -738,7 +753,8 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             s."updatedAt",
             COUNT(DISTINCT ch.id) as "characterCount",
             COUNT(DISTINCT c.id) as "chapterCount",
-            COUNT(DISTINCT m.id) as "messageCount"
+            COUNT(DISTINCT m.id) as "messageCount",
+            f.path as "coverArtUrl"
           FROM "Story" s
           LEFT JOIN "Character" ch ON ch."storyId" = s.id
           LEFT JOIN "Book" b ON b."storyId" = s.id
@@ -746,9 +762,10 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           LEFT JOIN "Chapter" c ON c."arcId" = a.id
           LEFT JOIN "Scene" sc ON sc."chapterId" = c.id
           LEFT JOIN "Message" m ON m."sceneId" = sc.id
+          LEFT JOIN "File" f ON f.id = s."coverArtFileId"
           WHERE s."ownerId" = ${userId}
           ${search ? Prisma.sql`AND (s.name ILIKE ${`%${search}%`} OR s.summary ILIKE ${`%${search}%`})` : Prisma.empty}
-          GROUP BY s.id
+          GROUP BY s.id, f.path
           ORDER BY s."sortOrder" ASC, s."updatedAt" DESC
           LIMIT ${pageSize} OFFSET ${skip}
         `
@@ -764,6 +781,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             characterCount: Number(s.characterCount),
             chapterCount: Number(s.chapterCount),
             messageCount: Number(s.messageCount),
+            coverArtUrl: s.coverArtUrl,
           })),
           pagination: {
             page,
@@ -806,6 +824,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             id,
             ownerId: userId,
           },
+          include: { coverArtFile: true },
         })
 
         if (!story) {
@@ -879,6 +898,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const story = await prisma.story.update({
           where: { id },
           data,
+          include: { coverArtFile: true },
         })
 
         fastify.log.info({ storyId: story.id, userId }, 'Story updated')
@@ -974,6 +994,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             id,
             ownerId: userId,
           },
+          include: { coverArtFile: true },
         })
 
         if (!story) {

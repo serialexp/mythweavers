@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import type { FastifyInstance } from 'fastify'
+import { prisma } from '../src/lib/prisma.js'
 import { buildApp, cleanDatabase } from './helpers.js'
 
 describe('Public Story Endpoints', () => {
@@ -478,6 +479,79 @@ describe('Public Story Endpoints', () => {
 
       expect(response.statusCode).toBe(200)
       expect(response.json().story.name).toBe('Public Story')
+    })
+
+    test('should expose coverArtUrl on single and list endpoints', async () => {
+      // Create + publish story
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { name: 'Story With Cover' },
+      })
+      const storyId = createResponse.json().story.id
+
+      // Attach a cover file (owner = story's user)
+      const userId = createResponse.json().story.ownerId as number
+      const file = await prisma.file.create({
+        data: {
+          ownerId: userId,
+          storyId,
+          localPath: '/tmp/fake-pub.png',
+          r2Key: null,
+          visibility: 'private',
+          path: '/files/1/2025/12/pub-cover.png',
+          sha256: 'deadbeef',
+          width: 100,
+          height: 100,
+          bytes: 1024,
+          mimeType: 'image/png',
+        },
+      })
+
+      await app.inject({
+        method: 'PATCH',
+        url: `/my/stories/${storyId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { coverArtFileId: file.id, published: true },
+      })
+
+      // Single story
+      const single = await app.inject({ method: 'GET', url: `/stories/${storyId}` })
+      expect(single.statusCode).toBe(200)
+      expect(single.json().story.coverArtUrl).toBe(file.path)
+
+      // List
+      const list = await app.inject({ method: 'GET', url: '/stories' })
+      expect(list.statusCode).toBe(200)
+      const item = list.json().stories.find((s: { id: string }) => s.id === storyId)
+      expect(item).toBeDefined()
+      expect(item.coverArtUrl).toBe(file.path)
+
+      // Structure endpoint should also include the URL
+      const struct = await app.inject({ method: 'GET', url: `/stories/${storyId}/structure` })
+      expect(struct.statusCode).toBe(200)
+      expect(struct.json().story.coverArtUrl).toBe(file.path)
+    })
+
+    test('should return null coverArtUrl when no cover is set', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { name: 'No Cover' },
+      })
+      const storyId = createResponse.json().story.id
+      await app.inject({
+        method: 'PATCH',
+        url: `/my/stories/${storyId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { published: true },
+      })
+
+      const res = await app.inject({ method: 'GET', url: `/stories/${storyId}` })
+      expect(res.statusCode).toBe(200)
+      expect(res.json().story.coverArtUrl).toBeNull()
     })
   })
 })

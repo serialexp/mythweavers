@@ -94,12 +94,60 @@ export const currentStoryStore = {
   get lastChapterReleasedAt(): string | null {
     return storyState.story?.lastChapterReleasedAt ?? null
   },
+  get summary(): string | null {
+    return storyState.story?.summary ?? null
+  },
+  get coverArtFileId(): string | null {
+    return storyState.story?.coverArtFileId ?? null
+  },
+  get coverArtUrl(): string | null {
+    return storyState.story?.coverArtUrl ?? null
+  },
 
   // Actions
   setName: (name: string, isPlaceholder = false) => {
     if (!storyState.story) return
     setStoryState('story', 'name', name)
     setStoryState('story', 'isPlaceholderName', isPlaceholder)
+  },
+
+  setSummary: (summary: string | null) => {
+    if (!storyState.story) return
+    setStoryState('story', 'summary', summary)
+    saveService.saveStorySettings(storyState.story.id, { summary })
+  },
+
+  setCoverArt: (coverArtFileId: string | null, coverArtUrl: string | null) => {
+    if (!storyState.story) return
+    setStoryState('story', 'coverArtFileId', coverArtFileId)
+    setStoryState('story', 'coverArtUrl', coverArtUrl)
+    saveService.saveStorySettings(storyState.story.id, { coverArtFileId })
+  },
+
+  /**
+   * Update name + summary + cover together as a single save operation.
+   * Used by StoryDetailsModal.
+   */
+  updateDetails: (details: { name?: string; summary?: string | null; coverArtFileId?: string | null; coverArtUrl?: string | null }) => {
+    if (!storyState.story) return
+    if (details.name !== undefined) {
+      setStoryState('story', 'name', details.name)
+      setStoryState('story', 'isPlaceholderName', false)
+    }
+    if (details.summary !== undefined) {
+      setStoryState('story', 'summary', details.summary)
+    }
+    if (details.coverArtFileId !== undefined) {
+      setStoryState('story', 'coverArtFileId', details.coverArtFileId)
+    }
+    if (details.coverArtUrl !== undefined) {
+      setStoryState('story', 'coverArtUrl', details.coverArtUrl)
+    }
+    const patch: Record<string, unknown> = {}
+    if (details.name !== undefined) patch.name = details.name
+    if (details.summary !== undefined) patch.summary = details.summary
+    if (details.coverArtFileId !== undefined) patch.coverArtFileId = details.coverArtFileId
+    saveService.saveStorySettings(storyState.story.id, patch)
   },
 
   setLastKnownUpdatedAt: (updatedAt: string | undefined) => {
@@ -194,6 +242,18 @@ export const currentStoryStore = {
   loadAIOverrides: (overrides: StoryAIOverrides | null) => {
     if (!storyState.story) return
     setStoryState('story', 'aiOverrides', overrides ? { ...overrides } : null)
+  },
+
+  /** Load editable metadata (summary, cover art) from a server story response. */
+  loadDetails: (details: {
+    summary?: string | null
+    coverArtFileId?: string | null
+    coverArtUrl?: string | null
+  }) => {
+    if (!storyState.story) return
+    setStoryState('story', 'summary', details.summary ?? null)
+    setStoryState('story', 'coverArtFileId', details.coverArtFileId ?? null)
+    setStoryState('story', 'coverArtUrl', details.coverArtUrl ?? null)
   },
 
   /**

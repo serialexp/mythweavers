@@ -41,6 +41,10 @@ const bookSchema = z.strictObject({
     description: 'Cover art file ID',
     example: 'clx1234567890',
   }),
+  coverArtUrl: z.string().nullable().meta({
+    description: 'Cover art URL path (from the associated file, if any)',
+    example: '/files/1/2025/12/cover.jpg',
+  }),
   spineArtFileId: z.string().nullable().meta({
     description: 'Spine art file ID',
     example: 'clx1234567890',
@@ -103,6 +107,10 @@ const updateBookBodySchema = z.strictObject({
     description: 'Estimated page count',
     example: 250,
   }),
+  coverArtFileId: z.string().nullable().optional().meta({
+    description: 'Cover art file ID (null to remove cover)',
+    example: 'clx1234567890',
+  }),
 })
 
 // Path parameters
@@ -145,8 +153,10 @@ const deleteBookResponseSchema = z.strictObject({
 
 // Helper to format book for response
 function formatBook(book: any) {
+  const { coverArtFile, ...rest } = book
   return {
-    ...book,
+    ...rest,
+    coverArtUrl: coverArtFile?.path ?? null,
     createdAt: book.createdAt.toISOString(),
     updatedAt: book.updatedAt.toISOString(),
   }
@@ -213,6 +223,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
             sortOrder: finalSortOrder,
             nodeType: nodeType || 'story',
           },
+          include: { coverArtFile: true },
         })
 
         fastify.log.info({ bookId: book.id, storyId, userId }, 'Book created')
@@ -266,6 +277,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const books = await prisma.book.findMany({
           where: { storyId, deleted: false },
           orderBy: { sortOrder: 'asc' },
+          include: { coverArtFile: true },
         })
 
         return {
@@ -308,6 +320,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
               ownerId: userId,
             },
           },
+          include: { coverArtFile: true },
         })
 
         if (!book) {
@@ -367,6 +380,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const book = await prisma.book.update({
           where: { id },
           data: updates,
+          include: { coverArtFile: true },
         })
 
         fastify.log.info({ bookId: book.id, userId }, 'Book updated')

@@ -885,6 +885,10 @@ export type GetMyStoriesResponses = {
              * Number of messages in story
              */
             messageCount: number;
+            /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
         }>;
         pagination: {
             /**
@@ -1076,6 +1080,10 @@ export type PostMyStoriesResponses = {
              * Cover art file ID
              */
             coverArtFileId: string | null;
+            /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -1378,6 +1386,10 @@ export type GetMyStoriesByIdResponses = {
              * Cover art file ID
              */
             coverArtFileId: string | null;
+            /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -1547,6 +1559,10 @@ export type PatchMyStoriesByIdData = {
          * Custom base URL for OpenAI-compatible APIs
          */
         openaiEndpoint?: string | null;
+        /**
+         * Cover art file ID (null to remove cover)
+         */
+        coverArtFileId?: string | null;
         coverColor?: string;
         coverTextColor?: string;
         coverFontFamily?: string;
@@ -1715,6 +1731,10 @@ export type PatchMyStoriesByIdResponses = {
              * Cover art file ID
              */
             coverArtFileId: string | null;
+            /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -1950,6 +1970,10 @@ export type GetMyStoriesByIdExportResponses = {
              * Cover art file ID
              */
             coverArtFileId: string | null;
+            /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -3114,6 +3138,10 @@ export type GetMyStoriesByStoryIdBooksResponses = {
              */
             coverArtFileId: string | null;
             /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
+            /**
              * Spine art file ID
              */
             spineArtFileId: string | null;
@@ -3268,6 +3296,10 @@ export type PostMyStoriesByStoryIdBooksResponses = {
              * Cover art file ID
              */
             coverArtFileId: string | null;
+            /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
             /**
              * Spine art file ID
              */
@@ -3461,6 +3493,10 @@ export type GetMyBooksByIdResponses = {
              */
             coverArtFileId: string | null;
             /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
+            /**
              * Spine art file ID
              */
             spineArtFileId: string | null;
@@ -3508,6 +3544,10 @@ export type PatchMyBooksByIdData = {
          * Estimated page count
          */
         pages?: number | null;
+        /**
+         * Cover art file ID (null to remove cover)
+         */
+        coverArtFileId?: string | null;
     };
     path: {
         /**
@@ -3615,6 +3655,10 @@ export type PatchMyBooksByIdResponses = {
              * Cover art file ID
              */
             coverArtFileId: string | null;
+            /**
+             * Cover art URL path (from the associated file, if any)
+             */
+            coverArtUrl: string | null;
             /**
              * Spine art file ID
              */

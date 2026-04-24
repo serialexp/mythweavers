@@ -1,5 +1,6 @@
 import { ActionRow, Badge, IconButton, Input, Spinner } from '@mythweavers/ui'
 import { Component, For, Show, createSignal } from 'solid-js'
+import { getApiBaseUrl } from '../client/config'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { storyManager } from '../utils/storyManager'
 import * as styles from './StoryList.css'
@@ -16,6 +17,13 @@ export interface StoryListItem {
   type: 'local' | 'server'
   isCurrentStory: boolean
   hasLocalDifferences?: boolean // True if local version differs from server
+  coverArtUrl?: string | null
+}
+
+const resolveCoverUrl = (urlPath: string | null | undefined): string | null => {
+  if (!urlPath) return null
+  if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) return urlPath
+  return `${getApiBaseUrl()}${urlPath}`
 }
 
 interface StoryListProps {
@@ -142,10 +150,18 @@ export const StoryList: Component<StoryListProps> = (props) => {
                     />
                   }
                 >
-                  <div
-                    class={styles.storyName}
-                    onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}
-                  >
+                  <div class={styles.titleWithThumb}>
+                    <Show when={resolveCoverUrl(story.coverArtUrl)}>
+                      <img
+                        src={resolveCoverUrl(story.coverArtUrl)!}
+                        alt=""
+                        class={styles.thumbnail}
+                      />
+                    </Show>
+                    <div
+                      class={styles.storyName}
+                      onDblClick={() => props.editingEnabled && startEditing(story.id, story.name)}
+                    >
                     {story.type === 'server' ? (
                       <span title="Server story" style={{ display: 'inline-flex' }}>
                         <PhCloudIcon weight="fill" class={styles.storyTypeIcon} />
@@ -166,6 +182,7 @@ export const StoryList: Component<StoryListProps> = (props) => {
                         Current
                       </Badge>
                     )}
+                    </div>
                   </div>
                 </Show>
               }

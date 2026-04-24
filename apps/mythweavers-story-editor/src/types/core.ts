@@ -165,6 +165,12 @@ export interface Node {
   // future = scheduled, past = live. Only meaningful on type === 'chapter'.
   publishedAt?: string | null
 
+  // Cover art (book-only in practice). coverArtUrl is the resolved URL path
+  // from the backend (derived from the associated File row); coverArtFileId
+  // is the file ID to persist on update.
+  coverArtFileId?: string | null
+  coverArtUrl?: string | null
+
   // Metadata
   createdAt: Date
   updatedAt: Date

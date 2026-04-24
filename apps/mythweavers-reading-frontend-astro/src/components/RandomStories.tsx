@@ -1,6 +1,6 @@
 import { Button } from '@mythweavers/ui'
 import { For, createSignal } from 'solid-js'
-import { storiesApi, type PublicStory } from '../lib/api'
+import { resolveCoverArtUrl, storiesApi, type PublicStory } from '../lib/api'
 import StoryCard from './StoryCard'
 import * as pageStyles from '../styles/pages.css'
 
@@ -40,6 +40,7 @@ export default function RandomStories(props: RandomStoriesProps) {
               color={story.coverColor}
               textColor={story.coverTextColor}
               fontFamily={story.coverFontFamily}
+              coverArtAsset={resolveCoverArtUrl(story.coverArtUrl) ?? undefined}
               canAddToLibrary={props.canAddToLibrary}
             />
           )}

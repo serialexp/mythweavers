@@ -43,9 +43,20 @@ export interface PublicStory {
   coverColor: string
   coverTextColor: string
   coverFontFamily: string
+  coverArtUrl: string | null
   pages: number | null
   createdAt: string
   updatedAt: string
+}
+
+/**
+ * Resolve a relative file path (e.g. `/files/1/2025/12/cover.png`) into an
+ * absolute URL pointing at the backend. Returns null for nullish input.
+ */
+export function resolveCoverArtUrl(coverArtUrl: string | null | undefined): string | null {
+  if (!coverArtUrl) return null
+  if (coverArtUrl.startsWith('http://') || coverArtUrl.startsWith('https://')) return coverArtUrl
+  return `${getApiUrl()}${coverArtUrl}`
 }
 
 export interface Book {

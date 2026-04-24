@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import { Badge, Button, Card, CardBody, LinkButton, Prose } from '@mythweavers/ui'
 import { Layout } from '../Layout'
-import type { StoryWithStructure, User } from '../../lib/api'
+import { resolveCoverArtUrl, type StoryWithStructure, type User } from '../../lib/api'
 import * as pageStyles from '../../styles/pages.css'
 import * as styles from '../../styles/story.css'
 
@@ -33,17 +33,31 @@ export const StoryPage = (props: StoryPageProps) => {
                 <div class={styles.storyLayout}>
                   {/* Cover image */}
                   <div class={styles.coverSection}>
-                    <div
-                      class={styles.coverImage}
-                      style={{
-                        'background-color': story().coverColor,
-                        color: story().coverTextColor,
-                      }}
+                    <Show
+                      when={resolveCoverArtUrl(story().coverArtUrl)}
+                      fallback={
+                        <div
+                          class={styles.coverImage}
+                          style={{
+                            'background-color': story().coverColor,
+                            color: story().coverTextColor,
+                          }}
+                        >
+                          <span class={styles.coverTitle} style={{ 'font-family': story().coverFontFamily }}>
+                            {story().name}
+                          </span>
+                        </div>
+                      }
                     >
-                      <span class={styles.coverTitle} style={{ 'font-family': story().coverFontFamily }}>
-                        {story().name}
-                      </span>
-                    </div>
+                      {(url) => (
+                        <img
+                          class={styles.coverImage}
+                          src={url()}
+                          alt={story().name}
+                          style={{ 'object-fit': 'cover' }}
+                        />
+                      )}
+                    </Show>
 
                     <div class={styles.coverActions}>
                       <Show when={props.firstChapterId}>

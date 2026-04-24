@@ -317,6 +317,7 @@ export const storyManager = {
         characterCount: story.characterCount,
         chapterCount: story.chapterCount,
         storySetting: story.summary || '',
+        coverArtUrl: (story as { coverArtUrl?: string | null }).coverArtUrl ?? null,
         fingerprint: undefined,
       }))
     } catch (error) {

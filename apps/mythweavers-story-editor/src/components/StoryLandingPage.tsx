@@ -102,6 +102,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         fingerprint: story.fingerprint,
         localFingerprint,
         hasLocalDifferences,
+        coverArtUrl: story.coverArtUrl ?? null,
       }
     })
 

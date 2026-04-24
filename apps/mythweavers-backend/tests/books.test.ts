@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import type { FastifyInstance } from 'fastify'
+import { prisma } from '../src/lib/prisma.js'
 import { buildApp, cleanDatabase } from './helpers.js'
 
 describe('Book Endpoints', () => {
@@ -425,6 +426,62 @@ describe('Book Endpoints', () => {
       expect(response.statusCode).toBe(401)
       const body = response.json()
       expect(body.error).toBe('Authentication required')
+    })
+
+    test('should set and clear coverArtFileId and expose coverArtUrl', async () => {
+      // Initially no cover
+      const initial = await app.inject({
+        method: 'GET',
+        url: `/my/books/${bookId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+      expect(initial.json().book.coverArtFileId).toBe(null)
+      expect(initial.json().book.coverArtUrl).toBe(null)
+
+      const file = await prisma.file.create({
+        data: {
+          ownerId: _userId,
+          localPath: '/tmp/fake-book.png',
+          r2Key: null,
+          visibility: 'private',
+          path: '/files/1/2025/12/fake-book.png',
+          sha256: 'cafebabe',
+          width: 100,
+          height: 100,
+          bytes: 1024,
+          mimeType: 'image/png',
+        },
+      })
+
+      const setResponse = await app.inject({
+        method: 'PATCH',
+        url: `/my/books/${bookId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { coverArtFileId: file.id },
+      })
+      expect(setResponse.statusCode).toBe(200)
+      expect(setResponse.json().book.coverArtFileId).toBe(file.id)
+      expect(setResponse.json().book.coverArtUrl).toBe(file.path)
+
+      // List endpoint should also return coverArtUrl
+      const listResponse = await app.inject({
+        method: 'GET',
+        url: `/my/stories/${storyId}/books`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+      const listed = listResponse.json().books.find((b: { id: string }) => b.id === bookId)
+      expect(listed.coverArtUrl).toBe(file.path)
+
+      // Clear
+      const clearResponse = await app.inject({
+        method: 'PATCH',
+        url: `/my/books/${bookId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { coverArtFileId: null },
+      })
+      expect(clearResponse.statusCode).toBe(200)
+      expect(clearResponse.json().book.coverArtFileId).toBe(null)
+      expect(clearResponse.json().book.coverArtUrl).toBe(null)
     })
 
     test('should reject for non-existent book', async () => {

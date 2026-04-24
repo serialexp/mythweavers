@@ -19,7 +19,9 @@ import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 import { estimateTokensFromText } from '../utils/templateAI'
 import { createAnthropicClient } from '../utils/anthropicClient'
 import { ChapterPublishingModal } from './ChapterPublishingModal'
+import { BookDetailsModal } from './BookDetailsModal'
 import { CharacterUpdateModal } from './CharacterUpdateModal'
+import { StoryDetailsModal } from './StoryDetailsModal'
 import { ContextItemGenerateModal } from './ContextItemGenerateModal'
 import { NodeStatusMenu } from './NodeStatusMenu'
 import { PublishingBadge } from './PublishingBadge'
@@ -27,7 +29,7 @@ import { SplitSceneModal } from './SplitSceneModal'
 import { StoryPublishingModal } from './StoryPublishingModal'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
-import { PhArrowCounterClockwiseIcon, PhArrowDownIcon, PhArrowUpIcon, PhBookIcon, PhBookOpenIcon, PhCaretDownIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleHalfIcon, PhCircleIcon, PhClockIcon, PhCodeIcon, PhDotsThreeIcon, PhFileTextIcon, PhFloppyDiskIcon, PhGlobeIcon, PhPencilSimpleIcon, PhPlusCircleIcon, PhScissorsIcon, PhSignOutIcon, PhTrashIcon, PhTreeStructureIcon, PhUsersIcon, PhWarningIcon } from 'solidjs-phosphor'
+import { PhArrowCounterClockwiseIcon, PhArrowDownIcon, PhArrowUpIcon, PhBookIcon, PhBookOpenIcon, PhCaretDownIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleHalfIcon, PhCircleIcon, PhClockIcon, PhCodeIcon, PhDotsThreeIcon, PhFileTextIcon, PhFloppyDiskIcon, PhGlobeIcon, PhInfoIcon, PhPencilSimpleIcon, PhPlusCircleIcon, PhScissorsIcon, PhSignOutIcon, PhTrashIcon, PhTreeStructureIcon, PhUsersIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface NodeItemProps {
   treeNode: TreeNode
@@ -36,6 +38,7 @@ interface NodeItemProps {
   onSplitScene?: (nodeId: string) => void
   onExtractBook?: (bookId: string) => void
   onPublishChapter?: (chapterId: string) => void
+  onOpenBookDetails?: (bookId: string) => void
 }
 
 const getAllowedParentType = (type: NodeType): NodeType | null => {
@@ -1073,6 +1076,12 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             </DropdownItem>
             <Show when={node()?.type === 'book'}>
               <DropdownItem
+                icon={<PhInfoIcon />}
+                onClick={() => props.onOpenBookDetails?.(props.treeNode.id)}
+              >
+                Details…
+              </DropdownItem>
+              <DropdownItem
                 icon={<PhSignOutIcon />}
                 onClick={() => props.onExtractBook?.(props.treeNode.id)}
               >
@@ -1153,7 +1162,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       <Show when={isExpanded() && hasChildren()}>
         <div class={styles.childrenContainer}>
           <For each={props.treeNode.children}>
-            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} onExtractBook={props.onExtractBook} onPublishChapter={props.onPublishChapter} />}
+            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} onExtractBook={props.onExtractBook} onPublishChapter={props.onPublishChapter} onOpenBookDetails={props.onOpenBookDetails} />}
           </For>
         </div>
       </Show>
@@ -1177,6 +1186,8 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   const [showSplitSceneModal, setShowSplitSceneModal] = createSignal(false)
   const [splitTargetNodeId, setSplitTargetNodeId] = createSignal<string | null>(null)
   const [showStoryPublishingModal, setShowStoryPublishingModal] = createSignal(false)
+  const [showStoryDetailsModal, setShowStoryDetailsModal] = createSignal(false)
+  const [bookDetailsTargetId, setBookDetailsTargetId] = createSignal<string | null>(null)
   const [chapterPublishingTargetId, setChapterPublishingTargetId] = createSignal<string | null>(null)
   const handlePublishChapter = (chapterId: string) => setChapterPublishingTargetId(chapterId)
 
@@ -1554,6 +1565,17 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
                   class={styles.actionButton}
                   onClick={(e) => {
                     e.stopPropagation()
+                    setShowStoryDetailsModal(true)
+                  }}
+                  title="Story details"
+                  aria-label="Story details"
+                >
+                  <PhInfoIcon />
+                </button>
+                <button
+                  class={styles.actionButton}
+                  onClick={(e) => {
+                    e.stopPropagation()
                     setShowStoryPublishingModal(true)
                   }}
                   title="Story publishing"
@@ -1566,7 +1588,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
           </div>
 
           <For each={nodeStore.tree}>
-            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} onExtractBook={handleExtractBook} onPublishChapter={handlePublishChapter} />}
+            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} onExtractBook={handleExtractBook} onPublishChapter={handlePublishChapter} onOpenBookDetails={(bookId) => setBookDetailsTargetId(bookId)} />}
           </For>
 
           <Show when={nodeStore.tree.length === 0}>
@@ -1675,6 +1697,17 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
       <StoryPublishingModal
         open={showStoryPublishingModal()}
         onClose={() => setShowStoryPublishingModal(false)}
+      />
+
+      <StoryDetailsModal
+        isOpen={showStoryDetailsModal()}
+        onClose={() => setShowStoryDetailsModal(false)}
+      />
+
+      <BookDetailsModal
+        isOpen={bookDetailsTargetId() !== null}
+        bookId={bookDetailsTargetId()}
+        onClose={() => setBookDetailsTargetId(null)}
       />
 
       <ChapterPublishingModal

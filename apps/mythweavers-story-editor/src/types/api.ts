@@ -231,6 +231,8 @@ export interface ApiStoryMetadata {
   storySetting: string
   messageCount: number
   characterCount: number
+  chapterCount?: number
+  coverArtUrl?: string | null
   fingerprint?: string // Hash of message content for change detection
 }
 

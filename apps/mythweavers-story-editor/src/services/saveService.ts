@@ -326,6 +326,8 @@ interface StorySettingsOperation extends SaveOperationBase {
   entityType: 'story-settings'
   data: Partial<{
     name: string
+    summary: string | null
+    coverArtFileId: string | null
     person: 'first' | 'second' | 'third'
     tense: 'present' | 'past'
     storySetting: string
@@ -1103,7 +1105,8 @@ export class SaveService {
               name: operation.data.title,
               summary: operation.data.summary,
               sortOrder: operation.data.order,
-            },
+              coverArtFileId: operation.data.coverArtFileId,
+            } as any,
           })
         } else if (operation.data.type === 'arc') {
           await patchMyArcsById({
@@ -1348,6 +1351,8 @@ export class SaveService {
         // Build the body, including plotPointDefaults which may not be in generated types yet
         const updateBody: Record<string, unknown> = {
           name: operation.data.name,
+          summary: operation.data.summary,
+          coverArtFileId: operation.data.coverArtFileId,
           genre: operation.data.storySetting, // storySetting is the genre (fantasy, sci-fi, etc.)
           defaultPerspective: operation.data.person ? perspectiveMap[operation.data.person] : undefined,
           defaultTense: operation.data.tense ? tenseMap[operation.data.tense] : undefined,
@@ -1778,6 +1783,8 @@ export class SaveService {
     storyId: string,
     settings: Partial<{
       name: string
+      summary: string | null
+      coverArtFileId: string | null
       person: 'first' | 'second' | 'third'
       tense: 'present' | 'past'
       storySetting: string

@@ -232,6 +232,13 @@ const App: Component = () => {
         lastChapterReleasedAt: story.lastChapterReleasedAt ?? null,
       })
 
+      // Load editable metadata (summary + cover art) from the server payload.
+      currentStoryStore.loadDetails({
+        summary: story.summary ?? null,
+        coverArtFileId: story.coverArtFileId ?? null,
+        coverArtUrl: (story as { coverArtUrl?: string | null }).coverArtUrl ?? null,
+      })
+
       // Load story-level AI overrides (provider/model from story become overrides)
       console.log('[loadServerStoryData] Loading AI overrides...')
       const aiOverrides = story.aiOverrides ?? null
@@ -305,6 +312,8 @@ const App: Component = () => {
           title: book.name,
           summary: book.summary,
           order: book.sortOrder ?? bookIndex,
+          coverArtFileId: book.coverArtFileId ?? null,
+          coverArtUrl: book.coverArtUrl ?? null,
           expanded: true,
           isOpen: true,
           createdAt: book.createdAt,

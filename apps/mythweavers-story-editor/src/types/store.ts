@@ -33,6 +33,10 @@ export interface CurrentStory {
   publishedAt?: string | null
   firstChapterReleasedAt?: string | null
   lastChapterReleasedAt?: string | null
+  // Editable metadata for publishing
+  summary?: string | null
+  coverArtFileId?: string | null
+  coverArtUrl?: string | null
 }
 
 export interface CacheEntry {

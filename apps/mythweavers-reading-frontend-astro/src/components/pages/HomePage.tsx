@@ -2,7 +2,7 @@ import { For, Show } from 'solid-js'
 import { Card, CardBody, CardTitle, LinkButton } from '@mythweavers/ui'
 import { Layout } from '../Layout'
 import StoryCard from '../StoryCard'
-import type { PublicStory, User } from '../../lib/api'
+import { resolveCoverArtUrl, type PublicStory, type User } from '../../lib/api'
 import * as pageStyles from '../../styles/pages.css'
 
 export interface HomePageProps {
@@ -55,6 +55,7 @@ export const HomePage = (props: HomePageProps) => {
                         color={story.coverColor}
                         textColor={story.coverTextColor}
                         fontFamily={story.coverFontFamily}
+                        coverArtAsset={resolveCoverArtUrl(story.coverArtUrl) ?? undefined}
                         canAddToLibrary={!!props.user}
                       />
                     )}
