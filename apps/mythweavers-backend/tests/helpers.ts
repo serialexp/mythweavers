@@ -34,6 +34,7 @@ import myPathsRoutes from '../src/routes/my/paths.js'
 import myPawnsRoutes from '../src/routes/my/pawns.js'
 import myPlotPointStatesRoutes from '../src/routes/my/plot-point-states.js'
 import myPublishingRoutes from '../src/routes/my/publishing.js'
+import myRoyalRoadRoutes from '../src/routes/my/royal-road.js'
 import myScenesRoutes from '../src/routes/my/scenes.js'
 import myStoriesRoutes from '../src/routes/my/stories.js'
 import myLanguagesRoutes from '../src/routes/my/languages.js'
@@ -160,6 +161,7 @@ async function buildAppInternal() {
   await app.register(myPathSegmentsRoutes, { prefix: '/my' })
   await app.register(myPlotPointStatesRoutes, { prefix: '/my' })
   await app.register(myPublishingRoutes, { prefix: '/my' })
+  await app.register(myRoyalRoadRoutes, { prefix: '/my' })
   await app.register(myExportStoryRoutes, { prefix: '/my' })
   await app.register(myBalanceRoutes, { prefix: '/my' })
   await app.register(myPreferencesRoutes, { prefix: '/my' })
