@@ -59,6 +59,11 @@ const chapterSchema = z.strictObject({
     description: 'When the chapter was deleted',
     example: null,
   }),
+  wordCount: z.number().int().meta({
+    description:
+      'Cached total word count across all non-deleted messages in all non-deleted scenes under this chapter. Recalculated on paragraph changes.',
+    example: 1250,
+  }),
   createdAt: z.string().meta({
     description: 'Creation timestamp',
     example: '2025-12-05T12:00:00.000Z',
