@@ -14,6 +14,7 @@ import { viewModeStore } from '../stores/viewModeStore'
 import { Message as MessageType } from '../types/core'
 import { processPastedText } from '../utils/textProcessing'
 import { getTokenUsage } from '../utils/tokenUtils'
+import { BackgroundMessage } from './BackgroundMessage'
 import { BranchMessage } from './BranchMessage'
 import { MessageActionsDropdown } from './MessageActionsDropdown'
 import { MessageRegenerateButton } from './MessageRegenerateButton'
@@ -49,7 +50,8 @@ export const Message: Component<MessageProps> = (props) => {
       props.message.role === 'assistant' &&
       !props.message.isQuery &&
       props.message.type !== 'event' &&
-      props.message.type !== 'branch'
+      props.message.type !== 'branch' &&
+      props.message.type !== 'background'
     )
   })
   const [editInstruction, setEditInstruction] = createSignal('')
@@ -876,20 +878,24 @@ export const Message: Component<MessageProps> = (props) => {
             </Show>
           </Show>
 
-          {/* Non-story content (events, branches, queries): Use plain text rendering */}
+          {/* Non-story content (events, branches, backgrounds, queries): use type-specific rendering */}
           <Show when={!isStoryContent()}>
-            <Show
-              when={props.message.type === 'branch'}
-              fallback={
-                <>
-                  <Show when={props.message.type === 'event'}>
-                    <span class={styles.eventIcon}>📌 </span>
-                  </Show>
-                  {props.message.content}
-                </>
-              }
-            >
-              <BranchMessage message={props.message} />
+            <Show when={props.message.type === 'background'} fallback={
+              <Show
+                when={props.message.type === 'branch'}
+                fallback={
+                  <>
+                    <Show when={props.message.type === 'event'}>
+                      <span class={styles.eventIcon}>📌 </span>
+                    </Show>
+                    {props.message.content}
+                  </>
+                }
+              >
+                <BranchMessage message={props.message} />
+              </Show>
+            }>
+              <BackgroundMessage message={props.message} />
             </Show>
           </Show>
         </div>

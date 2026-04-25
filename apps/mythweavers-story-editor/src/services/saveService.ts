@@ -121,7 +121,7 @@ interface MessageBatchOperation extends SaveOperationBase {
       sortOrder: number
       instruction?: string | null
       script?: string | null
-      type?: 'chapter' | 'event' | 'branch' | null
+      type?: 'chapter' | 'event' | 'branch' | 'background' | null
       options?: Array<{
         id: string
         label: string
@@ -129,6 +129,7 @@ interface MessageBatchOperation extends SaveOperationBase {
         targetMessageId: string
         description?: string
       }>
+      backgroundFileId?: string | null
       paragraphs?: Array<{ body: string; sortOrder: number }>
     }>
   }
@@ -734,7 +735,22 @@ export class SaveService {
             script: operation.data.script,
             sortOrder: operation.data.order,
             isQuery: operation.data.isQuery,
-          } as { instruction?: string; script?: string; sortOrder?: number; id?: string; isQuery?: boolean },
+            // Forward type + type-specific payload so non-paragraph messages
+            // (event / branch / background) land with their discriminator
+            // set on first insert rather than relying on a follow-up update.
+            type: operation.data.type ?? undefined,
+            options: operation.data.options,
+            backgroundFileId: operation.data.backgroundFileId ?? undefined,
+          } as {
+            instruction?: string
+            script?: string
+            sortOrder?: number
+            id?: string
+            isQuery?: boolean
+            type?: string
+            options?: Array<{ id: string; label: string; targetNodeId: string; targetMessageId: string; description?: string }>
+            backgroundFileId?: string
+          },
         })
         if (insertResponse.data?.message) {
           this.updateLastKnownTimestamp(insertResponse.data.message.updatedAt)
@@ -754,6 +770,10 @@ export class SaveService {
         // Map sceneId to nodeId for the backend API
         const updateResponse = await patchMyMessagesById({
           path: { id: entityId },
+          // Cast: `backgroundFileId` is part of the backend API but the
+          // generated SDK hasn't been regenerated yet (regen happens after
+          // Bart runs the pending Prisma migration — see CURRENT_TASK.md).
+          // Once regenerated, this cast can be removed.
           body: {
             instruction: operation.data.instruction,
             script: operation.data.script,
@@ -762,7 +782,8 @@ export class SaveService {
             isQuery: operation.data.isQuery,
             type: operation.data.type,
             options: operation.data.options,
-          },
+            backgroundFileId: operation.data.backgroundFileId,
+          } as Parameters<typeof patchMyMessagesById>[0]['body'] & { backgroundFileId?: string | null },
         })
         // Message updated
         if (updateResponse.data?.message) {
@@ -2384,7 +2405,7 @@ export class SaveService {
       instruction?: string
       script?: string
       content?: string // Will be split into paragraphs
-      type?: 'chapter' | 'event' | 'branch' | null
+      type?: 'chapter' | 'event' | 'branch' | 'background' | null
       options?: Array<{
         id: string
         label: string
@@ -2392,6 +2413,7 @@ export class SaveService {
         targetMessageId: string
         description?: string
       }>
+      backgroundFileId?: string | null
     }>,
   ): Promise<void> {
     // Transform messages to API format, splitting content into paragraphs
@@ -2416,6 +2438,7 @@ export class SaveService {
         script: msg.script ?? null,
         type: msg.type ?? null,
         options: msg.options,
+        backgroundFileId: msg.backgroundFileId ?? null,
         paragraphs,
       }
     })

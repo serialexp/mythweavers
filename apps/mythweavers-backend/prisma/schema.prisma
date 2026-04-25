@@ -428,8 +428,12 @@ model Message {
   isQuery                 Boolean          @default(false) // True for meta/query messages not visible to content generation
 
   // Branch support (from Story Project)
-  type                    String?          // Message type: null for normal, 'chapter' for chapter markers, 'event' for events, 'branch' for branch points
+  type                    String?          // Message type: null for normal, 'chapter' for chapter markers, 'event' for events, 'branch' for branch points, 'background' for reader background changes
   options                 Json?            // BranchOption[] - only for branch messages
+
+  // Background image (only for type === 'background')
+  backgroundFileId        String?
+  backgroundFile          File?            @relation("MessageBackgroundFile", fields: [backgroundFileId], references: [id], onDelete: SetNull)
 
   // Current active revision (denormalized for easy querying)
   currentMessageRevisionId String?
@@ -685,6 +689,7 @@ model File {
   bookCoverArt     Book[]      @relation("BookCoverArt")
   bookSpineArt     Book[]      @relation("BookSpineArt")
   characterPicture Character[] @relation("CharacterPicture")
+  messageBackgrounds Message[] @relation("MessageBackgroundFile")
 
   @@index([r2Key])
 }

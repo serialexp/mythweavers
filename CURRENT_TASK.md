@@ -1,3 +1,37 @@
+# Pending Prisma migration: scene background images
+
+A separate in-flight task (per-scene background images via a new
+`Message.type = 'background'`) added these schema changes to
+`apps/mythweavers-backend/prisma/schema.prisma`:
+
+- `Message.backgroundFileId String?` + relation `MessageBackgroundFile`
+  to `File`, with `onDelete: SetNull`.
+- Reverse relation `messageBackgrounds` on `File`.
+- Updated comment on `Message.type` to mention the new
+  `'background'` value.
+
+These need a Prisma migration. Bart, please run:
+
+```bash
+cd apps/mythweavers-backend
+pnpm prisma migrate dev --name add_message_background_file
+```
+
+**Note on drift:** the database currently has a `RoyalRoadAccount`
+table and Royal-Road-related additions (`Story.royalRoadPublishingEnabled`,
+new `PublishingStatus` enum variants, `ChapterPublishing.attempts` etc.)
+that are NOT represented as a migration in `prisma/migrations/`.
+Prisma reported this as drift when I tried to run the migration —
+it wants to reset the schema. **Do not let it reset.** Resolve the
+drift first (likely `prisma migrate diff` to write a backfill
+migration capturing the existing state, then apply mine on top). The
+Prisma client has already been regenerated locally so code referencing
+`backgroundFileId` typechecks.
+
+Plan file: `~/.claude/plans/humble-dancing-koala.md`.
+
+---
+
 # Current Task: Publishing flow (writer → Astro reader) + daily email digest
 
 ## Status: Phase 1 schema drafted — NEEDS PRISMA MIGRATION before further work

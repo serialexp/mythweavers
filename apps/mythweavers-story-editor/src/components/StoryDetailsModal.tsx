@@ -1,7 +1,7 @@
 import { Button, Modal } from '@mythweavers/ui'
 import { Component, Show, createEffect, createSignal, on } from 'solid-js'
-import { getApiBaseUrl } from '../client/config'
 import { currentStoryStore } from '../stores/currentStoryStore'
+import { resolveStoryImageUrl, uploadStoryImage } from '../utils/uploadStoryImage'
 import * as styles from './StoryDetailsModal.css'
 
 interface StoryDetailsModalProps {
@@ -42,12 +42,6 @@ export const StoryDetailsModal: Component<StoryDetailsModalProps> = (props) => {
     ),
   )
 
-  const resolveImageUrl = (urlPath: string | null): string | null => {
-    if (!urlPath) return null
-    if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) return urlPath
-    return `${getApiBaseUrl()}${urlPath}`
-  }
-
   const handleFileSelected = async (event: Event) => {
     const input = event.currentTarget as HTMLInputElement
     const file = input.files?.[0]
@@ -56,30 +50,9 @@ export const StoryDetailsModal: Component<StoryDetailsModalProps> = (props) => {
     setIsUploading(true)
     setError(null)
     try {
-      const formData = new FormData()
-      formData.append('file', file, file.name)
-      if (currentStoryStore.id) {
-        formData.append('storyId', currentStoryStore.id)
-      }
-
-      const response = await fetch(`${getApiBaseUrl()}/my/files`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const body = await response.text()
-        throw new Error(body || 'Upload failed')
-      }
-
-      const result = await response.json()
-      const uploadedId: string | undefined = result.file?.id
-      const uploadedPath: string | undefined = result.file?.path
-      if (!uploadedId) throw new Error('Upload response missing file id')
-
-      setCoverArtFileId(uploadedId)
-      setCoverArtUrl(uploadedPath ?? null)
+      const uploaded = await uploadStoryImage(file, currentStoryStore.id ?? undefined)
+      setCoverArtFileId(uploaded.id)
+      setCoverArtUrl(uploaded.path)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload cover image')
     } finally {
@@ -109,7 +82,7 @@ export const StoryDetailsModal: Component<StoryDetailsModalProps> = (props) => {
     props.onClose()
   }
 
-  const displayCoverUrl = () => resolveImageUrl(coverArtUrl())
+  const displayCoverUrl = () => resolveStoryImageUrl(coverArtUrl())
 
   return (
     <Modal

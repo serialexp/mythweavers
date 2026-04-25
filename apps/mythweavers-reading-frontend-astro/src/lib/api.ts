@@ -85,10 +85,31 @@ export interface StoryWithStructure extends PublicStory {
   books: Book[]
 }
 
+/**
+ * One block in a chapter scene. The reader walks the structured `scenes`
+ * array and renders each block in order: `paragraphs` blocks become prose,
+ * `background` blocks become invisible scroll anchors that drive the
+ * crossfading background image.
+ */
+export type ChapterBlock =
+  | { type: 'paragraphs'; html: string }
+  | { type: 'background'; url: string; fileId: string }
+
+export interface ChapterScene {
+  id: string
+  blocks: ChapterBlock[]
+}
+
 export interface ChapterContent {
   id: string
   name: string
-  content: string
+  /**
+   * Background image URL active at the start of this chapter, carried
+   * forward from the most recent prior `background` message in earlier
+   * chapters. Null when no prior background has been set.
+   */
+  enteringBackgroundUrl: string | null
+  scenes: ChapterScene[]
   previousChapterId: string | null
   nextChapterId: string | null
 }

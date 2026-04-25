@@ -1,9 +1,10 @@
 import { Show } from 'solid-js'
-import { Card, CardBody, LinkButton, Prose } from '@mythweavers/ui'
+import { Card, CardBody, LinkButton } from '@mythweavers/ui'
 import { Layout } from '../Layout'
 import type { ChapterContent, User } from '../../lib/api'
 import * as pageStyles from '../../styles/pages.css'
 import * as styles from '../../styles/story.css'
+import { ChapterScenes } from './ChapterScenes'
 
 export interface ChapterPageProps {
   user: User | null
@@ -49,7 +50,10 @@ export const ChapterPage = (props: ChapterPageProps) => {
                   </div>
 
                   <h1 class={styles.chapterTitle}>{chapter().name}</h1>
-                  <Prose html={chapter().content || 'No content available'} size="lg" center />
+                  <ChapterScenes
+                    scenes={chapter().scenes}
+                    enteringBackgroundUrl={chapter().enteringBackgroundUrl}
+                  />
 
                   <div class={styles.chapterFooterNav}>
                     <Show when={chapter().previousChapterId} fallback={<div />}>

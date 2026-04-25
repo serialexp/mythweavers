@@ -1,5 +1,6 @@
 import { IconButton, LinkButton, NavBar, NavBarActions, NavBarBrand, NavBarNav, NavLink, ThemeProvider, useTheme } from '@mythweavers/ui'
 import type { ParentComponent } from 'solid-js'
+import { BackgroundLayer } from './BackgroundLayer'
 import * as styles from './Layout.css'
 import UserStatus, { type UserSession } from './UserStatus'
 
@@ -23,6 +24,10 @@ const LayoutInner: ParentComponent<{ user?: UserSession | null }> = (props) => {
 
   return (
     <div class={isDark() ? styles.darkTheme : styles.lightTheme}>
+      {/* Persistent crossfading background driven by `backgroundStore`.
+          Sits behind every page; on chapter pages, the chapter mounts
+          push images in via `setBackground(...)`. */}
+      <BackgroundLayer />
       <div class={styles.pageWrapper}>
         <NavBar variant="elevated" position="sticky">
           <NavBarBrand href="/">

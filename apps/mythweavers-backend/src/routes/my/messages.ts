@@ -34,16 +34,57 @@ function transformDates<T extends { createdAt: Date; updatedAt: Date }>(
   }
 }
 
-// Helper to transform message from Prisma (dates + options type cast)
-function transformMessage<T extends { createdAt: Date; updatedAt: Date; options: JsonValue | null }>(
-  obj: T,
-): Omit<T, 'createdAt' | 'updatedAt' | 'options'> & { createdAt: string; updatedAt: string; options: BranchOption[] | null } {
+// Background file shape exposed on message responses (subset of File)
+type BackgroundFileSummary = { id: string; path: string } | null
+
+// Helper to transform message from Prisma (dates + options type cast + optional backgroundFile).
+// The return shape is intentionally untyped against T's fields beyond the ones we touch — the
+// surrounding route typing (via Zod response schemas) covers the public contract.
+function transformMessage<
+  T extends {
+    createdAt: Date
+    updatedAt: Date
+    options: JsonValue | null
+    backgroundFile?: { id: string; path: string } | null
+  },
+>(obj: T) {
+  const { backgroundFile, ...rest } = obj as T & { backgroundFile?: { id: string; path: string } | null }
   return {
-    ...obj,
+    ...rest,
     createdAt: obj.createdAt.toISOString(),
     updatedAt: obj.updatedAt.toISOString(),
     options: obj.options as BranchOption[] | null,
+    backgroundFile: (backgroundFile ?? null) as BackgroundFileSummary,
   }
+}
+
+// Reusable include that loads the background file thumbnail data alongside a message.
+const messageWithBackgroundFile = {
+  backgroundFile: { select: { id: true, path: true } },
+} as const
+
+/**
+ * Verify that a File is owned by the same user (and, when supplied, the same
+ * story) as the message it is being attached to, and is an image.
+ *
+ * Returns null on success, or an error string suitable for a 400 response.
+ */
+async function validateBackgroundFile(
+  fileId: string,
+  userId: number,
+  storyId: string | null,
+): Promise<string | null> {
+  const file = await prisma.file.findUnique({
+    where: { id: fileId },
+    select: { id: true, ownerId: true, storyId: true, mimeType: true },
+  })
+  if (!file) return 'Background file not found'
+  if (file.ownerId !== userId) return 'Background file not owned by user'
+  if (storyId !== null && file.storyId !== null && file.storyId !== storyId) {
+    return 'Background file belongs to a different story'
+  }
+  if (!file.mimeType.startsWith('image/')) return 'Background file must be an image'
+  return null
 }
 
 // Helper to convert options for Prisma input (handles null -> Prisma.JsonNull)
@@ -82,11 +123,22 @@ const messageSchema = z.strictObject({
   type: z
     .string()
     .nullable()
-    .meta({ example: 'branch', description: 'Message type: null for normal, branch for choices, event for events' }),
+    .meta({ example: 'branch', description: 'Message type: null for normal, branch for choices, event for events, background for reader background-image changes' }),
   options: z
     .array(branchOptionSchema)
     .nullable()
     .meta({ description: 'Branch options - only present for branch type messages' }),
+  backgroundFileId: z.string().nullable().meta({
+    description: 'File ID of the background image — only present for background type messages',
+    example: 'clx1234567890',
+  }),
+  backgroundFile: z
+    .strictObject({
+      id: z.string().meta({ example: 'clx1234567890' }),
+      path: z.string().meta({ example: '/files/abc123.jpg' }),
+    })
+    .nullable()
+    .meta({ description: 'Hydrated background image file (id + URL path) — only for background type messages' }),
   currentMessageRevisionId: z.string().nullable().meta({ example: 'clx1234567890' }),
   createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
   updatedAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
@@ -115,11 +167,15 @@ const createMessageBodySchema = z.strictObject({
     example: false,
   }),
   type: z.string().optional().meta({
-    description: 'Message type: null for normal, branch for choices, event for events',
+    description: 'Message type: null for normal, branch for choices, event for events, background for reader background-image changes',
     example: 'branch',
   }),
   options: z.array(branchOptionSchema).optional().meta({
     description: 'Branch options - only for branch type messages',
+  }),
+  backgroundFileId: z.string().optional().meta({
+    description: 'File ID for the background image — required when type is "background"',
+    example: 'clx1234567890',
   }),
 })
 
@@ -145,6 +201,9 @@ const updateMessageBodySchema = z.strictObject({
   }),
   options: z.array(branchOptionSchema).nullable().optional().meta({
     description: 'Branch options - only for branch type messages',
+  }),
+  backgroundFileId: z.string().nullable().optional().meta({
+    description: 'File ID for the background image — set/replace for background type messages, null to clear',
   }),
   deleted: z.boolean().optional().meta({
     description: 'Soft delete flag',
@@ -225,6 +284,18 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(404).send({ error: 'Scene not found' })
       }
 
+      // Background-message validation: require & verify the file when type === 'background'.
+      const storyId = scene.chapter.arc.book.story.id
+      if (request.body.type === 'background') {
+        if (!request.body.backgroundFileId) {
+          return reply.code(400).send({ error: 'backgroundFileId is required for type=background' })
+        }
+        const err = await validateBackgroundFile(request.body.backgroundFileId, userId, storyId)
+        if (err) return reply.code(400).send({ error: err })
+      } else if (request.body.backgroundFileId !== undefined) {
+        return reply.code(400).send({ error: 'backgroundFileId only allowed when type=background' })
+      }
+
       // Handle sortOrder: if provided, bump all messages at or after that position
       let sortOrder = request.body.sortOrder
       if (sortOrder !== undefined) {
@@ -259,6 +330,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           isQuery: request.body.isQuery ?? false,
           type: request.body.type || null,
           options: toJsonInput(request.body.options), // undefined if not provided, array if provided
+          backgroundFileId: request.body.backgroundFileId ?? null,
           messageRevisions: {
             create: {
               version: 1,
@@ -277,6 +349,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
         data: {
           currentMessageRevisionId: firstRevision.id,
         },
+        include: messageWithBackgroundFile,
       })
 
       // Transform dates to ISO strings for schema validation
@@ -343,6 +416,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const messages = await prisma.message.findMany({
         where: { sceneId },
         orderBy: { sortOrder: 'asc' },
+        include: messageWithBackgroundFile,
       })
 
       return { messages: messages.map(transformMessage) }
@@ -377,6 +451,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const message = await prisma.message.findUnique({
         where: { id },
         include: {
+          ...messageWithBackgroundFile,
           scene: {
             include: {
               chapter: {
@@ -474,6 +549,19 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(404).send({ error: 'Message not found' })
       }
 
+      // Compute the resulting type after this patch (body wins, otherwise existing).
+      // Only validate the background file when the patch actually sets/changes it
+      // (request.body.backgroundFileId !== undefined). null is "clear", a string is "set".
+      const storyId = message.scene.chapter.arc.book.story.id
+      const resultingType = request.body.type !== undefined ? request.body.type : message.type
+      if (request.body.backgroundFileId !== undefined && request.body.backgroundFileId !== null) {
+        if (resultingType !== 'background') {
+          return reply.code(400).send({ error: 'backgroundFileId only allowed when type=background' })
+        }
+        const err = await validateBackgroundFile(request.body.backgroundFileId, userId, storyId)
+        if (err) return reply.code(400).send({ error: err })
+      }
+
       // Update message
       const updated = await prisma.message.update({
         where: { id },
@@ -485,8 +573,10 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           isQuery: request.body.isQuery,
           type: request.body.type,
           options: toJsonInput(request.body.options),
+          backgroundFileId: request.body.backgroundFileId,
           deleted: request.body.deleted,
         },
+        include: messageWithBackgroundFile,
       })
 
       return {

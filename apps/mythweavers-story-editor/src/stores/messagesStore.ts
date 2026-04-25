@@ -1561,6 +1561,39 @@ export const messagesStore = {
     return branchMessage.id
   },
 
+  // Create a background-image message that the reader app crossfades to.
+  // The file must already be uploaded via POST /my/files; pass its id + path.
+  createBackgroundMessage: (
+    afterMessageId: string | null,
+    file: { id: string; path: string },
+    nodeId?: string,
+  ) => {
+    let targetNodeId: string | undefined = nodeId
+    if (!targetNodeId && afterMessageId) {
+      const afterMessage = messagesState.messages.find((m) => m.id === afterMessageId)
+      targetNodeId = afterMessage?.sceneId
+    }
+    if (!targetNodeId) {
+      targetNodeId = nodeStore.selectedNodeId || undefined
+    }
+
+    const backgroundMessage: Message = {
+      id: generateMessageId(),
+      role: 'assistant',
+      type: 'background',
+      content: '', // background messages carry no narrative text
+      backgroundFileId: file.id,
+      backgroundFile: { id: file.id, path: file.path },
+      order: 0, // Will be set properly by insertMessage
+      sceneId: targetNodeId,
+      timestamp: new Date(),
+      isQuery: false,
+    }
+
+    messagesStore.insertMessage(afterMessageId, backgroundMessage)
+    return backgroundMessage.id
+  },
+
   // Refresh messages from current story
   refreshMessages: async () => {
     const storyId = currentStoryStore.id

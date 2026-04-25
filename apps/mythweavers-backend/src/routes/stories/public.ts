@@ -261,7 +261,36 @@ const getPublicStoryWithStructureResponseSchema = z.strictObject({
   story: publicStoryWithStructureSchema,
 })
 
-// Chapter content schema
+// Chapter content schema — structured into scenes and per-scene blocks so the
+// reader can intersperse `paragraphs` runs with `background` markers driving
+// the crossfading background image. Adjacent paragraph-bearing messages are
+// collapsed into a single paragraphs block; a background message breaks the
+// run and emits its own block.
+const paragraphsBlockSchema = z.strictObject({
+  type: z.literal('paragraphs'),
+  html: z.string().meta({
+    description: 'HTML for this run of contiguous paragraphs',
+    example: '<p>Once upon a time...</p><p>...the rain came down.</p>',
+  }),
+})
+const backgroundBlockSchema = z.strictObject({
+  type: z.literal('background'),
+  url: z.string().meta({
+    description: 'Relative URL of the background image (resolve against the backend origin)',
+    example: '/files/1/2025/12/storm.jpg',
+  }),
+  fileId: z.string().meta({
+    description: 'File ID of the background image',
+    example: 'clx1234567890',
+  }),
+})
+const chapterBlockSchema = z.union([paragraphsBlockSchema, backgroundBlockSchema])
+
+const chapterSceneSchema = z.strictObject({
+  id: z.string().meta({ description: 'Scene ID', example: 'clx1234567890' }),
+  blocks: z.array(chapterBlockSchema),
+})
+
 const chapterContentSchema = z.strictObject({
   id: z.string().meta({
     description: 'Chapter ID',
@@ -271,9 +300,13 @@ const chapterContentSchema = z.strictObject({
     description: 'Chapter name',
     example: 'Chapter 1: The Beginning',
   }),
-  content: z.string().meta({
-    description: 'Chapter content as HTML',
-    example: '<p>Once upon a time...</p>',
+  enteringBackgroundUrl: z.string().nullable().meta({
+    description:
+      'Background image URL active at the start of this chapter, carried in from the most recent prior `background` message in earlier chapters of the same story. Null when no prior background has been set.',
+    example: '/files/1/2025/12/dawn.jpg',
+  }),
+  scenes: z.array(chapterSceneSchema).meta({
+    description: 'Ordered scenes, each containing an ordered list of paragraph/background blocks',
   }),
   publishedAt: z.string().meta({
     description: 'When this chapter became publicly visible (ISO-8601).',
@@ -335,34 +368,145 @@ function formatPublicStoryWithStructure(story: any) {
   }
 }
 
-// Helper to extract chapter content from scenes/messages/paragraphs
-function extractChapterContent(chapter: any): string {
-  const parts: string[] = []
+// Block + scene types matching the public response schema.
+type ParagraphsBlock = { type: 'paragraphs'; html: string }
+type BackgroundBlock = { type: 'background'; url: string; fileId: string }
+type ChapterBlock = ParagraphsBlock | BackgroundBlock
+type ChapterScene = { id: string; blocks: ChapterBlock[] }
 
-  // Sort scenes by sortOrder
+/**
+ * Build the structured per-scene block list for a chapter. Background-type
+ * messages flush the running paragraphs buffer and emit their own block;
+ * other non-paragraph types (`event`, `branch`, `chapter`) are skipped, same
+ * as the legacy flat extractor.
+ */
+function buildChapterScenes(chapter: any): ChapterScene[] {
   const scenes = (chapter.scenes || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+  return scenes.map((scene: any): ChapterScene => {
+    const blocks: ChapterBlock[] = []
+    let paragraphsBuffer: string[] = []
+    const flushParagraphs = () => {
+      if (paragraphsBuffer.length > 0) {
+        blocks.push({ type: 'paragraphs', html: paragraphsBuffer.join('\n') })
+        paragraphsBuffer = []
+      }
+    }
 
-  for (const scene of scenes) {
-    // Sort messages by sortOrder
     const messages = (scene.messages || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-
     for (const message of messages) {
+      if (message.deleted) continue
+      if (message.type === 'background') {
+        // A background message emits a marker block, but only if the file
+        // still exists (FK is SetNull on file delete — we silently drop the
+        // marker rather than break the flow).
+        flushParagraphs()
+        const file = message.backgroundFile
+        if (file?.path && file.id) {
+          blocks.push({ type: 'background', url: file.path, fileId: file.id })
+        }
+        continue
+      }
+
       const revision = message.currentMessageRevision
       if (!revision) continue
-
-      // Sort paragraphs by sortOrder
       const paragraphs = (revision.paragraphs || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-
       for (const paragraph of paragraphs) {
         const paraRevision = paragraph.currentParagraphRevision
         if (paraRevision?.body) {
-          parts.push(`<p>${paraRevision.body}</p>`)
+          paragraphsBuffer.push(`<p>${paraRevision.body}</p>`)
         }
       }
     }
-  }
+    flushParagraphs()
+    return { id: scene.id, blocks }
+  })
+}
 
-  return parts.join('\n')
+/**
+ * Find the background URL active at the *start* of the given chapter — the
+ * most recent `background` message in any earlier visible chapter of the
+ * same story. Returns null if no prior background has been set.
+ *
+ * O(1) regardless of story length: a single ordered query that takes the
+ * latest hit by (book.sortOrder, arc.sortOrder, chapter.sortOrder,
+ * scene.sortOrder, message.sortOrder).
+ */
+async function getEnteringBackgroundUrl(
+  storyId: string,
+  currentChapter: { id: string; sortOrder: number; arc: { sortOrder: number; book: { sortOrder: number } } },
+  now: Date,
+): Promise<string | null> {
+  // Prisma's nested ordering across relations isn't expressible in a single
+  // findFirst across joined tables, so we do this in two steps: load all
+  // candidate background messages from earlier chapters with their position
+  // info, then sort in JS. The candidate set is small (one row per
+  // background message) so this scales fine for any realistic story.
+  const candidates = await prisma.message.findMany({
+    where: {
+      type: 'background',
+      deleted: false,
+      backgroundFileId: { not: null },
+      backgroundFile: { is: {} },
+      scene: {
+        deleted: false,
+        chapter: {
+          ...chapterVisibleWhere(now),
+          NOT: { id: currentChapter.id },
+          arc: { book: { storyId } },
+        },
+      },
+    },
+    select: {
+      sortOrder: true,
+      backgroundFile: { select: { path: true } },
+      scene: {
+        select: {
+          sortOrder: true,
+          chapter: {
+            select: {
+              sortOrder: true,
+              arc: { select: { sortOrder: true, book: { select: { sortOrder: true } } } },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  // Keep only candidates strictly before the current chapter in
+  // (book, arc, chapter) order.
+  const cur = {
+    book: currentChapter.arc.book.sortOrder,
+    arc: currentChapter.arc.sortOrder,
+    chapter: currentChapter.sortOrder,
+  }
+  const earlier = candidates.filter((c) => {
+    const b = c.scene.chapter.arc.book.sortOrder
+    if (b !== cur.book) return b < cur.book
+    const a = c.scene.chapter.arc.sortOrder
+    if (a !== cur.arc) return a < cur.arc
+    return c.scene.chapter.sortOrder < cur.chapter
+  })
+  if (earlier.length === 0) return null
+
+  // Sort in story order, take the LAST one (most recent in narrative order).
+  earlier.sort((x, y) => {
+    const xb = x.scene.chapter.arc.book.sortOrder
+    const yb = y.scene.chapter.arc.book.sortOrder
+    if (xb !== yb) return xb - yb
+    const xa = x.scene.chapter.arc.sortOrder
+    const ya = y.scene.chapter.arc.sortOrder
+    if (xa !== ya) return xa - ya
+    const xc = x.scene.chapter.sortOrder
+    const yc = y.scene.chapter.sortOrder
+    if (xc !== yc) return xc - yc
+    const xs = x.scene.sortOrder
+    const ys = y.scene.sortOrder
+    if (xs !== ys) return xs - ys
+    return x.sortOrder - y.sortOrder
+  })
+  const last = earlier[earlier.length - 1]
+  return last.backgroundFile?.path ?? null
 }
 
 const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -708,6 +852,9 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                         },
                       },
                     },
+                    // Hydrate the file record for `background` messages so
+                    // the structured extractor can emit { url, fileId }.
+                    backgroundFile: { select: { id: true, path: true } },
                   },
                 },
               },
@@ -757,11 +904,22 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
         setCacheHeaders(reply, etag, chapter.updatedAt)
 
+        const enteringBackgroundUrl = await getEnteringBackgroundUrl(
+          storyId,
+          {
+            id: chapter.id,
+            sortOrder: chapter.sortOrder,
+            arc: { sortOrder: chapter.arc.sortOrder, book: { sortOrder: chapter.arc.book.sortOrder } },
+          },
+          now,
+        )
+
         return {
           chapter: {
             id: chapter.id,
             name: chapter.name,
-            content: extractChapterContent(chapter),
+            enteringBackgroundUrl,
+            scenes: buildChapterScenes(chapter),
             publishedAt: (chapter.publishedAt as Date).toISOString(),
             previousChapterId,
             nextChapterId,
