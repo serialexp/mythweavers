@@ -103,6 +103,12 @@ export const currentStoryStore = {
   get coverArtUrl(): string | null {
     return storyState.story?.coverArtUrl ?? null
   },
+  get defaultBackgroundFileId(): string | null {
+    return storyState.story?.defaultBackgroundFileId ?? null
+  },
+  get defaultBackgroundUrl(): string | null {
+    return storyState.story?.defaultBackgroundUrl ?? null
+  },
 
   // Actions
   setName: (name: string, isPlaceholder = false) => {
@@ -249,11 +255,15 @@ export const currentStoryStore = {
     summary?: string | null
     coverArtFileId?: string | null
     coverArtUrl?: string | null
+    defaultBackgroundFileId?: string | null
+    defaultBackgroundUrl?: string | null
   }) => {
     if (!storyState.story) return
     setStoryState('story', 'summary', details.summary ?? null)
     setStoryState('story', 'coverArtFileId', details.coverArtFileId ?? null)
     setStoryState('story', 'coverArtUrl', details.coverArtUrl ?? null)
+    setStoryState('story', 'defaultBackgroundFileId', details.defaultBackgroundFileId ?? null)
+    setStoryState('story', 'defaultBackgroundUrl', details.defaultBackgroundUrl ?? null)
   },
 
   /**
@@ -294,6 +304,17 @@ export const currentStoryStore = {
     if (!storyState.story) return
     setStoryState('story', 'firstChapterReleasedAt', releaseDates.firstChapterReleasedAt)
     setStoryState('story', 'lastChapterReleasedAt', releaseDates.lastChapterReleasedAt)
+  },
+
+  /**
+   * Apply a default-background change returned by the server after a story
+   * /background PATCH. Mirrors both the file id and resolved URL into the
+   * store. Does NOT persist — saveService already did.
+   */
+  applyServerBackground: (backgroundFileId: string | null, backgroundUrl: string | null) => {
+    if (!storyState.story) return
+    setStoryState('story', 'defaultBackgroundFileId', backgroundFileId)
+    setStoryState('story', 'defaultBackgroundUrl', backgroundUrl)
   },
 
   /** Set a single AI override for the current story. Pass null to clear. */

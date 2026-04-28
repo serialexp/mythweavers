@@ -78,6 +78,11 @@ export const header = style({
   padding: `${tokens.space['4']} ${tokens.space['6']}`,
   borderBottom: `${tokens.borderWidth.default} solid ${tokens.color.border.subtle}`,
   flexShrink: 0,
+  '@media': {
+    '(max-width: 768px)': {
+      padding: `${tokens.space['3']} ${tokens.space['4']}`,
+    },
+  },
 })
 
 export const title = style({
@@ -118,6 +123,11 @@ export const content = style({
   padding: tokens.space['6'],
   overflow: 'auto',
   flex: 1,
+  '@media': {
+    '(max-width: 768px)': {
+      padding: tokens.space['3'],
+    },
+  },
 })
 
 export const footer = style({
@@ -128,4 +138,9 @@ export const footer = style({
   padding: `${tokens.space['4']} ${tokens.space['6']}`,
   borderTop: `${tokens.borderWidth.default} solid ${tokens.color.border.subtle}`,
   flexShrink: 0,
+  '@media': {
+    '(max-width: 768px)': {
+      padding: `${tokens.space['3']} ${tokens.space['4']}`,
+    },
+  },
 })

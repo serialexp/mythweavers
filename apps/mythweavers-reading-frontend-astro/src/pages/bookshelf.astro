@@ -2,16 +2,17 @@
 import '../styles/global.css'
 import { BookshelfPage } from '../components/pages/BookshelfPage'
 import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
-import { authApi, type User } from '../lib/api'
+import { authApi, bookshelfApi, type BookshelfStory, type User } from '../lib/api'
 
 const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
 const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
 const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
 
+const cookieHeader = Astro.request.headers.get('cookie') || ''
+
 // Get user session from backend - redirect if not logged in (pass cookie for SSR)
 let user: User | null = null
 try {
-  const cookieHeader = Astro.request.headers.get('cookie') || ''
   const session = await authApi.getSession(cookieHeader)
   if (session.authenticated && session.user) {
     user = session.user
@@ -24,6 +25,15 @@ try {
 if (!user) {
   return Astro.redirect('/login')
 }
+
+// SSR-fetch the user's bookshelf so the first paint shows real data.
+let initialStories: BookshelfStory[] = []
+try {
+  const result = await bookshelfApi.list({ cookie: cookieHeader })
+  initialStories = result.stories
+} catch (err) {
+  console.error('Failed to load bookshelf for SSR', err)
+}
 ---
 
 <html lang="en" class={themeClass}>
@@ -35,6 +45,11 @@ if (!user) {
     <link rel="icon" href="/favicon.ico" />
   </head>
   <body>
-    <BookshelfPage client:load initialTheme={initialTheme} user={user} />
+    <BookshelfPage
+      client:load
+      initialTheme={initialTheme}
+      user={user}
+      initialStories={initialStories}
+    />
   </body>
 </html>

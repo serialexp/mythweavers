@@ -1,9 +1,8 @@
 import { IconButton } from '@mythweavers/ui'
 import { Component, createSignal } from 'solid-js'
 import { PhImageIcon } from 'solidjs-phosphor'
-import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
-import { uploadStoryImage } from '../utils/uploadStoryImage'
+import { BackgroundPickerModal } from './BackgroundPickerModal'
 
 interface InsertBackgroundButtonProps {
   afterMessageId?: string | null
@@ -15,59 +14,34 @@ interface InsertBackgroundButtonProps {
  * reader app crossfades to this image as the reader scrolls past it (and
  * uses the most-recent prior background as the chapter's entering image).
  *
- * The flow is intentionally one-shot: open file picker → upload → insert
- * a message of type 'background' carrying the uploaded fileId. There's no
- * preview modal because the message itself renders a thumbnail in the
- * message stream once inserted (handled by Message.tsx).
+ * Uses the unified `BackgroundPickerModal` (same pattern as `InsertAudioButton`)
+ * so authors can reuse a previously-uploaded image from the library as well as
+ * upload a new one — no more re-uploading the same file repeatedly.
  */
 export const InsertBackgroundButton: Component<InsertBackgroundButtonProps> = (props) => {
-  const [isUploading, setIsUploading] = createSignal(false)
-  let fileInputRef: HTMLInputElement | undefined
+  const [isOpen, setIsOpen] = createSignal(false)
 
-  const handleClick = () => {
-    if (isUploading()) return
-    fileInputRef?.click()
-  }
-
-  const handleFileSelected = async (event: Event) => {
-    const input = event.currentTarget as HTMLInputElement
-    const file = input.files?.[0]
-    if (!file) return
+  const handlePicked = (file: { id: string; path: string }) => {
     if (props.afterMessageId === undefined) {
       throw new Error('afterMessageId must be defined (either a string or null)')
     }
-
-    setIsUploading(true)
-    try {
-      const uploaded = await uploadStoryImage(file, currentStoryStore.id ?? undefined)
-      messagesStore.createBackgroundMessage(props.afterMessageId, uploaded, props.nodeId)
-    } catch (err) {
-      // TODO: route through a shared toast/notification system once one exists.
-      console.error('[InsertBackgroundButton] Failed to upload background image:', err)
-      alert(err instanceof Error ? err.message : 'Failed to upload background image')
-    } finally {
-      setIsUploading(false)
-      // Reset so re-selecting the same file still fires change.
-      if (fileInputRef) fileInputRef.value = ''
-    }
+    messagesStore.createBackgroundMessage(props.afterMessageId, file, props.nodeId)
   }
 
   return (
     <>
       <IconButton
-        onClick={handleClick}
+        onClick={() => setIsOpen(true)}
         aria-label="Insert background image change"
-        title={isUploading() ? 'Uploading…' : 'Insert background image change'}
-        disabled={isUploading()}
+        title="Insert background image change"
       >
         <PhImageIcon size={18} />
       </IconButton>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={handleFileSelected}
+      <BackgroundPickerModal
+        isOpen={isOpen()}
+        selectedFileId={null}
+        onPick={handlePicked}
+        onClose={() => setIsOpen(false)}
       />
     </>
   )

@@ -84,7 +84,11 @@ export function rollSteering(): SteeringBucket {
 export function steeringGuidance(b: SteeringBucket): string {
   switch (b) {
     case 'well':
-      return `STEERING (hidden from player): Fortune favors the protagonist this turn. Their action succeeds cleanly — perhaps a little beyond what they hoped for. NPCs and the environment break the protagonist's way: a gamble pays off, an ally appears, a door opens. Do NOT be saccharine; keep it earned and grounded in the world. No deus ex machina.`
+      return `STEERING (hidden from player): Fortune favors the protagonist this turn. Their action succeeds, and EXACTLY ONE small thing in the present scene tilts in their favor — no more. The favorable element must be a person or object already physically present in this scene, behaving in a slightly better-than-expected way. It must NOT be: a new character arriving, an absent character returning, a convenient item appearing, or a previously-met NPC turning out to have a conveniently useful skill/identity/history. Coincidental backstory reveals are forbidden — an NPC is who they were established to be, nothing more.
+
+Good fortune looks like: an opponent fumbles or hesitates visibly, an NPC already in the room lets slip more than they meant to, a known obstacle proves smaller than feared, the protagonist spots something useful that was on the page but unremarked, an item the protagonist was already known to have turns out to be just enough.
+
+The protagonist should end the turn modestly — but visibly — better off than they started it. One small win, fully grounded. If you're tempted to add a second lucky beat or invent a helpful detail about an existing character, stop at the first.`
     case 'steady':
       return `STEERING (hidden from player): The world is neutral this turn. Resolve the action honestly — neither lucky nor punishing. NPCs act in character based on their established personalities. Nothing dramatic tips the scales in either direction.`
     case 'worse':
@@ -113,23 +117,60 @@ export const CORE_DIRECTIVE = `The player's input describes their INTENT, not ex
 
 The player's action is the starting point of each turn. Resolve it first and honestly, then let the world react to it in the same narrative — do not wait for another turn to show consequences.`
 
-// Role-specific instruction for the single per-turn narrative call.
-export const NARRATIVE_INSTRUCTION = `YOUR ROLE THIS TURN: Write the story narrative.
+/**
+ * Role-specific instruction for pass 1 (resolution).
+ *
+ * Narrates the direct consequences of the player's action. NPCs react
+ * reactively but do NOT pursue their own agenda here — that's pass 2's job.
+ * Ends in a beat where the world waits, so the player can optionally stop
+ * the scene there (when auto-advance is off).
+ */
+export const RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Resolve the player's action.
 
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
 
-STRUCTURE OF A TURN (one continuous narrative, not labeled sections):
-1. FIRST, resolve the player's action. What they attempted happens — colored by the steering guidance below. Show it in-scene with sensory detail and dialogue, not summary.
-2. THEN, in the same narrative, let the world react. NPCs present in the scene act in character (drawing on their established personalities from the World Bible and prior turns). The environment responds. Something small moves forward — a reply, a gesture, a shift in the situation — so the scene never hangs waiting for the next player input.
+SCOPE OF THIS TURN:
+- Narrate the immediate, direct consequences of what the protagonist just did. That's it.
+- NPCs present in the scene may REACT to the action (flinch, reply, look up) but do NOT pursue their own plans or agendas — that's a later beat, not this one.
+- The environment responds only insofar as it was touched by the action (the door the protagonist pushed, the glass they knocked over).
+- End the turn on a beat where the world WAITS — a reply half-finished, a held breath, a pause — so the scene can either be moved forward deliberately or left for the next player input.
 
 RULES:
 - Show, don't tell. Vivid sensory details, dialogue, action.
 - Player input is intent, not literal text. Translate it into natural in-character actions and dialogue. Only text in "quotes" should be used verbatim.
-- 3-6 paragraphs total across both halves of the turn.
-- End with an open prompt for the protagonist's next action. No numbered options.
+- 2-4 paragraphs.
+- Do NOT end with an open prompt for the next action — the scene ends mid-beat, waiting.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
-- NPCs must act consistently with their established personalities. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.`
+- The steering guidance below colors the outcome of the action itself (fortune, friction, failure).`
+
+/**
+ * Role-specific instruction for pass 2 (world step).
+ *
+ * Fires after the resolution turn is finalized. The shared history ends with
+ * the freshly-written resolution narrative as an assistant message. Now NPCs
+ * and the environment move on their own agenda and the scene is set up for
+ * the next player input.
+ */
+export const WORLD_STEP_INSTRUCTION = `YOUR ROLE THIS TURN: Let the world move.
+
+The player's most recent action has already been resolved (see the preceding narrative). The scene is currently on a held beat. Now NPCs and the environment move on their own agenda.
+
+Write ONLY the story narrative — no metadata, no headings, no XML tags.
+
+SCOPE OF THIS TURN:
+- NPCs present in the scene act in character (drawing on their established personalities from the World Bible and prior turns). They pursue their own goals, not just react to the protagonist.
+- The environment shifts where it would naturally — a guard turns a corner, the tide comes in, a door opens elsewhere.
+- Continue directly from where the resolution narrative left off. Do not recap or restate events that were just narrated.
+- End with an open prompt for the protagonist's next action. No numbered options.
+
+RULES:
+- Show, don't tell. Vivid sensory details, dialogue, action.
+- 2-4 paragraphs.
+- Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
+- Everything must be physically plausible within the established world.
+- NPCs must act consistently with their established personalities. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.
+- The steering guidance below colors what the world does (fortune, friction, complication).`
 
 export const NONSENSE_CHECK_INSTRUCTION = `YOUR ROLE: Check ONLY the text above for things that don't make sense.
 
@@ -346,7 +387,14 @@ function addTurnToMessages(
   })
 }
 
-export function buildNarrativeMessages(
+/**
+ * Build messages for pass 1 — the resolution narrative.
+ *
+ * Same shape as the old single-call builder, just uses
+ * `RESOLUTION_INSTRUCTION` instead of the combined one. Also handles the
+ * opening turn (no player action yet) — treated as a resolution turn.
+ */
+export function buildResolutionMessages(
   turns: AdventureTurn[],
   settingDescription: string,
   playerAction: string | null,
@@ -365,8 +413,12 @@ export function buildNarrativeMessages(
   const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
   messages.push({
     role: 'system',
-    content: `${NARRATIVE_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
+    content: `${RESOLUTION_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
   })
+
+  // Author directive first, so the player action remains the message the
+  // model is actually replying to.
+  appendDirective(messages, turnDirective)
 
   // Final user message
   if (playerAction !== null) {
@@ -382,7 +434,43 @@ ${settingDescription}`,
     })
   }
 
+  return messages
+}
+
+/**
+ * Build messages for pass 2 — the world step.
+ *
+ * The shared history already ends with the resolution turn's narrative as
+ * the last assistant message. We add a role-specific system instruction
+ * (with the SAME steering bucket as pass 1) and a terse user nudge to kick
+ * off the world reaction.
+ */
+export function buildWorldStepMessages(
+  turns: AdventureTurn[],
+  settingDescription: string,
+  steering: SteeringBucket | undefined,
+  turnDirective?: string,
+  compactions?: Record<string, AdventureCompaction>,
+  worldBible?: string,
+): LLMMessage[] {
+  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
+
+  const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
+  messages.push({
+    role: 'system',
+    content: `${WORLD_STEP_INSTRUCTION}${steeringBlock}`,
+  })
+
+  // Author directive first, so the world-step nudge remains the message the
+  // model is actually replying to.
   appendDirective(messages, turnDirective)
+
+  // Terse user nudge — keeps the assistant/user alternation legal and
+  // signals the phase change explicitly to the model.
+  messages.push({
+    role: 'user',
+    content: 'Now let the world respond. NPCs act on their own priorities; the environment shifts.',
+  })
 
   return messages
 }
@@ -416,6 +504,7 @@ export function buildRevisionMessages(
   originalNarrative: string,
   inconsistencies: string,
   steering: SteeringBucket | undefined,
+  kind: 'resolution' | 'world-step',
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
@@ -423,12 +512,17 @@ export function buildRevisionMessages(
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
   const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
+  const roleInstruction = kind === 'world-step' ? WORLD_STEP_INSTRUCTION : RESOLUTION_INSTRUCTION
   messages.push({
     role: 'system',
-    content: `${NARRATIVE_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
+    content: `${roleInstruction}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
   })
 
   const isOpeningTurn = turns.length === 0 && playerAction === null
+
+  // Author directive first, so the player action remains the message the
+  // model originally responded to (matches the live build order).
+  appendDirective(messages, turnDirective)
 
   if (playerAction !== null) {
     messages.push({ role: 'user', content: playerAction })
@@ -442,8 +536,6 @@ The opening should introduce the protagonist through action and detail — show 
 ${settingDescription}`,
     })
   }
-
-  appendDirective(messages, turnDirective)
 
   // Place the original narrative as an assistant message, then ask for revision
   messages.push({

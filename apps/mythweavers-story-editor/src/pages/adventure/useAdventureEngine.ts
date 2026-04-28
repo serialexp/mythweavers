@@ -9,7 +9,8 @@ import {
   SETTING_KNOBS,
   SETTING_GEN_PROMPT,
   pickRandom,
-  buildNarrativeMessages,
+  buildResolutionMessages,
+  buildWorldStepMessages,
   buildNonsenseCheckMessages,
   buildRevisionMessages,
   buildCompactionMessages,
@@ -27,6 +28,8 @@ export interface AdventureEngine {
   handleKeyDown: (e: KeyboardEvent) => void
   handleAbort: () => void
   handleRetry: () => void
+  handleRetryWorldStep: () => void
+  handleAdvanceWorld: () => void
   handleRegenerate: () => void
   handleEditAndRegenerate: (newAction: string) => void
   handleReviseNarrative: () => void
@@ -102,6 +105,95 @@ export function createAdventureEngine(
 
   // --- Generation ---
 
+  /**
+   * Stream a single LLM generation into `streamingContent`. Returns the
+   * cleaned narrative, or null if the model returned nothing (error surfaces
+   * via streamErrors / empty-narrative handling by the caller).
+   */
+  async function streamPass(
+    messages: LLMMessage[],
+    callType: string,
+  ): Promise<{ narrative: string; streamErrors: string[] }> {
+    const resolved = resolveModel('adventure')
+    const client = LLMClientFactory.getClient(resolved.provider)
+
+    let accumulated = ''
+    const streamErrors: string[] = []
+    const response = client.generate({
+      model: resolved.model,
+      messages,
+      max_tokens: effectiveSettings.maxTokens,
+      thinking_budget: effectiveSettings.thinkingBudget
+        ? Math.min(
+            effectiveSettings.thinkingBudget,
+            Math.floor(effectiveSettings.maxTokens / 2),
+          )
+        : undefined,
+      signal: abortController!.signal,
+      metadata: { callType },
+    })
+
+    for await (const event of response) {
+      if (event.type === 'chunk') {
+        accumulated += event.text
+        const displayContent = accumulated
+          .replace(/<think>[\s\S]*?<\/think>/g, '')
+          .replace(/<\/?narrative>/g, '')
+          .trim()
+        adventureStore.setStreamingContent(displayContent)
+      }
+      if (event.type === 'error') {
+        streamErrors.push((event as { type: 'error'; error: string }).error)
+      }
+    }
+
+    return { narrative: cleanNarrative(accumulated), streamErrors }
+  }
+
+  /**
+   * Run the world-step pass (pass 2) with the given steering. Assumes the
+   * resolution turn has already been finalized onto `adventureStore.turns`.
+   * Caller is responsible for managing `isGenerating` bracketing.
+   */
+  async function runWorldStep(steering: SteeringBucket | undefined) {
+    adventureStore.setStreamingContent('')
+    const messages = buildWorldStepMessages(
+      adventureStore.turns,
+      adventureStore.settingDescription,
+      steering,
+      adventureStore.directive,
+      adventureStore.compactions,
+      adventureStore.worldBible,
+    )
+
+    const { narrative, streamErrors } = await streamPass(
+      messages,
+      'adventure-world-step',
+    )
+
+    if (streamErrors.length > 0 && !narrative) {
+      adventureStore.setStreamingContent('')
+      adventureStore.setError(`World step: ${streamErrors.join('\n')}`)
+      return
+    }
+
+    if (!narrative) {
+      adventureStore.setStreamingContent('')
+      adventureStore.setError(
+        'World step returned an empty response. You can retry the world step or continue.',
+      )
+      return
+    }
+
+    adventureStore.finalizeTurn({
+      playerAction: null,
+      narrative,
+      kind: 'world-step',
+      ...(steering ? { steering } : {}),
+    })
+    persist()
+  }
+
   async function generate(playerAction: string | null) {
     if (adventureStore.isGenerating) return
 
@@ -113,8 +205,8 @@ export function createAdventureEngine(
     adventureStore.setPendingAction(playerAction)
     persistNow()
 
-    // Roll steering for this turn (opening turn has no player action and no
-    // steering — the first narrative is just establishment).
+    // Roll steering once for this player input — applied to BOTH passes.
+    // Opening turn has no player action and no steering.
     const steering: SteeringBucket | undefined =
       playerAction !== null ? rollSteering() : undefined
     if (steering) {
@@ -124,8 +216,8 @@ export function createAdventureEngine(
     abortController = new AbortController()
 
     try {
-      // --- Stream narrative (single LLM call per turn) ---
-      const narrativeMessages = buildNarrativeMessages(
+      // --- Pass 1: resolution ---
+      const resolutionMessages = buildResolutionMessages(
         adventureStore.turns,
         adventureStore.settingDescription,
         playerAction,
@@ -135,46 +227,11 @@ export function createAdventureEngine(
         adventureStore.worldBible,
       )
 
-      const narrativeResolved = resolveModel('adventure')
-      const narrativeClient = LLMClientFactory.getClient(
-        narrativeResolved.provider,
+      const { narrative, streamErrors } = await streamPass(
+        resolutionMessages,
+        'adventure',
       )
 
-      let accumulated = ''
-      const streamErrors: string[] = []
-      const narrativeResponse = narrativeClient.generate({
-        model: narrativeResolved.model,
-        messages: narrativeMessages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
-          ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
-            )
-          : undefined,
-        signal: abortController.signal,
-        metadata: { callType: 'adventure' },
-      })
-
-      for await (const event of narrativeResponse) {
-        if (event.type === 'chunk') {
-          accumulated += event.text
-          // Show streaming content (strip thinking tags for display)
-          const displayContent = accumulated
-            .replace(/<think>[\s\S]*?<\/think>/g, '')
-            .replace(/<\/?narrative>/g, '')
-            .trim()
-          adventureStore.setStreamingContent(displayContent)
-        }
-        if (event.type === 'error') {
-          streamErrors.push((event as { type: 'error'; error: string }).error)
-        }
-      }
-
-      const narrative = cleanNarrative(accumulated)
-
-      // If we got stream-level errors (e.g. 429, 500), show those instead
-      // of a generic "empty response" message.
       if (streamErrors.length > 0 && !narrative) {
         adventureStore.setStreamingContent('')
         adventureStore.setError(streamErrors.join('\n'))
@@ -183,8 +240,6 @@ export function createAdventureEngine(
         return
       }
 
-      // If the model returned nothing (or only whitespace / thinking tags),
-      // skip downstream checks — there's nothing to analyse.
       if (!narrative) {
         adventureStore.setStreamingContent('')
         adventureStore.setError('The model returned an empty response. Try again or switch models.')
@@ -196,15 +251,52 @@ export function createAdventureEngine(
       // --- Consistency check (nonsense) ---
       const checkedNarrative = await runNarrativeChecks(narrative, playerAction)
 
-      // Batch-finalize: clear streaming and add turn in one render frame
+      // Finalize resolution turn. Opening turn is stored as 'resolution'
+      // (acts as the establishing beat).
       adventureStore.finalizeTurn({
         playerAction,
         narrative: checkedNarrative,
+        kind: 'resolution',
         ...(steering ? { steering } : {}),
       })
       persist()
 
-      // Run compaction in the background (non-blocking, fire-and-forget)
+      // --- Pass 2: world step (opt-in) ---
+      // Skip for opening turn (no player action to react to) or when the
+      // story toggle is off.
+      const shouldAdvance =
+        playerAction !== null && adventureStore.autoAdvanceWorld
+      if (shouldAdvance) {
+        // runWorldStep handles its own error surfacing; don't crash pass 1
+        // if pass 2 misbehaves.
+        adventureStore.setIsGenerating(true)
+        try {
+          await runWorldStep(steering)
+        } catch (worldErr: unknown) {
+          if (worldErr instanceof DOMException && worldErr.name === 'AbortError') {
+            const partial = adventureStore.streamingContent
+            const wsNarrative = partial ? cleanNarrative(partial) : ''
+            if (wsNarrative && !wsNarrative.startsWith('⏳')) {
+              adventureStore.finalizeAbort({
+                playerAction: null,
+                narrative: wsNarrative,
+                kind: 'world-step',
+                ...(steering ? { steering } : {}),
+              })
+              persist()
+            } else {
+              adventureStore.setStreamingContent('')
+            }
+          } else {
+            const message =
+              worldErr instanceof Error ? worldErr.message : 'World step failed'
+            adventureStore.setError(`World step: ${message}`)
+            console.error('World step error:', worldErr)
+          }
+        }
+      }
+
+      // Run compaction in the background (non-blocking)
       runPendingCompactions()
 
       // Focus input for next action
@@ -213,13 +305,14 @@ export function createAdventureEngine(
       })
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        // User aborted — if we have partial narrative content, save it
+        // User aborted during pass 1 — if we have partial narrative, save it
         const partial = adventureStore.streamingContent
         const narrative = partial ? cleanNarrative(partial) : ''
         if (narrative && !narrative.startsWith('⏳')) {
           adventureStore.finalizeAbort({
             playerAction,
             narrative,
+            kind: 'resolution',
             ...(steering ? { steering } : {}),
           })
           persist()
@@ -231,7 +324,6 @@ export function createAdventureEngine(
           err instanceof Error ? err.message : 'Unknown error occurred'
         adventureStore.setError(message)
         adventureStore.setLastFailedAction(playerAction)
-        // Restore the action to the input so the user can edit and resubmit
         if (playerAction) adventureStore.setPlayerInput(playerAction)
         console.error('Adventure generation error:', err)
       }
@@ -241,6 +333,74 @@ export function createAdventureEngine(
       adventureStore.setPendingAction(null)
       abortController = null
     }
+  }
+
+  /**
+   * Manually trigger pass 2 on the current last turn. Only valid when the
+   * last turn is a resolution with no following world-step and we're idle.
+   * Reuses the steering from that resolution turn.
+   */
+  async function handleAdvanceWorld() {
+    if (adventureStore.isGenerating) return
+    const turns = adventureStore.turns
+    if (turns.length === 0) return
+    const last = turns[turns.length - 1]
+    const lastKind = last.kind ?? 'resolution'
+    if (lastKind !== 'resolution') return
+    // Opening turn has no player action and no steering — not a valid base.
+    if (last.playerAction === null) return
+
+    adventureStore.setError(null)
+    adventureStore.setIsGenerating(true)
+    adventureStore.setStreamingContent('')
+    abortController = new AbortController()
+
+    const steering = last.steering
+
+    try {
+      await runWorldStep(steering)
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        const partial = adventureStore.streamingContent
+        const wsNarrative = partial ? cleanNarrative(partial) : ''
+        if (wsNarrative && !wsNarrative.startsWith('⏳')) {
+          adventureStore.finalizeAbort({
+            playerAction: null,
+            narrative: wsNarrative,
+            kind: 'world-step',
+            ...(steering ? { steering } : {}),
+          })
+          persist()
+        } else {
+          adventureStore.setStreamingContent('')
+        }
+      } else {
+        const message =
+          err instanceof Error ? err.message : 'World step failed'
+        adventureStore.setError(`World step: ${message}`)
+        console.error('World step error:', err)
+      }
+    } finally {
+      adventureStore.setIsGenerating(false)
+      adventureStore.setStreamingContent('')
+      abortController = null
+    }
+  }
+
+  /**
+   * Re-run the world step. If the last turn is a stalled/failed world-step,
+   * pop it first so we don't stack. Otherwise behaves like handleAdvanceWorld.
+   */
+  async function handleRetryWorldStep() {
+    if (adventureStore.isGenerating) return
+    const turns = adventureStore.turns
+    if (turns.length === 0) return
+    const last = turns[turns.length - 1]
+    if ((last.kind ?? 'resolution') === 'world-step') {
+      adventureStore.removeLastTurn()
+      persist()
+    }
+    await handleAdvanceWorld()
   }
 
   // --- Compaction (background, non-blocking) ---
@@ -412,6 +572,7 @@ export function createAdventureEngine(
         lastTurn.narrative,
         nonsenseIssues,
         lastTurn.steering,
+        lastTurn.kind ?? 'resolution',
         adventureStore.directive,
         adventureStore.compactions,
         adventureStore.worldBible,
@@ -533,6 +694,20 @@ export function createAdventureEngine(
     if (adventureStore.turns.length === 0) return
 
     const lastTurn = adventureStore.turns[adventureStore.turns.length - 1]
+    const lastKind = lastTurn.kind ?? 'resolution'
+
+    if (lastKind === 'world-step') {
+      // Pop just the world-step; re-fire pass 2 with the steering saved on
+      // the preceding resolution turn.
+      adventureStore.removeLastTurn()
+      persist()
+      handleAdvanceWorld()
+      return
+    }
+
+    // Resolution (or legacy): pop it and re-fire the whole pipeline. If the
+    // turn right before it was a world-step from an earlier player input,
+    // leave that in place — regenerate only reruns the most recent input.
     const action = lastTurn.playerAction
     adventureStore.removeLastTurn()
     persist()
@@ -690,6 +865,8 @@ export function createAdventureEngine(
     handleKeyDown,
     handleAbort,
     handleRetry,
+    handleRetryWorldStep,
+    handleAdvanceWorld,
     handleRegenerate,
     handleEditAndRegenerate,
     handleReviseNarrative,

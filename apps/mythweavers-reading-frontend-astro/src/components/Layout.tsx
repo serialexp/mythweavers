@@ -45,6 +45,11 @@ const LayoutInner: ParentComponent<{ user?: UserSession | null }> = (props) => {
           <NavBarNav>
             <NavLink href="/">Home</NavLink>
             <NavLink href="/stories">Stories</NavLink>
+            <NavLink href="/search">Search</NavLink>
+            <NavLink href="/authors">Authors</NavLink>
+            {props.user && <NavLink href="/bookshelf">Bookshelf</NavLink>}
+            {props.user && <NavLink href="/my-fiction">My Fiction</NavLink>}
+            {props.user && <NavLink href="/settings">Settings</NavLink>}
           </NavBarNav>
 
           <NavBarActions>
@@ -63,16 +68,12 @@ const LayoutInner: ParentComponent<{ user?: UserSession | null }> = (props) => {
           </NavBarActions>
         </NavBar>
 
-        <main
-          class={styles.mainContent}
-          style={{
-            'background-image': isDark() ? 'url(/bg-dark.png)' : 'url(/bg-light.png)',
-            'background-attachment': 'fixed',
-            'background-size': 'cover',
-          }}
-        >
-          {props.children}
-        </main>
+        {/* `<main>` is intentionally transparent — the visible backdrop is
+            owned entirely by <BackgroundLayer /> above. That layer falls
+            back to the theme-appropriate default (`bg-dark.png` /
+            `bg-light.png`) when no chapter has pushed an explicit
+            background, and crossfades to the chapter's image otherwise. */}
+        <main class={styles.mainContent}>{props.children}</main>
       </div>
     </div>
   )

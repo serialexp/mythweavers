@@ -245,6 +245,56 @@ export type GetAuthSessionResponses = {
 
 export type GetAuthSessionResponse = GetAuthSessionResponses[keyof GetAuthSessionResponses];
 
+export type PostAuthChangePasswordData = {
+    body: {
+        /**
+         * The user's current password (required to authorise the change).
+         */
+        currentPassword: string;
+        /**
+         * New password (minimum 8 characters).
+         */
+        newPassword: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/auth/change-password';
+};
+
+export type PostAuthChangePasswordErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostAuthChangePasswordError = PostAuthChangePasswordErrors[keyof PostAuthChangePasswordErrors];
+
+export type PostAuthChangePasswordResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type PostAuthChangePasswordResponse = PostAuthChangePasswordResponses[keyof PostAuthChangePasswordResponses];
+
 export type PostOauthDeviceData = {
     body: {
         /**
@@ -1088,6 +1138,14 @@ export type PostMyStoriesResponses = {
              * Cover art URL path (from the associated file, if any)
              */
             coverArtUrl: string | null;
+            /**
+             * Story-level default background image file ID. Inherited downward by books/arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the story-level default background (from the joined file, if loaded). Optional because not every endpoint hydrates it.
+             */
+            defaultBackgroundUrl?: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -1398,6 +1456,14 @@ export type GetMyStoriesByIdResponses = {
              * Cover art URL path (from the associated file, if any)
              */
             coverArtUrl: string | null;
+            /**
+             * Story-level default background image file ID. Inherited downward by books/arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the story-level default background (from the joined file, if loaded). Optional because not every endpoint hydrates it.
+             */
+            defaultBackgroundUrl?: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -1747,6 +1813,14 @@ export type PatchMyStoriesByIdResponses = {
              * Cover art URL path (from the associated file, if any)
              */
             coverArtUrl: string | null;
+            /**
+             * Story-level default background image file ID. Inherited downward by books/arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the story-level default background (from the joined file, if loaded). Optional because not every endpoint hydrates it.
+             */
+            defaultBackgroundUrl?: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -1990,6 +2064,14 @@ export type GetMyStoriesByIdExportResponses = {
              * Cover art URL path (from the associated file, if any)
              */
             coverArtUrl: string | null;
+            /**
+             * Story-level default background image file ID. Inherited downward by books/arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the story-level default background (from the joined file, if loaded). Optional because not every endpoint hydrates it.
+             */
+            defaultBackgroundUrl?: string | null;
             defaultPerspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
             defaultTense: 'PAST' | 'PRESENT' | null;
             /**
@@ -2102,6 +2184,7 @@ export type GetMyStoriesByIdExportResponses = {
             sortOrder: number;
             coverArtFileId: string | null;
             spineArtFileId: string | null;
+            defaultBackgroundFileId: string | null;
             pages: number | null;
             nodeType: 'story' | 'non-story' | 'context';
             deleted: boolean;
@@ -2114,6 +2197,7 @@ export type GetMyStoriesByIdExportResponses = {
                 name: string;
                 summary: string | null;
                 sortOrder: number;
+                defaultBackgroundFileId: string | null;
                 nodeType: 'story' | 'non-story' | 'context';
                 deleted: boolean;
                 deletedAt: string | null;
@@ -2125,6 +2209,7 @@ export type GetMyStoriesByIdExportResponses = {
                     name: string;
                     summary: string | null;
                     sortOrder: number;
+                    defaultBackgroundFileId: string | null;
                     nodeType: 'story' | 'non-story' | 'context';
                     status: string | null;
                     deleted: boolean;
@@ -2145,6 +2230,7 @@ export type GetMyStoriesByIdExportResponses = {
                         includeInFull: number;
                         deleted: boolean;
                         deletedAt: string | null;
+                        defaultBackgroundFileId: string | null;
                         perspective: 'FIRST' | 'SECOND' | 'THIRD' | null;
                         viewpointCharacterId: string | null;
                         activeCharacterIds: Array<string>;
@@ -3162,6 +3248,14 @@ export type GetMyStoriesByStoryIdBooksResponses = {
              */
             spineArtFileId: string | null;
             /**
+             * Book-level default background image file ID. Inherited downward by arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the book-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the book is soft-deleted
              */
             deleted: boolean;
@@ -3320,6 +3414,14 @@ export type PostMyStoriesByStoryIdBooksResponses = {
              * Spine art file ID
              */
             spineArtFileId: string | null;
+            /**
+             * Book-level default background image file ID. Inherited downward by arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the book-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the book is soft-deleted
              */
@@ -3517,6 +3619,14 @@ export type GetMyBooksByIdResponses = {
              */
             spineArtFileId: string | null;
             /**
+             * Book-level default background image file ID. Inherited downward by arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the book-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the book is soft-deleted
              */
             deleted: boolean;
@@ -3680,6 +3790,14 @@ export type PatchMyBooksByIdResponses = {
              */
             spineArtFileId: string | null;
             /**
+             * Book-level default background image file ID. Inherited downward by arcs/chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the book-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the book is soft-deleted
              */
             deleted: boolean;
@@ -3787,6 +3905,14 @@ export type GetMyBooksByBookIdArcsResponses = {
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
+            /**
+             * Arc-level default background image file ID. Inherited downward by chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the arc-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the arc is soft-deleted
              */
@@ -3930,6 +4056,14 @@ export type PostMyBooksByBookIdArcsResponses = {
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
+            /**
+             * Arc-level default background image file ID. Inherited downward by chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the arc-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the arc is soft-deleted
              */
@@ -4111,6 +4245,14 @@ export type GetMyArcsByIdResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Arc-level default background image file ID. Inherited downward by chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the arc-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the arc is soft-deleted
              */
             deleted: boolean;
@@ -4250,6 +4392,14 @@ export type PatchMyArcsByIdResponses = {
              */
             nodeType: 'story' | 'non-story' | 'context';
             /**
+             * Arc-level default background image file ID. Inherited downward by chapters/scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the arc-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the arc is soft-deleted
              */
             deleted: boolean;
@@ -4377,6 +4527,14 @@ export type GetMyArcsByArcIdChaptersResponses = {
              * Chapter status: draft, needs_work, review, done
              */
             status: string | null;
+            /**
+             * Chapter-level default background image file ID. Inherited downward by scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the chapter-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the chapter is soft-deleted
              */
@@ -4544,6 +4702,14 @@ export type PostMyArcsByArcIdChaptersResponses = {
              * Chapter status: draft, needs_work, review, done
              */
             status: string | null;
+            /**
+             * Chapter-level default background image file ID. Inherited downward by scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the chapter-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the chapter is soft-deleted
              */
@@ -4745,6 +4911,14 @@ export type GetMyChaptersByIdResponses = {
              */
             status: string | null;
             /**
+             * Chapter-level default background image file ID. Inherited downward by scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the chapter-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the chapter is soft-deleted
              */
             deleted: boolean;
@@ -4916,6 +5090,14 @@ export type PatchMyChaptersByIdResponses = {
              */
             status: string | null;
             /**
+             * Chapter-level default background image file ID. Inherited downward by scenes that do not set their own.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the chapter-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the chapter is soft-deleted
              */
             deleted: boolean;
@@ -5051,6 +5233,14 @@ export type GetMyChaptersByChapterIdScenesResponses = {
              * When this scene occurs in story timeline (minutes)
              */
             storyTime: number | null;
+            /**
+             * Scene-level default background image file ID. Innermost level — overrides any inherited default at the start of this scene.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the scene-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the scene is soft-deleted
              */
@@ -5250,6 +5440,14 @@ export type PostMyChaptersByChapterIdScenesResponses = {
              * When this scene occurs in story timeline (minutes)
              */
             storyTime: number | null;
+            /**
+             * Scene-level default background image file ID. Innermost level — overrides any inherited default at the start of this scene.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the scene-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the scene is soft-deleted
              */
@@ -5459,6 +5657,14 @@ export type GetMyScenesByIdResponses = {
              */
             storyTime: number | null;
             /**
+             * Scene-level default background image file ID. Innermost level — overrides any inherited default at the start of this scene.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the scene-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
+            /**
              * Whether the scene is soft-deleted
              */
             deleted: boolean;
@@ -5653,6 +5859,14 @@ export type PatchMyScenesByIdResponses = {
              * When this scene occurs in story timeline (minutes)
              */
             storyTime: number | null;
+            /**
+             * Scene-level default background image file ID. Innermost level — overrides any inherited default at the start of this scene.
+             */
+            defaultBackgroundFileId: string | null;
+            /**
+             * Resolved URL of the scene-level default background (from the joined file, if loaded).
+             */
+            defaultBackgroundUrl?: string | null;
             /**
              * Whether the scene is soft-deleted
              */
@@ -7339,7 +7553,7 @@ export type GetMyScenesBySceneIdMessagesResponses = {
              */
             isQuery: boolean;
             /**
-             * Message type: null for normal, branch for choices, event for events
+             * Message type: null for normal, branch for choices, event for events, background for reader background-image changes, audio for inline reader audio embeds
              */
             type: string | null;
             /**
@@ -7352,6 +7566,28 @@ export type GetMyScenesBySceneIdMessagesResponses = {
                 targetMessageId: string;
                 description?: string;
             }> | null;
+            /**
+             * File ID of the background image — only present for background type messages
+             */
+            backgroundFileId: string | null;
+            /**
+             * Hydrated background image file (id + URL path) — only for background type messages
+             */
+            backgroundFile: {
+                id: string;
+                path: string;
+            } | null;
+            /**
+             * File ID of the audio embed — only present for audio type messages
+             */
+            audioFileId: string | null;
+            /**
+             * Hydrated audio file (id + URL path) — only for audio type messages
+             */
+            audioFile: {
+                id: string;
+                path: string;
+            } | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -7384,7 +7620,7 @@ export type PostMyScenesBySceneIdMessagesData = {
          */
         isQuery?: boolean;
         /**
-         * Message type: null for normal, branch for choices, event for events
+         * Message type: null for normal, branch for choices, event for events, background for reader background-image changes
          */
         type?: string;
         /**
@@ -7397,6 +7633,14 @@ export type PostMyScenesBySceneIdMessagesData = {
             targetMessageId: string;
             description?: string;
         }>;
+        /**
+         * File ID for the background image — required when type is "background"
+         */
+        backgroundFileId?: string;
+        /**
+         * File ID for the audio embed — required when type is "audio"
+         */
+        audioFileId?: string;
     };
     path: {
         /**
@@ -7473,7 +7717,7 @@ export type PostMyScenesBySceneIdMessagesResponses = {
              */
             isQuery: boolean;
             /**
-             * Message type: null for normal, branch for choices, event for events
+             * Message type: null for normal, branch for choices, event for events, background for reader background-image changes, audio for inline reader audio embeds
              */
             type: string | null;
             /**
@@ -7486,6 +7730,28 @@ export type PostMyScenesBySceneIdMessagesResponses = {
                 targetMessageId: string;
                 description?: string;
             }> | null;
+            /**
+             * File ID of the background image — only present for background type messages
+             */
+            backgroundFileId: string | null;
+            /**
+             * Hydrated background image file (id + URL path) — only for background type messages
+             */
+            backgroundFile: {
+                id: string;
+                path: string;
+            } | null;
+            /**
+             * File ID of the audio embed — only present for audio type messages
+             */
+            audioFileId: string | null;
+            /**
+             * Hydrated audio file (id + URL path) — only for audio type messages
+             */
+            audioFile: {
+                id: string;
+                path: string;
+            } | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -7615,7 +7881,7 @@ export type GetMyMessagesByIdResponses = {
              */
             isQuery: boolean;
             /**
-             * Message type: null for normal, branch for choices, event for events
+             * Message type: null for normal, branch for choices, event for events, background for reader background-image changes, audio for inline reader audio embeds
              */
             type: string | null;
             /**
@@ -7628,6 +7894,28 @@ export type GetMyMessagesByIdResponses = {
                 targetMessageId: string;
                 description?: string;
             }> | null;
+            /**
+             * File ID of the background image — only present for background type messages
+             */
+            backgroundFileId: string | null;
+            /**
+             * Hydrated background image file (id + URL path) — only for background type messages
+             */
+            backgroundFile: {
+                id: string;
+                path: string;
+            } | null;
+            /**
+             * File ID of the audio embed — only present for audio type messages
+             */
+            audioFileId: string | null;
+            /**
+             * Hydrated audio file (id + URL path) — only for audio type messages
+             */
+            audioFile: {
+                id: string;
+                path: string;
+            } | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -7673,6 +7961,14 @@ export type PatchMyMessagesByIdData = {
             targetMessageId: string;
             description?: string;
         }> | null;
+        /**
+         * File ID for the background image — set/replace for background type messages, null to clear
+         */
+        backgroundFileId?: string | null;
+        /**
+         * File ID for the audio embed — set/replace for audio type messages, null to clear
+         */
+        audioFileId?: string | null;
         /**
          * Soft delete flag
          */
@@ -7753,7 +8049,7 @@ export type PatchMyMessagesByIdResponses = {
              */
             isQuery: boolean;
             /**
-             * Message type: null for normal, branch for choices, event for events
+             * Message type: null for normal, branch for choices, event for events, background for reader background-image changes, audio for inline reader audio embeds
              */
             type: string | null;
             /**
@@ -7766,6 +8062,28 @@ export type PatchMyMessagesByIdResponses = {
                 targetMessageId: string;
                 description?: string;
             }> | null;
+            /**
+             * File ID of the background image — only present for background type messages
+             */
+            backgroundFileId: string | null;
+            /**
+             * Hydrated background image file (id + URL path) — only for background type messages
+             */
+            backgroundFile: {
+                id: string;
+                path: string;
+            } | null;
+            /**
+             * File ID of the audio embed — only present for audio type messages
+             */
+            audioFileId: string | null;
+            /**
+             * Hydrated audio file (id + URL path) — only for audio type messages
+             */
+            audioFile: {
+                id: string;
+                path: string;
+            } | null;
             currentMessageRevisionId: string | null;
             createdAt: string;
             updatedAt: string;
@@ -9178,19 +9496,6 @@ export type DeleteMyFilesByIdErrors = {
         stack?: string;
         debug?: unknown;
     };
-    /**
-     * Default Response
-     */
-    409: {
-        /**
-         * Error message
-         */
-        error: string;
-        validation?: unknown;
-        zodIssues?: unknown;
-        stack?: string;
-        debug?: unknown;
-    };
 };
 
 export type DeleteMyFilesByIdError = DeleteMyFilesByIdErrors[keyof DeleteMyFilesByIdErrors];
@@ -9200,10 +9505,60 @@ export type DeleteMyFilesByIdResponses = {
      * Default Response
      */
     200: {
-        /**
-         * Operation succeeded
-         */
         success: true;
+        /**
+         * Counts of every place this file is currently referenced. Deleting the file nulls all of these via SetNull cascades.
+         */
+        unlinked: {
+            /**
+             * Stories using this file as cover art
+             */
+            storyCoverArt: number;
+            /**
+             * Books using this file as cover art
+             */
+            bookCoverArt: number;
+            /**
+             * Books using this file as spine art
+             */
+            bookSpineArt: number;
+            /**
+             * Characters using this file as their picture
+             */
+            characterPicture: number;
+            /**
+             * Inline background-message references
+             */
+            messageBackground: number;
+            /**
+             * Inline audio-message references
+             */
+            messageAudio: number;
+            /**
+             * Stories using this as their default background
+             */
+            storyDefaultBackground: number;
+            /**
+             * Books using this as their default background
+             */
+            bookDefaultBackground: number;
+            /**
+             * Arcs using this as their default background
+             */
+            arcDefaultBackground: number;
+            /**
+             * Chapters using this as their default background
+             */
+            chapterDefaultBackground: number;
+            /**
+             * Scenes using this as their default background
+             */
+            sceneDefaultBackground: number;
+            /**
+             * Sum across all reference types
+             */
+            total: number;
+        };
     };
 };
 
@@ -9272,6 +9627,59 @@ export type GetMyFilesByIdResponses = {
             mimeType: string;
             createdAt: string;
             updatedAt: string;
+        };
+        /**
+         * Counts of every place this file is currently referenced. Deleting the file nulls all of these via SetNull cascades.
+         */
+        usage: {
+            /**
+             * Stories using this file as cover art
+             */
+            storyCoverArt: number;
+            /**
+             * Books using this file as cover art
+             */
+            bookCoverArt: number;
+            /**
+             * Books using this file as spine art
+             */
+            bookSpineArt: number;
+            /**
+             * Characters using this file as their picture
+             */
+            characterPicture: number;
+            /**
+             * Inline background-message references
+             */
+            messageBackground: number;
+            /**
+             * Inline audio-message references
+             */
+            messageAudio: number;
+            /**
+             * Stories using this as their default background
+             */
+            storyDefaultBackground: number;
+            /**
+             * Books using this as their default background
+             */
+            bookDefaultBackground: number;
+            /**
+             * Arcs using this as their default background
+             */
+            arcDefaultBackground: number;
+            /**
+             * Chapters using this as their default background
+             */
+            chapterDefaultBackground: number;
+            /**
+             * Scenes using this as their default background
+             */
+            sceneDefaultBackground: number;
+            /**
+             * Sum across all reference types
+             */
+            total: number;
         };
     };
 };
@@ -15911,6 +16319,471 @@ export type PostMyChaptersByChapterIdUnpublishResponses = {
 
 export type PostMyChaptersByChapterIdUnpublishResponse = PostMyChaptersByChapterIdUnpublishResponses[keyof PostMyChaptersByChapterIdUnpublishResponses];
 
+export type PatchMyStoriesByStoryIdBackgroundData = {
+    body: {
+        /**
+         * File ID to use as the default background for this node, or null to clear. The file must belong to the same story as the target node.
+         */
+        backgroundFileId: string | null;
+    };
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/stories/{storyId}/background';
+};
+
+export type PatchMyStoriesByStoryIdBackgroundErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyStoriesByStoryIdBackgroundError = PatchMyStoriesByStoryIdBackgroundErrors[keyof PatchMyStoriesByStoryIdBackgroundErrors];
+
+export type PatchMyStoriesByStoryIdBackgroundResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        entityType: 'story' | 'book' | 'arc' | 'chapter' | 'scene';
+        entityId: string;
+        storyId: string;
+        defaultBackgroundFileId: string | null;
+        defaultBackgroundFile: {
+            id: string;
+            path: string;
+        } | null;
+    };
+};
+
+export type PatchMyStoriesByStoryIdBackgroundResponse = PatchMyStoriesByStoryIdBackgroundResponses[keyof PatchMyStoriesByStoryIdBackgroundResponses];
+
+export type PatchMyBooksByBookIdBackgroundData = {
+    body: {
+        /**
+         * File ID to use as the default background for this node, or null to clear. The file must belong to the same story as the target node.
+         */
+        backgroundFileId: string | null;
+    };
+    path: {
+        /**
+         * Book ID
+         */
+        bookId: string;
+    };
+    query?: never;
+    url: '/my/books/{bookId}/background';
+};
+
+export type PatchMyBooksByBookIdBackgroundErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyBooksByBookIdBackgroundError = PatchMyBooksByBookIdBackgroundErrors[keyof PatchMyBooksByBookIdBackgroundErrors];
+
+export type PatchMyBooksByBookIdBackgroundResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        entityType: 'story' | 'book' | 'arc' | 'chapter' | 'scene';
+        entityId: string;
+        storyId: string;
+        defaultBackgroundFileId: string | null;
+        defaultBackgroundFile: {
+            id: string;
+            path: string;
+        } | null;
+    };
+};
+
+export type PatchMyBooksByBookIdBackgroundResponse = PatchMyBooksByBookIdBackgroundResponses[keyof PatchMyBooksByBookIdBackgroundResponses];
+
+export type PatchMyArcsByArcIdBackgroundData = {
+    body: {
+        /**
+         * File ID to use as the default background for this node, or null to clear. The file must belong to the same story as the target node.
+         */
+        backgroundFileId: string | null;
+    };
+    path: {
+        /**
+         * Arc ID
+         */
+        arcId: string;
+    };
+    query?: never;
+    url: '/my/arcs/{arcId}/background';
+};
+
+export type PatchMyArcsByArcIdBackgroundErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyArcsByArcIdBackgroundError = PatchMyArcsByArcIdBackgroundErrors[keyof PatchMyArcsByArcIdBackgroundErrors];
+
+export type PatchMyArcsByArcIdBackgroundResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        entityType: 'story' | 'book' | 'arc' | 'chapter' | 'scene';
+        entityId: string;
+        storyId: string;
+        defaultBackgroundFileId: string | null;
+        defaultBackgroundFile: {
+            id: string;
+            path: string;
+        } | null;
+    };
+};
+
+export type PatchMyArcsByArcIdBackgroundResponse = PatchMyArcsByArcIdBackgroundResponses[keyof PatchMyArcsByArcIdBackgroundResponses];
+
+export type PatchMyChaptersByChapterIdBackgroundData = {
+    body: {
+        /**
+         * File ID to use as the default background for this node, or null to clear. The file must belong to the same story as the target node.
+         */
+        backgroundFileId: string | null;
+    };
+    path: {
+        /**
+         * Chapter ID
+         */
+        chapterId: string;
+    };
+    query?: never;
+    url: '/my/chapters/{chapterId}/background';
+};
+
+export type PatchMyChaptersByChapterIdBackgroundErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyChaptersByChapterIdBackgroundError = PatchMyChaptersByChapterIdBackgroundErrors[keyof PatchMyChaptersByChapterIdBackgroundErrors];
+
+export type PatchMyChaptersByChapterIdBackgroundResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        entityType: 'story' | 'book' | 'arc' | 'chapter' | 'scene';
+        entityId: string;
+        storyId: string;
+        defaultBackgroundFileId: string | null;
+        defaultBackgroundFile: {
+            id: string;
+            path: string;
+        } | null;
+    };
+};
+
+export type PatchMyChaptersByChapterIdBackgroundResponse = PatchMyChaptersByChapterIdBackgroundResponses[keyof PatchMyChaptersByChapterIdBackgroundResponses];
+
+export type PatchMyScenesBySceneIdBackgroundData = {
+    body: {
+        /**
+         * File ID to use as the default background for this node, or null to clear. The file must belong to the same story as the target node.
+         */
+        backgroundFileId: string | null;
+    };
+    path: {
+        /**
+         * Scene ID
+         */
+        sceneId: string;
+    };
+    query?: never;
+    url: '/my/scenes/{sceneId}/background';
+};
+
+export type PatchMyScenesBySceneIdBackgroundErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyScenesBySceneIdBackgroundError = PatchMyScenesBySceneIdBackgroundErrors[keyof PatchMyScenesBySceneIdBackgroundErrors];
+
+export type PatchMyScenesBySceneIdBackgroundResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        entityType: 'story' | 'book' | 'arc' | 'chapter' | 'scene';
+        entityId: string;
+        storyId: string;
+        defaultBackgroundFileId: string | null;
+        defaultBackgroundFile: {
+            id: string;
+            path: string;
+        } | null;
+    };
+};
+
+export type PatchMyScenesBySceneIdBackgroundResponse = PatchMyScenesBySceneIdBackgroundResponses[keyof PatchMyScenesBySceneIdBackgroundResponses];
+
 export type DeleteMyRoyalRoadAccountData = {
     body?: never;
     path?: never;
@@ -17341,6 +18214,535 @@ export type PostMyLlmGenerateErrors = {
 };
 
 export type PostMyLlmGenerateError = PostMyLlmGenerateErrors[keyof PostMyLlmGenerateErrors];
+
+export type GetMyBookshelfData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Filter to stories saved under this kind only.
+         */
+        kind?: 'FAVORITE' | 'FOLLOW' | 'READ_LATER';
+    };
+    url: '/my/bookshelf';
+};
+
+export type GetMyBookshelfErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyBookshelfError = GetMyBookshelfErrors[keyof GetMyBookshelfErrors];
+
+export type GetMyBookshelfResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        stories: Array<{
+            /**
+             * Story ID
+             */
+            id: string;
+            /**
+             * Story name/title
+             */
+            name: string;
+            /**
+             * Story summary/description
+             */
+            summary: string | null;
+            owner: {
+                /**
+                 * Owner user ID
+                 */
+                id: number;
+                /**
+                 * Owner username
+                 */
+                username: string;
+            };
+            /**
+             * Story publication status
+             */
+            status: 'COMPLETED' | 'ONGOING' | 'HIATUS';
+            /**
+             * Story type
+             */
+            type: 'FANFICTION' | 'ORIGINAL';
+            /**
+             * Cover background color
+             */
+            coverColor: string;
+            /**
+             * Cover text color
+             */
+            coverTextColor: string;
+            /**
+             * Cover font family
+             */
+            coverFontFamily: string;
+            /**
+             * Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.
+             */
+            coverArtUrl: string | null;
+            /**
+             * Estimated page count
+             */
+            pages: number | null;
+            /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+            /**
+             * Save categories the current user has set for this story
+             */
+            kinds: Array<'FAVORITE' | 'FOLLOW' | 'READ_LATER'>;
+        }>;
+    };
+};
+
+export type GetMyBookshelfResponse = GetMyBookshelfResponses[keyof GetMyBookshelfResponses];
+
+export type PostMyBookshelfData = {
+    body: {
+        /**
+         * Story to add to the shelf
+         */
+        storyId: string;
+        /**
+         * Bookshelf save category
+         */
+        kind: 'FAVORITE' | 'FOLLOW' | 'READ_LATER';
+    };
+    path?: never;
+    query?: never;
+    url: '/my/bookshelf';
+};
+
+export type PostMyBookshelfErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyBookshelfError = PostMyBookshelfErrors[keyof PostMyBookshelfErrors];
+
+export type PostMyBookshelfResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+    /**
+     * Default Response
+     */
+    201: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+};
+
+export type PostMyBookshelfResponse = PostMyBookshelfResponses[keyof PostMyBookshelfResponses];
+
+export type GetMyBookshelfByStoryIdData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/bookshelf/{storyId}';
+};
+
+export type GetMyBookshelfByStoryIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyBookshelfByStoryIdError = GetMyBookshelfByStoryIdErrors[keyof GetMyBookshelfByStoryIdErrors];
+
+export type GetMyBookshelfByStoryIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        FAVORITE: boolean;
+        FOLLOW: boolean;
+        READ_LATER: boolean;
+    };
+};
+
+export type GetMyBookshelfByStoryIdResponse = GetMyBookshelfByStoryIdResponses[keyof GetMyBookshelfByStoryIdResponses];
+
+export type DeleteMyBookshelfByStoryIdByKindData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+        /**
+         * Bookshelf save category
+         */
+        kind: 'FAVORITE' | 'FOLLOW' | 'READ_LATER';
+    };
+    query?: never;
+    url: '/my/bookshelf/{storyId}/{kind}';
+};
+
+export type DeleteMyBookshelfByStoryIdByKindErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyBookshelfByStoryIdByKindError = DeleteMyBookshelfByStoryIdByKindErrors[keyof DeleteMyBookshelfByStoryIdByKindErrors];
+
+export type DeleteMyBookshelfByStoryIdByKindResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+};
+
+export type DeleteMyBookshelfByStoryIdByKindResponse = DeleteMyBookshelfByStoryIdByKindResponses[keyof DeleteMyBookshelfByStoryIdByKindResponses];
+
+export type GetMyReadingStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/reading-status';
+};
+
+export type GetMyReadingStatusErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyReadingStatusError = GetMyReadingStatusErrors[keyof GetMyReadingStatusErrors];
+
+export type GetMyReadingStatusResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        entries: Array<{
+            story: {
+                /**
+                 * Story ID
+                 */
+                id: string;
+                /**
+                 * Story name/title
+                 */
+                name: string;
+                /**
+                 * Story summary/description
+                 */
+                summary: string | null;
+                owner: {
+                    /**
+                     * Owner user ID
+                     */
+                    id: number;
+                    /**
+                     * Owner username
+                     */
+                    username: string;
+                };
+                /**
+                 * Story publication status
+                 */
+                status: 'COMPLETED' | 'ONGOING' | 'HIATUS';
+                /**
+                 * Story type
+                 */
+                type: 'FANFICTION' | 'ORIGINAL';
+                /**
+                 * Cover background color
+                 */
+                coverColor: string;
+                /**
+                 * Cover text color
+                 */
+                coverTextColor: string;
+                /**
+                 * Cover font family
+                 */
+                coverFontFamily: string;
+                /**
+                 * Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.
+                 */
+                coverArtUrl: string | null;
+                /**
+                 * Estimated page count
+                 */
+                pages: number | null;
+                /**
+                 * When this story became publicly visible (ISO-8601). Always set for public responses.
+                 */
+                publishedAt: string;
+                /**
+                 * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+                 */
+                firstChapterReleasedAt: string | null;
+                /**
+                 * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+                 */
+                lastChapterReleasedAt: string | null;
+                /**
+                 * Creation timestamp
+                 */
+                createdAt: string;
+                /**
+                 * Last update timestamp
+                 */
+                updatedAt: string;
+            };
+            /**
+             * ID of the most recently opened chapter, or null if no chapters are visible.
+             */
+            lastChapterId: string | null;
+            /**
+             * Timestamp of the last recorded read (ISO-8601).
+             */
+            lastChapterReadAt: string | null;
+        }>;
+    };
+};
+
+export type GetMyReadingStatusResponse = GetMyReadingStatusResponses[keyof GetMyReadingStatusResponses];
+
+export type PostMyReadingStatusData = {
+    body: {
+        /**
+         * Story whose reading position is being updated.
+         */
+        storyId: string;
+        /**
+         * Chapter the user just opened (must belong to the story).
+         */
+        chapterId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/reading-status';
+};
+
+export type PostMyReadingStatusErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyReadingStatusError = PostMyReadingStatusErrors[keyof PostMyReadingStatusErrors];
+
+export type PostMyReadingStatusResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Operation succeeded
+         */
+        success: true;
+    };
+};
+
+export type PostMyReadingStatusResponse = PostMyReadingStatusResponses[keyof PostMyReadingStatusResponses];
+
+export type GetMyReadingStatusByStoryIdData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: never;
+    url: '/my/reading-status/{storyId}';
+};
+
+export type GetMyReadingStatusByStoryIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyReadingStatusByStoryIdError = GetMyReadingStatusByStoryIdErrors[keyof GetMyReadingStatusByStoryIdErrors];
+
+export type GetMyReadingStatusByStoryIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * ID of the most recently opened chapter, or null if no read recorded.
+         */
+        lastChapterId: string | null;
+        /**
+         * Timestamp of the last recorded read (ISO-8601).
+         */
+        lastChapterReadAt: string | null;
+    };
+};
+
+export type GetMyReadingStatusByStoryIdResponse = GetMyReadingStatusByStoryIdResponses[keyof GetMyReadingStatusByStoryIdResponses];
 
 export type PostWebhooksStripeData = {
     body?: never;
@@ -18819,6 +20221,10 @@ export type GetStoriesResponses = {
              */
             coverFontFamily: string;
             /**
+             * Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.
+             */
+            coverArtUrl: string | null;
+            /**
              * Estimated page count
              */
             pages: number | null;
@@ -18958,6 +20364,10 @@ export type GetStoriesByIdResponses = {
              */
             coverFontFamily: string;
             /**
+             * Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.
+             */
+            coverArtUrl: string | null;
+            /**
              * Estimated page count
              */
             pages: number | null;
@@ -19078,6 +20488,10 @@ export type GetStoriesByIdStructureResponses = {
              * Cover font family
              */
             coverFontFamily: string;
+            /**
+             * Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.
+             */
+            coverArtUrl: string | null;
             /**
              * Estimated page count
              */
@@ -19224,9 +20638,49 @@ export type GetStoriesByIdChaptersByChapterIdResponses = {
              */
             name: string;
             /**
-             * Chapter content as HTML
+             * Background image URL active at the start of this chapter, carried in from the most recent prior `background` message in earlier chapters of the same story. Null when no prior background has been set.
              */
-            content: string;
+            enteringBackgroundUrl: string | null;
+            /**
+             * Ordered scenes, each containing an ordered list of paragraph/background blocks
+             */
+            scenes: Array<{
+                /**
+                 * Scene ID
+                 */
+                id: string;
+                blocks: Array<{
+                    type: 'paragraphs';
+                    /**
+                     * HTML for this run of contiguous paragraphs
+                     */
+                    html: string;
+                } | {
+                    type: 'background';
+                    /**
+                     * Relative URL of the background image (resolve against the backend origin)
+                     */
+                    url: string;
+                    /**
+                     * File ID of the background image
+                     */
+                    fileId: string;
+                } | {
+                    type: 'audio';
+                    /**
+                     * Relative URL of the audio file (resolve against the backend origin)
+                     */
+                    url: string;
+                    /**
+                     * File ID of the audio embed
+                     */
+                    fileId: string;
+                    /**
+                     * Audio mime type so the reader can pass it to <audio type="…">
+                     */
+                    mimeType: string;
+                }>;
+            }>;
             /**
              * When this chapter became publicly visible (ISO-8601).
              */
@@ -19244,6 +20698,215 @@ export type GetStoriesByIdChaptersByChapterIdResponses = {
 };
 
 export type GetStoriesByIdChaptersByChapterIdResponse = GetStoriesByIdChaptersByChapterIdResponses[keyof GetStoriesByIdChaptersByChapterIdResponses];
+
+export type GetAuthorsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Page number
+         */
+        page?: number;
+        /**
+         * Items per page (max 100)
+         */
+        pageSize?: number;
+        /**
+         * Filter by username (case-insensitive substring match)
+         */
+        search?: string;
+    };
+    url: '/authors/';
+};
+
+export type GetAuthorsErrors = {
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetAuthorsError = GetAuthorsErrors[keyof GetAuthorsErrors];
+
+export type GetAuthorsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        authors: Array<{
+            /**
+             * Author user ID
+             */
+            id: number;
+            /**
+             * Author username
+             */
+            username: string;
+            /**
+             * Resolved URL of the author's avatar image, or null if none.
+             */
+            avatarUrl: string | null;
+            /**
+             * Number of publicly-visible stories the author has published.
+             */
+            storyCount: number;
+        }>;
+    };
+};
+
+export type GetAuthorsResponse = GetAuthorsResponses[keyof GetAuthorsResponses];
+
+export type GetAuthorsByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Author user ID
+         */
+        id: number;
+    };
+    query?: never;
+    url: '/authors/{id}';
+};
+
+export type GetAuthorsByIdErrors = {
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetAuthorsByIdError = GetAuthorsByIdErrors[keyof GetAuthorsByIdErrors];
+
+export type GetAuthorsByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        author: {
+            /**
+             * Author user ID
+             */
+            id: number;
+            /**
+             * Author username
+             */
+            username: string;
+            /**
+             * Resolved URL of the author's avatar image, or null if none.
+             */
+            avatarUrl: string | null;
+            /**
+             * Number of publicly-visible stories the author has published.
+             */
+            storyCount: number;
+        };
+        stories: Array<{
+            /**
+             * Story ID
+             */
+            id: string;
+            /**
+             * Story name/title
+             */
+            name: string;
+            /**
+             * Story summary/description
+             */
+            summary: string | null;
+            owner: {
+                /**
+                 * Owner user ID
+                 */
+                id: number;
+                /**
+                 * Owner username
+                 */
+                username: string;
+            };
+            /**
+             * Story publication status
+             */
+            status: 'COMPLETED' | 'ONGOING' | 'HIATUS';
+            /**
+             * Story type
+             */
+            type: 'FANFICTION' | 'ORIGINAL';
+            /**
+             * Cover background color
+             */
+            coverColor: string;
+            /**
+             * Cover text color
+             */
+            coverTextColor: string;
+            /**
+             * Cover font family
+             */
+            coverFontFamily: string;
+            /**
+             * Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.
+             */
+            coverArtUrl: string | null;
+            /**
+             * Estimated page count
+             */
+            pages: number | null;
+            /**
+             * When this story became publicly visible (ISO-8601). Always set for public responses.
+             */
+            publishedAt: string;
+            /**
+             * Earliest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            firstChapterReleasedAt: string | null;
+            /**
+             * Latest publishedAt across the story's non-deleted chapters (ISO-8601). Null if no chapters are live yet.
+             */
+            lastChapterReleasedAt: string | null;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetAuthorsByIdResponse = GetAuthorsByIdResponses[keyof GetAuthorsByIdResponses];
 
 export type GetTagsData = {
     body?: never;

@@ -909,7 +909,7 @@ export function EditorContent(props: EditorContentProps): JSX.Element {
         {showPlaceholder() && (
           <div
             class="solidjs-editor-placeholder"
-            style={{ position: 'absolute', top: '0', left: '0', 'pointer-events': 'none', opacity: '0.5' }}
+            style={{ position: 'absolute', top: '7px', left: '20px', 'pointer-events': 'none', opacity: '0.5' }}
           >
             {int.placeholder()}
           </div>

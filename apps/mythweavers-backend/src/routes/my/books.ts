@@ -49,6 +49,18 @@ const bookSchema = z.strictObject({
     description: 'Spine art file ID',
     example: 'clx1234567890',
   }),
+  defaultBackgroundFileId: z.string().nullable().meta({
+    description:
+      'Book-level default background image file ID. Inherited downward by ' +
+      'arcs/chapters/scenes that do not set their own.',
+    example: 'clx1234567890',
+  }),
+  defaultBackgroundUrl: z.string().nullable().optional().meta({
+    description:
+      'Resolved URL of the book-level default background (from the joined ' +
+      'file, if loaded).',
+    example: '/files/1/2025/12/forest.jpg',
+  }),
   deleted: z.boolean().meta({
     description: 'Whether the book is soft-deleted',
     example: false,
@@ -153,10 +165,11 @@ const deleteBookResponseSchema = z.strictObject({
 
 // Helper to format book for response
 function formatBook(book: any) {
-  const { coverArtFile, ...rest } = book
+  const { coverArtFile, defaultBackgroundFile, ...rest } = book
   return {
     ...rest,
     coverArtUrl: coverArtFile?.path ?? null,
+    defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     createdAt: book.createdAt.toISOString(),
     updatedAt: book.updatedAt.toISOString(),
   }
@@ -223,7 +236,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
             sortOrder: finalSortOrder,
             nodeType: nodeType || 'story',
           },
-          include: { coverArtFile: true },
+          include: { coverArtFile: true, defaultBackgroundFile: true },
         })
 
         fastify.log.info({ bookId: book.id, storyId, userId }, 'Book created')
@@ -277,7 +290,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const books = await prisma.book.findMany({
           where: { storyId, deleted: false },
           orderBy: { sortOrder: 'asc' },
-          include: { coverArtFile: true },
+          include: { coverArtFile: true, defaultBackgroundFile: true },
         })
 
         return {
@@ -320,7 +333,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
               ownerId: userId,
             },
           },
-          include: { coverArtFile: true },
+          include: { coverArtFile: true, defaultBackgroundFile: true },
         })
 
         if (!book) {
@@ -380,7 +393,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const book = await prisma.book.update({
           where: { id },
           data: updates,
-          include: { coverArtFile: true },
+          include: { coverArtFile: true, defaultBackgroundFile: true },
         })
 
         fastify.log.info({ bookId: book.id, userId }, 'Book updated')

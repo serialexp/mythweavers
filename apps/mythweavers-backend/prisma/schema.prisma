@@ -78,17 +78,17 @@ enum ParagraphState {
 // ============================================================================
 
 model User {
-  id                Int                @id @default(autoincrement())
-  email             String             @unique
-  username          String             @unique
-  passwordHash      String             // scrypt hash with salt (format: "salt:hash")
-  role              String             @default("user")
-  avatarUrl         String?
-  balance           Decimal            @default(0) @db.Decimal(12, 6)
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String // scrypt hash with salt (format: "salt:hash")
+  role         String   @default("user")
+  avatarUrl    String?
+  balance      Decimal  @default(0) @db.Decimal(12, 6)
   /// User preferences stored as JSON (AI settings, provider keys, custom providers, etc.)
-  preferences       Json?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  preferences  Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
   ownedStories      Story[]
@@ -126,9 +126,9 @@ model AccessToken {
   userId    Int
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String    @unique // mw_xxxxxxxxxxxx
-  name      String             // "Claude Artifact" or user-defined
+  name      String // "Claude Artifact" or user-defined
   lastUsed  DateTime?
-  expiresAt DateTime?          // null = never expires
+  expiresAt DateTime? // null = never expires
   createdAt DateTime  @default(now())
 
   @@index([token])
@@ -139,8 +139,8 @@ model DeviceCode {
   id         String   @id @default(cuid())
   deviceCode String   @unique // Random string for polling
   userCode   String   @unique // Human-friendly ABCD-1234
-  userId     Int?             // Set when user approves
-  expiresAt  DateTime         // Short-lived: 15 minutes
+  userId     Int? // Set when user approves
+  expiresAt  DateTime // Short-lived: 15 minutes
   approved   Boolean  @default(false)
   createdAt  DateTime @default(now())
 
@@ -153,7 +153,7 @@ model Adventure {
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String   @default("Untitled Adventure")
-  data      Json     // Full artifact state as JSON blob
+  data      Json // Full artifact state as JSON blob
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -170,6 +170,11 @@ model BookShelfStory {
   kind      SavedType
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  // A user can only save a given story once per kind. The bookshelf POST
+  // route relies on this for idempotent inserts (catches Prisma P2002).
+  @@unique([ownerId, storyId, kind])
+  @@index([ownerId, kind])
 }
 
 // ============================================================================
@@ -177,94 +182,99 @@ model BookShelfStory {
 // ============================================================================
 
 model Story {
-  id                     String            @id @default(cuid())
-  name                   String            @default("")
-  summary                String?           @db.Text
-  ownerId                Int
-  owner                  User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  importedFromId         String?           @unique // Original story ID from Writer/Story backend migration
-  royalRoadId            Int?              @unique
+  id                         String       @id @default(cuid())
+  name                       String       @default("")
+  summary                    String?      @db.Text
+  ownerId                    Int
+  owner                      User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  importedFromId             String?      @unique // Original story ID from Writer/Story backend migration
+  royalRoadId                Int?         @unique
   /// When true, chapters with publishedAt <= now are auto-published to Royal Road by
   /// the RR publishing worker. Requires a connected RoyalRoadAccount on the owner.
-  royalRoadPublishingEnabled Boolean       @default(false)
+  royalRoadPublishingEnabled Boolean      @default(false)
   /// @deprecated Use `publishedAt` instead. Kept during migration period; will be dropped once all callers are cut over.
-  published              Boolean           @default(false)
+  published                  Boolean      @default(false)
   /// When this story became (or will become) publicly visible on the reading frontend.
   /// null = draft/unpublished. A value in the future = scheduled. A value <= now = live.
   /// For visibility, this gates ALL descendant chapters: a chapter is only visible if
   /// its own publishedAt is set AND the parent story's publishedAt is set.
-  publishedAt            DateTime?
-  status                 StoryStatus       @default(ONGOING)
-  type                   StoryType         @default(ORIGINAL)
-  wordsPerWeek           Int?
-  spellingLevel          Int?              @default(3)
-  chapters               Int?
-  firstChapterReleasedAt DateTime?
-  lastChapterReleasedAt  DateTime?
-  coverArtFileId         String?
-  coverArtFile           File?             @relation("StoryCoverArt", fields: [coverArtFileId], references: [id], onDelete: SetNull)
-  coverColor             String            @default("#000000")
-  coverTextColor         String            @default("#FFFFFF")
-  coverFontFamily        String            @default("Georgia")
-  defaultPerspective     Perspective?      @default(THIRD)
-  defaultTense           Tense?            @default(PAST)
-  genre                  String?           // Story genre (fantasy, sci-fi, etc.)
-  paragraphsPerTurn      Int               @default(3) // Target paragraphs per AI generation
-  format                 String            @default("narrative") // 'narrative' | 'cyoa'
-  defaultProtagonistId   String?
-  defaultProtagonist     Character?        @relation("DefaultProtagonist", fields: [defaultProtagonistId], references: [id], onDelete: SetNull)
-  sortOrder              Int               @default(0)
-  pages                  Int?
+  publishedAt                DateTime?
+  status                     StoryStatus  @default(ONGOING)
+  type                       StoryType    @default(ORIGINAL)
+  wordsPerWeek               Int?
+  spellingLevel              Int?         @default(3)
+  chapters                   Int?
+  firstChapterReleasedAt     DateTime?
+  lastChapterReleasedAt      DateTime?
+  coverArtFileId             String?
+  coverArtFile               File?        @relation("StoryCoverArt", fields: [coverArtFileId], references: [id], onDelete: SetNull)
+  /// Default background image shown in the reader for content under this story, unless overridden
+  /// by a more specific node default (book/arc/chapter/scene) or an inline background message.
+  /// Resolved server-side; the reader receives explicit background blocks at every firing boundary.
+  defaultBackgroundFileId    String?
+  defaultBackgroundFile      File?        @relation("StoryDefaultBackground", fields: [defaultBackgroundFileId], references: [id], onDelete: SetNull)
+  coverColor                 String       @default("#000000")
+  coverTextColor             String       @default("#FFFFFF")
+  coverFontFamily            String       @default("Georgia")
+  defaultPerspective         Perspective? @default(THIRD)
+  defaultTense               Tense?       @default(PAST)
+  genre                      String? // Story genre (fantasy, sci-fi, etc.)
+  paragraphsPerTurn          Int          @default(3) // Target paragraphs per AI generation
+  format                     String       @default("narrative") // 'narrative' | 'cyoa'
+  defaultProtagonistId       String?
+  defaultProtagonist         Character?   @relation("DefaultProtagonist", fields: [defaultProtagonistId], references: [id], onDelete: SetNull)
+  sortOrder                  Int          @default(0)
+  pages                      Int?
 
   // Timeline support (from Story Project)
-  timelineStartTime      Int?              // Minutes from epoch (negative = BBY, positive = ABY)
-  timelineEndTime        Int?
-  timelineGranularity    String            @default("hour") // 'hour' | 'day'
+  timelineStartTime   Int? // Minutes from epoch (negative = BBY, positive = ABY)
+  timelineEndTime     Int?
+  timelineGranularity String @default("hour") // 'hour' | 'day'
 
   // Calendar support (from Story Project)
-  defaultCalendarId      String?
-  defaultCalendar        Calendar?         @relation("DefaultCalendar", fields: [defaultCalendarId], references: [id], onDelete: SetNull)
+  defaultCalendarId String?
+  defaultCalendar   Calendar? @relation("DefaultCalendar", fields: [defaultCalendarId], references: [id], onDelete: SetNull)
 
   // Language/Translation support
-  defaultLanguageId      String?
-  defaultLanguage        Language?         @relation("DefaultLanguage", fields: [defaultLanguageId], references: [id], onDelete: SetNull)
+  defaultLanguageId String?
+  defaultLanguage   Language? @relation("DefaultLanguage", fields: [defaultLanguageId], references: [id], onDelete: SetNull)
 
   // Branching support (from Story Project)
-  branchChoices          Json?             // Record<branchMessageId, selectedOptionId>
+  branchChoices Json? // Record<branchMessageId, selectedOptionId>
 
   // UI state (from Story Project)
-  selectedNodeId         String?           // Last selected node (scene) ID for restoring UI state
+  selectedNodeId String? // Last selected node (scene) ID for restoring UI state
 
   // LLM settings (from Story Project)
-  provider               String            @default("ollama") // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
-  model                  String?
-  openaiEndpoint         String?           // Custom base URL for OpenAI-compatible APIs
+  provider       String  @default("ollama") // 'ollama' | 'openrouter' | 'anthropic' | 'openai'
+  model          String?
+  openaiEndpoint String? // Custom base URL for OpenAI-compatible APIs
 
   // Story-level AI settings overrides (JSON blob)
   // Nullable fields within: null/missing = inherit from global user preferences
   // Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }
-  aiOverrides            Json?
+  aiOverrides Json?
 
   // Script support
-  globalScript           String?           @db.Text // JavaScript function for initializing story data and defining reusable functions
-  plotPointDefaults      Json?             // Array of { key: string, type: 'string' | 'number', default: string | number }
+  globalScript      String? @db.Text // JavaScript function for initializing story data and defining reusable functions
+  plotPointDefaults Json? // Array of { key: string, type: 'string' | 'number', default: string | number }
 
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  books                  Book[]
-  files                  File[]
-  storyReadStatuses      StoryReadStatus[]
-  storyTags              StoryTag[]
-  characters             Character[]
-  contextItems           ContextItem[]     // Replaces Location + PlotPoint
-  calendars              Calendar[]        @relation("StoryCalendars")
-  languages              Language[]        @relation("StoryLanguages")
-  maps                   Map[]
-  mediaAttachments       MediaAttachment[]
-  bookShelfStories       BookShelfStory[]
-  plotPointStates        PlotPointState[]
+  books             Book[]
+  files             File[]
+  storyReadStatuses StoryReadStatus[]
+  storyTags         StoryTag[]
+  characters        Character[]
+  contextItems      ContextItem[] // Replaces Location + PlotPoint
+  calendars         Calendar[]        @relation("StoryCalendars")
+  languages         Language[]        @relation("StoryLanguages")
+  maps              Map[]
+  mediaAttachments  MediaAttachment[]
+  bookShelfStories  BookShelfStory[]
+  plotPointStates   PlotPointState[]
 
   @@index([ownerId])
 }
@@ -300,6 +310,12 @@ model StoryReadStatus {
   lastChapterReadAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  // One row per (user, story); the reading-status POST route uses upsert
+  // against this constraint. Index on (userId, updatedAt) supports the
+  // "Continue reading" list which sorts by recency.
+  @@unique([userId, storyId])
+  @@index([userId, updatedAt])
 }
 
 // ============================================================================
@@ -307,76 +323,85 @@ model StoryReadStatus {
 // ============================================================================
 
 model Book {
-  id             String    @id @default(cuid())
-  name           String    @default("")
-  summary        String?   @db.Text
-  storyId        String
-  story          Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  coverArtFileId String?
-  coverArtFile   File?     @relation("BookCoverArt", fields: [coverArtFileId], references: [id], onDelete: SetNull)
-  spineArtFileId String?
-  spineArtFile   File?     @relation("BookSpineArt", fields: [spineArtFileId], references: [id], onDelete: SetNull)
-  pages          Int?
-  sortOrder      Int
-  nodeType       String    @default("story") // "story" | "non-story" | "context"
-  deleted        Boolean   @default(false)
-  deletedAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                      String    @id @default(cuid())
+  name                    String    @default("")
+  summary                 String?   @db.Text
+  storyId                 String
+  story                   Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  coverArtFileId          String?
+  coverArtFile            File?     @relation("BookCoverArt", fields: [coverArtFileId], references: [id], onDelete: SetNull)
+  spineArtFileId          String?
+  spineArtFile            File?     @relation("BookSpineArt", fields: [spineArtFileId], references: [id], onDelete: SetNull)
+  /// Default background image for content under this book. See Story.defaultBackgroundFileId for resolution rules.
+  defaultBackgroundFileId String?
+  defaultBackgroundFile   File?     @relation("BookDefaultBackground", fields: [defaultBackgroundFileId], references: [id], onDelete: SetNull)
+  pages                   Int?
+  sortOrder               Int
+  nodeType                String    @default("story") // "story" | "non-story" | "context"
+  deleted                 Boolean   @default(false)
+  deletedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  arcs           Arc[]
+  arcs Arc[]
 
   @@index([storyId])
   @@index([deleted])
 }
 
 model Arc {
-  id        String    @id @default(cuid())
-  name      String    @default("")
-  summary   String?   @db.Text
-  bookId    String
-  book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  sortOrder Int
-  nodeType  String    @default("story") // "story" | "non-story" | "context"
-  deleted   Boolean   @default(false)
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                      String    @id @default(cuid())
+  name                    String    @default("")
+  summary                 String?   @db.Text
+  bookId                  String
+  book                    Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sortOrder               Int
+  nodeType                String    @default("story") // "story" | "non-story" | "context"
+  /// Default background image for content under this arc. See Story.defaultBackgroundFileId for resolution rules.
+  defaultBackgroundFileId String?
+  defaultBackgroundFile   File?     @relation("ArcDefaultBackground", fields: [defaultBackgroundFileId], references: [id], onDelete: SetNull)
+  deleted                 Boolean   @default(false)
+  deletedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  chapters  Chapter[]
+  chapters Chapter[]
 
   @@index([bookId])
   @@index([deleted])
 }
 
 model Chapter {
-  id               String              @id @default(cuid())
-  name             String              @default("")
-  summary          String?             @db.Text
-  arcId            String
-  arc              Arc                 @relation(fields: [arcId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  name        String    @default("")
+  summary     String?   @db.Text
+  arcId       String
+  arc         Arc       @relation(fields: [arcId], references: [id], onDelete: Cascade)
   /// @deprecated Use `publishedAt` instead. Kept during migration period; will be dropped once all callers are cut over.
-  publishedOn      DateTime?
+  publishedOn DateTime?
   /// When this chapter became (or will become) publicly visible on the reading frontend.
   /// null = draft/unpublished. A value in the future = scheduled. A value <= now = live.
   /// Visibility also requires the parent Story.publishedAt to be <= now.
-  publishedAt      DateTime?
-  sortOrder        Int
-  royalRoadId      Int?
-  nodeType         String              @default("story") // "story" | "non-story" | "context"
+  publishedAt DateTime?
+  sortOrder   Int
+  royalRoadId Int?
+  nodeType    String    @default("story") // "story" | "non-story" | "context"
 
   /// Cached total word count across all non-deleted messages in all non-deleted scenes
   /// under this chapter. Recalculated on paragraph create/update/delete. Not a source of
   /// truth — rebuild with `scripts/backfill-chapter-wordcount.ts` if it drifts.
-  wordCount        Int                 @default(0)
+  wordCount Int @default(0)
 
   // Chapter state (from Story Project Node model)
-  status           String?             // Chapter status: draft, needs_work, review, done
-  deleted          Boolean             @default(false)
-  deletedAt        DateTime?
+  status                  String? // Chapter status: draft, needs_work, review, done
+  /// Default background image for content under this chapter. See Story.defaultBackgroundFileId for resolution rules.
+  defaultBackgroundFileId String?
+  defaultBackgroundFile   File?     @relation("ChapterDefaultBackground", fields: [defaultBackgroundFileId], references: [id], onDelete: SetNull)
+  deleted                 Boolean   @default(false)
+  deletedAt               DateTime?
 
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   scenes           Scene[]
   publishingStatus ChapterPublishing[]
@@ -388,32 +413,35 @@ model Chapter {
 }
 
 model Scene {
-  id                    String       @id @default(cuid())
-  name                  String       @default("")
-  summary               String?      @db.Text
-  chapterId             String
-  chapter               Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  sortOrder             Int
+  id        String  @id @default(cuid())
+  name      String  @default("")
+  summary   String? @db.Text
+  chapterId String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  sortOrder Int
 
   // Scene state (from Story Project Node model)
-  status                String?      // Scene status: draft, needs_work, review, done
-  includeInFull         Int          @default(2) // 0=not included, 1=summary only, 2=full content
-  deleted               Boolean      @default(false)
-  deletedAt             DateTime?
+  status                  String? // Scene status: draft, needs_work, review, done
+  includeInFull           Int       @default(2) // 0=not included, 1=summary only, 2=full content
+  /// Default background image for content under this scene. See Story.defaultBackgroundFileId for resolution rules.
+  defaultBackgroundFileId String?
+  defaultBackgroundFile   File?     @relation("SceneDefaultBackground", fields: [defaultBackgroundFileId], references: [id], onDelete: SetNull)
+  deleted                 Boolean   @default(false)
+  deletedAt               DateTime?
 
   // POV & Context (Scene is the POV/context boundary)
-  perspective           Perspective? // FIRST/THIRD person
-  viewpointCharacterId  String?      // POV character
-  activeCharacterIds    Json?        // JSON array of active character IDs
-  activeContextItemIds  Json?        // JSON array of active context item IDs
-  goal                  String?      @db.Text  // Scene goal for generation
-  storyTime             Int?         // When this scene occurs in timeline
+  perspective          Perspective? // FIRST/THIRD person
+  viewpointCharacterId String? // POV character
+  activeCharacterIds   Json? // JSON array of active character IDs
+  activeContextItemIds Json? // JSON array of active context item IDs
+  goal                 String?      @db.Text // Scene goal for generation
+  storyTime            Int? // When this scene occurs in timeline
 
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  messages              Message[]
-  mediaLinks            MediaSceneLink[]
+  messages   Message[]
+  mediaLinks MediaSceneLink[]
 
   @@index([chapterId])
   @@index([deleted])
@@ -424,101 +452,108 @@ model Scene {
 // ============================================================================
 
 model Message {
-  id                      String           @id @default(cuid())
-  sceneId                 String
-  scene                   Scene            @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  sortOrder               Int
-  instruction             String?          @db.Text  // Generation instruction for this message
-  script                  String?          @db.Text  // JavaScript to execute
-  deleted                 Boolean          @default(false) // Soft delete flag
-  isQuery                 Boolean          @default(false) // True for meta/query messages not visible to content generation
+  id          String  @id @default(cuid())
+  sceneId     String
+  scene       Scene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  sortOrder   Int
+  instruction String? @db.Text // Generation instruction for this message
+  script      String? @db.Text // JavaScript to execute
+  deleted     Boolean @default(false) // Soft delete flag
+  isQuery     Boolean @default(false) // True for meta/query messages not visible to content generation
 
   // Branch support (from Story Project)
-  type                    String?          // Message type: null for normal, 'chapter' for chapter markers, 'event' for events, 'branch' for branch points, 'background' for reader background changes
-  options                 Json?            // BranchOption[] - only for branch messages
+  type    String? // Message type: null for normal, 'chapter' for chapter markers, 'event' for events, 'branch' for branch points, 'background' for reader background changes, 'audio' for inline reader audio embeds
+  options Json? // BranchOption[] - only for branch messages
 
   // Background image (only for type === 'background')
-  backgroundFileId        String?
-  backgroundFile          File?            @relation("MessageBackgroundFile", fields: [backgroundFileId], references: [id], onDelete: SetNull)
+  backgroundFileId String?
+  backgroundFile   File?   @relation("MessageBackgroundFile", fields: [backgroundFileId], references: [id], onDelete: SetNull)
+
+  // Audio file (only for type === 'audio'). The reader renders an inline
+  // <audio controls> element here — playback is reader-initiated, not
+  // scroll-triggered, so there is no carry-forward semantics like
+  // background. SetNull on file delete drops the embed gracefully.
+  audioFileId String?
+  audioFile   File?   @relation("MessageAudioFile", fields: [audioFileId], references: [id], onDelete: SetNull)
 
   // Current active revision (denormalized for easy querying)
   currentMessageRevisionId String?
   currentMessageRevision   MessageRevision? @relation("CurrentRevision", fields: [currentMessageRevisionId], references: [id], onDelete: SetNull)
 
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  messageRevisions        MessageRevision[] @relation("AllRevisions")
-  plotPointStates         PlotPointState[]
+  messageRevisions MessageRevision[] @relation("AllRevisions")
+  plotPointStates  PlotPointState[]
 
   @@index([sceneId])
   @@index([sceneId, deleted])
 }
 
 model MessageRevision {
-  id                  String    @id @default(cuid())
-  messageId           String
-  message             Message   @relation("AllRevisions", fields: [messageId], references: [id], onDelete: Cascade)
-  version             Int       // 1, 2, 3, etc.
-  versionType         String    @default("initial") // initial, regeneration, edit, rewrite, cli_edit, auto
+  id          String  @id @default(cuid())
+  messageId   String
+  message     Message @relation("AllRevisions", fields: [messageId], references: [id], onDelete: Cascade)
+  version     Int // 1, 2, 3, etc.
+  versionType String  @default("initial") // initial, regeneration, edit, rewrite, cli_edit, auto
 
   // AI generation metadata
-  model               String?   // LLM model used
+  model               String? // LLM model used
   tokensPerSecond     Float?
   totalTokens         Int?
   promptTokens        Int?
   cacheCreationTokens Int?
   cacheReadTokens     Int?
-  think               String?   @db.Text
-  showThink           Boolean   @default(false)
+  think               String? @db.Text
+  showThink           Boolean @default(false)
 
-  createdAt           DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  paragraphs          Paragraph[]
-  currentRevisionFor  Message[] @relation("CurrentRevision")
+  paragraphs         Paragraph[]
+  currentRevisionFor Message[]   @relation("CurrentRevision")
 
-  @@index([messageId])
   @@unique([messageId, version])
+  @@index([messageId])
 }
 
 model Paragraph {
-  id                        String              @id @default(cuid())
-  messageRevisionId         String
-  messageRevision           MessageRevision     @relation(fields: [messageRevisionId], references: [id], onDelete: Cascade)
-  sortOrder                 Int
+  id                String          @id @default(cuid())
+  messageRevisionId String
+  messageRevision   MessageRevision @relation(fields: [messageRevisionId], references: [id], onDelete: Cascade)
+  sortOrder         Int
 
   // Current active revision (denormalized for easy querying)
   currentParagraphRevisionId String?
-  currentParagraphRevision   ParagraphRevision?  @relation("CurrentRevision", fields: [currentParagraphRevisionId], references: [id], onDelete: SetNull)
+  currentParagraphRevision   ParagraphRevision? @relation("CurrentRevision", fields: [currentParagraphRevisionId], references: [id], onDelete: SetNull)
 
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  paragraphRevisions        ParagraphRevision[] @relation("AllRevisions")
+  paragraphRevisions ParagraphRevision[] @relation("AllRevisions")
 
   @@index([messageRevisionId])
 }
 
 model ParagraphRevision {
-  id                  String               @id @default(cuid())
-  paragraphId         String
-  paragraph           Paragraph            @relation("AllRevisions", fields: [paragraphId], references: [id], onDelete: Cascade)
-  body                String               @db.Text
-  contentSchema       String?              @db.Text // Store original content schema as JSON
-  version             Int                  @default(1)
-  state               ParagraphState?      // AI, DRAFT, REVISE, FINAL, SDT
-  script              String?              @db.Text // JavaScript to execute for this paragraph
-  plotPointActions    Json?                // @deprecated Use script instead
-  inventoryActions    Json?                // @deprecated Use script instead
+  id               String          @id @default(cuid())
+  paragraphId      String
+  paragraph        Paragraph       @relation("AllRevisions", fields: [paragraphId], references: [id], onDelete: Cascade)
+  body             String          @db.Text
+  contentSchema    String?         @db.Text // Store original content schema as JSON
+  version          Int             @default(1)
+  state            ParagraphState? // AI, DRAFT, REVISE, FINAL, SDT
+  script           String?         @db.Text // JavaScript to execute for this paragraph
+  plotPointActions Json? // @deprecated Use script instead
+  inventoryActions Json? // @deprecated Use script instead
 
-  createdAt           DateTime             @default(now())
+  createdAt DateTime @default(now())
 
-  paragraphComments   ParagraphComment[]
-  embeddings          ParagraphEmbedding[]
-  currentRevisionFor  Paragraph[]          @relation("CurrentRevision")
+  paragraphComments  ParagraphComment[]
+  embeddings         ParagraphEmbedding[]
+  currentRevisionFor Paragraph[]          @relation("CurrentRevision")
 
-  @@index([paragraphId])
   @@unique([paragraphId, version])
+  @@index([paragraphId])
 }
 
 // ============================================================================
@@ -532,7 +567,7 @@ model PlotPointState {
   messageId String
   message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   key       String
-  value     String   // Store numbers as strings, parse on use
+  value     String // Store numbers as strings, parse on use
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -559,7 +594,7 @@ model ParagraphEmbedding {
   paragraphRevision   ParagraphRevision @relation(fields: [paragraphRevisionId], references: [id], onDelete: Cascade)
   paragraphIndex      Int
   content             String            @db.Text
-  embedding           Bytes             // Vector stored as binary
+  embedding           Bytes // Vector stored as binary
   model               String
   dimension           Int
   createdAt           DateTime          @default(now())
@@ -604,20 +639,20 @@ model ChapterPublishing {
 /// storageStateJson caches the Playwright storage state between runs so the
 /// worker can skip the login form when cookies are still valid.
 model RoyalRoadAccount {
-  id                  String    @id @default(cuid())
-  userId              Int       @unique
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  email               String
+  id                String    @id @default(cuid())
+  userId            Int       @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email             String
   /// AES-GCM ciphertext. Format: base64(iv || ciphertext || authTag).
-  encryptedPassword   String    @db.Text
+  encryptedPassword String    @db.Text
   /// Playwright storage state (cookies + localStorage) serialized as JSON.
-  storageStateJson    Json?
+  storageStateJson  Json?
   /// Last time we successfully logged in (via form or reused storageState).
-  lastLoginAt         DateTime?
+  lastLoginAt       DateTime?
   /// Last auth-related error (wrong password, captcha, etc.). Cleared on successful login.
-  lastError           String?   @db.Text
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  lastError         String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 // ============================================================================
@@ -625,44 +660,44 @@ model RoyalRoadAccount {
 // ============================================================================
 
 model Character {
-  id                         String                   @id @default(cuid())
-  storyId                    String
-  story                      Story                    @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  pictureFileId              String?
-  pictureFile                File?                    @relation("CharacterPicture", fields: [pictureFileId], references: [id], onDelete: SetNull)
-  firstName                  String
-  middleName                 String?
-  lastName                   String?
-  nickname                   String?
-  description                String?                  @db.Text // Primary field for AI generation (dynamic template)
+  id            String  @id @default(cuid())
+  storyId       String
+  story         Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  pictureFileId String?
+  pictureFile   File?   @relation("CharacterPicture", fields: [pictureFileId], references: [id], onDelete: SetNull)
+  firstName     String
+  middleName    String?
+  lastName      String?
+  nickname      String?
+  description   String? @db.Text // Primary field for AI generation (dynamic template)
 
   // Optional metadata fields (from Writer - for character sheets/organization, not AI generation)
-  background                 String?                  @db.Text
-  personality                String?                  @db.Text
-  personalityQuirks          String?                  @db.Text
-  likes                      String?                  @db.Text
-  dislikes                   String?                  @db.Text
-  age                        String?
-  gender                     String?
-  sexualOrientation          String?
-  height                     Int?
-  hairColor                  String?
-  eyeColor                   String?
-  distinguishingFeatures     String?                  @db.Text
-  writingStyle               String?                  @db.Text
-  isMainCharacter            Boolean                  @default(true)
-  laterVersionOfId           String?
-  laterVersionOf             Character?               @relation("CharacterVersion", fields: [laterVersionOfId], references: [id], onDelete: SetNull)
-  previousVersion            Character[]              @relation("CharacterVersion")
-  significantActions         Json?
+  background             String?     @db.Text
+  personality            String?     @db.Text
+  personalityQuirks      String?     @db.Text
+  likes                  String?     @db.Text
+  dislikes               String?     @db.Text
+  age                    String?
+  gender                 String?
+  sexualOrientation      String?
+  height                 Int?
+  hairColor              String?
+  eyeColor               String?
+  distinguishingFeatures String?     @db.Text
+  writingStyle           String?     @db.Text
+  isMainCharacter        Boolean     @default(true)
+  laterVersionOfId       String?
+  laterVersionOf         Character?  @relation("CharacterVersion", fields: [laterVersionOfId], references: [id], onDelete: SetNull)
+  previousVersion        Character[] @relation("CharacterVersion")
+  significantActions     Json?
 
   // Timeline support (from Story Project)
-  birthdate                  Int?                     // Birth date in story time
+  birthdate Int? // Birth date in story time
 
-  createdAt                  DateTime                 @default(now())
-  updatedAt                  DateTime                 @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  defaultProtagonistForStory Story[]                  @relation("DefaultProtagonist")
+  defaultProtagonistForStory Story[] @relation("DefaultProtagonist")
   inventory                  Item[]
 
   @@index([storyId])
@@ -672,7 +707,7 @@ model ContextItem {
   id          String   @id @default(cuid())
   storyId     String
   story       Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  type        String   // 'theme' | 'location' | 'plot'
+  type        String // 'theme' | 'location' | 'plot'
   name        String
   description String   @db.Text
   isGlobal    Boolean  @default(false) // Whether active in all chapters
@@ -684,14 +719,14 @@ model ContextItem {
 }
 
 model Item {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   characterId String
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
   name        String
   description String?
-  amount      Int      @default(1)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  amount      Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([characterId, name])
   @@index([characterId])
@@ -721,11 +756,17 @@ model File {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  storyCoverArt    Story[]     @relation("StoryCoverArt")
-  bookCoverArt     Book[]      @relation("BookCoverArt")
-  bookSpineArt     Book[]      @relation("BookSpineArt")
-  characterPicture Character[] @relation("CharacterPicture")
-  messageBackgrounds Message[] @relation("MessageBackgroundFile")
+  storyCoverArt             Story[]     @relation("StoryCoverArt")
+  bookCoverArt              Book[]      @relation("BookCoverArt")
+  bookSpineArt              Book[]      @relation("BookSpineArt")
+  characterPicture          Character[] @relation("CharacterPicture")
+  messageBackgrounds        Message[]   @relation("MessageBackgroundFile")
+  messageAudio              Message[]   @relation("MessageAudioFile")
+  storyDefaultBackgrounds   Story[]     @relation("StoryDefaultBackground")
+  bookDefaultBackgrounds    Book[]      @relation("BookDefaultBackground")
+  arcDefaultBackgrounds     Arc[]       @relation("ArcDefaultBackground")
+  chapterDefaultBackgrounds Chapter[]   @relation("ChapterDefaultBackground")
+  sceneDefaultBackgrounds   Scene[]     @relation("SceneDefaultBackground")
 
   @@index([r2Key])
 }
@@ -738,8 +779,8 @@ model Calendar {
   id        String   @id @default(cuid())
   storyId   String
   story     Story    @relation("StoryCalendars", fields: [storyId], references: [id], onDelete: Cascade)
-  name      String   // Calendar name (extracted from config for easier access)
-  config    Json     // CalendarConfig as JSONB
+  name      String // Calendar name (extracted from config for easier access)
+  config    Json // CalendarConfig as JSONB
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -756,8 +797,8 @@ model Language {
   id        String   @id @default(cuid())
   storyId   String
   story     Story    @relation("StoryLanguages", fields: [storyId], references: [id], onDelete: Cascade)
-  name      String   // Used in LLM prompts, e.g. "Scottish Gaelic"
-  label     String   // Display in UI, e.g. "Gaelic"
+  name      String // Used in LLM prompts, e.g. "Scottish Gaelic"
+  label     String // Display in UI, e.g. "Gaelic"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -771,18 +812,18 @@ model Language {
 // ============================================================================
 
 model Map {
-  id             String      @id @default(cuid())
+  id             String     @id @default(cuid())
   storyId        String
-  story          Story       @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story          Story      @relation(fields: [storyId], references: [id], onDelete: Cascade)
   name           String
   fileId         String?
   borderColor    String?
-  propertySchema Json?       // Schema defining available properties and state fields for landmarks
+  propertySchema Json? // Schema defining available properties and state fields for landmarks
   landmarks      Landmark[]
   pawns          Pawn[]
   paths          Path[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   @@index([storyId])
 }
@@ -796,8 +837,8 @@ model Landmark {
   name        String
   description String          @db.Text
   type        String          @default("point") // Generic: "point", "area", "region", etc.
-  color       String?         // Pin/marker color
-  size        String?         // "small", "medium", "large"
+  color       String? // Pin/marker color
+  size        String? // "small", "medium", "large"
   properties  Json            @default("{}") // Custom properties as key-value pairs
   states      LandmarkState[]
 
@@ -806,16 +847,16 @@ model Landmark {
 }
 
 model LandmarkState {
-  id          String   @id @default(cuid())
-  storyId     String
-  mapId       String
-  landmarkId  String
-  landmark    Landmark @relation(fields: [mapId, landmarkId], references: [mapId, id], onDelete: Cascade)
-  storyTime   Int?     // When this state change occurs (minutes from 0 BBY)
-  field       String
-  value       String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  storyId    String
+  mapId      String
+  landmarkId String
+  landmark   Landmark @relation(fields: [mapId, landmarkId], references: [mapId, id], onDelete: Cascade)
+  storyTime  Int? // When this state change occurs (minutes from 0 BBY)
+  field      String
+  value      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([mapId, landmarkId, storyTime, field])
   @@index([storyId, storyTime])
@@ -823,18 +864,18 @@ model LandmarkState {
 }
 
 model Pawn {
-  id               String         @id @default(cuid())
-  mapId            String
-  map              Map            @relation(fields: [mapId], references: [id], onDelete: Cascade)
-  name             String
-  description      String?        @db.Text
-  designation      String?
-  speed            Float          @default(1.0)
-  defaultX         Float
-  defaultY         Float
-  color            String?
-  size             String?
-  movements        PawnMovement[]
+  id          String         @id @default(cuid())
+  mapId       String
+  map         Map            @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  name        String
+  description String?        @db.Text
+  designation String?
+  speed       Float          @default(1.0)
+  defaultX    Float
+  defaultY    Float
+  color       String?
+  size        String?
+  movements   PawnMovement[]
 
   @@unique([mapId, id])
   @@index([mapId])
@@ -904,14 +945,14 @@ model MediaAttachment {
   story       Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
   name        String
   description String?  @db.Text
-  mediaType   String   // 'video' | 'audio' | 'image-sequence' | 'custom'
-  duration    Float?   // Duration in seconds (if applicable)
+  mediaType   String // 'video' | 'audio' | 'image-sequence' | 'custom'
+  duration    Float? // Duration in seconds (if applicable)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  frames      MediaFrame[]
-  segments    MediaSegment[]
-  sceneLinks  MediaSceneLink[]
+  frames     MediaFrame[]
+  segments   MediaSegment[]
+  sceneLinks MediaSceneLink[]
 
   @@index([storyId])
 }
@@ -921,8 +962,8 @@ model MediaFrame {
   mediaAttachmentId String
   mediaAttachment   MediaAttachment @relation(fields: [mediaAttachmentId], references: [id], onDelete: Cascade)
   frameNumber       Int
-  timestamp         Float           // Timestamp in seconds
-  imageUrl          String          // User-provided publicly accessible URL
+  timestamp         Float // Timestamp in seconds
+  imageUrl          String // User-provided publicly accessible URL
   description       String?         @db.Text
   createdAt         DateTime        @default(now())
 
@@ -936,11 +977,11 @@ model MediaSegment {
   mediaAttachmentId String
   mediaAttachment   MediaAttachment @relation(fields: [mediaAttachmentId], references: [id], onDelete: Cascade)
   segmentIndex      Int
-  startTime         Float           // Start timestamp in seconds
-  endTime           Float           // End timestamp in seconds
+  startTime         Float // Start timestamp in seconds
+  endTime           Float // End timestamp in seconds
   text              String          @db.Text // Transcript text for this segment
-  speaker           String?         // Speaker identification (if available)
-  videoUrl          String?         // Optional video segment URL
+  speaker           String? // Speaker identification (if available)
+  videoUrl          String? // Optional video segment URL
   createdAt         DateTime        @default(now())
 
   @@unique([mediaAttachmentId, segmentIndex])
@@ -954,8 +995,8 @@ model MediaSceneLink {
   mediaAttachment   MediaAttachment @relation(fields: [mediaAttachmentId], references: [id], onDelete: Cascade)
   sceneId           String
   scene             Scene           @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  startTime         Float?          // Optional: specific start time in media
-  endTime           Float?          // Optional: specific end time in media
+  startTime         Float? // Optional: specific start time in media
+  endTime           Float? // Optional: specific end time in media
   notes             String?         @db.Text
   createdAt         DateTime        @default(now())
 
@@ -971,10 +1012,10 @@ model MediaSceneLink {
 model LlmProvider {
   id          String      @id @default(cuid())
   name        String      @unique // Slug used in code, e.g. "anthropic", "openai", "moonshot"
-  displayName String               // Human-readable, e.g. "Anthropic", "OpenAI"
-  endpointUrl String               // Base URL, e.g. "https://api.anthropic.com"
-  protocol    LlmProtocol          // Streaming protocol: ANTHROPIC or OPENAI_COMPATIBLE
-  envKeyName  String               // Which env var holds the API key, e.g. "LLM_ANTHROPIC_API_KEY"
+  displayName String // Human-readable, e.g. "Anthropic", "OpenAI"
+  endpointUrl String // Base URL, e.g. "https://api.anthropic.com"
+  protocol    LlmProtocol // Streaming protocol: ANTHROPIC or OPENAI_COMPATIBLE
+  envKeyName  String // Which env var holds the API key, e.g. "LLM_ANTHROPIC_API_KEY"
   enabled     Boolean     @default(true)
   sortOrder   Int         @default(0)
   createdAt   DateTime    @default(now())
@@ -985,29 +1026,29 @@ model LlmProvider {
 }
 
 model LlmModel {
-  id          String      @id @default(cuid())
-  modelId     String               // Actual model ID sent to the API, e.g. "claude-sonnet-4-20250514"
-  displayName String?              // Optional human-friendly name
-  providerId  String
-  provider    LlmProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  enabled     Boolean     @default(true)
-  contextLength Int?               // Max context window in tokens
+  id            String      @id @default(cuid())
+  modelId       String // Actual model ID sent to the API, e.g. "claude-sonnet-4-20250514"
+  displayName   String? // Optional human-friendly name
+  providerId    String
+  provider      LlmProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  enabled       Boolean     @default(true)
+  contextLength Int? // Max context window in tokens
 
   // Cost to us (per million tokens)
-  costInput      Float   @default(0)
-  costOutput     Float   @default(0)
+  costInput      Float  @default(0)
+  costOutput     Float  @default(0)
   costCacheRead  Float?
   costCacheWrite Float?
 
   // Price charged to users (per million tokens)
-  priceInput      Float   @default(0)
-  priceOutput     Float   @default(0)
+  priceInput      Float  @default(0)
+  priceOutput     Float  @default(0)
   priceCacheRead  Float?
   priceCacheWrite Float?
 
-  sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([providerId, modelId])
   @@index([enabled])
@@ -1025,18 +1066,18 @@ enum LlmProviderTransactionType {
 /// Tracks top-ups and synced costs per LLM provider.
 /// Balance = sum(TOP_UP amounts) - sum(COST_SYNC amounts).
 model LlmProviderTransaction {
-  id         String                      @id @default(cuid())
+  id         String                     @id @default(cuid())
   providerId String
-  provider   LlmProvider                 @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider   LlmProvider                @relation(fields: [providerId], references: [id], onDelete: Cascade)
   type       LlmProviderTransactionType
   /// Always positive; sign is determined by type (TOP_UP = credit, COST_SYNC = debit)
-  amount     Decimal                     @db.Decimal(12, 6)
+  amount     Decimal                    @db.Decimal(12, 6)
   /// The date the cost/top-up applies to (not necessarily createdAt)
   date       DateTime
   notes      String?
   /// For COST_SYNC: a unique key to prevent duplicate imports (e.g. "anthropic:2026-04-01:2026-04-13")
-  syncKey    String?                     @unique
-  createdAt  DateTime                    @default(now())
+  syncKey    String?                    @unique
+  createdAt  DateTime                   @default(now())
 
   @@index([providerId])
   @@index([providerId, date])
@@ -1049,23 +1090,23 @@ model LlmProviderTransaction {
 /// Every mutation to a user's balance is recorded here.
 /// The User.balance field is a denormalized cache; the ledger is the source of truth.
 model BalanceLedger {
-  id             String        @id @default(cuid())
-  userId         Int
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Positive = credit, negative = debit
-  amount         Decimal       @db.Decimal(12, 6)
+  amount       Decimal @db.Decimal(12, 6)
   /// Running balance after this entry
-  balanceAfter   Decimal       @db.Decimal(12, 6)
+  balanceAfter Decimal @db.Decimal(12, 6)
 
-  type           LedgerEntryType
-  description    String        // e.g. "LLM usage: claude-sonnet-4", "Admin credit: top-up"
+  type        LedgerEntryType
+  description String // e.g. "LLM usage: claude-sonnet-4", "Admin credit: top-up"
 
   /// If this debit was caused by an LLM call, link to the detailed usage log
-  llmUsageLogId  String?       @unique
-  llmUsageLog    LlmUsageLog?  @relation(fields: [llmUsageLogId], references: [id], onDelete: SetNull)
+  llmUsageLogId String?      @unique
+  llmUsageLog   LlmUsageLog? @relation(fields: [llmUsageLogId], references: [id], onDelete: SetNull)
 
-  createdAt      DateTime      @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([userId, createdAt])
@@ -1073,42 +1114,42 @@ model BalanceLedger {
 }
 
 enum LedgerEntryType {
-  CREDIT      // Admin adds balance
-  TOPUP       // Stripe checkout top-up
-  LLM_USAGE   // Debit from an LLM call
-  ADJUSTMENT  // Manual admin correction
+  CREDIT // Admin adds balance
+  TOPUP // Stripe checkout top-up
+  LLM_USAGE // Debit from an LLM call
+  ADJUSTMENT // Manual admin correction
 }
 
 /// Detailed record of each server-side LLM proxy call.
 model LlmUsageLog {
-  id                     String   @id @default(cuid())
-  userId                 Int
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  modelId                String   // The model ID string (e.g. "claude-sonnet-4-20250514")
-  providerName           String   // Provider slug, denormalized for historical queries
+  id           String @id @default(cuid())
+  userId       Int
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modelId      String // The model ID string (e.g. "claude-sonnet-4-20250514")
+  providerName String // Provider slug, denormalized for historical queries
 
   // Token counts
-  promptTokens           Int      @default(0)
-  completionTokens       Int      @default(0)
-  cacheCreationTokens    Int      @default(0)
-  cacheReadTokens        Int      @default(0)
+  promptTokens        Int @default(0)
+  completionTokens    Int @default(0)
+  cacheCreationTokens Int @default(0)
+  cacheReadTokens     Int @default(0)
 
   // Prices at time of usage (snapshot, per million tokens)
-  priceInput             Float    @default(0)
-  priceOutput            Float    @default(0)
-  priceCacheRead         Float?
-  priceCacheWrite        Float?
+  priceInput      Float  @default(0)
+  priceOutput     Float  @default(0)
+  priceCacheRead  Float?
+  priceCacheWrite Float?
 
   // Calculated cost charged to user
-  cost                   Decimal  @db.Decimal(12, 6)
+  cost Decimal @db.Decimal(12, 6)
 
-  durationMs             Int?     // Stream duration
-  aborted                Boolean  @default(false) // Client disconnected mid-stream
+  durationMs Int? // Stream duration
+  aborted    Boolean @default(false) // Client disconnected mid-stream
 
-  createdAt              DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Reverse relation to ledger
-  balanceLedger          BalanceLedger?
+  balanceLedger BalanceLedger?
 
   @@index([userId])
   @@index([userId, createdAt])

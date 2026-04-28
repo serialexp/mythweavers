@@ -3,6 +3,7 @@ import type { JsonValue } from '@prisma/client/runtime/library'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { promoteFileToPublic } from '../../lib/file-storage.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema, successSchema } from '../../schemas/common.js'
 
@@ -34,10 +35,10 @@ function transformDates<T extends { createdAt: Date; updatedAt: Date }>(
   }
 }
 
-// Background file shape exposed on message responses (subset of File)
-type BackgroundFileSummary = { id: string; path: string } | null
+// Background / audio file shapes exposed on message responses (subset of File)
+type FileSummary = { id: string; path: string } | null
 
-// Helper to transform message from Prisma (dates + options type cast + optional backgroundFile).
+// Helper to transform message from Prisma (dates + options type cast + optional backgroundFile / audioFile).
 // The return shape is intentionally untyped against T's fields beyond the ones we touch — the
 // surrounding route typing (via Zod response schemas) covers the public contract.
 function transformMessage<
@@ -46,44 +47,71 @@ function transformMessage<
     updatedAt: Date
     options: JsonValue | null
     backgroundFile?: { id: string; path: string } | null
+    audioFile?: { id: string; path: string } | null
   },
 >(obj: T) {
-  const { backgroundFile, ...rest } = obj as T & { backgroundFile?: { id: string; path: string } | null }
+  const { backgroundFile, audioFile, ...rest } = obj as T & {
+    backgroundFile?: { id: string; path: string } | null
+    audioFile?: { id: string; path: string } | null
+  }
   return {
     ...rest,
     createdAt: obj.createdAt.toISOString(),
     updatedAt: obj.updatedAt.toISOString(),
     options: obj.options as BranchOption[] | null,
-    backgroundFile: (backgroundFile ?? null) as BackgroundFileSummary,
+    backgroundFile: (backgroundFile ?? null) as FileSummary,
+    audioFile: (audioFile ?? null) as FileSummary,
   }
 }
 
-// Reusable include that loads the background file thumbnail data alongside a message.
+// Reusable include that loads the background + audio file thumbnail data alongside a message.
 const messageWithBackgroundFile = {
   backgroundFile: { select: { id: true, path: true } },
+  audioFile: { select: { id: true, path: true } },
 } as const
 
 /**
- * Verify that a File is owned by the same user (and, when supplied, the same
- * story) as the message it is being attached to, and is an image.
+ * Verify that a File is owned by the requesting user and is an image.
+ *
+ * `File.storyId` is treated as a hint about the upload origin, not a hard
+ * scope — users routinely reuse the same image across stories, and the
+ * dedup-by-sha256 branch in the upload endpoint pins storyId to whichever
+ * story the file was first uploaded under. Cross-story access within a
+ * single account is allowed; cross-user access is rejected on ownership.
  *
  * Returns null on success, or an error string suitable for a 400 response.
  */
 async function validateBackgroundFile(
   fileId: string,
   userId: number,
-  storyId: string | null,
+  _storyId: string | null,
 ): Promise<string | null> {
   const file = await prisma.file.findUnique({
     where: { id: fileId },
-    select: { id: true, ownerId: true, storyId: true, mimeType: true },
+    select: { id: true, ownerId: true, mimeType: true },
   })
   if (!file) return 'Background file not found'
   if (file.ownerId !== userId) return 'Background file not owned by user'
-  if (storyId !== null && file.storyId !== null && file.storyId !== storyId) {
-    return 'Background file belongs to a different story'
-  }
   if (!file.mimeType.startsWith('image/')) return 'Background file must be an image'
+  return null
+}
+
+/**
+ * Same ownership check as validateBackgroundFile, but enforces an audio
+ * mime-type. Used when attaching an audio embed to an audio-type message.
+ */
+async function validateAudioFile(
+  fileId: string,
+  userId: number,
+  _storyId: string | null,
+): Promise<string | null> {
+  const file = await prisma.file.findUnique({
+    where: { id: fileId },
+    select: { id: true, ownerId: true, mimeType: true },
+  })
+  if (!file) return 'Audio file not found'
+  if (file.ownerId !== userId) return 'Audio file not owned by user'
+  if (!file.mimeType.startsWith('audio/')) return 'Audio file must be an audio file'
   return null
 }
 
@@ -123,7 +151,7 @@ const messageSchema = z.strictObject({
   type: z
     .string()
     .nullable()
-    .meta({ example: 'branch', description: 'Message type: null for normal, branch for choices, event for events, background for reader background-image changes' }),
+    .meta({ example: 'branch', description: 'Message type: null for normal, branch for choices, event for events, background for reader background-image changes, audio for inline reader audio embeds' }),
   options: z
     .array(branchOptionSchema)
     .nullable()
@@ -139,6 +167,17 @@ const messageSchema = z.strictObject({
     })
     .nullable()
     .meta({ description: 'Hydrated background image file (id + URL path) — only for background type messages' }),
+  audioFileId: z.string().nullable().meta({
+    description: 'File ID of the audio embed — only present for audio type messages',
+    example: 'clx1234567890',
+  }),
+  audioFile: z
+    .strictObject({
+      id: z.string().meta({ example: 'clx1234567890' }),
+      path: z.string().meta({ example: '/files/abc123.mp3' }),
+    })
+    .nullable()
+    .meta({ description: 'Hydrated audio file (id + URL path) — only for audio type messages' }),
   currentMessageRevisionId: z.string().nullable().meta({ example: 'clx1234567890' }),
   createdAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
   updatedAt: z.string().datetime().meta({ example: '2025-12-06T12:00:00.000Z' }),
@@ -177,6 +216,10 @@ const createMessageBodySchema = z.strictObject({
     description: 'File ID for the background image — required when type is "background"',
     example: 'clx1234567890',
   }),
+  audioFileId: z.string().optional().meta({
+    description: 'File ID for the audio embed — required when type is "audio"',
+    example: 'clx1234567890',
+  }),
 })
 
 // Update message body
@@ -204,6 +247,9 @@ const updateMessageBodySchema = z.strictObject({
   }),
   backgroundFileId: z.string().nullable().optional().meta({
     description: 'File ID for the background image — set/replace for background type messages, null to clear',
+  }),
+  audioFileId: z.string().nullable().optional().meta({
+    description: 'File ID for the audio embed — set/replace for audio type messages, null to clear',
   }),
   deleted: z.boolean().optional().meta({
     description: 'Soft delete flag',
@@ -292,8 +338,23 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
         const err = await validateBackgroundFile(request.body.backgroundFileId, userId, storyId)
         if (err) return reply.code(400).send({ error: err })
+        // Inline backgrounds are surfaced by the public reader, so the file
+        // needs to be publicly fetchable. One-way promotion — see
+        // promoteFileToPublic for rationale.
+        await promoteFileToPublic(request.body.backgroundFileId)
       } else if (request.body.backgroundFileId !== undefined) {
         return reply.code(400).send({ error: 'backgroundFileId only allowed when type=background' })
+      }
+
+      // Audio-message validation: parallel rules for type === 'audio'.
+      if (request.body.type === 'audio') {
+        if (!request.body.audioFileId) {
+          return reply.code(400).send({ error: 'audioFileId is required for type=audio' })
+        }
+        const err = await validateAudioFile(request.body.audioFileId, userId, storyId)
+        if (err) return reply.code(400).send({ error: err })
+      } else if (request.body.audioFileId !== undefined) {
+        return reply.code(400).send({ error: 'audioFileId only allowed when type=audio' })
       }
 
       // Handle sortOrder: if provided, bump all messages at or after that position
@@ -331,6 +392,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           type: request.body.type || null,
           options: toJsonInput(request.body.options), // undefined if not provided, array if provided
           backgroundFileId: request.body.backgroundFileId ?? null,
+          audioFileId: request.body.audioFileId ?? null,
           messageRevisions: {
             create: {
               version: 1,
@@ -560,6 +622,17 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
         const err = await validateBackgroundFile(request.body.backgroundFileId, userId, storyId)
         if (err) return reply.code(400).send({ error: err })
+        // Inline backgrounds are surfaced by the public reader — promote so
+        // the file can be fetched without auth. See promoteFileToPublic.
+        await promoteFileToPublic(request.body.backgroundFileId)
+      }
+      // Same rule for audio: validate only when the patch sets a non-null id.
+      if (request.body.audioFileId !== undefined && request.body.audioFileId !== null) {
+        if (resultingType !== 'audio') {
+          return reply.code(400).send({ error: 'audioFileId only allowed when type=audio' })
+        }
+        const err = await validateAudioFile(request.body.audioFileId, userId, storyId)
+        if (err) return reply.code(400).send({ error: err })
       }
 
       // Update message
@@ -574,6 +647,7 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           type: request.body.type,
           options: toJsonInput(request.body.options),
           backgroundFileId: request.body.backgroundFileId,
+          audioFileId: request.body.audioFileId,
           deleted: request.body.deleted,
         },
         include: messageWithBackgroundFile,

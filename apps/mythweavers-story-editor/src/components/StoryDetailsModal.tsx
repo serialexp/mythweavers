@@ -1,7 +1,8 @@
 import { Button, Modal } from '@mythweavers/ui'
 import { Component, Show, createEffect, createSignal, on } from 'solid-js'
 import { currentStoryStore } from '../stores/currentStoryStore'
-import { resolveStoryImageUrl, uploadStoryImage } from '../utils/uploadStoryImage'
+import { resolveStoryImageUrl } from '../utils/uploadStoryImage'
+import { FilePicker } from './FilePicker'
 import * as styles from './StoryDetailsModal.css'
 
 interface StoryDetailsModalProps {
@@ -21,10 +22,7 @@ export const StoryDetailsModal: Component<StoryDetailsModalProps> = (props) => {
   const [summary, setSummary] = createSignal('')
   const [coverArtFileId, setCoverArtFileId] = createSignal<string | null>(null)
   const [coverArtUrl, setCoverArtUrl] = createSignal<string | null>(null)
-  const [isUploading, setIsUploading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
-
-  let fileInputRef: HTMLInputElement | undefined
 
   // Seed form from current story when the modal opens.
   createEffect(
@@ -42,24 +40,9 @@ export const StoryDetailsModal: Component<StoryDetailsModalProps> = (props) => {
     ),
   )
 
-  const handleFileSelected = async (event: Event) => {
-    const input = event.currentTarget as HTMLInputElement
-    const file = input.files?.[0]
-    if (!file) return
-
-    setIsUploading(true)
-    setError(null)
-    try {
-      const uploaded = await uploadStoryImage(file, currentStoryStore.id ?? undefined)
-      setCoverArtFileId(uploaded.id)
-      setCoverArtUrl(uploaded.path)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload cover image')
-    } finally {
-      setIsUploading(false)
-      // Reset the input so re-selecting the same file still fires change
-      if (fileInputRef) fileInputRef.value = ''
-    }
+  const handlePickedCover = (file: { id: string; path: string }) => {
+    setCoverArtFileId(file.id)
+    setCoverArtUrl(file.path)
   }
 
   const handleRemoveCover = () => {
@@ -95,9 +78,7 @@ export const StoryDetailsModal: Component<StoryDetailsModalProps> = (props) => {
           <Button variant="secondary" onClick={props.onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isUploading()}>
-            Save
-          </Button>
+          <Button onClick={handleSave}>Save</Button>
         </div>
       }
     >
@@ -146,30 +127,23 @@ export const StoryDetailsModal: Component<StoryDetailsModalProps> = (props) => {
               </Show>
             </div>
             <div class={styles.coverActions}>
-              <input
-                ref={fileInputRef}
-                class={styles.hiddenInput}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelected}
-              />
-              <Button
-                variant="secondary"
-                onClick={() => fileInputRef?.click()}
-                disabled={isUploading()}
-              >
-                {isUploading() ? 'Uploading…' : coverArtFileId() ? 'Replace Cover' : 'Upload Cover'}
-              </Button>
               <Show when={coverArtFileId()}>
-                <Button variant="secondary" onClick={handleRemoveCover} disabled={isUploading()}>
+                <Button variant="secondary" onClick={handleRemoveCover}>
                   Remove Cover
                 </Button>
               </Show>
               <div class={styles.coverHelp}>
-                Images are uploaded as-is (no cropping). Recommended aspect ratio 2:3 (like a book cover).
+                Pick from your library below or upload a new image. Recommended aspect ratio 2:3
+                (like a book cover).
               </div>
             </div>
           </div>
+          <FilePicker
+            selectedFileId={coverArtFileId()}
+            onSelect={handlePickedCover}
+            onUpload={handlePickedCover}
+            mimePrefix="image/"
+          />
         </div>
       </div>
     </Modal>

@@ -4,6 +4,7 @@ import { messagesStore } from '../stores/messagesStore'
 import { uiStore } from '../stores/uiStore'
 import { Message as MessageType } from '../types/core'
 import { generateMessageId } from '../utils/id'
+import { InsertAudioButton } from './InsertAudioButton'
 import { InsertBackgroundButton } from './InsertBackgroundButton'
 import { InsertBranchButton } from './InsertBranchButton'
 import * as styles from './InsertControls.css'
@@ -89,6 +90,7 @@ export const InsertControls: Component<InsertControlsProps> = (props) => {
       <InsertEventButton afterMessageId={props.afterMessageId} />
       <InsertBranchButton afterMessageId={props.afterMessageId} nodeId={props.nodeId} />
       <InsertBackgroundButton afterMessageId={props.afterMessageId} nodeId={props.nodeId} />
+      <InsertAudioButton afterMessageId={props.afterMessageId} nodeId={props.nodeId} />
       <Show when={uiStore.hasCutMessage()}>
         <Button
           variant="primary"

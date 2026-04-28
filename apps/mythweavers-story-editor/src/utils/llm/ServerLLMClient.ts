@@ -102,6 +102,16 @@ export class ServerLLMClient implements LLMClient {
     // Parse the normalized SSE stream from the backend.
     // The backend emits events like: { type: 'chunk', response: '...' }
     // We convert them to the shared LLMStreamEvent format.
+    //
+    // NOTE: Do NOT return early on 'done'. Some upstream providers (notably
+    // Moonshot/Kimi) emit `finish_reason` and the trailing `usage` chunk as
+    // SEPARATE SSE chunks, so the order coming out of the OpenAI-compat
+    // parser is `done`, then `usage`, then a second `done`. If we returned
+    // on the first done, the usage event would be silently discarded —
+    // which is exactly why server-proxied Kimi calls never reported tokens.
+    // Instead, just yield done and let the SSE stream end naturally when
+    // the backend closes the response.
+    let doneYielded = false
     for await (const raw of parseSSEStream(response.body)) {
       const event = raw as { type: string; response?: string; usage?: any; error?: string }
 
@@ -117,8 +127,13 @@ export class ServerLLMClient implements LLMClient {
           }
           break
         case 'done':
-          yield { type: 'done' }
-          return
+          // Only yield 'done' once — providers may emit it multiple times
+          // (e.g. once from finish_reason, once from the trailing usage chunk).
+          if (!doneYielded) {
+            doneYielded = true
+            yield { type: 'done' }
+          }
+          break
         case 'error':
           yield { type: 'error', error: event.error || 'Server stream error' }
           break

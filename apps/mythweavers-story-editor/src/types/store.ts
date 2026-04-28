@@ -37,6 +37,9 @@ export interface CurrentStory {
   summary?: string | null
   coverArtFileId?: string | null
   coverArtUrl?: string | null
+  // Story-level default background image (fires at story start in the reader).
+  defaultBackgroundFileId?: string | null
+  defaultBackgroundUrl?: string | null
 }
 
 export interface CacheEntry {

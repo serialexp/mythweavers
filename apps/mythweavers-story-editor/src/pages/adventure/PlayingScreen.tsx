@@ -1,11 +1,41 @@
 import { type Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { Button, Text } from '@mythweavers/ui'
 import { adventureStore } from '../../stores/adventureStore'
-import { getCompactionRanges, type CompactionRange } from './prompts'
+import {
+  getCompactionRanges,
+  type CompactionRange,
+  type SteeringBucket,
+} from './prompts'
 import { useEngine } from './useAdventureEngine'
 import * as styles from '../AdventurePage.css'
 
 // --- Render helpers ---
+
+function steeringLabel(b: SteeringBucket): string {
+  switch (b) {
+    case 'well':
+      return 'Fortune +'
+    case 'steady':
+      return 'Neutral'
+    case 'worse':
+      return 'Friction'
+    case 'hell':
+      return 'Disaster'
+  }
+}
+
+function steeringClass(b: SteeringBucket): string {
+  switch (b) {
+    case 'well':
+      return styles.steeringChipWell
+    case 'steady':
+      return styles.steeringChipSteady
+    case 'worse':
+      return styles.steeringChipWorse
+    case 'hell':
+      return styles.steeringChipHell
+  }
+}
 
 function renderNarrative(text: string) {
   const paragraphs = text.split('\n\n').filter((p) => p.trim())
@@ -168,9 +198,23 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
   if (!turn()) return null
 
   const isLastTurn = () => index === adventureStore.turns.length - 1
+  const kind = () => turn().kind ?? 'resolution'
+  const isWorldStep = () => kind() === 'world-step'
 
   return (
-    <div class={styles.turn}>
+    <div class={isWorldStep() ? styles.worldStepTurn : styles.turn}>
+      <Show when={isWorldStep()}>
+        <div
+          class={
+            adventureStore.autoAdvanceWorld
+              ? `${styles.worldStepChip} ${styles.worldStepChipAuto}`
+              : styles.worldStepChip
+          }
+        >
+          — the world moves —
+        </div>
+      </Show>
+
       <Show when={turn().playerAction}>
         <EditablePlayerAction
           action={turn().playerAction!}
@@ -178,6 +222,14 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
           isGenerating={adventureStore.isGenerating}
           engine={engine}
         />
+      </Show>
+
+      <Show when={turn().steering}>
+        {(s) => (
+          <div class={`${styles.steeringChip} ${steeringClass(s())}`}>
+            {steeringLabel(s())}
+          </div>
+        )}
       </Show>
 
       {renderNarrative(turn().narrative)}
@@ -223,6 +275,27 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
           >
             ↩ Rewind here
           </button>
+        </Show>
+
+        {/* Manual "Advance world" — only on the latest turn, when it's a
+            resolution with a player action, and auto-advance is off. */}
+        <Show
+          when={
+            !adventureStore.isGenerating &&
+            isLastTurn() &&
+            !isWorldStep() &&
+            !adventureStore.autoAdvanceWorld &&
+            turn().playerAction !== null
+          }
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => engine.handleAdvanceWorld()}
+            title="Let NPCs and the world react before your next action"
+          >
+            ▸ Advance world
+          </Button>
         </Show>
       </div>
     </div>

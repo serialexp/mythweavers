@@ -55,6 +55,18 @@ const chapterSchema = z.strictObject({
     description: 'Chapter status: draft, needs_work, review, done',
     example: 'draft',
   }),
+  defaultBackgroundFileId: z.string().nullable().meta({
+    description:
+      'Chapter-level default background image file ID. Inherited downward by ' +
+      'scenes that do not set their own.',
+    example: 'clx1234567890',
+  }),
+  defaultBackgroundUrl: z.string().nullable().optional().meta({
+    description:
+      'Resolved URL of the chapter-level default background (from the joined ' +
+      'file, if loaded).',
+    example: '/files/1/2025/12/forest.jpg',
+  }),
   deleted: z.boolean().meta({
     description: 'Whether the chapter is soft-deleted',
     example: false,
@@ -172,8 +184,10 @@ const deleteChapterResponseSchema = z.strictObject({
 
 // Helper to format chapter for response
 function formatChapter(chapter: any) {
+  const { defaultBackgroundFile, ...rest } = chapter
   return {
-    ...chapter,
+    ...rest,
+    defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     publishedOn: chapter.publishedOn?.toISOString() || null,
     publishedAt: chapter.publishedAt?.toISOString() || null,
     createdAt: chapter.createdAt.toISOString(),

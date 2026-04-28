@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -217,6 +218,39 @@ export async function existsInR2(key: string, visibility: StorageVisibility = 'p
     }
     throw error
   }
+}
+
+/**
+ * Copy an object between R2 buckets (e.g. private → public for promotion
+ * when a file becomes referenced by publicly-served content).
+ *
+ * Returns the public URL when copying to the public bucket; otherwise the
+ * private API path (`/my/files/{key}`). The key itself is preserved across
+ * buckets so that downstream code can keep using a single `r2Key` regardless
+ * of which bucket the bytes currently live in.
+ */
+export async function copyR2Object(
+  key: string,
+  fromVisibility: StorageVisibility,
+  toVisibility: StorageVisibility,
+): Promise<string> {
+  if (fromVisibility === toVisibility) {
+    return toVisibility === 'public' ? `${PUBLIC_BUCKET_URL}/${key}` : `/my/files/${key}`
+  }
+
+  const client = getR2Client()
+  const sourceBucket = fromVisibility === 'public' ? PUBLIC_BUCKET : PRIVATE_BUCKET
+  const targetBucket = toVisibility === 'public' ? PUBLIC_BUCKET : PRIVATE_BUCKET
+
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: targetBucket,
+      Key: key,
+      CopySource: `/${sourceBucket}/${encodeURIComponent(key)}`,
+    }),
+  )
+
+  return toVisibility === 'public' ? `${PUBLIC_BUCKET_URL}/${key}` : `/my/files/${key}`
 }
 
 /**

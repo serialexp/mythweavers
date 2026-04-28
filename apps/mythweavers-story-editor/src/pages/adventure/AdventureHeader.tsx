@@ -129,6 +129,27 @@ export const AdventureHeader: Component<{
             />
           </div>
 
+          {/* World reactions toggle */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>
+              <input
+                type="checkbox"
+                checked={adventureStore.autoAdvanceWorld}
+                onChange={(e) => {
+                  adventureStore.setAutoAdvanceWorld(e.currentTarget.checked)
+                  engine.persist()
+                }}
+                style={{ 'margin-right': '8px' }}
+              />
+              Let the world react after each action
+            </label>
+            <div class={styles.directiveHint}>
+              When on, NPCs act and the scene moves forward automatically after
+              each of your turns. When off, the scene waits for you — use the
+              "Advance world" button on the latest turn to step it manually.
+            </div>
+          </div>
+
           {/* Directive section */}
           <div class={styles.storyPanelSection}>
             <label class={styles.formLabel}>Per-Turn Directive</label>

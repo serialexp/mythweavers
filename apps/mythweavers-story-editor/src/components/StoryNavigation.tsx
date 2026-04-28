@@ -18,6 +18,7 @@ import { buildNodeMarkdown, buildPrecedingContextMarkdown, buildTreeMarkdown } f
 import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 import { estimateTokensFromText } from '../utils/templateAI'
 import { createAnthropicClient } from '../utils/anthropicClient'
+import { BackgroundOptionsModal } from './BackgroundOptionsModal'
 import { ChapterPublishingModal } from './ChapterPublishingModal'
 import { BookDetailsModal } from './BookDetailsModal'
 import { CharacterUpdateModal } from './CharacterUpdateModal'
@@ -30,7 +31,7 @@ import { RoyalRoadPublishingPanel } from './RoyalRoadPublishingPanel'
 import { StoryPublishingModal } from './StoryPublishingModal'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
-import { PhArrowCounterClockwiseIcon, PhArrowDownIcon, PhArrowUpIcon, PhBookIcon, PhBookOpenIcon, PhCaretDownIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleHalfIcon, PhCircleIcon, PhClockIcon, PhCodeIcon, PhDotsThreeIcon, PhFileTextIcon, PhFloppyDiskIcon, PhGlobeIcon, PhInfoIcon, PhPencilSimpleIcon, PhPlusCircleIcon, PhScissorsIcon, PhSignOutIcon, PhTrashIcon, PhTreeStructureIcon, PhUsersIcon, PhWarningIcon } from 'solidjs-phosphor'
+import { PhArrowCounterClockwiseIcon, PhArrowDownIcon, PhArrowUpIcon, PhBookIcon, PhBookOpenIcon, PhCaretDownIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleHalfIcon, PhCircleIcon, PhClockIcon, PhCodeIcon, PhDotsThreeIcon, PhFileTextIcon, PhFloppyDiskIcon, PhGlobeIcon, PhImageIcon, PhInfoIcon, PhPencilSimpleIcon, PhPlusCircleIcon, PhScissorsIcon, PhSignOutIcon, PhTrashIcon, PhTreeStructureIcon, PhUsersIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface NodeItemProps {
   treeNode: TreeNode
@@ -40,6 +41,7 @@ interface NodeItemProps {
   onExtractBook?: (bookId: string) => void
   onPublishChapter?: (chapterId: string) => void
   onOpenBookDetails?: (bookId: string) => void
+  onOpenBackgroundOptions?: (nodeId: string) => void
 }
 
 const getAllowedParentType = (type: NodeType): NodeType | null => {
@@ -1152,6 +1154,12 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 Move Down
               </DropdownItem>
             </Show>
+            <DropdownItem
+              icon={<PhImageIcon />}
+              onClick={() => props.onOpenBackgroundOptions?.(props.treeNode.id)}
+            >
+              Background…
+            </DropdownItem>
             <DropdownItem icon={<PhTrashIcon />} onClick={handleDelete} danger>
               Delete
             </DropdownItem>
@@ -1163,7 +1171,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       <Show when={isExpanded() && hasChildren()}>
         <div class={styles.childrenContainer}>
           <For each={props.treeNode.children}>
-            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} onExtractBook={props.onExtractBook} onPublishChapter={props.onPublishChapter} onOpenBookDetails={props.onOpenBookDetails} />}
+            {(child) => <NodeItem treeNode={child} level={props.level + 1} onSelectChapter={props.onSelectChapter} onSplitScene={props.onSplitScene} onExtractBook={props.onExtractBook} onPublishChapter={props.onPublishChapter} onOpenBookDetails={props.onOpenBookDetails} onOpenBackgroundOptions={props.onOpenBackgroundOptions} />}
           </For>
         </div>
       </Show>
@@ -1192,6 +1200,22 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
   const [showRoyalRoadPanel, setShowRoyalRoadPanel] = createSignal(false)
   const [chapterPublishingTargetId, setChapterPublishingTargetId] = createSignal<string | null>(null)
   const handlePublishChapter = (chapterId: string) => setChapterPublishingTargetId(chapterId)
+
+  // Background-options modal target. Null = closed; 'story' = story-level
+  // (entityId derived from currentStoryStore at open time); otherwise the
+  // node id of a book/arc/chapter/scene whose default we're editing.
+  const [backgroundTarget, setBackgroundTarget] = createSignal<
+    | { level: 'story' }
+    | { level: 'book' | 'arc' | 'chapter' | 'scene'; nodeId: string }
+    | null
+  >(null)
+  const handleOpenNodeBackground = (nodeId: string) => {
+    const n = nodeStore.nodes[nodeId]
+    if (!n) return
+    if (n.type === 'book' || n.type === 'arc' || n.type === 'chapter' || n.type === 'scene') {
+      setBackgroundTarget({ level: n.type, nodeId })
+    }
+  }
 
   // LocalStorage key for presets (per-story)
   const getPresetsKey = () => `story-presets-${currentStoryStore.id}`
@@ -1589,6 +1613,17 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
                   class={styles.actionButton}
                   onClick={(e) => {
                     e.stopPropagation()
+                    setBackgroundTarget({ level: 'story' })
+                  }}
+                  title="Default background"
+                  aria-label="Default background"
+                >
+                  <PhImageIcon />
+                </button>
+                <button
+                  class={styles.actionButton}
+                  onClick={(e) => {
+                    e.stopPropagation()
                     setShowRoyalRoadPanel(true)
                   }}
                   title="Royal Road publishing"
@@ -1601,7 +1636,7 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
           </div>
 
           <For each={nodeStore.tree}>
-            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} onExtractBook={handleExtractBook} onPublishChapter={handlePublishChapter} onOpenBookDetails={(bookId) => setBookDetailsTargetId(bookId)} />}
+            {(treeNode) => <NodeItem treeNode={treeNode} level={0} onSelectChapter={props.onSelectChapter} onSplitScene={handleSplitScene} onExtractBook={handleExtractBook} onPublishChapter={handlePublishChapter} onOpenBookDetails={(bookId) => setBookDetailsTargetId(bookId)} onOpenBackgroundOptions={handleOpenNodeBackground} />}
           </For>
 
           <Show when={nodeStore.tree.length === 0}>
@@ -1733,6 +1768,48 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
         chapterId={chapterPublishingTargetId()}
         onClose={() => setChapterPublishingTargetId(null)}
       />
+
+      {(() => {
+        const target = backgroundTarget()
+        if (!target) {
+          return (
+            <BackgroundOptionsModal
+              isOpen={false}
+              target={null}
+              onClose={() => setBackgroundTarget(null)}
+            />
+          )
+        }
+        if (target.level === 'story') {
+          return (
+            <BackgroundOptionsModal
+              isOpen={true}
+              target={{
+                level: 'story',
+                entityId: currentStoryStore.id ?? '',
+                initialFileId: currentStoryStore.defaultBackgroundFileId ?? null,
+                initialUrl: currentStoryStore.defaultBackgroundUrl ?? null,
+                displayName: currentStoryStore.name ?? undefined,
+              }}
+              onClose={() => setBackgroundTarget(null)}
+            />
+          )
+        }
+        const node = nodeStore.nodes[target.nodeId]
+        return (
+          <BackgroundOptionsModal
+            isOpen={true}
+            target={{
+              level: target.level,
+              entityId: target.nodeId,
+              initialFileId: node?.defaultBackgroundFileId ?? null,
+              initialUrl: node?.defaultBackgroundUrl ?? null,
+              displayName: node?.title,
+            }}
+            onClose={() => setBackgroundTarget(null)}
+          />
+        )
+      })()}
     </TreeDragDropProvider>
   )
 }

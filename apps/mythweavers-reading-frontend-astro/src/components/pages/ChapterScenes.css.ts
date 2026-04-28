@@ -18,3 +18,22 @@ export const bgAnchor = style({
   margin: '0',
   padding: '0',
 })
+
+/**
+ * Wrapper around an inline `<audio controls>` block. Centred and constrained
+ * so the player doesn't stretch full-width on wide screens, with margin so
+ * it sits cleanly between paragraph runs.
+ */
+export const audioWrap = style({
+  display: 'flex',
+  justifyContent: 'center',
+  margin: '1.5rem auto',
+  maxWidth: '640px',
+  width: '100%',
+})
+
+export const audioPlayer = style({
+  width: '100%',
+  // Match Prose's max width so embedded players sit naturally with the prose.
+  maxWidth: '100%',
+})

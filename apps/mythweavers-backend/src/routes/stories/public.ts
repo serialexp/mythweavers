@@ -2,89 +2,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema, paginationSchema } from '../../schemas/common.js'
-
-// Enums from Prisma schema
-const storyStatusSchema = z.enum(['COMPLETED', 'ONGOING', 'HIATUS']).meta({
-  description: 'Story publication status',
-  example: 'ONGOING',
-})
-
-const storyTypeSchema = z.enum(['FANFICTION', 'ORIGINAL']).meta({
-  description: 'Story type',
-  example: 'ORIGINAL',
-})
-
-// Owner info (subset of user data for public view)
-const ownerSchema = z.strictObject({
-  id: z.number().meta({
-    description: 'Owner user ID',
-    example: 1,
-  }),
-  username: z.string().meta({
-    description: 'Owner username',
-    example: 'johndoe',
-  }),
-})
-
-// Public story response schema (what we show to anonymous users)
-const publicStorySchema = z.strictObject({
-  id: z.string().meta({
-    description: 'Story ID',
-    example: 'clx1234567890',
-  }),
-  name: z.string().meta({
-    description: 'Story name/title',
-    example: 'My Epic Adventure',
-  }),
-  summary: z.string().nullable().meta({
-    description: 'Story summary/description',
-    example: 'A tale of heroes and dragons',
-  }),
-  owner: ownerSchema,
-  status: storyStatusSchema,
-  type: storyTypeSchema,
-  coverColor: z.string().meta({
-    description: 'Cover background color',
-    example: '#000000',
-  }),
-  coverTextColor: z.string().meta({
-    description: 'Cover text color',
-    example: '#FFFFFF',
-  }),
-  coverFontFamily: z.string().meta({
-    description: 'Cover font family',
-    example: 'Georgia',
-  }),
-  coverArtUrl: z.string().nullable().meta({
-    description:
-      "Relative URL path to the story's uploaded cover image (null if none). Resolve against the backend origin.",
-    example: '/files/1/2025/12/cover.png',
-  }),
-  pages: z.number().nullable().meta({
-    description: 'Estimated page count',
-    example: 120,
-  }),
-  publishedAt: z.string().meta({
-    description: 'When this story became publicly visible (ISO-8601). Always set for public responses.',
-    example: '2025-12-05T12:00:00.000Z',
-  }),
-  firstChapterReleasedAt: z.string().nullable().meta({
-    description: 'Earliest publishedAt across the story\'s non-deleted chapters (ISO-8601). Null if no chapters are live yet.',
-    example: '2025-12-05T12:00:00.000Z',
-  }),
-  lastChapterReleasedAt: z.string().nullable().meta({
-    description: 'Latest publishedAt across the story\'s non-deleted chapters (ISO-8601). Null if no chapters are live yet.',
-    example: '2026-03-01T12:00:00.000Z',
-  }),
-  createdAt: z.string().meta({
-    description: 'Creation timestamp',
-    example: '2025-12-05T12:00:00.000Z',
-  }),
-  updatedAt: z.string().meta({
-    description: 'Last update timestamp',
-    example: '2025-12-05T12:00:00.000Z',
-  }),
-})
+import {
+  formatPublicStory,
+  publicStorySchema,
+  storyStatusSchema,
+  storyTypeSchema,
+  storyVisibleWhere,
+} from '../../schemas/story.js'
 
 // List query parameters
 const listPublicStoriesQuerySchema = z.strictObject({
@@ -130,42 +54,10 @@ const getPublicStoryResponseSchema = z.strictObject({
   story: publicStorySchema,
 })
 
-// Helper to format story for public response
-function formatPublicStory(story: any) {
-  return {
-    id: story.id,
-    name: story.name,
-    summary: story.summary,
-    owner: {
-      id: story.owner.id,
-      username: story.owner.username,
-    },
-    status: story.status,
-    type: story.type,
-    coverColor: story.coverColor,
-    coverTextColor: story.coverTextColor,
-    coverFontFamily: story.coverFontFamily,
-    coverArtUrl: story.coverArtFile?.path ?? null,
-    pages: story.pages,
-    publishedAt: story.publishedAt.toISOString(),
-    firstChapterReleasedAt: story.firstChapterReleasedAt
-      ? story.firstChapterReleasedAt.toISOString()
-      : null,
-    lastChapterReleasedAt: story.lastChapterReleasedAt
-      ? story.lastChapterReleasedAt.toISOString()
-      : null,
-    createdAt: story.createdAt.toISOString(),
-    updatedAt: story.updatedAt.toISOString(),
-  }
-}
-
 // ---- Visibility filter helpers ----
-// A story is visible iff publishedAt is set AND <= now.
-// A chapter is visible iff its own publishedAt is set AND <= now, its
-// parent story is visible, and it's not soft-deleted.
-function storyVisibleWhere(now: Date) {
-  return { publishedAt: { not: null, lte: now } } as const
-}
+// `storyVisibleWhere` is shared via schemas/story.ts — duplicate kept here for
+// chapter visibility, which has stricter rules (deleted: false plus parent
+// story visibility).
 function chapterVisibleWhere(now: Date) {
   return { deleted: false, publishedAt: { not: null, lte: now } } as const
 }
@@ -284,7 +176,25 @@ const backgroundBlockSchema = z.strictObject({
     example: 'clx1234567890',
   }),
 })
-const chapterBlockSchema = z.union([paragraphsBlockSchema, backgroundBlockSchema])
+// Inline audio embed. Reader renders an <audio controls> element; playback is
+// reader-initiated, never autoplay, so unlike `background` there is no
+// carry-forward / scroll-trigger semantics.
+const audioBlockSchema = z.strictObject({
+  type: z.literal('audio'),
+  url: z.string().meta({
+    description: 'Relative URL of the audio file (resolve against the backend origin)',
+    example: '/files/1/2025/12/song.mp3',
+  }),
+  fileId: z.string().meta({
+    description: 'File ID of the audio embed',
+    example: 'clx1234567890',
+  }),
+  mimeType: z.string().meta({
+    description: 'Audio mime type so the reader can pass it to <audio type="…">',
+    example: 'audio/mpeg',
+  }),
+})
+const chapterBlockSchema = z.union([paragraphsBlockSchema, backgroundBlockSchema, audioBlockSchema])
 
 const chapterSceneSchema = z.strictObject({
   id: z.string().meta({ description: 'Scene ID', example: 'clx1234567890' }),
@@ -371,14 +281,36 @@ function formatPublicStoryWithStructure(story: any) {
 // Block + scene types matching the public response schema.
 type ParagraphsBlock = { type: 'paragraphs'; html: string }
 type BackgroundBlock = { type: 'background'; url: string; fileId: string }
-type ChapterBlock = ParagraphsBlock | BackgroundBlock
+type AudioBlock = { type: 'audio'; url: string; fileId: string; mimeType: string }
+type ChapterBlock = ParagraphsBlock | BackgroundBlock | AudioBlock
 type ChapterScene = { id: string; blocks: ChapterBlock[] }
 
 /**
- * Build the structured per-scene block list for a chapter. Background-type
- * messages flush the running paragraphs buffer and emit their own block;
- * other non-paragraph types (`event`, `branch`, `chapter`) are skipped, same
- * as the legacy flat extractor.
+ * Build the structured per-scene block list for a chapter.
+ *
+ * Two sources can emit `background` blocks:
+ *
+ *   1. **Scene-level default**: if a scene has its own explicit
+ *      `defaultBackgroundFileId`, we emit a block at the very start of that
+ *      scene so the reader switches to it as soon as scene content scrolls
+ *      into view. This is the firing rule: only nodes that *explicitly* set
+ *      a default fire — inheritance never does. So a scene with a null
+ *      `defaultBackgroundFileId` emits nothing at its boundary, and any
+ *      previously-active background (whether an inline override or a
+ *      higher-level default) persists into it.
+ *
+ *   2. **Inline `type: 'background'` messages**: act as mid-scene overrides.
+ *      They flush the running paragraphs buffer and emit their own block.
+ *      Because nothing fires at the next scene boundary unless that scene
+ *      sets its own default, an inline override naturally persists across
+ *      scene boundaries until something explicit overrides it.
+ *
+ * The chapter-level firing (chapter has its own explicit default) is folded
+ * into `enteringBackgroundUrl` by the caller, so we don't emit anything
+ * extra at the chapter's first scene for it.
+ *
+ * Other non-paragraph message types (`event`, `branch`, `chapter`) are
+ * skipped, same as the legacy flat extractor.
  */
 function buildChapterScenes(chapter: any): ChapterScene[] {
   const scenes = (chapter.scenes || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder)
@@ -392,6 +324,14 @@ function buildChapterScenes(chapter: any): ChapterScene[] {
       }
     }
 
+    // Scene-level firing: emit a background change at the scene's start if
+    // the scene has its own explicit default (and the file still exists —
+    // FK is SetNull on file delete).
+    const sceneDefault = scene.defaultBackgroundFile
+    if (scene.defaultBackgroundFileId && sceneDefault?.path && sceneDefault.id) {
+      blocks.push({ type: 'background', url: sceneDefault.path, fileId: sceneDefault.id })
+    }
+
     const messages = (scene.messages || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder)
     for (const message of messages) {
       if (message.deleted) continue
@@ -403,6 +343,17 @@ function buildChapterScenes(chapter: any): ChapterScene[] {
         const file = message.backgroundFile
         if (file?.path && file.id) {
           blocks.push({ type: 'background', url: file.path, fileId: file.id })
+        }
+        continue
+      }
+      if (message.type === 'audio') {
+        // Inline audio embed. Same SetNull-on-delete safety as background:
+        // skip the block entirely if the file row is gone, rather than
+        // emitting a broken player.
+        flushParagraphs()
+        const file = message.audioFile
+        if (file?.path && file.id && file.mimeType) {
+          blocks.push({ type: 'audio', url: file.path, fileId: file.id, mimeType: file.mimeType })
         }
         continue
       }
@@ -423,25 +374,170 @@ function buildChapterScenes(chapter: any): ChapterScene[] {
 }
 
 /**
- * Find the background URL active at the *start* of the given chapter — the
- * most recent `background` message in any earlier visible chapter of the
- * same story. Returns null if no prior background has been set.
+ * Find the background URL active at the *start* of the given chapter,
+ * after applying the chapter's own boundary firing (if it has an explicit
+ * `defaultBackgroundFileId`).
  *
- * O(1) regardless of story length: a single ordered query that takes the
- * latest hit by (book.sortOrder, arc.sortOrder, chapter.sortOrder,
- * scene.sortOrder, message.sortOrder).
+ * Six firing sources are merged in narrative order; the last one before the
+ * chapter's first scene wins:
+ *
+ *   1. Story-level default (position: outermost / before everything)
+ *   2. Book-level defaults (position: at the book's structural boundary)
+ *   3. Arc-level defaults (position: at the arc's structural boundary)
+ *   4. Chapter-level defaults — including the *current* chapter, so its own
+ *      boundary firing is folded into the entering value
+ *   5. Scene-level defaults — only in *prior* chapters; current chapter's
+ *      scene firings are emitted by buildChapterScenes()
+ *   6. Inline `type: 'background'` messages — only in *prior* chapters
+ *
+ * Visibility filter: chapter/scene/message-sourced events only count if the
+ * containing chapter is visible (publishedAt set & in the past), since
+ * unpublished chapters aren't experienced by the reader. Story/book/arc
+ * defaults always fire — they exist as structural metadata regardless of
+ * which chapters are published.
  */
 async function getEnteringBackgroundUrl(
   storyId: string,
   currentChapter: { id: string; sortOrder: number; arc: { sortOrder: number; book: { sortOrder: number } } },
   now: Date,
 ): Promise<string | null> {
-  // Prisma's nested ordering across relations isn't expressible in a single
-  // findFirst across joined tables, so we do this in two steps: load all
-  // candidate background messages from earlier chapters with their position
-  // info, then sort in JS. The candidate set is small (one row per
-  // background message) so this scales fine for any realistic story.
-  const candidates = await prisma.message.findMany({
+  const cur = {
+    book: currentChapter.arc.book.sortOrder,
+    arc: currentChapter.arc.sortOrder,
+    chapter: currentChapter.sortOrder,
+  }
+
+  // Position tuple (book, arc, chapter, scene, message). -Infinity is used
+  // for unspecified/structural levels (e.g. a book-level default fires
+  // before any of its arcs, so its arc/chapter/scene/message slots are -Inf).
+  type Event = { pos: [number, number, number, number, number]; url: string }
+  const events: Event[] = []
+
+  // (1) Story default — fires at the very start of the story.
+  const story = await prisma.story.findUnique({
+    where: { id: storyId },
+    select: { defaultBackgroundFile: { select: { path: true } } },
+  })
+  if (story?.defaultBackgroundFile?.path) {
+    events.push({
+      pos: [-Infinity, -Infinity, -Infinity, -Infinity, -Infinity],
+      url: story.defaultBackgroundFile.path,
+    })
+  }
+
+  // (2) Book defaults at-or-before current book.
+  const books = await prisma.book.findMany({
+    where: {
+      storyId,
+      deleted: false,
+      sortOrder: { lte: cur.book },
+      defaultBackgroundFileId: { not: null },
+    },
+    select: { sortOrder: true, defaultBackgroundFile: { select: { path: true } } },
+  })
+  for (const b of books) {
+    if (b.defaultBackgroundFile?.path) {
+      events.push({
+        pos: [b.sortOrder, -Infinity, -Infinity, -Infinity, -Infinity],
+        url: b.defaultBackgroundFile.path,
+      })
+    }
+  }
+
+  // (3) Arc defaults at-or-before current arc (in same book) or in any prior book.
+  const arcs = await prisma.arc.findMany({
+    where: {
+      deleted: false,
+      defaultBackgroundFileId: { not: null },
+      book: { storyId, deleted: false },
+    },
+    select: {
+      sortOrder: true,
+      defaultBackgroundFile: { select: { path: true } },
+      book: { select: { sortOrder: true } },
+    },
+  })
+  for (const a of arcs) {
+    const b = a.book.sortOrder
+    if (b > cur.book) continue
+    if (b === cur.book && a.sortOrder > cur.arc) continue
+    if (a.defaultBackgroundFile?.path) {
+      events.push({
+        pos: [b, a.sortOrder, -Infinity, -Infinity, -Infinity],
+        url: a.defaultBackgroundFile.path,
+      })
+    }
+  }
+
+  // (4) Chapter defaults at-or-before currentChapter (visibility-gated).
+  //     Includes currentChapter itself — its own chapter-level firing is
+  //     part of the entering value.
+  const chapters = await prisma.chapter.findMany({
+    where: {
+      ...chapterVisibleWhere(now),
+      defaultBackgroundFileId: { not: null },
+      arc: { book: { storyId } },
+    },
+    select: {
+      sortOrder: true,
+      defaultBackgroundFile: { select: { path: true } },
+      arc: { select: { sortOrder: true, book: { select: { sortOrder: true } } } },
+    },
+  })
+  for (const c of chapters) {
+    const b = c.arc.book.sortOrder
+    const a = c.arc.sortOrder
+    if (b > cur.book) continue
+    if (b === cur.book && a > cur.arc) continue
+    if (b === cur.book && a === cur.arc && c.sortOrder > cur.chapter) continue
+    if (c.defaultBackgroundFile?.path) {
+      events.push({
+        pos: [b, a, c.sortOrder, -Infinity, -Infinity],
+        url: c.defaultBackgroundFile.path,
+      })
+    }
+  }
+
+  // (5) Scene defaults in chapters STRICTLY BEFORE currentChapter.
+  //     Current chapter's scene firings are emitted by buildChapterScenes.
+  const scenes = await prisma.scene.findMany({
+    where: {
+      deleted: false,
+      defaultBackgroundFileId: { not: null },
+      chapter: {
+        ...chapterVisibleWhere(now),
+        NOT: { id: currentChapter.id },
+        arc: { book: { storyId } },
+      },
+    },
+    select: {
+      sortOrder: true,
+      defaultBackgroundFile: { select: { path: true } },
+      chapter: {
+        select: {
+          sortOrder: true,
+          arc: { select: { sortOrder: true, book: { select: { sortOrder: true } } } },
+        },
+      },
+    },
+  })
+  for (const s of scenes) {
+    const b = s.chapter.arc.book.sortOrder
+    const a = s.chapter.arc.sortOrder
+    const c = s.chapter.sortOrder
+    if (b > cur.book) continue
+    if (b === cur.book && a > cur.arc) continue
+    if (b === cur.book && a === cur.arc && c >= cur.chapter) continue
+    if (s.defaultBackgroundFile?.path) {
+      events.push({
+        pos: [b, a, c, s.sortOrder, -Infinity],
+        url: s.defaultBackgroundFile.path,
+      })
+    }
+  }
+
+  // (6) Inline background messages in chapters STRICTLY BEFORE currentChapter.
+  const messages = await prisma.message.findMany({
     where: {
       type: 'background',
       deleted: false,
@@ -472,41 +568,31 @@ async function getEnteringBackgroundUrl(
       },
     },
   })
-
-  // Keep only candidates strictly before the current chapter in
-  // (book, arc, chapter) order.
-  const cur = {
-    book: currentChapter.arc.book.sortOrder,
-    arc: currentChapter.arc.sortOrder,
-    chapter: currentChapter.sortOrder,
+  for (const m of messages) {
+    const b = m.scene.chapter.arc.book.sortOrder
+    const a = m.scene.chapter.arc.sortOrder
+    const c = m.scene.chapter.sortOrder
+    if (b > cur.book) continue
+    if (b === cur.book && a > cur.arc) continue
+    if (b === cur.book && a === cur.arc && c >= cur.chapter) continue
+    if (m.backgroundFile?.path) {
+      events.push({
+        pos: [b, a, c, m.scene.sortOrder, m.sortOrder],
+        url: m.backgroundFile.path,
+      })
+    }
   }
-  const earlier = candidates.filter((c) => {
-    const b = c.scene.chapter.arc.book.sortOrder
-    if (b !== cur.book) return b < cur.book
-    const a = c.scene.chapter.arc.sortOrder
-    if (a !== cur.arc) return a < cur.arc
-    return c.scene.chapter.sortOrder < cur.chapter
-  })
-  if (earlier.length === 0) return null
 
-  // Sort in story order, take the LAST one (most recent in narrative order).
-  earlier.sort((x, y) => {
-    const xb = x.scene.chapter.arc.book.sortOrder
-    const yb = y.scene.chapter.arc.book.sortOrder
-    if (xb !== yb) return xb - yb
-    const xa = x.scene.chapter.arc.sortOrder
-    const ya = y.scene.chapter.arc.sortOrder
-    if (xa !== ya) return xa - ya
-    const xc = x.scene.chapter.sortOrder
-    const yc = y.scene.chapter.sortOrder
-    if (xc !== yc) return xc - yc
-    const xs = x.scene.sortOrder
-    const ys = y.scene.sortOrder
-    if (xs !== ys) return xs - ys
-    return x.sortOrder - y.sortOrder
+  if (events.length === 0) return null
+  events.sort((x, y) => {
+    for (let i = 0; i < 5; i++) {
+      const xv = x.pos[i]
+      const yv = y.pos[i]
+      if (xv !== yv) return xv - yv
+    }
+    return 0
   })
-  const last = earlier[earlier.length - 1]
-  return last.backgroundFile?.path ?? null
+  return events[events.length - 1].url
 }
 
 const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -841,6 +927,10 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             },
             scenes: {
               include: {
+                // Hydrate the scene's own default background file so
+                // buildChapterScenes can emit a scene-boundary firing
+                // when the scene has its own explicit default.
+                defaultBackgroundFile: { select: { id: true, path: true } },
                 messages: {
                   include: {
                     currentMessageRevision: {
@@ -855,6 +945,9 @@ const publicStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                     // Hydrate the file record for `background` messages so
                     // the structured extractor can emit { url, fileId }.
                     backgroundFile: { select: { id: true, path: true } },
+                    // Hydrate the audio file (with mimeType) for `audio`
+                    // messages so the reader's <audio> tag knows its format.
+                    audioFile: { select: { id: true, path: true, mimeType: true } },
                   },
                 },
               },

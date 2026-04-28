@@ -2,6 +2,7 @@ import { randomBytes, scrypt } from 'node:crypto'
 import { promisify } from 'node:util'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
+import { requireAuth } from '../../lib/auth.js'
 import { authConfig, getCookieOptions } from '../../lib/config.js'
 import { prisma } from '../../lib/prisma.js'
 import { preferencesSchema, type UserPreferences } from '../my/preferences.js'
@@ -57,6 +58,21 @@ const sessionResponseSchema = z.strictObject({
 })
 
 const logoutResponseSchema = z.strictObject({
+  success: z.literal(true),
+})
+
+const changePasswordBodySchema = z.strictObject({
+  currentPassword: z.string().min(1).meta({
+    description: 'The user\'s current password (required to authorise the change).',
+    example: 'old-secure-password',
+  }),
+  newPassword: z.string().min(8).meta({
+    description: 'New password (minimum 8 characters).',
+    example: 'new-secure-password-456',
+  }),
+})
+
+const changePasswordResponseSchema = z.strictObject({
   success: z.literal(true),
 })
 
@@ -316,6 +332,58 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
       } catch (error) {
         fastify.log.error({ error }, 'Session check failed')
         return reply.status(500).send({ error: 'Session check failed' })
+      }
+    },
+  )
+
+  // POST /auth/change-password
+  // Requires the user's current password to authorise the change. Existing
+  // sessions remain valid — we don't force a re-login. Bart's call: keep it
+  // friction-free for users editing settings on the reader.
+  fastify.post(
+    '/change-password',
+    {
+      preHandler: requireAuth,
+      schema: {
+        description: 'Change the password for the current user.',
+        tags: ['auth'],
+        body: changePasswordBodySchema,
+        response: {
+          200: changePasswordResponseSchema,
+          400: errorSchema,
+          401: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { currentPassword, newPassword } = request.body
+        const user = request.user!
+
+        // Verify current password before accepting the new one. Same scrypt
+        // verification as login.
+        const [salt, storedHash] = user.passwordHash.split(':')
+        const derivedKey = (await scryptAsync(currentPassword, salt, 64)) as Buffer
+        if (derivedKey.toString('hex') !== storedHash) {
+          return reply.status(401).send({ error: 'Current password is incorrect' })
+        }
+
+        // Hash the new password with a fresh salt.
+        const newSalt = randomBytes(16).toString('hex')
+        const newDerivedKey = (await scryptAsync(newPassword, newSalt, 64)) as Buffer
+        const newHash = `${newSalt}:${newDerivedKey.toString('hex')}`
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { passwordHash: newHash },
+        })
+
+        fastify.log.info({ userId: user.id }, 'User changed password')
+        return { success: true as const }
+      } catch (error) {
+        fastify.log.error({ error }, 'Password change failed')
+        return reply.status(500).send({ error: 'Password change failed' })
       }
     },
   )

@@ -81,16 +81,32 @@ function usesMaxCompletionTokens(model: string): boolean {
 function parseStreamChunk(parsed: any): LLMStreamEvent[] {
   const events: LLMStreamEvent[] = []
 
-  // Usage info (usually in the final chunk when stream_options.include_usage is set)
+  // Usage info (usually in the final chunk when stream_options.include_usage is set).
+  // Different OpenAI-compatible providers report cached input tokens in different
+  // fields, so we accept several common shapes:
+  //   - OpenAI / Azure OpenAI:        usage.prompt_tokens_details.cached_tokens
+  //   - Moonshot (Kimi):              usage.cached_tokens                       (top-level)
+  //   - DeepSeek:                     usage.prompt_cache_hit_tokens
+  //   - OpenRouter → Anthropic:       usage.cache_read_input_tokens
+  //                                   usage.cache_creation_input_tokens
   if (parsed.usage) {
+    const u = parsed.usage
+    const cacheRead =
+      u.prompt_tokens_details?.cached_tokens ??
+      u.cached_tokens ??
+      u.prompt_cache_hit_tokens ??
+      u.cache_read_input_tokens
+    const cacheWrite = u.cache_creation_input_tokens
     events.push({
       type: "usage",
       usage: {
-        prompt_tokens: parsed.usage.prompt_tokens,
-        completion_tokens: parsed.usage.completion_tokens,
-        total_tokens: parsed.usage.total_tokens,
-        cache_read_input_tokens:
-          parsed.usage.prompt_tokens_details?.cached_tokens,
+        prompt_tokens: u.prompt_tokens,
+        completion_tokens: u.completion_tokens,
+        total_tokens: u.total_tokens,
+        ...(cacheRead != null ? { cache_read_input_tokens: cacheRead } : {}),
+        ...(cacheWrite != null
+          ? { cache_creation_input_tokens: cacheWrite }
+          : {}),
       },
     })
   }

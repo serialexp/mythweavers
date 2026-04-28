@@ -1,7 +1,7 @@
-import { Show } from 'solid-js'
+import { Show, createEffect } from 'solid-js'
 import { Card, CardBody, LinkButton } from '@mythweavers/ui'
 import { Layout } from '../Layout'
-import type { ChapterContent, User } from '../../lib/api'
+import { readingStatusApi, type ChapterContent, type User } from '../../lib/api'
 import * as pageStyles from '../../styles/pages.css'
 import * as styles from '../../styles/story.css'
 import { ChapterScenes } from './ChapterScenes'
@@ -15,6 +15,17 @@ export interface ChapterPageProps {
 }
 
 export const ChapterPage = (props: ChapterPageProps) => {
+  // Record this chapter as the user's most-recently-read for the story.
+  // Fire-and-forget: failures (e.g. unauthenticated, story unpublished mid-read)
+  // shouldn't break the reading experience.
+  createEffect(() => {
+    if (!props.user || !props.chapter) return
+    const chapterId = props.chapter.id
+    void readingStatusApi.record(props.storyId, chapterId).catch((err) => {
+      console.warn('Failed to record reading status', err)
+    })
+  })
+
   return (
     <Layout initialTheme={props.initialTheme} user={props.user}>
       <div class={pageStyles.pageContainer}>

@@ -33,6 +33,18 @@ const arcSchema = z.strictObject({
     example: 0,
   }),
   nodeType: nodeTypeSchema,
+  defaultBackgroundFileId: z.string().nullable().meta({
+    description:
+      'Arc-level default background image file ID. Inherited downward by ' +
+      'chapters/scenes that do not set their own.',
+    example: 'clx1234567890',
+  }),
+  defaultBackgroundUrl: z.string().nullable().optional().meta({
+    description:
+      'Resolved URL of the arc-level default background (from the joined ' +
+      'file, if loaded).',
+    example: '/files/1/2025/12/forest.jpg',
+  }),
   deleted: z.boolean().meta({
     description: 'Whether the arc is soft-deleted',
     example: false,
@@ -129,8 +141,10 @@ const deleteArcResponseSchema = z.strictObject({
 
 // Helper to format arc for response
 function formatArc(arc: any) {
+  const { defaultBackgroundFile, ...rest } = arc
   return {
-    ...arc,
+    ...rest,
+    defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     createdAt: arc.createdAt.toISOString(),
     updatedAt: arc.updatedAt.toISOString(),
   }

@@ -2,7 +2,14 @@
 import '../styles/global.css'
 import { HomePage } from '../components/pages/HomePage'
 import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
-import { storiesApi, authApi, type PublicStory, type User } from '../lib/api'
+import {
+  storiesApi,
+  authApi,
+  readingStatusApi,
+  type PublicStory,
+  type ReadingStatusEntry,
+  type User,
+} from '../lib/api'
 
 // Read theme from cookie for SSR
 const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
@@ -11,14 +18,25 @@ const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightThem
 
 // Get user session from backend (pass cookie for SSR)
 let user: User | null = null
+const cookieHeader = Astro.request.headers.get('cookie') || ''
 try {
-  const cookieHeader = Astro.request.headers.get('cookie') || ''
   const session = await authApi.getSession(cookieHeader)
   if (session.authenticated && session.user) {
     user = session.user
   }
 } catch {
   // Not authenticated
+}
+
+// Continue Reading — only for logged-in users; cap to a few entries.
+let continueReading: ReadingStatusEntry[] = []
+if (user) {
+  try {
+    const result = await readingStatusApi.list(cookieHeader)
+    continueReading = result.entries.slice(0, 5)
+  } catch (error) {
+    console.error('Error fetching reading status:', error)
+  }
 }
 
 // Fetch stories
@@ -29,6 +47,7 @@ try {
 } catch (error) {
   console.error('Error fetching stories:', error)
 }
+
 ---
 
 <html lang="en" class={themeClass}>
@@ -40,6 +59,12 @@ try {
     <link rel="icon" href="/favicon.ico" />
   </head>
   <body>
-    <HomePage client:load initialTheme={initialTheme} user={user} stories={stories} />
+    <HomePage
+      client:load
+      initialTheme={initialTheme}
+      user={user}
+      stories={stories}
+      continueReading={continueReading}
+    />
   </body>
 </html>

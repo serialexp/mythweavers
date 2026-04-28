@@ -71,6 +71,18 @@ const sceneSchema = z.strictObject({
     description: 'When this scene occurs in story timeline (minutes)',
     example: 1440,
   }),
+  defaultBackgroundFileId: z.string().nullable().meta({
+    description:
+      'Scene-level default background image file ID. Innermost level — ' +
+      'overrides any inherited default at the start of this scene.',
+    example: 'clx1234567890',
+  }),
+  defaultBackgroundUrl: z.string().nullable().optional().meta({
+    description:
+      'Resolved URL of the scene-level default background (from the joined ' +
+      'file, if loaded).',
+    example: '/files/1/2025/12/forest.jpg',
+  }),
   deleted: z.boolean().meta({
     description: 'Whether the scene is soft-deleted',
     example: false,
@@ -243,8 +255,10 @@ const deleteSceneResponseSchema = z.strictObject({
 
 // Helper to format scene for response
 function formatScene(scene: any) {
+  const { defaultBackgroundFile, ...rest } = scene
   return {
-    ...scene,
+    ...rest,
+    defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     createdAt: scene.createdAt.toISOString(),
     updatedAt: scene.updatedAt.toISOString(),
   }

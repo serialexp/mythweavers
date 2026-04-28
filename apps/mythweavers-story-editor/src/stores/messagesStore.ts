@@ -180,6 +180,19 @@ saveService.setCallbacks({
     nodeStore.updateNodeNoSave(chapterId, { publishedAt })
     currentStoryStore.applyServerReleaseDates(releaseDates)
   },
+  onBackgroundChanged: (level, entityId, _storyId, backgroundFileId, backgroundUrl) => {
+    // Mirror the server's resolved fields back into the relevant store so
+    // subscribers (modal preview, future reader-preview) see the change
+    // without a full refetch.
+    if (level === 'story') {
+      currentStoryStore.applyServerBackground(backgroundFileId, backgroundUrl)
+    } else {
+      nodeStore.updateNodeNoSave(entityId, {
+        defaultBackgroundFileId: backgroundFileId,
+        defaultBackgroundUrl: backgroundUrl,
+      })
+    }
+  },
   getStorageMode: () => currentStoryStore.storageMode ?? null,
 })
 
@@ -1592,6 +1605,42 @@ export const messagesStore = {
 
     messagesStore.insertMessage(afterMessageId, backgroundMessage)
     return backgroundMessage.id
+  },
+
+  // Create an inline audio-embed message. Mirrors createBackgroundMessage:
+  // the file must already be uploaded via POST /my/files; we just attach its
+  // id + path. Unlike background, the reader doesn't carry audio forward —
+  // each embed plays only when the user explicitly hits play on its inline
+  // controls — so there is no extra carry-forward bookkeeping here.
+  createAudioMessage: (
+    afterMessageId: string | null,
+    file: { id: string; path: string },
+    nodeId?: string,
+  ) => {
+    let targetNodeId: string | undefined = nodeId
+    if (!targetNodeId && afterMessageId) {
+      const afterMessage = messagesState.messages.find((m) => m.id === afterMessageId)
+      targetNodeId = afterMessage?.sceneId
+    }
+    if (!targetNodeId) {
+      targetNodeId = nodeStore.selectedNodeId || undefined
+    }
+
+    const audioMessage: Message = {
+      id: generateMessageId(),
+      role: 'assistant',
+      type: 'audio',
+      content: '', // audio messages carry no narrative text
+      audioFileId: file.id,
+      audioFile: { id: file.id, path: file.path },
+      order: 0, // Will be set properly by insertMessage
+      sceneId: targetNodeId,
+      timestamp: new Date(),
+      isQuery: false,
+    }
+
+    messagesStore.insertMessage(afterMessageId, audioMessage)
+    return audioMessage.id
   },
 
   // Refresh messages from current story

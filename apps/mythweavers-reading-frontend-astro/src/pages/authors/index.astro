@@ -1,0 +1,49 @@
+---
+import '../../styles/global.css'
+import { AuthorsPage } from '../../components/pages/AuthorsPage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { authApi, authorsApi, type AuthorSummary, type User } from '../../lib/api'
+
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+let user: User | null = null
+const cookieHeader = Astro.request.headers.get('cookie') || ''
+try {
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated && session.user) user = session.user
+} catch {
+  // Not authenticated
+}
+
+const url = new URL(Astro.request.url)
+const search = url.searchParams.get('search') || ''
+
+let authors: AuthorSummary[] = []
+try {
+  const result = await authorsApi.list({ search: search || undefined, cookie: cookieHeader })
+  authors = result.authors
+} catch (error) {
+  console.error('Error fetching authors:', error)
+}
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Authors - MythWeavers</title>
+    <meta name="description" content="Browse authors on MythWeavers" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <AuthorsPage
+      client:load
+      initialTheme={initialTheme}
+      user={user}
+      authors={authors}
+      search={search}
+    />
+  </body>
+</html>

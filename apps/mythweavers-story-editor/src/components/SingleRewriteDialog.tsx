@@ -30,6 +30,7 @@ export function SingleRewriteDialog() {
   const [expandedSceneIds, setExpandedSceneIds] = createSignal<Set<string>>(new Set())
   const [isRewriting, setIsRewriting] = createSignal(false)
   const [rewriteResult, setRewriteResult] = createSignal<RewriteResult | null>(null)
+  const [activeTab, setActiveTab] = createSignal<'instructions' | 'context'>('instructions')
 
   // Check if we have a result to show (preview phase)
   const hasResult = () => rewriteResult() !== null
@@ -281,10 +282,60 @@ export function SingleRewriteDialog() {
         onClose={handleClose}
         title={hasResult() ? 'Review Rewrite' : 'Rewrite with Context'}
         size="xl"
+        footer={
+          <div
+            style={{
+              width: '100%',
+              display: 'flex',
+              'justify-content': 'space-between',
+              'align-items': 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <Show
+              when={hasResult()}
+              fallback={
+                <>
+                  <div class={styles.selectionInfo}>
+                    {singleRewriteDialogStore.selectedSceneIds.size} scene(s) selected for context
+                  </div>
+                  <div class={styles.footerActions}>
+                    <Button variant="secondary" onClick={handleClose} disabled={isRewriting()}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={handleRewrite}
+                      disabled={isRewriting() || !rewriteInstruction()}
+                    >
+                      {isRewriting() ? (
+                        <>
+                          <Spinner size="sm" /> Rewriting...
+                        </>
+                      ) : (
+                        'Rewrite'
+                      )}
+                    </Button>
+                  </div>
+                </>
+              }
+            >
+              <div class={styles.selectionInfo}>Review the proposed changes before accepting</div>
+              <div class={styles.footerActions}>
+                <Button variant="secondary" onClick={handleReject}>
+                  Reject
+                </Button>
+                <Button variant="primary" onClick={handleAccept}>
+                  Accept
+                </Button>
+              </div>
+            </Show>
+          </div>
+        }
       >
         {/* Preview Phase - Show diff with Accept/Reject */}
         <Show when={hasResult()}>
-          <div style={{ padding: '1rem' }}>
+          <div class={styles.phaseWrapper}>
             <div class={styles.previewContainer}>
               <div class={styles.diffContainer}>
                 {/* Original Content */}
@@ -321,25 +372,11 @@ export function SingleRewriteDialog() {
               </div>
             </div>
           </div>
-
-          <div class={styles.footer}>
-            <div class={styles.selectionInfo}>
-              Review the proposed changes before accepting
-            </div>
-            <div class={styles.footerActions}>
-              <Button variant="secondary" onClick={handleReject}>
-                Reject
-              </Button>
-              <Button variant="primary" onClick={handleAccept}>
-                Accept
-              </Button>
-            </div>
-          </div>
         </Show>
 
         {/* Input Phase - Select context and enter instructions */}
         <Show when={!hasResult()}>
-          <div style={{ padding: '1rem' }}>
+          <div class={styles.phaseWrapper}>
             <Show when={isRewriting()}>
               <div class={styles.loadingContainer}>
                 <Spinner size="md" />
@@ -348,9 +385,32 @@ export function SingleRewriteDialog() {
             </Show>
 
             <Show when={!isRewriting()}>
-              <div class={styles.twoColumnLayout}>
+              <div class={styles.tabBar} role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab() === 'instructions'}
+                  class={activeTab() === 'instructions' ? styles.tabButtonActive : styles.tabButton}
+                  onClick={() => setActiveTab('instructions')}
+                >
+                  Instructions
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab() === 'context'}
+                  class={activeTab() === 'context' ? styles.tabButtonActive : styles.tabButton}
+                  onClick={() => setActiveTab('context')}
+                >
+                  Context Scenes
+                  <Show when={singleRewriteDialogStore.selectedSceneIds.size > 0}>
+                    {' '}({singleRewriteDialogStore.selectedSceneIds.size})
+                  </Show>
+                </button>
+              </div>
+              <div class={styles.twoColumnLayout} data-active-tab={activeTab()}>
                 {/* Left column: Scene selection */}
-                <div class={styles.column}>
+                <div class={`${styles.column} ${styles.columnContext}`}>
                   <div class={styles.columnHeader}>
                     Context Scenes
                     <Show when={singleRewriteDialogStore.selectedSceneIds.size > 0}>
@@ -429,7 +489,7 @@ export function SingleRewriteDialog() {
                 </div>
 
                 {/* Right column: Message and instruction */}
-                <div class={styles.column}>
+                <div class={`${styles.column} ${styles.columnInstructions}`}>
                   <div class={styles.columnHeader}>Rewrite Message</div>
 
                   <div class={styles.instructionArea}>
@@ -438,7 +498,7 @@ export function SingleRewriteDialog() {
                       value={rewriteInstruction()}
                       onInput={(e) => setRewriteInstruction(e.currentTarget.value)}
                       placeholder='e.g., "Make this character remember meeting Ahsoka in the earlier scene"'
-                      rows={3}
+                      rows={6}
                     />
                   </div>
 
@@ -461,30 +521,6 @@ export function SingleRewriteDialog() {
                 </div>
               </div>
             </Show>
-          </div>
-
-          <div class={styles.footer}>
-            <div class={styles.selectionInfo}>
-              {singleRewriteDialogStore.selectedSceneIds.size} scene(s) selected for context
-            </div>
-            <div class={styles.footerActions}>
-              <Button variant="secondary" onClick={handleClose} disabled={isRewriting()}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleRewrite}
-                disabled={isRewriting() || !rewriteInstruction()}
-              >
-                {isRewriting() ? (
-                  <>
-                    <Spinner size="sm" /> Rewriting...
-                  </>
-                ) : (
-                  'Rewrite'
-                )}
-              </Button>
-            </div>
           </div>
         </Show>
       </Modal>

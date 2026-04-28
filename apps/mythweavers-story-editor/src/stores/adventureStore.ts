@@ -20,6 +20,7 @@ interface AdventureState {
   compactions: Record<string, AdventureCompaction>
   directive: string
   worldBible: string
+  autoAdvanceWorld: boolean
 
   // Generation state
   isGenerating: boolean
@@ -69,6 +70,7 @@ const [state, setState] = createStore<AdventureState>({
   compactions: {},
   directive: '',
   worldBible: '',
+  autoAdvanceWorld: false,
 
   isGenerating: false,
   streamingContent: '',
@@ -118,6 +120,9 @@ export const adventureStore = {
   },
   get worldBible() {
     return state.worldBible
+  },
+  get autoAdvanceWorld() {
+    return state.autoAdvanceWorld
   },
 
   get isGenerating() {
@@ -200,6 +205,9 @@ export const adventureStore = {
   },
   setWorldBible(v: string) {
     setState('worldBible', v)
+  },
+  setAutoAdvanceWorld(v: boolean) {
+    setState('autoAdvanceWorld', v)
   },
 
   setIsGenerating(v: boolean) {
@@ -322,6 +330,7 @@ export const adventureStore = {
       compactions: { ...state.compactions },
       directive: state.directive,
       worldBible: state.worldBible,
+      autoAdvanceWorld: state.autoAdvanceWorld,
       ...(action ? { pendingAction: action } : {}),
     }
   },
@@ -361,6 +370,7 @@ export const adventureStore = {
         settingDescription: saved?.settingDescription ?? '',
         directive: saved?.directive ?? '',
         worldBible: saved?.worldBible ?? '',
+        autoAdvanceWorld: saved?.autoAdvanceWorld ?? false,
 
         isGenerating: false,
         streamingContent: '',
@@ -400,6 +410,7 @@ export const adventureStore = {
         settingDescription: '',
         directive: '',
         worldBible: '',
+        autoAdvanceWorld: false,
 
         isGenerating: false,
         streamingContent: '',

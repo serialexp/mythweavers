@@ -6,7 +6,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "generate:client": "openapi-ts -i http://localhost:3201/docs/openapi.json -o src/api-client"
   },
   "dependencies": {
     "@astrojs/node": "^9.0.0",
@@ -18,6 +19,7 @@
     "solid-js": "^1.9.5"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.88.0",
     "@vanilla-extract/vite-plugin": "^4.0.20",
     "typescript": "^5.7.0",
     "vite": "^6.4.0"

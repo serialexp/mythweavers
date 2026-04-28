@@ -33,6 +33,7 @@ import myPathSegmentsRoutes from '../src/routes/my/path-segments.js'
 import myPathsRoutes from '../src/routes/my/paths.js'
 import myPawnsRoutes from '../src/routes/my/pawns.js'
 import myPlotPointStatesRoutes from '../src/routes/my/plot-point-states.js'
+import myBackgroundRoutes from '../src/routes/my/background.js'
 import myPublishingRoutes from '../src/routes/my/publishing.js'
 import myRoyalRoadRoutes from '../src/routes/my/royal-road.js'
 import myScenesRoutes from '../src/routes/my/scenes.js'
@@ -46,9 +47,12 @@ import myBalanceRoutes from '../src/routes/my/balance.js'
 import myPreferencesRoutes from '../src/routes/my/preferences.js'
 import myUsageRoutes from '../src/routes/my/usage.js'
 import myLlmRoutes from '../src/routes/my/llm.js'
+import myBookshelfRoutes from '../src/routes/my/bookshelf.js'
+import myReadingStatusRoutes from '../src/routes/my/reading-status.js'
 import adminLlmRoutes from '../src/routes/admin/llm.js'
 import adminUsersRoutes from '../src/routes/admin/users.js'
 import publicStoriesRoutes from '../src/routes/stories/public.js'
+import publicAuthorsRoutes from '../src/routes/authors/public.js'
 import publicTagRoutes from '../src/routes/tags/public.js'
 
 let cachedApp: Awaited<ReturnType<typeof buildAppInternal>> | null = null
@@ -161,15 +165,19 @@ async function buildAppInternal() {
   await app.register(myPathSegmentsRoutes, { prefix: '/my' })
   await app.register(myPlotPointStatesRoutes, { prefix: '/my' })
   await app.register(myPublishingRoutes, { prefix: '/my' })
+  await app.register(myBackgroundRoutes, { prefix: '/my' })
   await app.register(myRoyalRoadRoutes, { prefix: '/my' })
   await app.register(myExportStoryRoutes, { prefix: '/my' })
   await app.register(myBalanceRoutes, { prefix: '/my' })
   await app.register(myPreferencesRoutes, { prefix: '/my' })
   await app.register(myUsageRoutes, { prefix: '/my' })
   await app.register(myLlmRoutes, { prefix: '/my' })
+  await app.register(myBookshelfRoutes, { prefix: '/my' })
+  await app.register(myReadingStatusRoutes, { prefix: '/my' })
   await app.register(adminLlmRoutes, { prefix: '/admin' })
   await app.register(adminUsersRoutes, { prefix: '/admin' })
   await app.register(publicStoriesRoutes, { prefix: '/stories' })
+  await app.register(publicAuthorsRoutes, { prefix: '/authors' })
   await app.register(publicTagRoutes, { prefix: '' })
   await app.register(calendarPresetsRoutes, { prefix: '/calendars' })
 

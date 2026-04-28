@@ -14,6 +14,17 @@ export interface AdventureTurn {
   narrative: string
   /** Hidden steering roll applied to this turn. Undefined for the opening turn. */
   steering?: SteeringBucket
+  /**
+   * Which phase of a player input produced this turn.
+   * - 'resolution' (default): pass 1 — narrates the direct consequences of
+   *   `playerAction`. Also used for the opening turn and for legacy turns
+   *   saved before the two-pass split.
+   * - 'world-step': pass 2 — NPC/world reactions after the resolution.
+   *   `playerAction` is always null on these. Runs automatically when the
+   *   story's `autoAdvanceWorld` setting is on, or on demand via the
+   *   "Advance world" button.
+   */
+  kind?: 'resolution' | 'world-step'
 }
 
 export interface AdventureCompaction {
@@ -33,6 +44,13 @@ export interface PersistedState {
   directive?: string
   worldBible?: string
   pendingAction?: string | null
+  /**
+   * When true, the engine automatically fires the world-step (pass 2)
+   * generation after the resolution pass for every player input.
+   * Default: false (scene waits for the player; world can still be
+   * stepped manually via "Advance world").
+   */
+  autoAdvanceWorld?: boolean
 }
 
 // --- localStorage helpers (offline / crash recovery) ---

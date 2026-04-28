@@ -108,6 +108,20 @@ export async function requireAuth(request: FastifyRequest, _reply: FastifyReply)
 }
 
 /**
+ * Optional-auth middleware. Attaches `request.user` if a valid session
+ * cookie is present, but does NOT reject the request when no user is
+ * found. Use on endpoints that serve both anonymous and authenticated
+ * traffic (e.g. public file reads where the handler itself decides
+ * whether to allow access based on the resource's visibility flag).
+ */
+export async function attachUser(request: FastifyRequest, _reply: FastifyReply) {
+  const user = await getUserFromSession(request)
+  if (user) {
+    request.user = user
+  }
+}
+
+/**
  * Admin middleware that requires an authenticated admin user.
  * Throws 401 if not authenticated, 403 if not admin.
  */

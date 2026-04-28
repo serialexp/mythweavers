@@ -47,10 +47,12 @@ export interface Message {
   isCompacted?: boolean // True if this is a compacted summary message
   compactedMessageIds?: string[] // IDs of messages this compaction represents
   script?: string // JavaScript to execute for this turn, modifying the data object
-  type?: 'chapter' | 'event' | 'branch' | 'background' | null // Message type: null for normal, 'chapter' for chapter markers, 'event' for script events, 'branch' for branch points, 'background' for reader background-image changes
+  type?: 'chapter' | 'event' | 'branch' | 'background' | 'audio' | null // Message type: null for normal, 'chapter' for chapter markers, 'event' for script events, 'branch' for branch points, 'background' for reader background-image changes, 'audio' for inline reader audio embeds
   options?: BranchOption[] // Branch options - only for branch messages
   backgroundFileId?: string | null // File ID for the background image — only for 'background' messages
   backgroundFile?: { id: string; path: string } | null // Hydrated background file (id + URL) — only for 'background' messages
+  audioFileId?: string | null // File ID for the audio embed — only for 'audio' messages
+  audioFile?: { id: string; path: string } | null // Hydrated audio file (id + URL) — only for 'audio' messages
   sceneId?: string // References the scene this message belongs to
   currentMessageRevisionId?: string | null // ID of the current message revision (needed for paragraph operations)
   contentVersion?: number // Ephemeral counter bumped when external content should be accepted by the editor
@@ -172,6 +174,13 @@ export interface Node {
   // is the file ID to persist on update.
   coverArtFileId?: string | null
   coverArtUrl?: string | null
+
+  // Default background image for narrative-position resolution. When set on
+  // any node level (book/arc/chapter/scene), it "fires" a background change
+  // at that node boundary; inheritance fills in the resolved file but only
+  // explicit defaults emit a change event in the reader.
+  defaultBackgroundFileId?: string | null
+  defaultBackgroundUrl?: string | null
 
   // Metadata
   createdAt: Date

@@ -5,10 +5,11 @@ import { charactersStore } from '../stores/charactersStore'
 import type { Character } from '../types/core'
 import { getCharacterDisplayName, parseCharacterName } from '../utils/character'
 import { generateMessageId } from '../utils/id'
+import { resolveStoryImageUrl } from '../utils/uploadStoryImage'
 import * as styles from './Characters.css'
 import { EJSCodeEditor } from './EJSCodeEditor'
 import { EJSRenderer } from './EJSRenderer'
-import { ImageCropModal } from './ImageCropModal'
+import { FilePicker } from './FilePicker'
 import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { StoryTimePicker } from './StoryTimePicker'
 import { TemplateChangeRequest } from './TemplateChangeRequest'
@@ -32,13 +33,18 @@ export const Characters: Component<CharactersProps> = (props) => {
   const [editDescription, setEditDescription] = createSignal('')
   const [editBirthdate, setEditBirthdate] = createSignal<number | undefined>(undefined)
   const [showEditBirthdatePicker, setShowEditBirthdatePicker] = createSignal(false)
-  const [newCharacterImageData, setNewCharacterImageData] = createSignal<string | null>(null)
-  const [editProfileImageData, setEditProfileImageData] = createSignal<string | null | undefined>(undefined)
-  const [editProfileImagePreview, setEditProfileImagePreview] = createSignal<string | null>(null)
+  // New-character image state. We track file id + resolved URL together so the
+  // saveService receives a real pictureFileId and the preview shows the same
+  // image without a round-trip. The image picker uploads (and crops) before
+  // handing us the file, so we never carry around base64 data here anymore.
+  const [newPictureFileId, setNewPictureFileId] = createSignal<string | null>(null)
+  const [newPictureUrl, setNewPictureUrl] = createSignal<string | null>(null)
 
-  // Image crop modal state
-  const [cropModalImage, setCropModalImage] = createSignal<string | null>(null)
-  const [cropModalMode, setCropModalMode] = createSignal<'new' | 'edit'>('new')
+  // Edit-character image state. `editPictureChanged` distinguishes "no change"
+  // (don't touch the persisted picture) from "explicitly cleared" (send null).
+  const [editPictureFileId, setEditPictureFileId] = createSignal<string | null>(null)
+  const [editPictureUrl, setEditPictureUrl] = createSignal<string | null>(null)
+  const [editPictureChanged, setEditPictureChanged] = createSignal(false)
 
   let panelRef: ListDetailPanelRef | undefined
   let newEditorRef: { insertAtCursor: (text: string) => void } | null = null
@@ -69,14 +75,18 @@ export const Characters: Component<CharactersProps> = (props) => {
       description,
       birthdate: newCharacterBirthdate(),
       isMainCharacter: false,
-      profileImageData: newCharacterImageData(),
+      // The picker has already uploaded the file, so we just attach its id and
+      // point profileImageData at the resolved URL for immediate display.
+      pictureFileId: newPictureFileId() ?? undefined,
+      profileImageData: newPictureUrl(),
     }
 
     charactersStore.addCharacter(character)
     setNewCharacterName('')
     setNewCharacterDescription('')
     setNewCharacterBirthdate(undefined)
-    setNewCharacterImageData(null)
+    setNewPictureFileId(null)
+    setNewPictureUrl(null)
     panelRef?.select(character.id)
   }
 
@@ -85,8 +95,12 @@ export const Characters: Component<CharactersProps> = (props) => {
       setEditName(getCharacterDisplayName(character))
       setEditDescription(character.description ?? '')
       setEditBirthdate(character.birthdate ?? undefined)
-      setEditProfileImagePreview(character.profileImageData ?? null)
-      setEditProfileImageData(undefined)
+      // Seed the picker with the character's existing file id (so the matching
+      // tile is highlighted) and its current image URL for the preview. The
+      // "changed" flag stays false until the user actually picks/clears.
+      setEditPictureFileId(character.pictureFileId ?? null)
+      setEditPictureUrl(character.profileImageData ?? null)
+      setEditPictureChanged(false)
       setEditingId(character.id)
     })
   }
@@ -106,11 +120,12 @@ export const Characters: Component<CharactersProps> = (props) => {
       birthdate: editBirthdate(),
     }
 
-    if (editProfileImageData() !== undefined) {
-      updates.profileImageData = editProfileImageData()
-      if (editProfileImageData() === null) {
-        updates.pictureFileId = null
-      }
+    // Only push the image fields when the user actually touched the picker —
+    // otherwise an unchanged edit would clobber the persisted picture with the
+    // currently-displayed URL string and lose the canonical file id linkage.
+    if (editPictureChanged()) {
+      updates.pictureFileId = editPictureFileId()
+      updates.profileImageData = editPictureUrl()
     }
 
     charactersStore.updateCharacter(editingId(), updates)
@@ -118,8 +133,9 @@ export const Characters: Component<CharactersProps> = (props) => {
     setEditName('')
     setEditDescription('')
     setEditBirthdate(undefined)
-    setEditProfileImagePreview(null)
-    setEditProfileImageData(undefined)
+    setEditPictureFileId(null)
+    setEditPictureUrl(null)
+    setEditPictureChanged(false)
   }
 
   const cancelEdit = () => {
@@ -127,8 +143,9 @@ export const Characters: Component<CharactersProps> = (props) => {
     setEditName('')
     setEditDescription('')
     setEditBirthdate(undefined)
-    setEditProfileImagePreview(null)
-    setEditProfileImageData(undefined)
+    setEditPictureFileId(null)
+    setEditPictureUrl(null)
+    setEditPictureChanged(false)
   }
 
   const handleKeyPress = (e: KeyboardEvent, action: () => void) => {
@@ -143,59 +160,29 @@ export const Characters: Component<CharactersProps> = (props) => {
     }
   }
 
-  const handleNewImageSelect = (event: Event) => {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (file?.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setCropModalImage(reader.result)
-          setCropModalMode('new')
-        }
-      }
-      reader.readAsDataURL(file)
-    }
-    input.value = ''
-  }
-
-  const handleEditImageSelect = (event: Event) => {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (file?.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setCropModalImage(reader.result)
-          setCropModalMode('edit')
-        }
-      }
-      reader.readAsDataURL(file)
-    }
-    input.value = ''
-  }
-
-  const handleCropConfirm = (croppedImage: string) => {
-    if (cropModalMode() === 'new') {
-      setNewCharacterImageData(croppedImage)
-    } else {
-      setEditProfileImagePreview(croppedImage)
-      setEditProfileImageData(croppedImage)
-    }
-    setCropModalImage(null)
-  }
-
-  const handleCropCancel = () => {
-    setCropModalImage(null)
+  // Picker callbacks: a `file` arrives when the user selects an existing tile
+  // or finishes uploading + cropping a new one. Either way we just record the
+  // id and (resolved) URL.
+  const handleNewPicked = (file: { id: string; path: string }) => {
+    setNewPictureFileId(file.id)
+    setNewPictureUrl(resolveStoryImageUrl(file.path))
   }
 
   const clearNewImage = () => {
-    setNewCharacterImageData(null)
+    setNewPictureFileId(null)
+    setNewPictureUrl(null)
+  }
+
+  const handleEditPicked = (file: { id: string; path: string }) => {
+    setEditPictureFileId(file.id)
+    setEditPictureUrl(resolveStoryImageUrl(file.path))
+    setEditPictureChanged(true)
   }
 
   const clearEditImage = () => {
-    setEditProfileImagePreview(null)
-    setEditProfileImageData(null)
+    setEditPictureFileId(null)
+    setEditPictureUrl(null)
+    setEditPictureChanged(true)
   }
 
   const getAvatarInitial = (name: string) => {
@@ -269,21 +256,17 @@ export const Characters: Component<CharactersProps> = (props) => {
                 />
                 <div class={styles.imageSection}>
                   <div class={styles.imagePreview}>
-                    <Show when={editProfileImagePreview()}>
+                    <Show when={editPictureUrl()}>
                       {(image) => <img src={image()} alt="Character preview" class={styles.imagePreviewImage} />}
                     </Show>
-                    <Show when={!editProfileImagePreview()}>
+                    <Show when={!editPictureUrl()}>
                       <div class={styles.imagePlaceholder}>
                         {getAvatarInitial(editName() || getCharacterDisplayName(char))}
                       </div>
                     </Show>
                   </div>
                   <div class={styles.imageControls}>
-                    <label class={styles.imageUploadButton}>
-                      Upload Image
-                      <input type="file" accept="image/*" onChange={handleEditImageSelect} style={{ display: 'none' }} />
-                    </label>
-                    <Show when={editProfileImagePreview()}>
+                    <Show when={editPictureUrl()}>
                       <button
                         type="button"
                         class={styles.imageRemoveButton}
@@ -295,6 +278,13 @@ export const Characters: Component<CharactersProps> = (props) => {
                     </Show>
                   </div>
                 </div>
+                <FilePicker
+                  selectedFileId={editPictureFileId()}
+                  onSelect={handleEditPicked}
+                  onUpload={handleEditPicked}
+                  mimePrefix="image/"
+                  cropConfig={{ aspectRatio: 1, circular: true, outputSize: 256 }}
+                />
                 <EJSCodeEditor
                   value={editDescription()}
                   onChange={setEditDescription}
@@ -414,19 +404,15 @@ export const Characters: Component<CharactersProps> = (props) => {
             />
             <div class={styles.imageSection}>
               <div class={styles.imagePreview}>
-                <Show when={newCharacterImageData()}>
+                <Show when={newPictureUrl()}>
                   {(image) => <img src={image()} alt="New character preview" class={styles.imagePreviewImage} />}
                 </Show>
-                <Show when={!newCharacterImageData()}>
+                <Show when={!newPictureUrl()}>
                   <div class={styles.imagePlaceholder}>{getAvatarInitial(newCharacterName() || '?')}</div>
                 </Show>
               </div>
               <div class={styles.imageControls}>
-                <label class={styles.imageUploadButton}>
-                  Upload Image
-                  <input type="file" accept="image/*" onChange={handleNewImageSelect} style={{ display: 'none' }} />
-                </label>
-                <Show when={newCharacterImageData()}>
+                <Show when={newPictureUrl()}>
                   <button
                     type="button"
                     class={styles.imageRemoveButton}
@@ -438,6 +424,13 @@ export const Characters: Component<CharactersProps> = (props) => {
                 </Show>
               </div>
             </div>
+            <FilePicker
+              selectedFileId={newPictureFileId()}
+              onSelect={handleNewPicked}
+              onUpload={handleNewPicked}
+              mimePrefix="image/"
+              cropConfig={{ aspectRatio: 1, circular: true, outputSize: 256 }}
+            />
             <EJSCodeEditor
               value={newCharacterDescription()}
               onChange={setNewCharacterDescription}
@@ -494,16 +487,6 @@ export const Characters: Component<CharactersProps> = (props) => {
             </Button>
           </div>
         )}
-      />
-
-      <ImageCropModal
-        isOpen={cropModalImage() !== null}
-        imageSrc={cropModalImage()}
-        onConfirm={handleCropConfirm}
-        onCancel={handleCropCancel}
-        aspectRatio={1}
-        circular={true}
-        outputSize={256}
       />
     </Show>
   )

@@ -49,6 +49,11 @@ import {
   patchMyChaptersByChapterIdPublishing,
   postMyChaptersByChapterIdPublishNow,
   postMyChaptersByChapterIdUnpublish,
+  patchMyStoriesByStoryIdBackground,
+  patchMyBooksByBookIdBackground,
+  patchMyArcsByArcIdBackground,
+  patchMyChaptersByChapterIdBackground,
+  patchMyScenesBySceneIdBackground,
   getApiBaseUrl,
 } from '../client/config'
 import { VersionConflictError } from '../types/api'
@@ -121,7 +126,7 @@ interface MessageBatchOperation extends SaveOperationBase {
       sortOrder: number
       instruction?: string | null
       script?: string | null
-      type?: 'chapter' | 'event' | 'branch' | 'background' | null
+      type?: 'chapter' | 'event' | 'branch' | 'background' | 'audio' | null
       options?: Array<{
         id: string
         label: string
@@ -130,6 +135,7 @@ interface MessageBatchOperation extends SaveOperationBase {
         description?: string
       }>
       backgroundFileId?: string | null
+      audioFileId?: string | null
       paragraphs?: Array<{ body: string; sortOrder: number }>
     }>
   }
@@ -380,6 +386,43 @@ interface ChapterPublishingOperation extends SaveOperationBase {
     | { mode: 'schedule'; publishedAt: string }
 }
 
+// Default-background operations. These wrap the /my/{stories|books|arcs|chapters|scenes}/:id/background
+// PATCH endpoints. Each entity level has its own operation kind so the queue
+// dedupes per-entity (so a rapid double-click only fires the latest pick).
+//
+// `backgroundFileId: null` clears the default and means "no fire" at this node.
+type BackgroundData = { backgroundFileId: string | null }
+
+interface StoryBackgroundOperation extends SaveOperationBase {
+  type: 'story-background'
+  entityType: 'story-background'
+  data: BackgroundData
+}
+
+interface BookBackgroundOperation extends SaveOperationBase {
+  type: 'book-background'
+  entityType: 'book-background'
+  data: BackgroundData
+}
+
+interface ArcBackgroundOperation extends SaveOperationBase {
+  type: 'arc-background'
+  entityType: 'arc-background'
+  data: BackgroundData
+}
+
+interface ChapterBackgroundOperation extends SaveOperationBase {
+  type: 'chapter-background'
+  entityType: 'chapter-background'
+  data: BackgroundData
+}
+
+interface SceneBackgroundOperation extends SaveOperationBase {
+  type: 'scene-background'
+  entityType: 'scene-background'
+  data: BackgroundData
+}
+
 // Discriminated union of all save operations
 type SaveOperation =
   | MessageInsertOperation
@@ -418,6 +461,11 @@ type SaveOperation =
   | StorySettingsOperation
   | StoryPublishingOperation
   | ChapterPublishingOperation
+  | StoryBackgroundOperation
+  | BookBackgroundOperation
+  | ArcBackgroundOperation
+  | ChapterBackgroundOperation
+  | SceneBackgroundOperation
 
 // Helper type to extract operation type string
 type SaveOperationType = SaveOperation['type']
@@ -456,6 +504,13 @@ export class SaveService {
       lastChapterReleasedAt: string | null
     },
   ) => void
+  private onBackgroundChanged?: (
+    entityType: 'story' | 'book' | 'arc' | 'chapter' | 'scene',
+    entityId: string,
+    storyId: string,
+    backgroundFileId: string | null,
+    backgroundUrl: string | null,
+  ) => void
   private getStorageMode?: () => 'local' | 'server' | null
 
   // Set callbacks for UI updates
@@ -477,6 +532,13 @@ export class SaveService {
         lastChapterReleasedAt: string | null
       },
     ) => void
+    onBackgroundChanged?: (
+      entityType: 'story' | 'book' | 'arc' | 'chapter' | 'scene',
+      entityId: string,
+      storyId: string,
+      backgroundFileId: string | null,
+      backgroundUrl: string | null,
+    ) => void
     getStorageMode?: () => 'local' | 'server' | null
   }) {
     this.onSaveStatusChange = callbacks.onSaveStatusChange
@@ -488,6 +550,7 @@ export class SaveService {
     this.onLastKnownUpdatedAtChange = callbacks.onLastKnownUpdatedAtChange
     this.onStoryPublishingChanged = callbacks.onStoryPublishingChanged
     this.onChapterPublishingChanged = callbacks.onChapterPublishingChanged
+    this.onBackgroundChanged = callbacks.onBackgroundChanged
     this.getStorageMode = callbacks.getStorageMode
   }
 
@@ -741,6 +804,7 @@ export class SaveService {
             type: operation.data.type ?? undefined,
             options: operation.data.options,
             backgroundFileId: operation.data.backgroundFileId ?? undefined,
+            audioFileId: operation.data.audioFileId ?? undefined,
           } as {
             instruction?: string
             script?: string
@@ -750,6 +814,7 @@ export class SaveService {
             type?: string
             options?: Array<{ id: string; label: string; targetNodeId: string; targetMessageId: string; description?: string }>
             backgroundFileId?: string
+            audioFileId?: string
           },
         })
         if (insertResponse.data?.message) {
@@ -783,7 +848,11 @@ export class SaveService {
             type: operation.data.type,
             options: operation.data.options,
             backgroundFileId: operation.data.backgroundFileId,
-          } as Parameters<typeof patchMyMessagesById>[0]['body'] & { backgroundFileId?: string | null },
+            audioFileId: operation.data.audioFileId,
+          } as Parameters<typeof patchMyMessagesById>[0]['body'] & {
+            backgroundFileId?: string | null
+            audioFileId?: string | null
+          },
         })
         // Message updated
         if (updateResponse.data?.message) {
@@ -1473,6 +1542,90 @@ export class SaveService {
         break
       }
 
+      case 'story-background': {
+        const res = await patchMyStoriesByStoryIdBackground({
+          path: { storyId },
+          body: { backgroundFileId: operation.data.backgroundFileId },
+        })
+        if (res.error) throw new Error((res.error as any).error || 'Failed to update story background')
+        this.onBackgroundChanged?.(
+          'story',
+          storyId,
+          storyId,
+          res.data?.defaultBackgroundFileId ?? null,
+          res.data?.defaultBackgroundFile?.path ?? null,
+        )
+        break
+      }
+
+      case 'book-background': {
+        const bookId = entityId
+        const res = await patchMyBooksByBookIdBackground({
+          path: { bookId },
+          body: { backgroundFileId: operation.data.backgroundFileId },
+        })
+        if (res.error) throw new Error((res.error as any).error || 'Failed to update book background')
+        this.onBackgroundChanged?.(
+          'book',
+          bookId,
+          storyId,
+          res.data?.defaultBackgroundFileId ?? null,
+          res.data?.defaultBackgroundFile?.path ?? null,
+        )
+        break
+      }
+
+      case 'arc-background': {
+        const arcId = entityId
+        const res = await patchMyArcsByArcIdBackground({
+          path: { arcId },
+          body: { backgroundFileId: operation.data.backgroundFileId },
+        })
+        if (res.error) throw new Error((res.error as any).error || 'Failed to update arc background')
+        this.onBackgroundChanged?.(
+          'arc',
+          arcId,
+          storyId,
+          res.data?.defaultBackgroundFileId ?? null,
+          res.data?.defaultBackgroundFile?.path ?? null,
+        )
+        break
+      }
+
+      case 'chapter-background': {
+        const chapterId = entityId
+        const res = await patchMyChaptersByChapterIdBackground({
+          path: { chapterId },
+          body: { backgroundFileId: operation.data.backgroundFileId },
+        })
+        if (res.error) throw new Error((res.error as any).error || 'Failed to update chapter background')
+        this.onBackgroundChanged?.(
+          'chapter',
+          chapterId,
+          storyId,
+          res.data?.defaultBackgroundFileId ?? null,
+          res.data?.defaultBackgroundFile?.path ?? null,
+        )
+        break
+      }
+
+      case 'scene-background': {
+        const sceneId = entityId
+        const res = await patchMyScenesBySceneIdBackground({
+          path: { sceneId },
+          body: { backgroundFileId: operation.data.backgroundFileId },
+        })
+        if (res.error) throw new Error((res.error as any).error || 'Failed to update scene background')
+        this.onBackgroundChanged?.(
+          'scene',
+          sceneId,
+          storyId,
+          res.data?.defaultBackgroundFileId ?? null,
+          res.data?.defaultBackgroundFile?.path ?? null,
+        )
+        break
+      }
+
       default: {
         // Exhaustive check - this should never be reached
         const _exhaustive: never = operation
@@ -1877,6 +2030,59 @@ export class SaveService {
       entityId: chapterId,
       storyId,
       data,
+    })
+  }
+
+  // Default-background operations. Same dedupe pattern as publishing — the
+  // queue collapses repeat picks per (entityType, entityId), so a rapid
+  // sequence of clicks resolves to the latest selection.
+  saveStoryBackground(storyId: string, backgroundFileId: string | null): Promise<void> {
+    return this.queueSave({
+      type: 'story-background',
+      entityType: 'story-background',
+      entityId: storyId,
+      storyId,
+      data: { backgroundFileId },
+    })
+  }
+
+  saveBookBackground(storyId: string, bookId: string, backgroundFileId: string | null): Promise<void> {
+    return this.queueSave({
+      type: 'book-background',
+      entityType: 'book-background',
+      entityId: bookId,
+      storyId,
+      data: { backgroundFileId },
+    })
+  }
+
+  saveArcBackground(storyId: string, arcId: string, backgroundFileId: string | null): Promise<void> {
+    return this.queueSave({
+      type: 'arc-background',
+      entityType: 'arc-background',
+      entityId: arcId,
+      storyId,
+      data: { backgroundFileId },
+    })
+  }
+
+  saveChapterBackground(storyId: string, chapterId: string, backgroundFileId: string | null): Promise<void> {
+    return this.queueSave({
+      type: 'chapter-background',
+      entityType: 'chapter-background',
+      entityId: chapterId,
+      storyId,
+      data: { backgroundFileId },
+    })
+  }
+
+  saveSceneBackground(storyId: string, sceneId: string, backgroundFileId: string | null): Promise<void> {
+    return this.queueSave({
+      type: 'scene-background',
+      entityType: 'scene-background',
+      entityId: sceneId,
+      storyId,
+      data: { backgroundFileId },
     })
   }
 
@@ -2405,7 +2611,7 @@ export class SaveService {
       instruction?: string
       script?: string
       content?: string // Will be split into paragraphs
-      type?: 'chapter' | 'event' | 'branch' | 'background' | null
+      type?: 'chapter' | 'event' | 'branch' | 'background' | 'audio' | null
       options?: Array<{
         id: string
         label: string
@@ -2414,6 +2620,7 @@ export class SaveService {
         description?: string
       }>
       backgroundFileId?: string | null
+      audioFileId?: string | null
     }>,
   ): Promise<void> {
     // Transform messages to API format, splitting content into paragraphs
@@ -2439,6 +2646,7 @@ export class SaveService {
         type: msg.type ?? null,
         options: msg.options,
         backgroundFileId: msg.backgroundFileId ?? null,
+        audioFileId: msg.audioFileId ?? null,
         paragraphs,
       }
     })

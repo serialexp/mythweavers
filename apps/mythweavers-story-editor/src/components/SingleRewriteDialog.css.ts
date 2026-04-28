@@ -1,12 +1,89 @@
 import { style } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
 
+export const phaseWrapper = style({
+  padding: '1rem',
+  '@media': {
+    '(max-width: 768px)': {
+      padding: 0,
+    },
+  },
+})
+
 export const twoColumnLayout = style({
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
   gap: '1rem',
   height: '60vh',
   minHeight: '400px',
+  '@media': {
+    '(max-width: 768px)': {
+      gridTemplateColumns: '1fr',
+      height: '70vh',
+      minHeight: 0,
+    },
+  },
+})
+
+export const tabBar = style({
+  display: 'none',
+  '@media': {
+    '(max-width: 768px)': {
+      display: 'flex',
+      gap: '0.25rem',
+      marginBottom: '0.75rem',
+      borderBottom: `1px solid ${tokens.color.border.default}`,
+    },
+  },
+})
+
+export const tabButton = style({
+  flex: 1,
+  padding: '0.5rem 0.75rem',
+  background: 'transparent',
+  border: 'none',
+  borderBottom: '2px solid transparent',
+  marginBottom: '-1px',
+  cursor: 'pointer',
+  fontSize: '0.875rem',
+  fontWeight: 500,
+  color: tokens.color.text.secondary,
+  transition: 'all 0.15s ease',
+  ':hover': {
+    color: tokens.color.text.primary,
+  },
+})
+
+export const tabButtonActive = style([
+  tabButton,
+  {
+    color: tokens.color.text.primary,
+    borderBottomColor: tokens.color.accent.primary,
+  },
+])
+
+export const columnContext = style({
+  '@media': {
+    '(max-width: 768px)': {
+      selectors: {
+        '[data-active-tab="instructions"] &': {
+          display: 'none',
+        },
+      },
+    },
+  },
+})
+
+export const columnInstructions = style({
+  '@media': {
+    '(max-width: 768px)': {
+      selectors: {
+        '[data-active-tab="context"] &': {
+          display: 'none',
+        },
+      },
+    },
+  },
 })
 
 export const column = style({
@@ -23,6 +100,11 @@ export const columnHeader = style({
   paddingBottom: '0.5rem',
   borderBottom: `1px solid ${tokens.color.border.default}`,
   flexShrink: 0,
+  '@media': {
+    '(max-width: 768px)': {
+      display: 'none',
+    },
+  },
 })
 
 export const searchInput = style({

@@ -232,11 +232,15 @@ const App: Component = () => {
         lastChapterReleasedAt: story.lastChapterReleasedAt ?? null,
       })
 
-      // Load editable metadata (summary + cover art) from the server payload.
+      // Load editable metadata (summary + cover art + default background)
+      // from the server payload.
       currentStoryStore.loadDetails({
         summary: story.summary ?? null,
         coverArtFileId: story.coverArtFileId ?? null,
         coverArtUrl: (story as { coverArtUrl?: string | null }).coverArtUrl ?? null,
+        defaultBackgroundFileId: story.defaultBackgroundFileId ?? null,
+        defaultBackgroundUrl:
+          (story as { defaultBackgroundUrl?: string | null }).defaultBackgroundUrl ?? null,
       })
 
       // Load story-level AI overrides (provider/model from story become overrides)
@@ -314,6 +318,8 @@ const App: Component = () => {
           order: book.sortOrder ?? bookIndex,
           coverArtFileId: book.coverArtFileId ?? null,
           coverArtUrl: book.coverArtUrl ?? null,
+          defaultBackgroundFileId: book.defaultBackgroundFileId ?? null,
+          defaultBackgroundUrl: book.defaultBackgroundUrl ?? null,
           expanded: true,
           isOpen: true,
           createdAt: book.createdAt,
@@ -330,6 +336,8 @@ const App: Component = () => {
             title: arc.name,
             summary: arc.summary,
             order: arc.sortOrder ?? arcIndex,
+            defaultBackgroundFileId: arc.defaultBackgroundFileId ?? null,
+            defaultBackgroundUrl: arc.defaultBackgroundUrl ?? null,
             expanded: true,
             isOpen: true,
             createdAt: arc.createdAt,
@@ -352,6 +360,8 @@ const App: Component = () => {
               // chapter tree and publishing modal. Fall back to the legacy
               // publishedOn field for older exports that pre-date the rename.
               publishedAt: chapter.publishedAt ?? chapter.publishedOn ?? null,
+              defaultBackgroundFileId: chapter.defaultBackgroundFileId ?? null,
+              defaultBackgroundUrl: chapter.defaultBackgroundUrl ?? null,
               expanded: true,
               isOpen: true,
               createdAt: chapter.createdAt,
@@ -378,6 +388,8 @@ const App: Component = () => {
                 storyTime: scene.storyTime,
                 status: scene.status,
                 includeInFull: scene.includeInFull,
+                defaultBackgroundFileId: scene.defaultBackgroundFileId ?? null,
+                defaultBackgroundUrl: scene.defaultBackgroundUrl ?? null,
                 expanded: true,
                 isOpen: true,
                 createdAt: scene.createdAt,

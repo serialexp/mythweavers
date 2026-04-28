@@ -1,0 +1,52 @@
+---
+import '../../styles/global.css'
+import { AuthorPage } from '../../components/pages/AuthorPage'
+import { chronicleTheme, starlightTheme } from '@mythweavers/ui/theme'
+import { authApi, authorsApi, type AuthorSummary, type PublicStory, type User } from '../../lib/api'
+
+const themeCookie = Astro.cookies.get('writer-ui-theme')?.value
+const initialTheme = themeCookie === 'chronicle' ? 'chronicle' : 'starlight'
+const themeClass = initialTheme === 'chronicle' ? chronicleTheme : starlightTheme
+
+let user: User | null = null
+const cookieHeader = Astro.request.headers.get('cookie') || ''
+try {
+  const session = await authApi.getSession(cookieHeader)
+  if (session.authenticated && session.user) user = session.user
+} catch {
+  // Not authenticated
+}
+
+const { id } = Astro.params
+const authorId = parseInt(id ?? '', 10)
+
+let author: AuthorSummary | null = null
+let stories: PublicStory[] = []
+if (!Number.isNaN(authorId)) {
+  try {
+    const result = await authorsApi.get(authorId, cookieHeader)
+    author = result.author
+    stories = result.stories
+  } catch (error) {
+    console.error('Error fetching author:', error)
+  }
+}
+---
+
+<html lang="en" class={themeClass}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{author ? `${author.username} - MythWeavers` : 'Author - MythWeavers'}</title>
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <AuthorPage
+      client:load
+      initialTheme={initialTheme}
+      user={user}
+      author={author}
+      stories={stories}
+    />
+  </body>
+</html>

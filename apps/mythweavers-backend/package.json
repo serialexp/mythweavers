@@ -15,7 +15,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "migrate:writer": "tsx scripts/migrate/from-writer.ts",
-    "migrate:story": "tsx --env-file-if-exists=.env --env-file-if-exists=../../.env.local scripts/migrate/from-story.ts"
+    "migrate:story": "tsx --env-file-if-exists=.env --env-file-if-exists=../../.env.local scripts/migrate/from-story.ts",
+    "cleanup:files": "tsx --env-file-if-exists=.env --env-file-if-exists=../../.env.local scripts/cleanup-unreachable-files.ts"
   },
   "keywords": [
     "writer",

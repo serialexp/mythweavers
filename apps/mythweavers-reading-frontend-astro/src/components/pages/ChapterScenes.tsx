@@ -90,6 +90,27 @@ export const ChapterScenes = (props: ChapterScenesProps) => {
                 if (block.type === 'paragraphs') {
                   return <Prose html={block.html} size="lg" center />
                 }
+                if (block.type === 'audio') {
+                  // Inline <audio controls>. No autoplay and no scroll
+                  // trigger — the reader presses play themselves, and
+                  // there's no global "currently playing" state because
+                  // each embed is a discrete moment in the chapter.
+                  // preload="metadata" so the duration shows up without
+                  // pulling the whole file before they decide to play.
+                  const absoluteUrl = resolveCoverArtUrl(block.url) ?? block.url
+                  return (
+                    <div class={styles.audioWrap}>
+                      <audio
+                        class={styles.audioPlayer}
+                        src={absoluteUrl}
+                        controls
+                        preload="metadata"
+                      >
+                        <source src={absoluteUrl} type={block.mimeType} />
+                      </audio>
+                    </div>
+                  )
+                }
                 // Invisible anchor — IntersectionObserver tracks its
                 // position and pushes its URL when it crosses the
                 // threshold. Resolve URL once at render so the dataset

@@ -14,6 +14,7 @@ import { viewModeStore } from '../stores/viewModeStore'
 import { Message as MessageType } from '../types/core'
 import { processPastedText } from '../utils/textProcessing'
 import { getTokenUsage } from '../utils/tokenUtils'
+import { AudioMessage } from './AudioMessage'
 import { BackgroundMessage } from './BackgroundMessage'
 import { BranchMessage } from './BranchMessage'
 import { MessageActionsDropdown } from './MessageActionsDropdown'
@@ -51,7 +52,8 @@ export const Message: Component<MessageProps> = (props) => {
       !props.message.isQuery &&
       props.message.type !== 'event' &&
       props.message.type !== 'branch' &&
-      props.message.type !== 'background'
+      props.message.type !== 'background' &&
+      props.message.type !== 'audio'
     )
   })
   const [editInstruction, setEditInstruction] = createSignal('')
@@ -878,21 +880,25 @@ export const Message: Component<MessageProps> = (props) => {
             </Show>
           </Show>
 
-          {/* Non-story content (events, branches, backgrounds, queries): use type-specific rendering */}
+          {/* Non-story content (events, branches, backgrounds, audio, queries): use type-specific rendering */}
           <Show when={!isStoryContent()}>
             <Show when={props.message.type === 'background'} fallback={
-              <Show
-                when={props.message.type === 'branch'}
-                fallback={
-                  <>
-                    <Show when={props.message.type === 'event'}>
-                      <span class={styles.eventIcon}>📌 </span>
-                    </Show>
-                    {props.message.content}
-                  </>
-                }
-              >
-                <BranchMessage message={props.message} />
+              <Show when={props.message.type === 'audio'} fallback={
+                <Show
+                  when={props.message.type === 'branch'}
+                  fallback={
+                    <>
+                      <Show when={props.message.type === 'event'}>
+                        <span class={styles.eventIcon}>📌 </span>
+                      </Show>
+                      {props.message.content}
+                    </>
+                  }
+                >
+                  <BranchMessage message={props.message} />
+                </Show>
+              }>
+                <AudioMessage message={props.message} />
               </Show>
             }>
               <BackgroundMessage message={props.message} />

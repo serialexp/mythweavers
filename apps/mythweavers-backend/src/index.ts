@@ -49,6 +49,7 @@ import myPathSegmentsRoutes from './routes/my/path-segments.js'
 import myPathsRoutes from './routes/my/paths.js'
 import myPawnsRoutes from './routes/my/pawns.js'
 import myPlotPointStatesRoutes from './routes/my/plot-point-states.js'
+import myBackgroundRoutes from './routes/my/background.js'
 import myPublishingRoutes from './routes/my/publishing.js'
 import myRoyalRoadRoutes from './routes/my/royal-road.js'
 import myScenesRoutes from './routes/my/scenes.js'
@@ -63,6 +64,8 @@ import myBalanceRoutes from './routes/my/balance.js'
 import myPreferencesRoutes from './routes/my/preferences.js'
 import myUsageRoutes from './routes/my/usage.js'
 import myLlmRoutes from './routes/my/llm.js'
+import myBookshelfRoutes from './routes/my/bookshelf.js'
+import myReadingStatusRoutes from './routes/my/reading-status.js'
 import stripeWebhookRoutes from './routes/webhooks/stripe.js'
 import wsRoutes from './routes/ws.js'
 import { prisma } from './lib/prisma.js'
@@ -72,6 +75,7 @@ import adminLlmRoutes from './routes/admin/llm.js'
 import adminUsersRoutes from './routes/admin/users.js'
 import publicStoriesRoutes from './routes/stories/public.js'
 import publicTagRoutes from './routes/tags/public.js'
+import publicAuthorsRoutes from './routes/authors/public.js'
 
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT) : 3201
 const HOST = process.env.HOST || '0.0.0.0'
@@ -317,6 +321,7 @@ await server.register(myPathsRoutes, { prefix: '/my' })
 await server.register(myPathSegmentsRoutes, { prefix: '/my' })
 await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
 await server.register(myPublishingRoutes, { prefix: '/my' })
+await server.register(myBackgroundRoutes, { prefix: '/my' })
 await server.register(myRoyalRoadRoutes, { prefix: '/my' })
 await server.register(myExportPdfRoutes, { prefix: '/my' })
 await server.register(myExportStoryRoutes, { prefix: '/my' })
@@ -324,11 +329,14 @@ await server.register(myBalanceRoutes, { prefix: '/my' })
 await server.register(myPreferencesRoutes, { prefix: '/my' })
 await server.register(myUsageRoutes, { prefix: '/my' })
 await server.register(myLlmRoutes, { prefix: '/my' })
+await server.register(myBookshelfRoutes, { prefix: '/my' })
+await server.register(myReadingStatusRoutes, { prefix: '/my' })
 await server.register(stripeWebhookRoutes, { prefix: '/webhooks' })
 await server.register(wsRoutes)
 await server.register(adminLlmRoutes, { prefix: '/admin' })
 await server.register(adminUsersRoutes, { prefix: '/admin' })
 await server.register(publicStoriesRoutes, { prefix: '/stories' })
+await server.register(publicAuthorsRoutes, { prefix: '/authors' })
 await server.register(publicTagRoutes, { prefix: '' })
 await server.register(calendarPresetsRoutes, { prefix: '/calendars' })
 

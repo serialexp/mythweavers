@@ -132,6 +132,18 @@ const storySchema = z.strictObject({
     description: 'Cover art URL path (from the associated file, if any)',
     example: '/files/1/2025/12/cover.jpg',
   }),
+  defaultBackgroundFileId: z.string().nullable().meta({
+    description:
+      'Story-level default background image file ID. Inherited downward by ' +
+      'books/arcs/chapters/scenes that do not set their own.',
+    example: 'clx1234567890',
+  }),
+  defaultBackgroundUrl: z.string().nullable().optional().meta({
+    description:
+      'Resolved URL of the story-level default background (from the joined ' +
+      'file, if loaded). Optional because not every endpoint hydrates it.',
+    example: '/files/1/2025/12/forest.jpg',
+  }),
   defaultPerspective: perspectiveSchema.nullable(),
   defaultTense: tenseSchema.nullable(),
   genre: z.string().nullable().meta({
@@ -428,6 +440,7 @@ const exportStoryResponseSchema = z.strictObject({
       sortOrder: z.number(),
       coverArtFileId: z.string().nullable(),
       spineArtFileId: z.string().nullable(),
+      defaultBackgroundFileId: z.string().nullable(),
       pages: z.number().nullable(),
       nodeType: z.enum(['story', 'non-story', 'context']),
       deleted: z.boolean(),
@@ -441,6 +454,7 @@ const exportStoryResponseSchema = z.strictObject({
           name: z.string(),
           summary: z.string().nullable(),
           sortOrder: z.number(),
+          defaultBackgroundFileId: z.string().nullable(),
           nodeType: z.enum(['story', 'non-story', 'context']),
           deleted: z.boolean(),
           deletedAt: z.string().nullable(),
@@ -453,6 +467,7 @@ const exportStoryResponseSchema = z.strictObject({
               name: z.string(),
               summary: z.string().nullable(),
               sortOrder: z.number(),
+              defaultBackgroundFileId: z.string().nullable(),
               nodeType: z.enum(['story', 'non-story', 'context']),
               status: z.string().nullable(),
               deleted: z.boolean(),
@@ -474,6 +489,7 @@ const exportStoryResponseSchema = z.strictObject({
                   includeInFull: z.number(),
                   deleted: z.boolean(),
                   deletedAt: z.string().nullable(),
+                  defaultBackgroundFileId: z.string().nullable(),
                   perspective: perspectiveSchema.nullable(),
                   viewpointCharacterId: z.string().nullable(),
                   activeCharacterIds: z.array(z.string()),
@@ -628,10 +644,11 @@ const exportStoryResponseSchema = z.strictObject({
 
 // Helper to format story for response
 function formatStory(story: any) {
-  const { coverArtFile, ...rest } = story
+  const { coverArtFile, defaultBackgroundFile, ...rest } = story
   return {
     ...rest,
     coverArtUrl: coverArtFile?.path ?? null,
+    defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     publishedAt: story.publishedAt ? story.publishedAt.toISOString() : null,
     firstChapterReleasedAt: story.firstChapterReleasedAt
       ? story.firstChapterReleasedAt.toISOString()
@@ -828,7 +845,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             id,
             ownerId: userId,
           },
-          include: { coverArtFile: true },
+          include: { coverArtFile: true, defaultBackgroundFile: true },
         })
 
         if (!story) {
@@ -902,7 +919,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const story = await prisma.story.update({
           where: { id },
           data,
-          include: { coverArtFile: true },
+          include: { coverArtFile: true, defaultBackgroundFile: true },
         })
 
         fastify.log.info({ storyId: story.id, userId }, 'Story updated')
@@ -998,7 +1015,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             id,
             ownerId: userId,
           },
-          include: { coverArtFile: true },
+          include: { coverArtFile: true, defaultBackgroundFile: true },
         })
 
         if (!story) {

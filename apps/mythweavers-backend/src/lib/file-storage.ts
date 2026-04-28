@@ -4,8 +4,10 @@ import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import type { MultipartFile } from '@fastify/multipart'
 import sharp from 'sharp'
+import { prisma } from './prisma.js'
 import {
   type StorageVisibility,
+  copyR2Object,
   deleteFromR2,
   generateStorageKey,
   getFromR2,
@@ -273,6 +275,66 @@ export async function deleteFile(
       }
     }
   }
+}
+
+/**
+ * Promote a file from `visibility: 'private'` to `'public'`.
+ *
+ * Called when a private file is referenced by content that the public
+ * reader frontend will serve (e.g. a chapter's default background, an
+ * inline `background` message, etc.). Setting a file as a background is
+ * an explicit, user-driven action — by doing so the user is signalling
+ * "I'm OK with this image being publicly fetchable", which lets us avoid
+ * a separate public-by-usage check at every read.
+ *
+ * Behaviour:
+ *
+ *   - **Already public**: no-op.
+ *   - **R2-backed file**: copies the object from the private bucket to
+ *     the public bucket (key preserved), updates `File.visibility` and
+ *     `File.path` to the public CDN URL, then deletes the private copy.
+ *     The promotion is one-way; we don't track demotion when a background
+ *     is unset, both for simplicity and because the user has already
+ *     consented to public exposure.
+ *   - **Local-storage file**: just flips `File.visibility`. The path
+ *     (`/my/files/...`) is identical for both visibilities locally; the
+ *     `/my/files/*` route consults `File.visibility` to decide whether
+ *     to require auth.
+ *
+ * Failures during the R2 copy bubble up to the caller — better to fail
+ * the user's "set background" action loudly than to leave a half-promoted
+ * file behind.
+ */
+export async function promoteFileToPublic(fileId: string): Promise<void> {
+  const file = await prisma.file.findUnique({
+    where: { id: fileId },
+    select: { id: true, visibility: true, r2Key: true, path: true },
+  })
+  if (!file) return // Caller is responsible for ownership/existence checks.
+  if (file.visibility === 'public') return
+
+  if (USE_R2 && file.r2Key) {
+    const newPath = await copyR2Object(file.r2Key, 'private', 'public')
+    await prisma.file.update({
+      where: { id: fileId },
+      data: { visibility: 'public', path: newPath },
+    })
+    // Reclaim the private-bucket bytes now that the public copy is the
+    // source of truth. Best-effort: a failure here just leaves an orphan
+    // object in the private bucket — the file row no longer points at it.
+    try {
+      await deleteFromR2(file.r2Key, 'private')
+    } catch (error) {
+      console.warn('Failed to delete private-bucket source after promotion', { fileId, error })
+    }
+    return
+  }
+
+  // Local-storage path: bytes don't move, only the flag does.
+  await prisma.file.update({
+    where: { id: fileId },
+    data: { visibility: 'public' },
+  })
 }
 
 /**

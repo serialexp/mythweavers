@@ -174,6 +174,77 @@ export const turn = style({
   animation: `${fadeIn} 0.2s ease-out`,
 })
 
+/**
+ * Pass 2 (world step) turns sit visually joined to the preceding resolution
+ * turn — tighter top margin, subtle left accent, faint background tint.
+ */
+export const worldStepTurn = style({
+  marginTop: `calc(${tokens.space['6']} * -0.5)`,
+  marginBottom: tokens.space['6'],
+  paddingLeft: tokens.space['3'],
+  borderLeft: `2px solid ${tokens.color.border.default}`,
+  animation: `${fadeIn} 0.2s ease-out`,
+})
+
+export const worldStepChip = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: tokens.space['2'],
+  fontSize: '0.7rem',
+  fontWeight: 600,
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  color: tokens.color.text.muted,
+  marginBottom: tokens.space['2'],
+})
+
+export const worldStepChipAuto = style({
+  opacity: 0.55,
+})
+
+/**
+ * Tiny inline indicator shown on each turn that had a steering roll.
+ * Lets the writer eyeball whether the rolled bucket lined up with the
+ * narrative the model produced. Hidden from players in the reader, only
+ * visible in the editor's adventure mode.
+ */
+export const steeringChip = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
+  fontSize: '0.65rem',
+  fontWeight: 600,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  borderRadius: tokens.radius.sm,
+  marginBottom: tokens.space['2'],
+  border: `1px solid ${tokens.color.border.default}`,
+  backgroundColor: tokens.color.surface.default,
+  color: tokens.color.text.muted,
+})
+
+export const steeringChipWell = style({
+  borderColor: '#3a8a3a',
+  color: '#3a8a3a',
+})
+
+export const steeringChipSteady = style({
+  borderColor: tokens.color.border.default,
+  color: tokens.color.text.muted,
+})
+
+export const steeringChipWorse = style({
+  borderColor: '#b87333',
+  color: '#b87333',
+})
+
+export const steeringChipHell = style({
+  borderColor: '#a83232',
+  color: '#a83232',
+})
+
 export const turnFooter = style({
   display: 'flex',
   alignItems: 'flex-start',
