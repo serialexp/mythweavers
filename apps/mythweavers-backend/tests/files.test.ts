@@ -426,6 +426,33 @@ describe('File Upload Endpoints', () => {
       const body = response.json()
       expect(body.file.id).toBe(fileId)
       expect(body.file.ownerId).toBe(userId)
+      // Usage block must be present and zeroed out for an unreferenced file.
+      // The picker uses this to decide whether to show a deletion warning.
+      expect(body.usage).toBeDefined()
+      expect(body.usage.total).toBe(0)
+      expect(body.usage.storyCoverArt).toBe(0)
+      expect(body.usage.characterPicture).toBe(0)
+    })
+
+    test('should report usage counts for a referenced file', async () => {
+      // Wire the file up as the story's cover art so the cover-art relation
+      // shows a non-zero count. The picker needs accurate counts here so the
+      // delete-confirmation UI can warn about what will be unlinked.
+      await prisma.story.update({
+        where: { id: storyId },
+        data: { coverArtFileId: fileId },
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/my/files/${fileId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.usage.storyCoverArt).toBe(1)
+      expect(body.usage.total).toBe(1)
     })
 
     test('should return 404 for non-existent file', async () => {
@@ -552,8 +579,12 @@ describe('File Upload Endpoints', () => {
       expect(response.statusCode).toBe(401)
     })
 
-    test('should prevent deletion of file in use', async () => {
-      // Use file as story cover art
+    test('should delete a file that is in use and report what was unlinked', async () => {
+      // Deletion is intentionally unconditional now: the user gets the usage
+      // counts up front via GET /my/files/:id and the client shows a confirm
+      // dialog. On DELETE the FK relations are SetNull-ed (not 409'd) and the
+      // response reports the per-relation counts that were just unlinked, so
+      // the UI can surface a "we cleared N references" toast if it wants.
       await prisma.story.update({
         where: { id: storyId },
         data: { coverArtFileId: fileId },
@@ -565,8 +596,21 @@ describe('File Upload Endpoints', () => {
         cookies: { [sessionCookie.name]: sessionCookie.value },
       })
 
-      expect(response.statusCode).toBe(409)
-      expect(response.json().error).toContain('in use')
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+      expect(body.unlinked.storyCoverArt).toBe(1)
+      expect(body.unlinked.total).toBe(1)
+
+      // File is gone…
+      const file = await prisma.file.findUnique({ where: { id: fileId } })
+      expect(file).toBeNull()
+
+      // …and the referencing story has had its cover-art FK set to null
+      // rather than being cascaded into oblivion.
+      const story = await prisma.story.findUnique({ where: { id: storyId } })
+      expect(story).not.toBeNull()
+      expect(story?.coverArtFileId).toBeNull()
     })
   })
 })
