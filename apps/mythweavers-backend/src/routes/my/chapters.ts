@@ -46,10 +46,6 @@ const chapterSchema = z.strictObject({
     description: 'Royal Road chapter ID',
     example: 123456,
   }),
-  wordCount: z.number().meta({
-    description: 'Cached word count for this chapter (sum of scene paragraphs)',
-    example: 2500,
-  }),
   nodeType: nodeTypeSchema,
   status: z.string().nullable().meta({
     description: 'Chapter status: draft, needs_work, review, done',
