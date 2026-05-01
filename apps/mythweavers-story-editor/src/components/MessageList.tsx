@@ -4,7 +4,7 @@ import { createDisplayMessagesMemo } from '../utils/messageFiltering'
 import MessageListItems from './MessageListItems'
 import * as styles from './MessageList.css'
 import * as viewStyles from './ViewStyles.css'
-import { PhCaretUpIcon } from 'solidjs-phosphor'
+import { PhCaretDownIcon, PhCaretUpIcon } from 'solidjs-phosphor'
 
 interface MessageListProps {
   isLoading: boolean
@@ -27,6 +27,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
   let scrollPositionBeforeUpdate: number | null = null
   let hasRestoredInitialScroll = false
   const [showScrollToTop, setShowScrollToTop] = createSignal(false)
+  const [showScrollToBottom, setShowScrollToBottom] = createSignal(false)
 
   // Chapter handlers removed - chapters are now nodes
   /*
@@ -244,9 +245,12 @@ export const MessageList: Component<MessageListProps> = (props) => {
     // Always save the current scroll position
     saveScrollPosition()
 
-    // Update scroll to top button visibility
+    // Update scroll to top / bottom button visibility
     if (messagesRef) {
       setShowScrollToTop(messagesRef.scrollTop > 100)
+      const distanceFromBottom =
+        messagesRef.scrollHeight - messagesRef.scrollTop - messagesRef.clientHeight
+      setShowScrollToBottom(distanceFromBottom > 100)
     }
 
     // If generating and user scrolls away from bottom, mark as manually scrolled
@@ -261,6 +265,12 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const handleScrollToTop = () => {
     if (messagesRef) {
       messagesRef.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const handleScrollToBottom = () => {
+    if (messagesRef) {
+      messagesRef.scrollTo({ top: messagesRef.scrollHeight, behavior: 'smooth' })
     }
   }
 
@@ -388,16 +398,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
             </div>
           </div>
         </Show>
-        <Show when={showScrollToTop()}>
+        <Show when={showScrollToTop() || showScrollToBottom()}>
           <div class={styles.scrollToTopContainer}>
-            <IconButton
-              variant="secondary"
-              size="md"
-              onClick={handleScrollToTop}
-              aria-label="Scroll to top"
-            >
-              <PhCaretUpIcon />
-            </IconButton>
+            <Show when={showScrollToTop()}>
+              <IconButton
+                variant="secondary"
+                size="md"
+                onClick={handleScrollToTop}
+                aria-label="Scroll to top"
+              >
+                <PhCaretUpIcon />
+              </IconButton>
+            </Show>
+            <Show when={showScrollToBottom()}>
+              <IconButton
+                variant="secondary"
+                size="md"
+                onClick={handleScrollToBottom}
+                aria-label="Scroll to bottom"
+              >
+                <PhCaretDownIcon />
+              </IconButton>
+            </Show>
           </div>
         </Show>
       </div>

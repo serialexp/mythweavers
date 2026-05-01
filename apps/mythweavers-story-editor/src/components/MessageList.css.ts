@@ -112,4 +112,7 @@ export const scrollToTopContainer = style({
   marginTop: 'auto',
   alignSelf: 'flex-end',
   marginRight: tokens.space['4'],
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['2'],
 })
