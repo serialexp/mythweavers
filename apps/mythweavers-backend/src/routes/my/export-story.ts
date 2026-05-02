@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { Prisma } from '@prisma/client'
 import archiver from 'archiver'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { FastifyPluginAsyncZodOpenApi } from 'fastify-zod-openapi'
@@ -578,6 +579,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                 id: scene.id,
                 name: scene.name,
                 summary: scene.summary,
+                summarySegments: scene.summarySegments,
                 sortOrder: scene.sortOrder,
                 status: scene.status,
                 includeInFull: scene.includeInFull,
@@ -1412,6 +1414,31 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                     await tx.message.update({
                       where: { id: newMessage.id },
                       data: { currentMessageRevisionId: currentRevisionId },
+                    })
+                  }
+                }
+
+                // After all messages are created for this scene, remap any
+                // summarySegments to point at the new message IDs. Segments
+                // whose endpoints can't be resolved are dropped (the matching
+                // message must have been deleted from the export source).
+                if (Array.isArray(sceneData.summarySegments) && sceneData.summarySegments.length > 0) {
+                  const remapped = sceneData.summarySegments
+                    .map((seg: { startMessageId: string; endMessageId: string; summary: string }) => {
+                      const start = idMaps.messages.get(seg.startMessageId)
+                      const end = idMaps.messages.get(seg.endMessageId)
+                      if (!start || !end) return null
+                      return { startMessageId: start, endMessageId: end, summary: seg.summary }
+                    })
+                    .filter(
+                      (
+                        seg: { startMessageId: string; endMessageId: string; summary: string } | null,
+                      ): seg is { startMessageId: string; endMessageId: string; summary: string } => seg !== null,
+                    )
+                  if (remapped.length > 0) {
+                    await tx.scene.update({
+                      where: { id: newScene.id },
+                      data: { summarySegments: remapped as Prisma.InputJsonValue },
                     })
                   }
                 }

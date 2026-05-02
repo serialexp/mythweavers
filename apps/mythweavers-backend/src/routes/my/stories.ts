@@ -484,6 +484,15 @@ const exportStoryResponseSchema = z.strictObject({
                   chapterId: z.string(),
                   name: z.string(),
                   summary: z.string().nullable(),
+                  summarySegments: z
+                    .array(
+                      z.strictObject({
+                        startMessageId: z.string(),
+                        endMessageId: z.string(),
+                        summary: z.string(),
+                      }),
+                    )
+                    .nullable(),
                   sortOrder: z.number(),
                   status: z.string().nullable(),
                   includeInFull: z.number(),
