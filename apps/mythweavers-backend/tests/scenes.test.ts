@@ -299,6 +299,35 @@ describe('Scene Endpoints', () => {
       expect(body.scene.viewpointCharacterId).toBe('char1')
     })
 
+    test('should round-trip summarySegments', async () => {
+      const segments = [
+        { startMessageId: 'msg_a', endMessageId: 'msg_c', summary: 'Pre-branch.' },
+        { startMessageId: 'msg_d', endMessageId: 'msg_f', summary: 'Option X path.' },
+      ]
+      const updateResponse = await app.inject({
+        method: 'PATCH',
+        url: `/my/scenes/${sceneId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { summarySegments: segments },
+      })
+
+      expect(updateResponse.statusCode).toBe(200)
+      const updateBody = updateResponse.json()
+      expect(updateBody.success).toBe(true)
+      expect(updateBody.scene.summarySegments).toEqual(segments)
+
+      // Clearing back to null should also work
+      const clearResponse = await app.inject({
+        method: 'PATCH',
+        url: `/my/scenes/${sceneId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { summarySegments: null },
+      })
+
+      expect(clearResponse.statusCode).toBe(200)
+      expect(clearResponse.json().scene.summarySegments).toBeNull()
+    })
+
     test('should update only specified fields', async () => {
       const response = await app.inject({
         method: 'PATCH',

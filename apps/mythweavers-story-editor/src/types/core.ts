@@ -138,6 +138,19 @@ export type NodeStatus = 'draft' | 'needs_work' | 'review' | 'done'
 export type NodeType = 'book' | 'arc' | 'chapter' | 'scene'
 export type NodeContentType = 'story' | 'non-story' | 'context' // API classification for content type
 
+/**
+ * One contiguous slice of a scene's messages whose summary is independent of
+ * other branches. A segment runs [startMessageId..endMessageId] inclusive in
+ * the scene's flat sortOrder; a branch message ends a segment, a branch
+ * target message starts one. For non-branching scenes there is exactly one
+ * segment covering the entire scene.
+ */
+export interface SummarySegment {
+  startMessageId: string
+  endMessageId: string
+  summary: string
+}
+
 export interface Node {
   id: string
   storyId: string
@@ -146,6 +159,12 @@ export interface Node {
   nodeType?: NodeContentType // API field: indicates if content is story, non-story, or context
   title: string
   summary?: string
+  /**
+   * Per-branch-segment summaries. When set, this is the authoritative summary
+   * data for the scene; legacy `summary` is only used as a fallback. See
+   * `SummarySegment` for the segment definition.
+   */
+  summarySegments?: SummarySegment[] | null
   order: number
   expanded?: boolean
   isSummarizing?: boolean

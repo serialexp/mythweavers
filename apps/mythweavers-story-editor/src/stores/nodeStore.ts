@@ -647,10 +647,27 @@ export const nodeStore = {
   },
 
   // Generate summary for a node (scene or chapter type).
-  // `messages` is the full messages array — passed by the caller to avoid a circular import.
+  //
+  // For scenes containing branches, the messages are split into segments
+  // (maximal runs bounded by branch boundaries) and each segment is
+  // summarized independently. The result is stored on `node.summarySegments`,
+  // and `node.summary` is also populated with the concatenation as a legacy
+  // fallback for callers that haven't been updated to read segments yet.
+  //
+  // `messages` is the full messages array — passed by the caller to avoid a
+  // circular import. We need `id`, `type`, and `options` (in addition to the
+  // filter fields) so we can compute branch targets and segment boundaries.
   async generateNodeSummary(
     nodeId: string,
-    messages: Array<{ sceneId?: string; role: string; type?: string | null; isQuery?: boolean; content: string }>,
+    messages: Array<{
+      id: string
+      sceneId?: string
+      role: string
+      type?: string | null
+      isQuery?: boolean
+      content: string
+      options?: { targetMessageId?: string }[]
+    }>,
     generateSummaryFn: (params: {
       nodeId: string
       messageContents: string[]
@@ -670,30 +687,86 @@ export const nodeStore = {
       // Mark node as summarizing
       setNodeState('nodes', nodeId, 'isSummarizing', true)
 
-      // Filter messages for this node
+      // Filter messages for this node, in their existing array order (which
+      // is sortOrder thanks to messagesStore).
       const nodeMessages = messages.filter(
         (msg) => msg.sceneId === nodeId && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
       )
-
-      console.log(`[generateNodeSummary] Found ${nodeMessages.length} messages in node ${nodeId}`)
 
       if (nodeMessages.length === 0) {
         throw new Error('No messages found in this node to summarize')
       }
 
-      // Extract message contents as an array (for chunked summarization)
-      const messageContents = nodeMessages.map((msg) => msg.content)
+      // Compute every branch-target message ID across the whole story. Cross-
+      // scene branches can target messages in this scene, so we have to look
+      // at all messages, not just this scene's.
+      const branchTargetIds = new Set<string>()
+      for (const msg of messages) {
+        if (msg.type !== 'branch' || !msg.options) continue
+        for (const opt of msg.options) {
+          if (opt.targetMessageId) branchTargetIds.add(opt.targetMessageId)
+        }
+      }
 
-      // Generate the summary using the provided function, including viewpoint character if set
-      const summary = await generateSummaryFn({
-        nodeId,
-        messageContents,
-        viewpointCharacterId: node.viewpointCharacterId,
-      })
+      // Plan segments. For non-branching scenes this returns one segment
+      // covering the whole list; for branching scenes it returns N segments
+      // bounded by branch boundaries.
+      type Segment = {
+        startMessageId: string
+        endMessageId: string
+        messages: typeof nodeMessages
+      }
+      const segments: Segment[] = []
+      let currentRun: typeof nodeMessages = []
+      const flush = () => {
+        if (currentRun.length === 0) return
+        segments.push({
+          startMessageId: currentRun[0].id,
+          endMessageId: currentRun[currentRun.length - 1].id,
+          messages: currentRun,
+        })
+        currentRun = []
+      }
+      for (const msg of nodeMessages) {
+        const isBranchTarget = branchTargetIds.has(msg.id)
+        if (isBranchTarget && currentRun.length > 0) flush()
+        currentRun.push(msg)
+        if (msg.type === 'branch') flush()
+      }
+      flush()
 
-      // Update the node with the summary
+      console.log(
+        `[generateNodeSummary] Node ${nodeId}: ${nodeMessages.length} messages split into ${segments.length} segment(s)`,
+      )
+
+      // Summarize each segment independently.
+      const segmentSummaries: { startMessageId: string; endMessageId: string; summary: string }[] = []
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i]
+        const messageContents = segment.messages.map((msg) => msg.content)
+        console.log(
+          `[generateNodeSummary] Summarizing segment ${i + 1}/${segments.length} (${segment.messages.length} messages)`,
+        )
+        const segmentSummary = await generateSummaryFn({
+          nodeId,
+          messageContents,
+          viewpointCharacterId: node.viewpointCharacterId,
+        })
+        segmentSummaries.push({
+          startMessageId: segment.startMessageId,
+          endMessageId: segment.endMessageId,
+          summary: segmentSummary.trim(),
+        })
+      }
+
+      // Combined string for legacy `summary` consumers. Segment-aware
+      // consumers should read `summarySegments` instead.
+      const combinedSummary = segmentSummaries.map((s) => s.summary).join('\n\n')
+
+      // Update the node with both fields
       batch(() => {
-        setNodeState('nodes', nodeId, 'summary', summary)
+        setNodeState('nodes', nodeId, 'summary', combinedSummary)
+        setNodeState('nodes', nodeId, 'summarySegments', segmentSummaries)
         setNodeState('nodes', nodeId, 'isSummarizing', false)
       })
 
@@ -706,7 +779,7 @@ export const nodeStore = {
         }
       }
 
-      return summary
+      return combinedSummary
     } catch (error) {
       // Clear summarizing state on error
       setNodeState('nodes', nodeId, 'isSummarizing', false)

@@ -86,3 +86,86 @@ the upsert relies on the new `@@unique([userId, storyId])` constraint.
   button behaviour clean.
 - WPW (words-per-week) filter from the legacy reader was intentionally
   dropped — confirmed with Bart.
+---
+
+# Per-segment summaries for branching scenes — handoff (2026-05-02)
+
+## Why
+
+CYOA scenes can contain `branch` messages whose options jump to different
+`targetMessageId`s. A single per-scene summary cannot represent multiple
+paths through the same scene — once the reader takes a branch, the summary
+either includes content from the path they didn't take, or omits content
+they did read. Solution: split each scene into segments along the
+branch-target graph and store one summary per segment.
+
+## Segment definition
+
+A segment is a maximal contiguous run of messages (in `sortOrder`) such that:
+- the run starts at the scene's first message OR at a message that is
+  `targetMessageId` of some branch option anywhere in the story;
+- the run ends at a `branch` message (inclusive) OR at the message just
+  before the next segment-start OR at the last message of the scene.
+
+This is implemented in `apps/mythweavers-story-editor/src/utils/summarySegments.ts`
+(`planSummarySegments`, `selectActiveSegments`, `collectBranchTargetMessageIds`).
+
+## What landed
+
+**Backend:**
+- `apps/mythweavers-backend/prisma/schema.prisma` — added
+  `summarySegments Json?` to `Scene`. **MIGRATION NOT YET APPLIED.**
+- `apps/mythweavers-backend/src/routes/my/scenes.ts` — added
+  `summarySegmentSchema`, threaded through `sceneSchema`,
+  `createSceneBodySchema`, `updateSceneBodySchema`, `formatScene`, POST and
+  PATCH handlers.
+- `apps/mythweavers-backend/tests/scenes.test.ts` — round-trip test
+  `should round-trip summarySegments` (PATCH set + clear). **Will fail
+  until migration is applied.**
+
+**Frontend:**
+- `apps/mythweavers-story-editor/src/types/core.ts` — added `SummarySegment`
+  interface and `summarySegments?: SummarySegment[] | null` on `Node`.
+- `apps/mythweavers-story-editor/src/utils/summarySegments.ts` — pure helpers.
+- `apps/mythweavers-story-editor/src/stores/nodeStore.ts` —
+  `generateNodeSummary` rewritten to plan segments, summarize each via the
+  passed `generateSummaryFn`, and persist both `summarySegments` (new
+  authoritative array) and `summary` (joined fallback for legacy readers).
+- `apps/mythweavers-story-editor/src/utils/contextGeneration.ts` — when
+  emitting a marked previous scene with `includeInFull === 1`, prefers
+  `summarySegments` filtered to the active path via `selectActiveSegments`,
+  falls back to `node.summary`.
+
+## What Bart needs to do
+
+1. Apply migration interactively — Prisma refuses non-interactive in this
+   env:
+   ```
+   cd apps/mythweavers-backend
+   pnpm prisma migrate dev --name add_scene_summary_segments
+   ```
+2. Regenerate the OpenAPI client (backend must be running):
+   ```
+   cd apps/mythweavers-story-editor
+   pnpm generate:client
+   ```
+3. Run backend scenes test to confirm:
+   ```
+   pnpm --filter @mythweavers/backend test tests/scenes.test.ts
+   ```
+
+## Follow-ups (out of scope this batch)
+
+- **Stale per-scene summaries.** Existing scenes with branches still have a
+  whole-scene `summary` and no `summarySegments`. Per Rule #8, no auto
+  migration; the `contextGeneration` fallback uses the legacy `summary`
+  string until the user regenerates. Worth telling authors to regenerate
+  summaries on any branching scene.
+- **Surface segments in the node-summary editor UI.** The settings/scene
+  details modal currently shows `node.summary` only. Eventually editors
+  should be able to see/edit per-segment summaries, with branch labels
+  for orientation. Tracked nowhere yet — add to TODO.md if desired.
+- **Pre-existing test infra issue:** `contextGeneration.test.ts` fails to
+  load with `Cannot read properties of undefined (reading 'registerGraph')`
+  from solid-js dev store. Pre-existing, not introduced by this work.
+

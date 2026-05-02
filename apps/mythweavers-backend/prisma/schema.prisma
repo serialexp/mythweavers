@@ -416,6 +416,15 @@ model Scene {
   id        String  @id @default(cuid())
   name      String  @default("")
   summary   String? @db.Text
+  /// Per-segment summaries for branching scenes. Array of
+  /// `{ startMessageId, endMessageId, summary }`. A segment is a maximal run of
+  /// messages bounded by branch boundaries (a branch message ends a segment;
+  /// any message that is a branch.option.targetMessageId starts one). For
+  /// non-branching scenes this can be a single-element array covering the
+  /// whole scene, OR null (in which case readers fall back to `summary`).
+  /// On read: walk the active branch path through this scene's messages and
+  /// emit each segment whose message range intersects the path.
+  summarySegments Json?
   chapterId String
   chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   sortOrder Int

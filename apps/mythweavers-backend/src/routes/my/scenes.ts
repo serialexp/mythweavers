@@ -11,6 +11,25 @@ const perspectiveSchema = z.enum(['FIRST', 'THIRD']).meta({
   example: 'THIRD',
 })
 
+// Per-segment summary entry. A segment is a maximal run of messages bounded
+// by branch boundaries within a scene. Used so that summary-mode rendering of
+// a previously-branched scene picks the segments along the active path
+// instead of one path-confused string.
+const summarySegmentSchema = z.strictObject({
+  startMessageId: z.string().meta({
+    description: 'First message in this segment (inclusive)',
+    example: 'msg_abc123',
+  }),
+  endMessageId: z.string().meta({
+    description: 'Last message in this segment (inclusive)',
+    example: 'msg_def456',
+  }),
+  summary: z.string().meta({
+    description: 'LLM-generated summary covering this segment',
+    example: 'The hero meets the stranger and learns about the prophecy.',
+  }),
+})
+
 // Scene response schema
 const sceneSchema = z.strictObject({
   id: z.string().meta({
@@ -24,6 +43,11 @@ const sceneSchema = z.strictObject({
   summary: z.string().nullable().meta({
     description: 'Scene summary/description',
     example: 'The hero wakes up in a strange place...',
+  }),
+  summarySegments: z.array(summarySegmentSchema).nullable().meta({
+    description:
+      'Per-segment summaries for branching scenes. Null when the scene has ' +
+      'no segmented summary; readers fall back to `summary`.',
   }),
   chapterId: z.string().meta({
     description: 'Parent chapter ID',
@@ -115,6 +139,9 @@ const createSceneBodySchema = z.strictObject({
     description: 'Scene summary/description',
     example: 'The hero wakes up in a strange place...',
   }),
+  summarySegments: z.array(summarySegmentSchema).optional().meta({
+    description: 'Per-segment summaries for branching scenes',
+  }),
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within chapter (defaults to end)',
     example: 0,
@@ -168,6 +195,10 @@ const updateSceneBodySchema = z.strictObject({
   summary: z.string().nullable().optional().meta({
     description: 'Scene summary/description',
     example: 'The hero wakes up in a strange place...',
+  }),
+  summarySegments: z.array(summarySegmentSchema).nullable().optional().meta({
+    description:
+      'Per-segment summaries for branching scenes. Send `null` to clear.',
   }),
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within chapter',
@@ -255,9 +286,12 @@ const deleteSceneResponseSchema = z.strictObject({
 
 // Helper to format scene for response
 function formatScene(scene: any) {
-  const { defaultBackgroundFile, ...rest } = scene
+  const { defaultBackgroundFile, summarySegments, ...rest } = scene
   return {
     ...rest,
+    summarySegments: (summarySegments ?? null) as
+      | z.infer<typeof summarySegmentSchema>[]
+      | null,
     defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     createdAt: scene.createdAt.toISOString(),
     updatedAt: scene.updatedAt.toISOString(),
@@ -295,6 +329,7 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           id,
           name,
           summary,
+          summarySegments,
           sortOrder,
           includeInFull,
           perspective,
@@ -339,6 +374,7 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             id, // Use client-provided ID if given
             name,
             summary: summary || null,
+            summarySegments: (summarySegments ?? null) as Prisma.InputJsonValue,
             chapterId,
             sortOrder: finalSortOrder,
             includeInFull: includeInFull ?? 2, // Default to 2 (full content) for new scenes

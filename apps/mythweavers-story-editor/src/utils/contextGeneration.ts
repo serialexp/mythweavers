@@ -1,10 +1,10 @@
 import { Character, ContextItem, Message, Node } from '../types/core'
 import { generateAnalysis } from './analysisClient'
 import { MissingSummariesError } from './errors'
-import { getMarkedNodesContent } from './nodeContentExport'
 import { calculateActivePath, getSceneNodesBeforeNode } from './nodeTraversal'
 import { buildSmartContext } from './smartContext'
 import { ChatMessage, getStoryInstructions } from './storyUtils'
+import { selectActiveSegments } from './summarySegments'
 
 export type ContextType = 'story' | 'query' | 'smart-story'
 
@@ -284,21 +284,96 @@ export async function generateContextMessages(options: ContextGenerationOptions)
         throw new MissingSummariesError(nodesWithoutSummaries)
       }
 
-      // Add marked previous nodes using shared utility
-      // This ensures same content format as character/context updates for cache sharing
-      const markedContent = getMarkedNodesContent()
-      for (const markedNode of markedContent) {
+      // Add marked previous nodes — filtered by active branch path at both
+      // node and message levels (sceneNodesBeforeCurrent is already filtered
+      // by activeNodeIds; storyMessages is already filtered by activeMessageIds).
+      //
+      // Emit per-turn user/assistant pairs (so CYOA's alternating structure
+      // is preserved across history, and so each turn is independently
+      // cacheable up to the breakpoint at the end of this block).
+      const markedHistoryStart = chatMessages.length
+      for (const node of sceneNodesBeforeCurrent) {
         // Skip current node - handled separately below
-        if (markedNode.nodeId === currentNodeId) continue
+        if (node.id === currentNodeId) continue
+        if (node.includeInFull !== 1 && node.includeInFull !== 2) continue
 
-        console.log(
-          `[generateContextMessages] Adding ${markedNode.isFullContent ? 'full content' : 'summary'} for node:`,
-          markedNode.title,
-        )
-        chatMessages.push({
-          role: 'assistant',
-          content: `[Scene: ${markedNode.title}]\n${markedNode.content}`,
-        })
+        if (node.includeInFull === 1) {
+          // Summary mode. If the scene has per-segment summaries (because it
+          // contains branches), emit one assistant message per ACTIVE segment
+          // — splitting along the branch path so we don't include summary
+          // text from paths the reader never took. Fall back to the legacy
+          // whole-scene `summary` field when no segments are stored.
+          const segments = node.summarySegments
+          if (segments && segments.length > 0) {
+            // Reconstruct the scene's full ordered message list (segments are
+            // anchored against all scene messages, not just active ones).
+            const sceneMessagesForNode = messages.filter(
+              (m) => m.sceneId === node.id && m.role === 'assistant' && m.type !== 'chapter' && !m.isQuery,
+            )
+            const activeSegments = selectActiveSegments(segments, sceneMessagesForNode, activeMessageIds)
+            if (activeSegments.length === 0) continue
+            console.log(
+              '[generateContextMessages] Adding segmented summary for node:',
+              node.title,
+              '— segments:',
+              activeSegments.length,
+              '/',
+              segments.length,
+            )
+            activeSegments.forEach((seg, idx) => {
+              if (!seg.summary?.trim()) return
+              chatMessages.push({
+                role: 'assistant',
+                content: idx === 0 ? `[Scene: ${node.title}]\n${seg.summary}` : seg.summary,
+              })
+            })
+            continue
+          }
+
+          // Legacy path: single whole-scene summary.
+          if (!node.summary?.trim()) continue
+          console.log('[generateContextMessages] Adding summary for node:', node.title)
+          chatMessages.push({
+            role: 'assistant',
+            content: `[Scene: ${node.title}]\n${node.summary}`,
+          })
+          continue
+        }
+
+        // includeInFull === 2: full content, per-turn splitting
+        const nodeMessages = storyMessages.filter((msg) => msg.sceneId === node.id)
+        if (nodeMessages.length === 0) continue
+        console.log('[generateContextMessages] Adding full content for node:', node.title, '— turns:', nodeMessages.length)
+
+        let isFirstAssistantInScene = true
+        for (const msg of nodeMessages) {
+          if (!msg.content?.trim()) continue
+
+          // In CYOA mode, surface the player's instruction as its own user turn
+          if (storyFormat === 'cyoa' && msg.instruction?.trim()) {
+            chatMessages.push({
+              role: 'user',
+              content: msg.instruction,
+            })
+          }
+
+          chatMessages.push({
+            role: 'assistant',
+            content: isFirstAssistantInScene
+              ? `[Scene: ${node.title}]\n${msg.content}`
+              : msg.content,
+          })
+          isFirstAssistantInScene = false
+        }
+      }
+
+      // Single cache breakpoint at the boundary between marked history and
+      // current scene. Marked history is stable across turns, so this gives
+      // us one large cacheable prefix; the current scene gets its own
+      // per-turn breakpoints below.
+      if (isClaudeModel && chatMessages.length > markedHistoryStart) {
+        const lastMarked = chatMessages[chatMessages.length - 1]
+        lastMarked.cache_control = { type: 'ephemeral', ttl: '1h' }
       }
 
       // Current node - add full messages with CYOA handling and cache control
