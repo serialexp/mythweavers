@@ -83,7 +83,7 @@ async function main() {
   console.log('Seeding LLM providers and models...\n')
 
   for (const [key, providerData] of Object.entries(PROVIDERS)) {
-    const provider = await prisma.llmProvider.upsert({
+    const provider = await prisma.provider.upsert({
       where: { name: providerData.name },
       create: providerData,
       update: {

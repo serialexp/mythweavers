@@ -62,7 +62,15 @@ enum Tense {
 enum LlmProtocol {
   ANTHROPIC
   OPENAI_COMPATIBLE
-  CLOUDFLARE
+  CLOUDFLARE // Cloudflare Workers AI — LLM via OpenAI-compatible /v1/chat/completions
+  CLOUDFLARE_IMAGE // Cloudflare Workers AI — image gen via /run/@cf/<model>
+  OPENAI_IMAGE // OpenAI image gen via /v1/images/generations
+}
+
+enum PricingMode {
+  FLAT_PER_IMAGE // Single price per image regardless of size/steps
+  PER_MP_TIERED // First MP charged at one rate, subsequent MPs at another (e.g. Cloudflare Klein 9B)
+  PER_TILE_STEP // Tiles × steps × per-tile-step rate (e.g. Cloudflare Flux 1 Schnell)
 }
 
 enum ParagraphState {
@@ -101,6 +109,7 @@ model User {
   storyReadStatuses StoryReadStatus[]
   balanceLedger     BalanceLedger[]
   llmUsageLogs      LlmUsageLog[]
+  imageUsageLogs    ImageUsageLog[]
   royalRoadAccount  RoyalRoadAccount?
 
   @@index([email])
@@ -777,6 +786,8 @@ model File {
   chapterDefaultBackgrounds Chapter[]   @relation("ChapterDefaultBackground")
   sceneDefaultBackgrounds   Scene[]     @relation("SceneDefaultBackground")
 
+  imageUsageLogs ImageUsageLog[] @relation("ImageUsageLogFile")
+
   @@index([r2Key])
 }
 
@@ -1015,32 +1026,36 @@ model MediaSceneLink {
 }
 
 // ============================================================================
-// LLM PROVIDER REGISTRY
+// PROVIDER REGISTRY (LLM + image generation)
 // ============================================================================
 
-model LlmProvider {
+/// Shared provider config for both LLM and image-gen models.
+/// One row per (provider × protocol) — e.g. Cloudflare needs two rows
+/// (CLOUDFLARE for LLM, CLOUDFLARE_IMAGE for image gen) sharing envKeyName.
+model Provider {
   id          String      @id @default(cuid())
-  name        String      @unique // Slug used in code, e.g. "anthropic", "openai", "moonshot"
+  name        String      @unique // Slug used in code, e.g. "anthropic", "openai", "cloudflare-image"
   displayName String // Human-readable, e.g. "Anthropic", "OpenAI"
   endpointUrl String // Base URL, e.g. "https://api.anthropic.com"
-  protocol    LlmProtocol // Streaming protocol: ANTHROPIC or OPENAI_COMPATIBLE
+  protocol    LlmProtocol // Wire protocol used to call this provider
   envKeyName  String // Which env var holds the API key, e.g. "LLM_ANTHROPIC_API_KEY"
   enabled     Boolean     @default(true)
   sortOrder   Int         @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  models       LlmModel[]
+  llmModels    LlmModel[]
+  imageModels  ImageModel[]
   transactions LlmProviderTransaction[]
 }
 
 model LlmModel {
-  id            String      @id @default(cuid())
+  id            String   @id @default(cuid())
   modelId       String // Actual model ID sent to the API, e.g. "claude-sonnet-4-20250514"
   displayName   String? // Optional human-friendly name
   providerId    String
-  provider      LlmProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  enabled       Boolean     @default(true)
+  provider      Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  enabled       Boolean  @default(true)
   contextLength Int? // Max context window in tokens
 
   // Cost to us (per million tokens)
@@ -1077,7 +1092,7 @@ enum LlmProviderTransactionType {
 model LlmProviderTransaction {
   id         String                     @id @default(cuid())
   providerId String
-  provider   LlmProvider                @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider   Provider                   @relation(fields: [providerId], references: [id], onDelete: Cascade)
   type       LlmProviderTransactionType
   /// Always positive; sign is determined by type (TOP_UP = credit, COST_SYNC = debit)
   amount     Decimal                    @db.Decimal(12, 6)
@@ -1115,6 +1130,10 @@ model BalanceLedger {
   llmUsageLogId String?      @unique
   llmUsageLog   LlmUsageLog? @relation(fields: [llmUsageLogId], references: [id], onDelete: SetNull)
 
+  /// If this debit was caused by an image generation, link to the detailed usage log
+  imageUsageLogId String?        @unique
+  imageUsageLog   ImageUsageLog? @relation(fields: [imageUsageLogId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -1126,6 +1145,7 @@ enum LedgerEntryType {
   CREDIT // Admin adds balance
   TOPUP // Stripe checkout top-up
   LLM_USAGE // Debit from an LLM call
+  IMAGE_USAGE // Debit from an image generation call
   ADJUSTMENT // Manual admin correction
 }
 
@@ -1163,4 +1183,106 @@ model LlmUsageLog {
   @@index([userId])
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+// ============================================================================
+// IMAGE GENERATION
+// ============================================================================
+
+/// Image-generation model registry. Sibling to LlmModel; both reference Provider.
+/// Pricing is per-image and varies by model: some are flat-per-image, some are
+/// tiered per megapixel (Cloudflare Klein 9B), some are tiles × steps × per-tile-step
+/// (Cloudflare Flux Schnell). The pricingMode discriminator picks which fields are used.
+model ImageModel {
+  id          String      @id @default(cuid())
+  modelId     String // Actual model ID sent to the API, e.g. "@cf/black-forest-labs/flux-1-schnell"
+  displayName String? // Optional human-friendly name, e.g. "Flux 1 Schnell"
+  description String? // Short description shown in the model picker
+  providerId  String
+  provider    Provider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  enabled     Boolean     @default(true)
+  pricingMode PricingMode
+
+  // Capability hints — used by the frontend to render a sensible picker.
+  defaultSteps    Int?
+  maxWidth        Int?
+  maxHeight       Int?
+  /// JSON array of supported "WIDTHxHEIGHT" strings, e.g. ["1024x1024","1792x1024"]. Null = freeform.
+  supportedSizes  Json?
+
+  // Cost to us (USD). Which fields are non-null depends on pricingMode.
+  costFlat            Float?
+  costFirstMP         Float?
+  costSubsequentMP    Float?
+  costPerTile         Float?
+  costPerTileStep     Float?
+
+  // Price charged to users (USD). Mirrors cost columns; user-facing.
+  priceFlat           Float?
+  priceFirstMP        Float?
+  priceSubsequentMP   Float?
+  pricePerTile        Float?
+  pricePerTileStep    Float?
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usageLogs ImageUsageLog[]
+
+  @@unique([providerId, modelId])
+  @@index([enabled])
+}
+
+/// Detailed record of each image generation. Snapshots prices at usage time
+/// (mirrors LlmUsageLog) so retroactive price changes don't rewrite history.
+model ImageUsageLog {
+  id           String  @id @default(cuid())
+  userId       Int
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modelId      String // Model ID string (e.g. "@cf/black-forest-labs/flux-1-schnell"), denormalized
+  providerName String // Provider slug, denormalized for historical queries
+
+  // FK back to the catalog row at the time of usage. Nullable so we can preserve history
+  // if a model row is later deleted.
+  imageModelId String?
+  imageModel   ImageModel? @relation(fields: [imageModelId], references: [id], onDelete: SetNull)
+
+  // The resulting File row, if generation succeeded. Nullable so we can log failed gens
+  // (we still want them visible in usage history even though no file was created).
+  fileId String?
+  file   File?   @relation("ImageUsageLogFile", fields: [fileId], references: [id], onDelete: SetNull)
+
+  // Generation parameters — all denormalized for historical reporting.
+  prompt   String  @db.Text
+  width    Int
+  height   Int
+  steps    Int?
+  tilesUsed   Int?
+  megapixels  Float?
+
+  // Snapshot of pricing at time of usage — same shape as ImageModel.
+  pricingMode       PricingMode
+  priceFlat            Float?
+  priceFirstMP         Float?
+  priceSubsequentMP    Float?
+  pricePerTile         Float?
+  pricePerTileStep     Float?
+
+  // Calculated cost charged to user
+  cost Decimal @db.Decimal(12, 6)
+
+  durationMs Int?
+  aborted    Boolean @default(false) // Client disconnected mid-generation
+  errored    Boolean @default(false) // Upstream returned an error
+
+  createdAt DateTime @default(now())
+
+  // Reverse relation to ledger
+  balanceLedger BalanceLedger?
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([imageModelId])
 }

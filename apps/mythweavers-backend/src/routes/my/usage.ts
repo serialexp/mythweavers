@@ -7,7 +7,7 @@ const errorSchema = z.object({ error: z.string() })
 
 const usageEntrySchema = z.object({
   id: z.string(),
-  type: z.enum(['CREDIT', 'TOPUP', 'LLM_USAGE', 'ADJUSTMENT']),
+  type: z.enum(['CREDIT', 'TOPUP', 'LLM_USAGE', 'IMAGE_USAGE', 'ADJUSTMENT']),
   amount: z.string().meta({ description: 'Signed amount as Decimal string' }),
   balanceAfter: z.string().meta({ description: 'Running balance after this entry' }),
   description: z.string(),
@@ -47,7 +47,7 @@ const usageResponseSchema = z.object({
 const usageQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().min(10).max(100).default(50),
-  type: z.enum(['CREDIT', 'TOPUP', 'LLM_USAGE', 'ADJUSTMENT']).optional(),
+  type: z.enum(['CREDIT', 'TOPUP', 'LLM_USAGE', 'IMAGE_USAGE', 'ADJUSTMENT']).optional(),
   since: z.string().datetime().optional().meta({ description: 'ISO 8601 lower bound for createdAt' }),
 })
 

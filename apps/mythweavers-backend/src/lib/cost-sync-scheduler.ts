@@ -53,7 +53,7 @@ async function runCostSync(log: FastifyBaseLogger): Promise<void> {
   const { startDate, endDate } = getSyncDateRange()
 
   // Find all enabled providers that support cost sync
-  const providers = await prisma.llmProvider.findMany({
+  const providers = await prisma.provider.findMany({
     where: {
       enabled: true,
       protocol: { in: ['ANTHROPIC', 'OPENAI_COMPATIBLE'] },

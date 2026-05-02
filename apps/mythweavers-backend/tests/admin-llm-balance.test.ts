@@ -16,7 +16,7 @@ describe('Admin LLM Balance Endpoints', () => {
     // Clean up LLM-specific tables
     await prisma.llmProviderTransaction.deleteMany()
     await prisma.llmModel.deleteMany()
-    await prisma.llmProvider.deleteMany()
+    await prisma.provider.deleteMany()
 
     // Create an admin user and get a session cookie
     const registerRes = await app.inject({
@@ -37,7 +37,7 @@ describe('Admin LLM Balance Endpoints', () => {
     })
 
     // Create a test provider
-    const provider = await prisma.llmProvider.create({
+    const provider = await prisma.provider.create({
       data: {
         name: 'test-anthropic',
         displayName: 'Test Anthropic',
@@ -321,7 +321,7 @@ describe('Admin LLM Balance Endpoints', () => {
 
   describe('POST /admin/llm/providers/:providerId/sync-costs', () => {
     test('should return 400 for Cloudflare provider', async () => {
-      const cfProvider = await prisma.llmProvider.create({
+      const cfProvider = await prisma.provider.create({
         data: {
           name: 'test-cloudflare',
           displayName: 'Test Cloudflare',

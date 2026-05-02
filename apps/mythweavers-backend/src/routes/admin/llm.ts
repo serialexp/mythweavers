@@ -175,7 +175,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async () => {
-      const providers = await prisma.llmProvider.findMany({
+      const providers = await prisma.provider.findMany({
         orderBy: { sortOrder: 'asc' },
       })
       return { providers: providers.map(enrichProvider) }
@@ -200,15 +200,15 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.id },
-        include: { models: { orderBy: { sortOrder: 'asc' } } },
+        include: { llmModels: { orderBy: { sortOrder: 'asc' } } },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
 
       return {
         provider: enrichProvider(provider),
-        models: provider.models.map(enrichModel),
+        models: provider.llmModels.map(enrichModel),
       }
     },
   )
@@ -233,7 +233,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       try {
-        const provider = await prisma.llmProvider.create({
+        const provider = await prisma.provider.create({
           data: {
             name: request.body.name,
             displayName: request.body.displayName,
@@ -277,7 +277,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (data.endpointUrl) data.endpointUrl = data.endpointUrl.replace(/\/+$/, '')
 
       try {
-        const provider = await prisma.llmProvider.update({
+        const provider = await prisma.provider.update({
           where: { id: request.params.id },
           data,
         })
@@ -310,7 +310,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       try {
-        await prisma.llmProvider.delete({ where: { id: request.params.id } })
+        await prisma.provider.delete({ where: { id: request.params.id } })
         return { success: true as const }
       } catch (err: any) {
         if (err.code === 'P2025') {
@@ -343,7 +343,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.providerId },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
@@ -377,7 +377,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.providerId },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
@@ -524,7 +524,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.providerId },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
@@ -579,7 +579,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.providerId },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
@@ -623,7 +623,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.providerId },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
@@ -667,7 +667,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.providerId },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
@@ -745,9 +745,9 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const provider = await prisma.llmProvider.findUnique({
+      const provider = await prisma.provider.findUnique({
         where: { id: request.params.providerId },
-        include: { models: { select: { modelId: true } } },
+        include: { llmModels: { select: { modelId: true } } },
       })
       if (!provider) return reply.status(404).send({ error: 'Provider not found' })
 
@@ -808,7 +808,7 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
 
       const body = await res.json() as any
-      const existingIds = new Set(provider.models.map((m) => m.modelId))
+      const existingIds = new Set(provider.llmModels.map((m) => m.modelId))
 
       let models: Array<{ id: string; name: string | null; owned_by: string | null; created: number | null; imported: boolean }>
 

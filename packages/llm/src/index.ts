@@ -10,6 +10,12 @@ export type {
   ConfigOrGetter,
   LLMClientConfig,
   LLMClient,
+  // Image generation
+  ImageGenerateOptions,
+  ImageGenerateResult,
+  ImageUsage,
+  ImageModelInfo,
+  ImageClient,
 } from "./types"
 
 export { resolve, normalizeTokenUsage } from "./types"
@@ -22,6 +28,7 @@ export {
 } from "./clients/openai-compatible"
 export { OllamaClient, type OllamaClientConfig } from "./clients/ollama"
 export { CloudflareClient } from "./clients/cloudflare"
+export { OpenAIClient } from "./clients/openai"
 
 // ---- Parsers (useful for ServerLLMClient and backend writeSSE) ----
 export { parseSSEStream } from "./utils/sse-parser"

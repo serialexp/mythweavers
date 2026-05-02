@@ -1,91 +1,153 @@
-# Reader feature port — handoff (2026-04-28, second batch)
+# AI image generation for backgrounds — handoff (2026-05-01)
 
-Continuation of the legacy-reader port. The previous handoff (3D flip card +
-bookshelf) is fully landed; this batch adds the missing browse/auth/history
-features Bart asked about.
+Adding the ability for authors to generate background images from text prompts,
+plugging into the existing background pipeline (`defaultBackgroundFileId` on
+Story / Book / Arc / Chapter / Scene).
+
+Plan file: `~/.claude/plans/streamed-stirring-puzzle.md`
 
 ## What landed in this batch
 
-**Backend — DONE in code:**
-- `apps/mythweavers-backend/prisma/schema.prisma` — `StoryReadStatus` got
-  `@@unique([userId, storyId])` + `@@index([userId, updatedAt])`.
-  **The reading-status idempotency tests depend on this constraint.**
-- `apps/mythweavers-backend/src/routes/authors/public.ts` — new file:
-  - `GET /authors?search=` — list authors with their published-story counts.
-  - `GET /authors/:id` — author profile + their visible stories.
-- `apps/mythweavers-backend/src/routes/auth/index.ts` — added
-  `POST /auth/change-password` (verifies current via scrypt, generates fresh
-  salt for the new hash; existing sessions stay valid).
-- `apps/mythweavers-backend/src/routes/my/reading-status.ts` — new file:
-  - `POST /my/reading-status` `{ storyId, chapterId }` — upserts (validates
-    story is publicly visible → 404, chapter belongs to story → 400).
-  - `GET /my/reading-status` — list filtered by `storyVisibleWhere(now)`.
-  - `GET /my/reading-status/:storyId` — `{ lastChapterId, lastChapterReadAt }`.
-- All three registered in BOTH `src/index.ts` and `tests/helpers.ts`.
-- New tests: `tests/authors.test.ts`, `tests/auth-change-password.test.ts`,
-  `tests/reading-status.test.ts`. Backend typecheck ✓.
+**Schema (additive + one rename):**
+- `apps/mythweavers-backend/prisma/schema.prisma`:
+  - `LlmProvider` table renamed → `Provider`. Same columns; new back-relation
+    `imageModels`. `LlmModel.providerId` and `LlmProviderTransaction.providerId`
+    still work — Prisma handles FK retargets automatically.
+  - `LlmProtocol` enum got two new values: `CLOUDFLARE_IMAGE` and
+    `OPENAI_IMAGE`. The existing `CLOUDFLARE` value is kept (LLM use).
+  - New `PricingMode` enum: `FLAT_PER_IMAGE | PER_MP_TIERED | PER_TILE_STEP`.
+  - New `LedgerEntryType` value: `IMAGE_USAGE`.
+  - New `BalanceLedger.imageUsageLogId` nullable column + relation.
+  - New tables: `ImageModel`, `ImageUsageLog`.
+- `pnpm --filter @mythweavers/backend prisma:generate` already run; types compile.
 
-**Frontend (Astro reader) — DONE in code:**
-- `src/lib/api.ts` extended: `authorsApi`, `myFictionApi`, `settingsApi`,
-  `readingStatusApi` + their types. SDK regenerated.
-- `src/lib/writer-url.ts` — new helper. Hostname-swap rule: writer is at
-  `write.{currenthost}` (or `localhost:3203` in dev).
-- New SolidJS pages + Astro shells:
-  - `/search` — query/status/type filters, paginated results.
-  - `/authors` and `/authors/[id]` — list and profile.
-  - `/my-fiction` — auth-required, lists stories the user owns, with
-    "Edit in Writer" button using the hostname-swap rule.
-  - `/settings` — auth-required, password-change form.
-- `ChapterPage.tsx` — fires `readingStatusApi.record(storyId, chapterId)` on
-  mount when the user is logged in (fire-and-forget; warnings logged).
-- `HomePage.tsx` + `pages/index.astro` — new "Continue Reading" section,
-  populated from `readingStatusApi.list({ cookie })` for logged-in users
-  (capped to 5 entries).
-- `Layout.tsx` — nav now includes Search, Authors, plus Bookshelf / My Fiction
-  / Settings for logged-in users.
-- Frontend build: `pnpm --filter @mythweavers/reading-frontend-astro build` ✓.
+**`packages/llm`:**
+- `src/types.ts` — added `ImageGenerateOptions`, `ImageGenerateResult`,
+  `ImageUsage`, `ImageModelInfo`, `ImageClient`. Exported from `index.ts`.
+- `src/clients/cloudflare.ts` — `CloudflareClient` now `implements LLMClient,
+  ImageClient`. Added `listImageModels()` (uses `/models/search?task=Text-to-Image`)
+  and `generateImage()` (POST `/run/@cf/<model>`, handles both binary and
+  `{ result: { image: <base64> } }` responses).
+- `src/clients/openai.ts` — new `OpenAIClient` implementing both interfaces.
+  LLM side delegates to an internal `OpenAICompatibleClient`; image side hits
+  `/v1/images/generations`. Hardcoded model list `gpt-image-1`, `dall-e-3`.
+
+**Backend:**
+- `src/lib/image-config.ts` — `resolveImageUpstream`, `getPublicImageModels`,
+  `tilesFor`, `megapixelsFor`, `computeCost`, `estimateCost`, `estimateOurCost`.
+  Mirrors `llm-config.ts`.
+- `src/lib/image-clients.ts` — `createImageClient(upstream)` factory
+  dispatching on `protocol`.
+- `src/routes/my/images.ts` — `GET /my/images/models` (public catalog),
+  `POST /my/images/generate` (the main endpoint). Includes:
+  - Story-ownership check (404 on miss).
+  - Width/height/steps clamping to model max.
+  - Pre-flight balance check (402 on insufficient).
+  - Per-user concurrency lock via `Map<number, AbortController>` (429 on dup).
+  - Client-disconnect → upstream `AbortController.abort()` plumbing.
+  - On success: `saveBuffer` outside the tx, then in one transaction: file
+    create-or-dedup + ImageUsageLog + balance decrement + BalanceLedger entry.
+  - Per-route `connectionTimeout: 90_000` for slower OpenAI gens.
+- Route registered in BOTH `src/index.ts` and `tests/helpers.ts`.
+- Cascading rename fixes: `src/routes/admin/llm.ts` (12 + 3 places),
+  `src/lib/cost-sync-scheduler.ts`, `src/routes/my/usage.ts` Zod enum,
+  `prisma/seed-llm-providers.ts`, `tests/admin-llm-balance.test.ts` —
+  all `prisma.llmProvider.*` → `prisma.provider.*` and `provider.models` →
+  `provider.llmModels`.
+
+**Tests:**
+- `tests/images.test.ts` — covers GET /models (auth, enabled-only),
+  POST /generate happy path + 400 (validation, unknown model, disabled provider,
+  missing env key), 401 (no auth), 402 (insufficient balance), 404 (foreign
+  story / non-existent), 429 (concurrency), 502 (upstream error), width/height
+  clamping, and per-user lock isolation. Uses `mock.module` to stub
+  `createImageClient` so no real upstream is hit.
+
+**Seed:**
+- `prisma/seed-image-providers.ts` — idempotent seed with two providers and
+  three models (Flux 1 Schnell, Flux 2 Klein 9B, gpt-image-1) at realistic
+  pricing/cost.
+
+**Backend typecheck**: `npx tsc --noEmit` ✓.
 
 ## What Bart needs to do
 
-**1. Apply the Prisma migration.** Per CLAUDE.md I can't run migrations.
-Purely additive (one unique index + one regular index), should not prompt
-about data loss:
+**1. Run the migration interactively.**
+
+Prisma cannot generate this migration non-interactively because it needs to
+confirm the `LlmProvider → Provider` table rename (Prisma can't tell rename
+from drop+create without a hint).
+
 ```bash
 cd apps/mythweavers-backend
-pnpm prisma migrate dev --name reading_status_unique
+pnpm prisma migrate dev --name image_generation
 ```
 
-**2. Run the backend tests** to confirm everything wires up:
+When Prisma asks whether you want to rename `LlmProvider` to `Provider` (or
+similar), accept the rename. **Do not let it drop and recreate.** All other
+changes are additive (new tables, new columns, new enum values).
+
+**2. Run the seed scripts** so the new providers/models exist:
+
 ```bash
-pnpm --filter @mythweavers/backend test
+cd apps/mythweavers-backend
+npx tsx prisma/seed-image-providers.ts
 ```
-The new test files (`authors.test.ts`, `auth-change-password.test.ts`,
-`reading-status.test.ts`) will fail until the migration is applied because
-the upsert relies on the new `@@unique([userId, storyId])` constraint.
 
-**3. Smoke test the new pages** with `pnpm dev`:
-- `/search?q=…` — verify search/status/type filters.
-- `/authors` and `/authors/{id}` — list + profile pages.
-- `/my-fiction` — log in, confirm your stories appear, click "Edit in Writer"
-  → opens `http://localhost:3203/story/{id}` (or `https://write.{host}/...`
-  in non-localhost).
-- `/settings` — change your password; verify old fails and new works.
-- Open a chapter while logged in → home page should show it under
-  "Continue Reading" on next load.
+(`seed-llm-providers.ts` is unchanged in behavior but its underlying Prisma
+calls now use `prisma.provider.*` after the rename — re-running it is harmless.)
 
-## Notes / known gaps
+**3. Confirm backend tests pass.**
 
-- Writer link uses `window.location` so it can't be embedded in SSR HTML
-  reliably; it lives in a `client:load` island, which is fine for the My
-  Fiction page since the whole page is one island already.
-- No cleanup yet of stale `StoryReadStatus` rows when a chapter is hard-
-  deleted. Cascade-delete behaviour is whatever the existing FK declares —
-  worth a glance if the model needs `onDelete: Cascade`.
-- Search page deliberately doesn't auto-fire on every keystroke; it submits
-  on Enter or "Search" click and round-trips the URL. That keeps SSR + back-
-  button behaviour clean.
-- WPW (words-per-week) filter from the legacy reader was intentionally
-  dropped — confirmed with Bart.
+```bash
+pnpm --filter @mythweavers/backend test tests/images.test.ts
+```
+
+Right now they all fail with `relation "public.ImageModel" does not exist`
+because the migration hasn't run yet. Once it has, they should pass.
+
+**4. Regenerate the story-editor SDK** (backend must be running on :3201):
+
+```bash
+pnpm dev:backend &
+pnpm --filter @mythweavers/story-editor generate:client
+```
+
+The SDK will get `getMyImagesModels` and `postMyImagesGenerate` calls.
+
+## What's still pending
+
+The frontend Generate panel in `BackgroundOptionsModal.tsx` is **not yet built**.
+The plan calls for:
+
+- Tab toggle in the modal: "Library" (existing) ↔ "Generate" (new).
+- Generate UI: prompt textarea, model `<select>` populated from
+  `getMyImagesModels()`, optional size select, Generate button, inline preview.
+- On click: `postMyImagesGenerate({ body: { storyId, prompt, model, width, height } })`,
+  then call existing `setFileId(fileId)` so the existing Save button hits the
+  background-set endpoint as before.
+- Cost estimate next to the button using the public model catalog.
+- Surface upstream errors verbatim in the existing error box.
+
+Files to touch:
+- `apps/mythweavers-story-editor/src/components/BackgroundOptionsModal.tsx`
+- `apps/mythweavers-story-editor/src/components/BackgroundOptionsModal.css.ts`
+
+Blocked on **step 4** above (SDK regen) — the typed calls don't exist yet.
+
+## Smoke test plan once everything is hooked up
+
+1. Set `LLM_CLOUDFLARE_API_KEY` + `LLM_CLOUDFLARE_ACCOUNT_ID` (already in your
+   env if LLM use already works).
+2. `pnpm dev` → open story-editor, BackgroundOptionsModal on a chapter.
+3. Pick `Flux 1 Schnell`, prompt "fantasy forest at dusk, painterly",
+   Generate → ~3s preview.
+4. Save → reader page shows the background.
+5. `pnpm db:studio` → confirm `ImageUsageLog` row, `BalanceLedger` row of type
+   `IMAGE_USAGE`, and `User.balance` decremented.
+6. Repeat with `gpt-image-1` (set `LLM_OPENAI_API_KEY` first).
+7. Concurrency: trigger two gens back-to-back from same browser → second 429.
+
 ---
 
 # Per-segment summaries for branching scenes — handoff (2026-05-02)

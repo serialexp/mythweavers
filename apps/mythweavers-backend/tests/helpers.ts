@@ -20,6 +20,7 @@ import myChaptersRoutes from '../src/routes/my/chapters.js'
 import myCharactersRoutes from '../src/routes/my/characters.js'
 import myContextItemsRoutes from '../src/routes/my/context-items.js'
 import myFilesRoutes from '../src/routes/my/files.js'
+import myImagesRoutes from '../src/routes/my/images.js'
 import myInventoryRoutes from '../src/routes/my/inventory.js'
 import myLandmarkStatesRoutes from '../src/routes/my/landmark-states.js'
 import myLandmarksRoutes from '../src/routes/my/landmarks.js'
@@ -151,6 +152,7 @@ async function buildAppInternal() {
   await app.register(myParagraphsRoutes, { prefix: '/my' })
   await app.register(myParagraphRevisionsRoutes, { prefix: '/my' })
   await app.register(myFilesRoutes, { prefix: '/my' })
+  await app.register(myImagesRoutes, { prefix: '/my' })
   await app.register(myInventoryRoutes, { prefix: '/my' })
   await app.register(myStoryTagsRoutes, { prefix: '/my' })
   await app.register(myCalendarsRoutes, { prefix: '/my' })

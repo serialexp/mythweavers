@@ -36,6 +36,7 @@ import myChaptersRoutes from './routes/my/chapters.js'
 import myCharactersRoutes from './routes/my/characters.js'
 import myContextItemsRoutes from './routes/my/context-items.js'
 import myFilesRoutes from './routes/my/files.js'
+import myImagesRoutes from './routes/my/images.js'
 import myInventoryRoutes from './routes/my/inventory.js'
 import myLandmarkStatesRoutes from './routes/my/landmark-states.js'
 import myLandmarksRoutes from './routes/my/landmarks.js'
@@ -307,6 +308,7 @@ await server.register(myMessageRevisionsRoutes, { prefix: '/my' })
 await server.register(myParagraphsRoutes, { prefix: '/my' })
 await server.register(myParagraphRevisionsRoutes, { prefix: '/my' })
 await server.register(myFilesRoutes, { prefix: '/my' })
+await server.register(myImagesRoutes, { prefix: '/my' })
 await server.register(myInventoryRoutes, { prefix: '/my' })
 await server.register(myStoryTagsRoutes, { prefix: '/my' })
 await server.register(myCalendarsRoutes, { prefix: '/my' })

@@ -4516,10 +4516,6 @@ export type GetMyArcsByArcIdChaptersResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Cached word count for this chapter (sum of scene paragraphs)
-             */
-            wordCount: number;
-            /**
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
@@ -4543,6 +4539,10 @@ export type GetMyArcsByArcIdChaptersResponses = {
              * When the chapter was deleted
              */
             deletedAt: string | null;
+            /**
+             * Cached total word count across all non-deleted messages in all non-deleted scenes under this chapter. Recalculated on paragraph changes.
+             */
+            wordCount: number;
             /**
              * Creation timestamp
              */
@@ -4691,10 +4691,6 @@ export type PostMyArcsByArcIdChaptersResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Cached word count for this chapter (sum of scene paragraphs)
-             */
-            wordCount: number;
-            /**
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
@@ -4718,6 +4714,10 @@ export type PostMyArcsByArcIdChaptersResponses = {
              * When the chapter was deleted
              */
             deletedAt: string | null;
+            /**
+             * Cached total word count across all non-deleted messages in all non-deleted scenes under this chapter. Recalculated on paragraph changes.
+             */
+            wordCount: number;
             /**
              * Creation timestamp
              */
@@ -4899,10 +4899,6 @@ export type GetMyChaptersByIdResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Cached word count for this chapter (sum of scene paragraphs)
-             */
-            wordCount: number;
-            /**
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
@@ -4926,6 +4922,10 @@ export type GetMyChaptersByIdResponses = {
              * When the chapter was deleted
              */
             deletedAt: string | null;
+            /**
+             * Cached total word count across all non-deleted messages in all non-deleted scenes under this chapter. Recalculated on paragraph changes.
+             */
+            wordCount: number;
             /**
              * Creation timestamp
              */
@@ -5078,10 +5078,6 @@ export type PatchMyChaptersByIdResponses = {
              */
             royalRoadId: number | null;
             /**
-             * Cached word count for this chapter (sum of scene paragraphs)
-             */
-            wordCount: number;
-            /**
              * Node type (story content, non-story, or context)
              */
             nodeType: 'story' | 'non-story' | 'context';
@@ -5105,6 +5101,10 @@ export type PatchMyChaptersByIdResponses = {
              * When the chapter was deleted
              */
             deletedAt: string | null;
+            /**
+             * Cached total word count across all non-deleted messages in all non-deleted scenes under this chapter. Recalculated on paragraph changes.
+             */
+            wordCount: number;
             /**
              * Creation timestamp
              */
@@ -5194,6 +5194,23 @@ export type GetMyChaptersByChapterIdScenesResponses = {
              */
             summary: string | null;
             /**
+             * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
+             */
+            summarySegments: Array<{
+                /**
+                 * First message in this segment (inclusive)
+                 */
+                startMessageId: string;
+                /**
+                 * Last message in this segment (inclusive)
+                 */
+                endMessageId: string;
+                /**
+                 * LLM-generated summary covering this segment
+                 */
+                summary: string;
+            }> | null;
+            /**
              * Parent chapter ID
              */
             chapterId: string;
@@ -5277,6 +5294,23 @@ export type PostMyChaptersByChapterIdScenesData = {
          * Scene summary/description
          */
         summary?: string;
+        /**
+         * Per-segment summaries for branching scenes
+         */
+        summarySegments?: Array<{
+            /**
+             * First message in this segment (inclusive)
+             */
+            startMessageId: string;
+            /**
+             * Last message in this segment (inclusive)
+             */
+            endMessageId: string;
+            /**
+             * LLM-generated summary covering this segment
+             */
+            summary: string;
+        }>;
         /**
          * Sort order within chapter (defaults to end)
          */
@@ -5400,6 +5434,23 @@ export type PostMyChaptersByChapterIdScenesResponses = {
              * Scene summary/description
              */
             summary: string | null;
+            /**
+             * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
+             */
+            summarySegments: Array<{
+                /**
+                 * First message in this segment (inclusive)
+                 */
+                startMessageId: string;
+                /**
+                 * Last message in this segment (inclusive)
+                 */
+                endMessageId: string;
+                /**
+                 * LLM-generated summary covering this segment
+                 */
+                summary: string;
+            }> | null;
             /**
              * Parent chapter ID
              */
@@ -5617,6 +5668,23 @@ export type GetMyScenesByIdResponses = {
              */
             summary: string | null;
             /**
+             * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
+             */
+            summarySegments: Array<{
+                /**
+                 * First message in this segment (inclusive)
+                 */
+                startMessageId: string;
+                /**
+                 * Last message in this segment (inclusive)
+                 */
+                endMessageId: string;
+                /**
+                 * LLM-generated summary covering this segment
+                 */
+                summary: string;
+            }> | null;
+            /**
              * Parent chapter ID
              */
             chapterId: string;
@@ -5696,6 +5764,23 @@ export type PatchMyScenesByIdData = {
          * Scene summary/description
          */
         summary?: string | null;
+        /**
+         * Per-segment summaries for branching scenes. Send `null` to clear.
+         */
+        summarySegments?: Array<{
+            /**
+             * First message in this segment (inclusive)
+             */
+            startMessageId: string;
+            /**
+             * Last message in this segment (inclusive)
+             */
+            endMessageId: string;
+            /**
+             * LLM-generated summary covering this segment
+             */
+            summary: string;
+        }> | null;
         /**
          * Sort order within chapter
          */
@@ -5819,6 +5904,23 @@ export type PatchMyScenesByIdResponses = {
              * Scene summary/description
              */
             summary: string | null;
+            /**
+             * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
+             */
+            summarySegments: Array<{
+                /**
+                 * First message in this segment (inclusive)
+                 */
+                startMessageId: string;
+                /**
+                 * Last message in this segment (inclusive)
+                 */
+                endMessageId: string;
+                /**
+                 * LLM-generated summary covering this segment
+                 */
+                summary: string;
+            }> | null;
             /**
              * Parent chapter ID
              */
@@ -9423,19 +9525,6 @@ export type GetMyFilesBy__Errors = {
     /**
      * Default Response
      */
-    401: {
-        /**
-         * Error message
-         */
-        error: string;
-        validation?: unknown;
-        zodIssues?: unknown;
-        stack?: string;
-        debug?: unknown;
-    };
-    /**
-     * Default Response
-     */
     404: {
         /**
          * Error message
@@ -9685,6 +9774,225 @@ export type GetMyFilesByIdResponses = {
 };
 
 export type GetMyFilesByIdResponse = GetMyFilesByIdResponses[keyof GetMyFilesByIdResponses];
+
+export type GetMyImagesModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/my/images/models';
+};
+
+export type GetMyImagesModelsErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyImagesModelsError = GetMyImagesModelsErrors[keyof GetMyImagesModelsErrors];
+
+export type GetMyImagesModelsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        models: Array<{
+            /**
+             * Model ID sent to the provider
+             */
+            name: string;
+            displayName: string | null;
+            description: string | null;
+            provider: string;
+            defaultSteps: number | null;
+            maxWidth: number | null;
+            maxHeight: number | null;
+            supportedSizes: Array<string> | null;
+            pricingMode: 'FLAT_PER_IMAGE' | 'PER_MP_TIERED' | 'PER_TILE_STEP';
+            pricing: {
+                priceFlat: number | null;
+                priceFirstMP: number | null;
+                priceSubsequentMP: number | null;
+                pricePerTile: number | null;
+                pricePerTileStep: number | null;
+            };
+        }>;
+    };
+};
+
+export type GetMyImagesModelsResponse = GetMyImagesModelsResponses[keyof GetMyImagesModelsResponses];
+
+export type PostMyImagesGenerateData = {
+    body: {
+        /**
+         * Story ID this image is being generated for. Used for ownership verification and to optionally pin the resulting File to the story.
+         */
+        storyId: string;
+        /**
+         * Image model ID from the public catalog (GET /my/images/models)
+         */
+        model: string;
+        /**
+         * Text prompt for the image model
+         */
+        prompt: string;
+        /**
+         * Output width in pixels (clamped to model max)
+         */
+        width?: number;
+        /**
+         * Output height in pixels (clamped to model max)
+         */
+        height?: number;
+        /**
+         * Denoising steps. Defaults to model.defaultSteps when omitted.
+         */
+        steps?: number;
+        negativePrompt?: string;
+        seed?: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/images/generate';
+};
+
+export type PostMyImagesGenerateErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    402: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    429: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    502: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyImagesGenerateError = PostMyImagesGenerateErrors[keyof PostMyImagesGenerateErrors];
+
+export type PostMyImagesGenerateResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        fileId: string;
+        path: string;
+        width: number | null;
+        height: number | null;
+        mimeType: string;
+        /**
+         * Cost charged to the user as a Decimal-string (matches BalanceLedger.amount serialization).
+         */
+        costDebited: string;
+    };
+};
+
+export type PostMyImagesGenerateResponse = PostMyImagesGenerateResponses[keyof PostMyImagesGenerateResponses];
 
 export type GetMyCharactersByCharacterIdInventoryData = {
     body?: never;
@@ -17981,7 +18289,7 @@ export type GetMyBalanceUsageData = {
     query?: {
         page?: number;
         pageSize?: number;
-        type?: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'ADJUSTMENT';
+        type?: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'IMAGE_USAGE' | 'ADJUSTMENT';
         /**
          * ISO 8601 lower bound for createdAt
          */
@@ -18008,7 +18316,7 @@ export type GetMyBalanceUsageResponses = {
     200: {
         entries: Array<{
             id: string;
-            type: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'ADJUSTMENT';
+            type: 'CREDIT' | 'TOPUP' | 'LLM_USAGE' | 'IMAGE_USAGE' | 'ADJUSTMENT';
             /**
              * Signed amount as Decimal string
              */

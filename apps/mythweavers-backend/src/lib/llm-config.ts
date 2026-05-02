@@ -1,7 +1,7 @@
 /**
  * Server-side LLM configuration.
  *
- * Provider and model definitions come from the database (LlmProvider / LlmModel).
+ * Provider and model definitions come from the database (Provider / LlmModel).
  * API keys are read from environment variables — the provider's `envKeyName` field
  * tells us which env var to read.
  */

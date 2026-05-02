@@ -128,3 +128,73 @@ export interface LLMClient {
   list(): Promise<{ models: LLMModel[] }>
   generate(options: LLMGenerateOptions): AsyncGenerator<LLMStreamEvent>
 }
+
+// ---- Image generation ----
+
+/**
+ * Options for a one-shot image-generation request. Non-streaming — providers
+ * either return the bytes directly (Cloudflare's `/run/@cf/<model>`) or a
+ * URL/base64 payload (OpenAI's `/v1/images/generations`). Either way the
+ * client is responsible for normalizing back to a `Uint8Array` + mimeType.
+ */
+export interface ImageGenerateOptions {
+  /** Model ID as understood by the provider (e.g. "@cf/black-forest-labs/flux-1-schnell", "gpt-image-1"). */
+  model: string
+  prompt: string
+  /** Output width in pixels. Provider clamps if it doesn't support arbitrary sizes. */
+  width?: number
+  /** Output height in pixels. Provider clamps if it doesn't support arbitrary sizes. */
+  height?: number
+  /** Number of denoising steps (Flux/SD style). Ignored by step-less APIs (gpt-image-1). */
+  steps?: number
+  negativePrompt?: string
+  /** Seed for reproducibility. May be ignored. */
+  seed?: number
+  signal?: AbortSignal
+  /** Provider-specific knobs (e.g. OpenAI quality/style). */
+  providerOptions?: Record<string, unknown>
+}
+
+/** Optional usage breakdown from the provider — used for billing snapshotting. */
+export interface ImageUsage {
+  /** Number of 512x512 tiles billed (Cloudflare). */
+  tiles?: number
+  /** Steps billed (Cloudflare PER_TILE_STEP models). */
+  steps?: number
+  /** Output megapixels (Cloudflare PER_MP_TIERED models). */
+  megapixels?: number
+}
+
+/**
+ * Normalized image-generation result. Always returns the raw bytes so the
+ * backend can pipe straight into `saveBuffer()` without worrying about
+ * base64 vs URL fetches. mimeType is whatever the provider emitted —
+ * varies between PNG/JPEG/WebP per model.
+ */
+export interface ImageGenerateResult {
+  buffer: Uint8Array
+  mimeType: string
+  width?: number
+  height?: number
+  usage?: ImageUsage
+}
+
+/** Lightweight model info for picker UIs. */
+export interface ImageModelInfo {
+  name: string
+  displayName?: string
+  description?: string
+  maxWidth?: number
+  maxHeight?: number
+  defaultSteps?: number
+}
+
+/**
+ * Image-generation client interface. Separate from `LLMClient` because the
+ * shape is fundamentally different (non-streaming, single result). A single
+ * provider class may implement both — see `CloudflareClient` and `OpenAIClient`.
+ */
+export interface ImageClient {
+  listImageModels(): Promise<{ models: ImageModelInfo[] }>
+  generateImage(options: ImageGenerateOptions): Promise<ImageGenerateResult>
+}

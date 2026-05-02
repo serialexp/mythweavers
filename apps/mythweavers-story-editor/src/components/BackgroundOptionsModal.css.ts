@@ -84,3 +84,104 @@ export const actions = style({
   paddingTop: tokens.space['2'],
   borderTop: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
 })
+
+// ---- Source tabs (Library / Generate) ----
+
+export const tabRow = style({
+  display: 'flex',
+  gap: tokens.space['1'],
+  borderBottom: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+})
+
+export const tab = style({
+  appearance: 'none',
+  background: 'transparent',
+  border: 'none',
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  fontSize: tokens.font.size.sm,
+  fontWeight: tokens.font.weight.medium,
+  color: tokens.color.text.secondary,
+  cursor: 'pointer',
+  borderBottom: `2px solid transparent`,
+  marginBottom: '-1px',
+  transition: 'color 0.15s ease, border-color 0.15s ease',
+  selectors: {
+    '&:hover:not(:disabled)': {
+      color: tokens.color.text.primary,
+    },
+    '&:disabled': {
+      cursor: 'not-allowed',
+      opacity: 0.5,
+    },
+  },
+})
+
+export const tabActive = style({
+  color: tokens.color.accent.primary,
+  borderBottomColor: tokens.color.accent.primary,
+})
+
+// ---- Generate panel ----
+
+export const generatePanel = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['3'],
+})
+
+export const promptInput = style({
+  width: '100%',
+  minHeight: '80px',
+  padding: tokens.space['2'],
+  fontSize: tokens.font.size.sm,
+  fontFamily: tokens.font.family.sans,
+  color: tokens.color.text.primary,
+  backgroundColor: tokens.color.bg.raised,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.default,
+  resize: 'vertical',
+  selectors: {
+    '&:focus': {
+      outline: 'none',
+      borderColor: tokens.color.border.focus,
+    },
+    '&:disabled': {
+      opacity: 0.5,
+      cursor: 'not-allowed',
+    },
+  },
+})
+
+export const selectInput = style({
+  width: '100%',
+  padding: `${tokens.space['2']} ${tokens.space['2']}`,
+  fontSize: tokens.font.size.sm,
+  fontFamily: tokens.font.family.sans,
+  color: tokens.color.text.primary,
+  backgroundColor: tokens.color.bg.raised,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.default,
+  selectors: {
+    '&:focus': {
+      outline: 'none',
+      borderColor: tokens.color.border.focus,
+    },
+    '&:disabled': {
+      opacity: 0.5,
+      cursor: 'not-allowed',
+    },
+  },
+})
+
+export const generateRow = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: tokens.space['3'],
+})
+
+export const costEstimate = style({
+  fontSize: tokens.font.size.xs,
+  color: tokens.color.text.muted,
+  fontVariantNumeric: 'tabular-nums',
+})
