@@ -92,9 +92,28 @@ The protagonist should end the turn modestly — but visibly — better off than
     case 'steady':
       return `STEERING (hidden from player): The world is neutral this turn. Resolve the action honestly — neither lucky nor punishing. NPCs act in character based on their established personalities. Nothing dramatic tips the scales in either direction.`
     case 'worse':
-      return `STEERING (hidden from player): Things lean against the protagonist this turn. Their action meets friction — partial success at best, or a complication lands alongside it. NPCs press their own interests, and someone nearby is in a worse mood than yesterday. No cliffhanger unless the scene earns it.`
+      return `STEERING (hidden from player): Things lean against the protagonist this turn. Their action meets friction — partial success at best, or a complication lands alongside it.
+
+PREFERRED SOURCES OF FRICTION, in order:
+1. The action's own mechanics — it's harder, slower, messier, or more partial than hoped.
+2. The environment or timing — a door sticks, a noise carries, weather shifts, someone walks in at the wrong moment.
+3. An NPC pressing their own interests — but ONLY if that NPC's established personality, goals, or current mood would already produce this behavior. The friction must be something a reader could nod at given what's been established about that NPC.
+
+HARD CONSTRAINT: Do not invent new grievances, hidden agendas, or out-of-character stubbornness to manufacture friction. An NPC is who they were established to be. If no established NPC would plausibly cause this friction, route it through the action or the environment instead. "Worse mood than yesterday" must have a visible in-world cause, not be a free-floating mood swing.
+
+No cliffhanger unless the scene earns it.`
     case 'hell':
-      return `STEERING (hidden from player): Things go wrong this turn. The action fails, backfires, or is overtaken by events outside the protagonist's control. An NPC moves against them, or the environment turns hostile. Stay inside the world's logic — this is bad luck and bad timing, not authorial cruelty. Consequences should feel plausible given what's been established.`
+      return `STEERING (hidden from player): Things go wrong this turn. The action fails, backfires, or is overtaken by events outside the protagonist's control.
+
+PREFERRED SOURCES OF DISASTER, in order:
+1. The action backfires or fails on its own terms — the lock breaks in the keyhole, the lie is too clever and contradicts itself, the leap falls short.
+2. The environment or timing turns hostile — the floor gives way, a patrol rounds the corner, a storm hits, something already established as risky comes due.
+3. An NPC moves against the protagonist — but ONLY an NPC who already had a reason to. Their opposition must trace cleanly back to something previously established: a stated goal, a prior slight, a known allegiance, an established personality trait. No new motives invented this turn.
+
+HARD CONSTRAINTS:
+- Stay inside the world's logic. This is bad luck and bad timing, not authorial cruelty.
+- NPCs do not act irrationally to make the disaster happen. A cautious NPC does not suddenly attack; a friendly NPC does not suddenly betray. If you cannot ground the disaster in established character, use the environment or the action's own backfire instead.
+- Consequences must feel plausible given what's been established. A reader looking back should be able to point to the seed of this disaster in earlier turns or the world bible.`
   }
 }
 
@@ -142,7 +161,8 @@ RULES:
 - Do NOT end with an open prompt for the next action — the scene ends mid-beat, waiting.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
-- The steering guidance below colors the outcome of the action itself (fortune, friction, failure).`
+- NPCs must react consistently with their established personalities and current motivations. A cautious NPC does not suddenly charge in; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not yet been established, make a reasonable choice and let that become their personality going forward. Steering (below) NEVER overrides character consistency — if the steering would require an NPC to act out of character, route the steered effect through the action's mechanics or the environment instead.
+- The steering guidance below colors the outcome of the action itself (fortune, friction, failure), but it does not license irrational NPC behavior.`
 
 /**
  * Role-specific instruction for pass 2 (world step).
@@ -169,8 +189,9 @@ RULES:
 - 2-4 paragraphs.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
-- NPCs must act consistently with their established personalities. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.
-- The steering guidance below colors what the world does (fortune, friction, complication).`
+- NPCs must act consistently with their established personalities, goals, and current motivations. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.
+- Character consistency is a hard constraint and steering NEVER overrides it. If the steering below would require an NPC to act out of character to produce the steered outcome, route that outcome through the environment, timing, or another already-motivated NPC instead.
+- The steering guidance below colors what the world does (fortune, friction, complication), but it does not license irrational NPC behavior.`
 
 export const NONSENSE_CHECK_INSTRUCTION = `YOUR ROLE: Check ONLY the text above for things that don't make sense.
 
