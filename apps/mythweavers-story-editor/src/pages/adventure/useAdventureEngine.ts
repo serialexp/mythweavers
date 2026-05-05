@@ -151,16 +151,18 @@ export function createAdventureEngine(
   }
 
   /**
-   * Run the world-step pass (pass 2) with the given steering. Assumes the
-   * resolution turn has already been finalized onto `adventureStore.turns`.
-   * Caller is responsible for managing `isGenerating` bracketing.
+   * Run the world-step pass (pass 2). Assumes the resolution turn has
+   * already been finalized onto `adventureStore.turns`. Caller is responsible
+   * for managing `isGenerating` bracketing.
+   *
+   * Steering is intentionally NOT applied here — it scopes only to the
+   * quality of the protagonist's action in pass 1.
    */
-  async function runWorldStep(steering: SteeringBucket | undefined) {
+  async function runWorldStep() {
     adventureStore.setStreamingContent('')
     const messages = buildWorldStepMessages(
       adventureStore.turns,
       adventureStore.settingDescription,
-      steering,
       adventureStore.directive,
       adventureStore.compactions,
       adventureStore.worldBible,
@@ -189,7 +191,6 @@ export function createAdventureEngine(
       playerAction: null,
       narrative,
       kind: 'world-step',
-      ...(steering ? { steering } : {}),
     })
     persist()
   }
@@ -205,8 +206,10 @@ export function createAdventureEngine(
     adventureStore.setPendingAction(playerAction)
     persistNow()
 
-    // Roll steering once for this player input — applied to BOTH passes.
-    // Opening turn has no player action and no steering.
+    // Roll steering once for this player input — applied ONLY to the
+    // resolution pass, since steering scopes to the protagonist's action
+    // execution. The world-step pass runs neutral. Opening turn has no
+    // player action and no steering.
     const steering: SteeringBucket | undefined =
       playerAction !== null ? rollSteering() : undefined
     if (steering) {
@@ -271,7 +274,7 @@ export function createAdventureEngine(
         // if pass 2 misbehaves.
         adventureStore.setIsGenerating(true)
         try {
-          await runWorldStep(steering)
+          await runWorldStep()
         } catch (worldErr: unknown) {
           if (worldErr instanceof DOMException && worldErr.name === 'AbortError') {
             const partial = adventureStore.streamingContent
@@ -281,7 +284,6 @@ export function createAdventureEngine(
                 playerAction: null,
                 narrative: wsNarrative,
                 kind: 'world-step',
-                ...(steering ? { steering } : {}),
               })
               persist()
             } else {
@@ -338,7 +340,6 @@ export function createAdventureEngine(
   /**
    * Manually trigger pass 2 on the current last turn. Only valid when the
    * last turn is a resolution with no following world-step and we're idle.
-   * Reuses the steering from that resolution turn.
    */
   async function handleAdvanceWorld() {
     if (adventureStore.isGenerating) return
@@ -347,7 +348,7 @@ export function createAdventureEngine(
     const last = turns[turns.length - 1]
     const lastKind = last.kind ?? 'resolution'
     if (lastKind !== 'resolution') return
-    // Opening turn has no player action and no steering — not a valid base.
+    // Opening turn has no player action and is not a valid base.
     if (last.playerAction === null) return
 
     adventureStore.setError(null)
@@ -355,10 +356,8 @@ export function createAdventureEngine(
     adventureStore.setStreamingContent('')
     abortController = new AbortController()
 
-    const steering = last.steering
-
     try {
-      await runWorldStep(steering)
+      await runWorldStep()
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         const partial = adventureStore.streamingContent
@@ -368,7 +367,6 @@ export function createAdventureEngine(
             playerAction: null,
             narrative: wsNarrative,
             kind: 'world-step',
-            ...(steering ? { steering } : {}),
           })
           persist()
         } else {
@@ -703,8 +701,8 @@ export function createAdventureEngine(
     const lastKind = lastTurn.kind ?? 'resolution'
 
     if (lastKind === 'world-step') {
-      // Pop just the world-step; re-fire pass 2 with the steering saved on
-      // the preceding resolution turn.
+      // Pop just the world-step and re-fire pass 2. World-step passes are
+      // not steered, so no per-turn state needs to be replayed.
       adventureStore.removeLastTurn()
       persist()
       handleAdvanceWorld()

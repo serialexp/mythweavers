@@ -80,40 +80,65 @@ export function rollSteering(): SteeringBucket {
 /**
  * Prose guidance for the narrative call, given a steering bucket.
  * Inlined into the narrative system message. Hidden from the player.
+ *
+ * IMPORTANT: Steering describes how WELL the protagonist EXECUTED their own
+ * action this turn — nothing more. It is purely about the quality of the
+ * protagonist's own performance: their poise, their timing, their wording,
+ * their craft, their luck with the dice of their own attempt.
+ *
+ * Steering does NOT describe:
+ *   - What NPCs decide to do (they always act in character)
+ *   - Whether the world turns for or against the protagonist (it doesn't)
+ *   - Whether convenient or inconvenient events occur (they don't)
+ *   - Whether bystanders are friendly or hostile (independent of steering)
+ *
+ * NPCs respond to the executed action HOWEVER their established personality
+ * would respond — a friendly bartender who hears a botched persuasion remains
+ * a friendly bartender (just unconvinced); a hostile guard who hears a
+ * smooth-talking lie remains a hostile guard (just thrown off-balance for a
+ * moment). Their reaction is shaped by HOW the action was executed, never by
+ * the steering directly.
  */
 export function steeringGuidance(b: SteeringBucket): string {
   switch (b) {
     case 'well':
-      return `STEERING (hidden from player): Fortune favors the protagonist this turn. Their action succeeds, and EXACTLY ONE small thing in the present scene tilts in their favor — no more. The favorable element must be a person or object already physically present in this scene, behaving in a slightly better-than-expected way. It must NOT be: a new character arriving, an absent character returning, a convenient item appearing, or a previously-met NPC turning out to have a conveniently useful skill/identity/history. Coincidental backstory reveals are forbidden — an NPC is who they were established to be, nothing more.
+      return `STEERING (hidden from player): The protagonist executes their action GRACEFULLY. Whatever they were trying to do, they pull it off with more poise, precision, eloquence, or luck than they had any right to expect. A persuasion attempt finds exactly the right words. A leap lands cleanly. A lie comes out smooth and unhesitating. A fight move connects with form. Their craft, this once, is at its peak.
 
-Good fortune looks like: an opponent fumbles or hesitates visibly, an NPC already in the room lets slip more than they meant to, a known obstacle proves smaller than feared, the protagonist spots something useful that was on the page but unremarked, an item the protagonist was already known to have turns out to be just enough.
+This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about:
+- The world conveniently bending in the protagonist's favor
+- NPCs being unusually agreeable, cooperative, or revealing more than usual
+- Helpful coincidences, lucky finds, or new useful information appearing
+- Bystanders or opponents fumbling or hesitating
 
-The protagonist should end the turn modestly — but visibly — better off than they started it. One small win, fully grounded. If you're tempted to add a second lucky beat or invent a helpful detail about an existing character, stop at the first.`
+NPCs respond to the well-executed action exactly as their established personality dictates. A skeptical merchant hearing a brilliantly-worded pitch is still a skeptical merchant — but now they are visibly considering it instead of dismissing it. A trained guard parrying a perfectly-timed strike is still a trained guard — but now they are momentarily on the back foot. The protagonist's excellence narrows the NPC's options; it does not change who the NPC is.
+
+If the player's action was vague, pick the most natural concrete attempt and let THAT be executed gracefully.`
     case 'steady':
-      return `STEERING (hidden from player): The world is neutral this turn. Resolve the action honestly — neither lucky nor punishing. NPCs act in character based on their established personalities. Nothing dramatic tips the scales in either direction.`
+      return `STEERING (hidden from player): The protagonist executes their action competently and honestly — neither lucky nor unlucky. Their performance is in their normal range. Resolve the action at face value. NPCs respond exactly as their established personalities would respond to a workmanlike attempt at this thing.`
     case 'worse':
-      return `STEERING (hidden from player): Things lean against the protagonist this turn. Their action meets friction — partial success at best, or a complication lands alongside it.
+      return `STEERING (hidden from player): The protagonist executes their action CLUMSILY. Whatever they were trying to do, their performance is awkward, halting, or partial. A persuasion attempt comes out stilted, missing the mark or hitting only part of it. A leap clears the gap but lands badly. A lie has a tell — a stutter, a glance, a detail that doesn't quite track. A fight move telegraphs. They get most of it, or some of it, but the craft is visibly off.
 
-PREFERRED SOURCES OF FRICTION, in order:
-1. The action's own mechanics — it's harder, slower, messier, or more partial than hoped.
-2. The environment or timing — a door sticks, a noise carries, weather shifts, someone walks in at the wrong moment.
-3. An NPC pressing their own interests — but ONLY if that NPC's established personality, goals, or current mood would already produce this behavior. The friction must be something a reader could nod at given what's been established about that NPC.
+This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about:
+- The world turning against them
+- NPCs being newly suspicious, hostile, or pressing agendas
+- Inconvenient coincidences, bad luck with the environment, or surprise complications from outside
+- Bystanders deciding to interfere
 
-HARD CONSTRAINT: Do not invent new grievances, hidden agendas, or out-of-character stubbornness to manufacture friction. An NPC is who they were established to be. If no established NPC would plausibly cause this friction, route it through the action or the environment instead. "Worse mood than yesterday" must have a visible in-world cause, not be a free-floating mood swing.
+NPCs respond to the clumsy execution exactly as their established personality dictates. A friendly bartender hearing a fumbled question is still a friendly bartender — but now they're confused, asking the protagonist to repeat themselves, or politely brushing past the awkwardness. A wary captain hearing a stilted bluff is still a wary captain — but now they're notably less convinced than they otherwise would have been. The protagonist's stumble narrows their own options; it does not change who the NPC is.
 
-No cliffhanger unless the scene earns it.`
+The friction comes from the protagonist, not the world. No cliffhanger unless the scene already earned it.`
     case 'hell':
-      return `STEERING (hidden from player): Things go wrong this turn. The action fails, backfires, or is overtaken by events outside the protagonist's control.
+      return `STEERING (hidden from player): The protagonist BUNGLES their action. Whatever they were trying to do, their execution backfires on its own terms. A persuasion attempt comes out so wrongly-pitched it actively offends, embarrasses, or gives the game away. A leap falls short or trips on the takeoff. A lie contradicts itself mid-sentence or names a detail that's plainly wrong. A fight move overcommits and leaves them open. They make a fool of themselves, or a mess of the attempt, on their own merits.
 
-PREFERRED SOURCES OF DISASTER, in order:
-1. The action backfires or fails on its own terms — the lock breaks in the keyhole, the lie is too clever and contradicts itself, the leap falls short.
-2. The environment or timing turns hostile — the floor gives way, a patrol rounds the corner, a storm hits, something already established as risky comes due.
-3. An NPC moves against the protagonist — but ONLY an NPC who already had a reason to. Their opposition must trace cleanly back to something previously established: a stated goal, a prior slight, a known allegiance, an established personality trait. No new motives invented this turn.
+This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about:
+- The world turning against them
+- NPCs becoming newly hostile, suddenly attacking, betraying, or revealing hidden agendas
+- The environment turning treacherous (the floor giving way, a storm hitting, a patrol coincidentally arriving)
+- Coincidental events outside the protagonist's control
 
-HARD CONSTRAINTS:
-- Stay inside the world's logic. This is bad luck and bad timing, not authorial cruelty.
-- NPCs do not act irrationally to make the disaster happen. A cautious NPC does not suddenly attack; a friendly NPC does not suddenly betray. If you cannot ground the disaster in established character, use the environment or the action's own backfire instead.
-- Consequences must feel plausible given what's been established. A reader looking back should be able to point to the seed of this disaster in earlier turns or the world bible.`
+NPCs respond to the bungled execution exactly as their established personality dictates. A kindly priest hearing a deeply offensive accidental insult is still a kindly priest — but now they are hurt, withdrawn, or coolly redirecting the conversation. A hot-tempered guard hearing the same insult is still a hot-tempered guard — and may well respond in kind. The disaster IS the protagonist's bad performance; the NPC's reaction follows naturally from THEIR character meeting THAT performance.
+
+The disaster comes from the protagonist, not the world. Stay inside the world's logic. NPC reactions must remain in character: a cautious NPC does not suddenly charge in, a friendly NPC does not suddenly betray, regardless of how badly the protagonist bungled.`
   }
 }
 
@@ -161,8 +186,8 @@ RULES:
 - Do NOT end with an open prompt for the next action — the scene ends mid-beat, waiting.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
-- NPCs must react consistently with their established personalities and current motivations. A cautious NPC does not suddenly charge in; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not yet been established, make a reasonable choice and let that become their personality going forward. Steering (below) NEVER overrides character consistency — if the steering would require an NPC to act out of character, route the steered effect through the action's mechanics or the environment instead.
-- The steering guidance below colors the outcome of the action itself (fortune, friction, failure), but it does not license irrational NPC behavior.`
+- NPCs must react consistently with their established personalities and current motivations. A cautious NPC does not suddenly charge in; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not yet been established, make a reasonable choice and let that become their personality going forward.
+- The steering guidance below describes ONLY the QUALITY of the protagonist's own execution this turn — how gracefully or clumsily they pulled off their attempt. It does NOT describe the world's mood toward the protagonist, NPC dispositions, or whether convenient/inconvenient events occur. The world is what it is; only the protagonist's craft varies.`
 
 /**
  * Role-specific instruction for pass 2 (world step).
@@ -190,8 +215,7 @@ RULES:
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
 - NPCs must act consistently with their established personalities, goals, and current motivations. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.
-- Character consistency is a hard constraint and steering NEVER overrides it. If the steering below would require an NPC to act out of character to produce the steered outcome, route that outcome through the environment, timing, or another already-motivated NPC instead.
-- The steering guidance below colors what the world does (fortune, friction, complication), but it does not license irrational NPC behavior.`
+- The world is neither for nor against the protagonist this turn. NPCs and the environment behave the way they would have anyway, given their established nature and what just happened in the resolution. Do NOT manufacture coincidences, surprise complications, lucky breaks, or hostile turns of fate to make the world feel dramatic — let the established characters and situation drive what happens next.`
 
 export const NONSENSE_CHECK_INSTRUCTION = `YOUR ROLE: Check ONLY the text above for things that don't make sense.
 
@@ -462,24 +486,27 @@ ${settingDescription}`,
  * Build messages for pass 2 — the world step.
  *
  * The shared history already ends with the resolution turn's narrative as
- * the last assistant message. We add a role-specific system instruction
- * (with the SAME steering bucket as pass 1) and a terse user nudge to kick
- * off the world reaction.
+ * the last assistant message. We add a role-specific system instruction and
+ * a terse user nudge to kick off the world reaction.
+ *
+ * Note: Steering is intentionally NOT applied to the world step. Steering
+ * scopes only to the QUALITY of the protagonist's own action; the world
+ * itself is neutral and reacts in character to whatever the resolution
+ * narrative just established. Pass 2 sees the resolution narrative as
+ * context and responds to it, no extra fortune/friction overlay required.
  */
 export function buildWorldStepMessages(
   turns: AdventureTurn[],
   settingDescription: string,
-  steering: SteeringBucket | undefined,
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
 ): LLMMessage[] {
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
-  const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
   messages.push({
     role: 'system',
-    content: `${WORLD_STEP_INSTRUCTION}${steeringBlock}`,
+    content: WORLD_STEP_INSTRUCTION,
   })
 
   // Author directive first, so the world-step nudge remains the message the
@@ -490,7 +517,7 @@ export function buildWorldStepMessages(
   // signals the phase change explicitly to the model.
   messages.push({
     role: 'user',
-    content: 'Now let the world respond. NPCs act on their own priorities; the environment shifts.',
+    content: 'Now let the world respond. NPCs act in character; the environment shifts only where it would naturally.',
   })
 
   return messages
@@ -532,7 +559,10 @@ export function buildRevisionMessages(
 ): LLMMessage[] {
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
-  const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
+  // Steering only applies to resolution passes — it describes the quality
+  // of the protagonist's execution, which world-step passes don't generate.
+  const steeringBlock =
+    kind === 'resolution' && steering ? `\n\n${steeringGuidance(steering)}` : ''
   const roleInstruction = kind === 'world-step' ? WORLD_STEP_INSTRUCTION : RESOLUTION_INSTRUCTION
   messages.push({
     role: 'system',
