@@ -422,6 +422,12 @@ export function createAdventureEngine(
         model: resolved.model,
         messages,
         max_tokens: effectiveSettings.maxTokens,
+        thinking_budget: effectiveSettings.thinkingBudget
+          ? Math.min(
+              effectiveSettings.thinkingBudget,
+              Math.floor(effectiveSettings.maxTokens / 2),
+            )
+          : undefined,
         metadata: { callType: 'adventure-compaction' },
       })
 

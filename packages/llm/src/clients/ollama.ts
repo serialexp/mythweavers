@@ -169,6 +169,14 @@ export class OllamaClient implements LLMClient {
       },
     }
 
+    // Ollama's reasoning toggle is a top-level `think` field. There's no
+    // token-budget equivalent — reasoning models think until they're done —
+    // so any positive Anthropic-style budget just enables thinking. Models
+    // that don't support reasoning ignore the field.
+    if (options.thinking_budget && options.thinking_budget > 0) {
+      requestBody.think = true
+    }
+
     const response = await fetch(`${this.host}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

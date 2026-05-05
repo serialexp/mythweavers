@@ -77,6 +77,93 @@ function usesMaxCompletionTokens(model: string): boolean {
   )
 }
 
+/**
+ * Map an Anthropic-style `thinking_budget` (token count) to a discrete
+ * `reasoning_effort` bucket used by OpenAI's o-series, gpt-5, and most
+ * other OpenAI-compatible reasoning endpoints.
+ */
+function budgetToEffort(budget: number): "low" | "medium" | "high" {
+  if (budget < 4096) return "low"
+  if (budget < 16384) return "medium"
+  return "high"
+}
+
+/**
+ * Whether a model name looks like a reasoning model that accepts
+ * `reasoning_effort`. Used as a guard so we don't tack the field onto
+ * non-reasoning models (which can 400 on strict providers).
+ */
+function looksLikeReasoningModel(model: string): boolean {
+  const m = model.toLowerCase()
+  return (
+    /^o[1-9]/.test(m) ||
+    m.startsWith("gpt-5") ||
+    m.includes("gpt-oss") ||
+    m.includes("thinking") ||
+    m.includes("-r1") ||
+    m.includes("reasoner") ||
+    m.includes("reasoning")
+  )
+}
+
+/** Whether the upstream looks like Moonshot's Kimi platform. */
+function isMoonshotEndpoint(baseUrl: string): boolean {
+  const u = baseUrl.toLowerCase()
+  return (
+    u.includes("moonshot.ai") ||
+    u.includes("moonshot.cn") ||
+    u.includes("kimi.ai")
+  )
+}
+
+/**
+ * Apply `thinking_budget` to an OpenAI-compatible request body, translating
+ * to the parameter shape the upstream provider expects.
+ *
+ * - **OpenRouter**: unified `reasoning: { max_tokens }` API — closest analogue
+ *   to Anthropic's `budget_tokens`. Budget 0/undefined → omit (provider default).
+ * - **OpenAI reasoning models / gpt-oss / DeepSeek R1 / Qwen-thinking / etc.**:
+ *   `reasoning_effort: "low" | "medium" | "high"` bucketed from the budget.
+ * - **Moonshot / Kimi reasoning models**: only a binary `thinking: { type:
+ *   "enabled" | "disabled" }` is supported — no token budget. Default upstream
+ *   is enabled, which can blow through `max_tokens` before producing any
+ *   visible answer. We treat budget=0/undefined as an explicit "disable", and
+ *   any positive budget as "enable". This is the only knob Moonshot exposes.
+ * - **Non-reasoning models on other endpoints**: leave the field off.
+ */
+function applyThinkingBudget(
+  requestBody: Record<string, unknown>,
+  options: LLMGenerateOptions,
+  baseUrl: string,
+): void {
+  const budget = options.thinking_budget
+  const url = baseUrl.toLowerCase()
+
+  // Moonshot/Kimi: binary toggle, opt-in only. We honor budget=0/undefined as
+  // "off" so users can actually stop the model from burning their max_tokens
+  // budget on reasoning before it ever produces an answer.
+  if (isMoonshotEndpoint(url)) {
+    requestBody.thinking = {
+      type: budget && budget > 0 ? "enabled" : "disabled",
+    }
+    return
+  }
+
+  // From here on, no budget = nothing to do.
+  if (!budget || budget <= 0) return
+
+  // OpenRouter: pass the budget through verbatim as max_tokens of reasoning.
+  if (url.includes("openrouter.ai")) {
+    requestBody.reasoning = { max_tokens: budget }
+    return
+  }
+
+  if (looksLikeReasoningModel(options.model)) {
+    requestBody.reasoning_effort = budgetToEffort(budget)
+  }
+  // Otherwise: silently drop. The model probably doesn't reason at all.
+}
+
 /** Map a raw OpenAI-compatible streaming chunk to LLMStreamEvents. */
 function parseStreamChunk(parsed: any): LLMStreamEvent[] {
   const events: LLMStreamEvent[] = []
@@ -246,6 +333,10 @@ export class OpenAICompatibleClient implements LLMClient {
     } else {
       requestBody.max_tokens = maxTokens
     }
+
+    // Translate Anthropic-style thinking_budget into the right shape for
+    // whatever OpenAI-compatible upstream we're talking to.
+    applyThinkingBudget(requestBody, options, this.getBaseUrl())
 
     const response = await fetch(
       this.buildUrl("/chat/completions"),
