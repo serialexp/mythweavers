@@ -180,6 +180,7 @@ SCOPE OF THIS TURN:
 - End the turn on a beat where the world WAITS — a reply half-finished, a held breath, a pause — so the scene can either be moved forward deliberately or left for the next player input.
 
 RULES:
+- POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you". Never "he/she/they" for the protagonist, never "I", never past tense. Example: "You step onto the porch. The boards groan under your weight." NOT "She stepped onto the porch" and NOT "I step onto the porch".
 - Show, don't tell. Vivid sensory details, dialogue, action.
 - Player input is intent, not literal text. Translate it into natural in-character actions and dialogue. Only text in "quotes" should be used verbatim.
 - 2-4 paragraphs.
@@ -210,6 +211,7 @@ SCOPE OF THIS TURN:
 - End with an open prompt for the protagonist's next action. No numbered options.
 
 RULES:
+- POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you". This is the SAME POV as the resolution narrative you're continuing from — do NOT switch to third person just because the camera is now on NPCs. NPCs are described as the protagonist sees and hears them: "The bartender wipes the same glass twice, watching you." NOT "The bartender wipes the same glass twice, watching the stranger." The protagonist remains "you" even when other characters are the active subject of a sentence.
 - Show, don't tell. Vivid sensory details, dialogue, action.
 - 2-4 paragraphs.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
@@ -517,7 +519,8 @@ export function buildWorldStepMessages(
   // signals the phase change explicitly to the model.
   messages.push({
     role: 'user',
-    content: 'Now let the world respond. NPCs act in character; the environment shifts only where it would naturally.',
+    content:
+      'Now let the world respond. NPCs act in character; the environment shifts only where it would naturally. Continue in second person, present tense — the protagonist remains "you", just as in the resolution narrative above.',
   })
 
   return messages
