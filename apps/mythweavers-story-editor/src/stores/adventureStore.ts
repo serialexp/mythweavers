@@ -21,6 +21,7 @@ interface AdventureState {
   directive: string
   worldBible: string
   autoAdvanceWorld: boolean
+  nonsenseCheckEnabled: boolean
 
   // Generation state
   isGenerating: boolean
@@ -71,6 +72,7 @@ const [state, setState] = createStore<AdventureState>({
   directive: '',
   worldBible: '',
   autoAdvanceWorld: false,
+  nonsenseCheckEnabled: true,
 
   isGenerating: false,
   streamingContent: '',
@@ -123,6 +125,9 @@ export const adventureStore = {
   },
   get autoAdvanceWorld() {
     return state.autoAdvanceWorld
+  },
+  get nonsenseCheckEnabled() {
+    return state.nonsenseCheckEnabled
   },
 
   get isGenerating() {
@@ -208,6 +213,9 @@ export const adventureStore = {
   },
   setAutoAdvanceWorld(v: boolean) {
     setState('autoAdvanceWorld', v)
+  },
+  setNonsenseCheckEnabled(v: boolean) {
+    setState('nonsenseCheckEnabled', v)
   },
 
   setIsGenerating(v: boolean) {
@@ -331,6 +339,7 @@ export const adventureStore = {
       directive: state.directive,
       worldBible: state.worldBible,
       autoAdvanceWorld: state.autoAdvanceWorld,
+      nonsenseCheckEnabled: state.nonsenseCheckEnabled,
       ...(action ? { pendingAction: action } : {}),
     }
   },
@@ -371,6 +380,7 @@ export const adventureStore = {
         directive: saved?.directive ?? '',
         worldBible: saved?.worldBible ?? '',
         autoAdvanceWorld: saved?.autoAdvanceWorld ?? false,
+        nonsenseCheckEnabled: saved?.nonsenseCheckEnabled ?? true,
 
         isGenerating: false,
         streamingContent: '',
@@ -411,6 +421,7 @@ export const adventureStore = {
         directive: '',
         worldBible: '',
         autoAdvanceWorld: false,
+        nonsenseCheckEnabled: true,
 
         isGenerating: false,
         streamingContent: '',

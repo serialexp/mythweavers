@@ -150,6 +150,31 @@ export const AdventureHeader: Component<{
             </div>
           </div>
 
+          {/* Narrative consistency check toggle */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>
+              <input
+                type="checkbox"
+                checked={adventureStore.nonsenseCheckEnabled}
+                onChange={(e) => {
+                  adventureStore.setNonsenseCheckEnabled(
+                    e.currentTarget.checked,
+                  )
+                  engine.persist()
+                }}
+                style={{ 'margin-right': '8px' }}
+              />
+              Check narrative consistency
+            </label>
+            <div class={styles.directiveHint}>
+              When on, an extra pass scans each generated narrative for
+              physical or logical contradictions and surfaces a warning you
+              can choose to revise. When off, turns finish faster and you
+              skip the check entirely — useful if the check model is flaky
+              or the spinner gets stuck.
+            </div>
+          </div>
+
           {/* Directive section */}
           <div class={styles.storyPanelSection}>
             <label class={styles.formLabel}>Per-Turn Directive</label>

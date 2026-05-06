@@ -251,18 +251,38 @@ export function createAdventureEngine(
         return
       }
 
-      // --- Consistency check (nonsense) ---
-      const checkedNarrative = await runNarrativeChecks(narrative, playerAction)
-
-      // Finalize resolution turn. Opening turn is stored as 'resolution'
+      // Finalize the resolution turn FIRST. The narrative is committed to
+      // the turn list and persisted before any optional post-processing
+      // runs, so a stuck or erroring nonsense check can no longer lose the
+      // narrative on reload or abort. Opening turn is stored as 'resolution'
       // (acts as the establishing beat).
       adventureStore.finalizeTurn({
         playerAction,
-        narrative: checkedNarrative,
+        narrative,
         kind: 'resolution',
         ...(steering ? { steering } : {}),
       })
       persist()
+
+      // --- Consistency check (nonsense) — optional, gated by user toggle ---
+      // Runs after finalize so the narrative is already saved. Failures or
+      // aborts here are non-fatal: the turn stays committed, we just drop
+      // the spinner and move on.
+      if (adventureStore.nonsenseCheckEnabled) {
+        try {
+          await runNarrativeChecks(narrative, playerAction)
+        } catch (checkErr: unknown) {
+          if (
+            !(checkErr instanceof DOMException && checkErr.name === 'AbortError')
+          ) {
+            const message =
+              checkErr instanceof Error ? checkErr.message : 'Nonsense check failed'
+            console.warn('[Checks] Skipped due to error:', message)
+          }
+        } finally {
+          adventureStore.setStreamingContent('')
+        }
+      }
 
       // --- Pass 2: world step (opt-in) ---
       // Skip for opening turn (no player action to react to) or when the
@@ -523,14 +543,17 @@ export function createAdventureEngine(
   async function runNarrativeChecks(
     narrative: string,
     _playerAction: string | null,
-  ): Promise<string> {
-    // Nothing to check on the opening turn or if the narrative is empty/trivial
-    if (adventureStore.turns.length === 0) return narrative
-    if (!narrative || narrative.trim().length < 50) return narrative
+  ): Promise<void> {
+    // Nothing to check on the opening turn (turns list is still empty here
+    // because the just-generated opening narrative was the first finalize)
+    // or if the narrative is empty/trivial. The turn list now includes the
+    // narrative being checked, so use length<=1 as the opening guard.
+    if (adventureStore.turns.length <= 1) return
+    if (!narrative || narrative.trim().length < 50) return
 
-    adventureStore.setStreamingContent(
-      `${narrative}\n\n⏳ Checking narrative...`,
-    )
+    // The narrative is already a committed turn at this point; show only a
+    // spinner, not the narrative text again.
+    adventureStore.setStreamingContent('⏳ Checking narrative...')
 
     const nonsenseIssues = await runSingleCheck(
       'Nonsense',
@@ -545,14 +568,12 @@ export function createAdventureEngine(
     if (!nonsenseIssues) {
       console.log('[Checks] Narrative passed all checks')
       adventureStore.setNonsenseWarning(null)
-      return narrative
+      return
     }
 
     // Store the warning for the user to review — don't auto-revise
     console.log('[Checks] Issues found (user will decide):\n', nonsenseIssues)
     adventureStore.setNonsenseWarning(nonsenseIssues)
-
-    return narrative
   }
 
   /** Revise the latest turn's narrative based on the nonsense warning. Called on user request. */

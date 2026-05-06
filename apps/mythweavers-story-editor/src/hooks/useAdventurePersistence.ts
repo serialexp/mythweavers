@@ -51,6 +51,13 @@ export interface PersistedState {
    * stepped manually via "Advance world").
    */
   autoAdvanceWorld?: boolean
+  /**
+   * When true, an extra LLM pass checks each generated narrative for
+   * physical/logical inconsistencies and surfaces a warning the user can
+   * choose to revise. Default: true. Disabling skips the check entirely
+   * (faster turns; useful when the check model is flaky).
+   */
+  nonsenseCheckEnabled?: boolean
 }
 
 // --- localStorage helpers (offline / crash recovery) ---
