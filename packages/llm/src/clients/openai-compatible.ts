@@ -143,8 +143,13 @@ function applyThinkingBudget(
   // "off" so users can actually stop the model from burning their max_tokens
   // budget on reasoning before it ever produces an answer.
   if (isMoonshotEndpoint(url)) {
-    requestBody.thinking = {
-      type: budget && budget > 0 ? "enabled" : "disabled",
+    const enabled = !!(budget && budget > 0)
+    requestBody.thinking = { type: enabled ? "enabled" : "disabled" }
+    // Moonshot's reasoning models reject any temperature other than 0.6 when
+    // thinking is disabled (the non-thinking decoder path is locked to that
+    // value upstream). Force it here so the request doesn't 400.
+    if (!enabled) {
+      requestBody.temperature = 0.6
     }
     return
   }
