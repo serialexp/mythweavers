@@ -421,6 +421,25 @@ export const streamingParagraph = style({
   color: tokens.color.text.primary,
 })
 
+/**
+ * Inline streaming cursor: a thin pulsing glyph appended after the last
+ * word of the streaming text. Inline-block + zero structural height so it
+ * doesn't change the surrounding paragraph's box — the streaming block
+ * and the committed-turn block end up the same height, and the swap on
+ * finalize is visually seamless.
+ */
+export const streamingCursor = style({
+  display: 'inline-block',
+  marginLeft: '2px',
+  color: tokens.color.accent.primary,
+  animation: `${pulse} 1.2s ease-in-out infinite`,
+  // Match surrounding text's vertical metrics so layout doesn't shift.
+  verticalAlign: 'baseline',
+  // Tighter than a full character — just a marker.
+  fontWeight: 600,
+  userSelect: 'none',
+})
+
 // Scroll indicator
 export const scrollToBottom = style({
   display: 'flex',
@@ -794,4 +813,274 @@ export const storyPanelSectionHeader = style({
   alignItems: 'center',
   justifyContent: 'space-between',
   marginBottom: tokens.space['1'],
+})
+
+// --- World panel (characters / plot points / agenda) ---
+
+export const worldPanelEmpty = style({
+  fontSize: '0.8rem',
+  color: tokens.color.text.muted,
+  fontStyle: 'italic',
+  padding: `${tokens.space['2']} 0`,
+})
+
+export const worldPanelList = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['2'],
+  marginTop: tokens.space['2'],
+})
+
+export const worldPanelCard = style({
+  backgroundColor: tokens.color.bg.base,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+  padding: tokens.space['2'],
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['1'],
+})
+
+export const worldPanelCardArchived = style({
+  opacity: 0.55,
+})
+
+export const worldPanelCardHeader = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: tokens.space['2'],
+})
+
+export const worldPanelCardTitle = style({
+  flex: 1,
+  fontSize: '0.9rem',
+  fontWeight: 600,
+  color: tokens.color.text.primary,
+  border: '1px solid transparent',
+  backgroundColor: 'transparent',
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  borderRadius: tokens.radius.sm,
+  fontFamily: 'inherit',
+  ':focus': {
+    outline: 'none',
+    borderColor: tokens.color.border.focus,
+    backgroundColor: tokens.color.bg.raised,
+  },
+})
+
+export const worldPanelCardActions = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
+})
+
+export const worldPanelField = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['1'],
+})
+
+export const worldPanelFieldLabel = style({
+  fontSize: '0.7rem',
+  fontWeight: 600,
+  color: tokens.color.text.muted,
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+})
+
+export const worldPanelFieldInput = style({
+  width: '100%',
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  backgroundColor: tokens.color.bg.raised,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.sm,
+  color: tokens.color.text.primary,
+  fontFamily: 'inherit',
+  fontSize: '0.85rem',
+  boxSizing: 'border-box',
+  ':focus': {
+    outline: 'none',
+    borderColor: tokens.color.border.focus,
+  },
+  '::placeholder': {
+    color: tokens.color.text.muted,
+  },
+})
+
+export const worldPanelFieldTextarea = style({
+  width: '100%',
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  backgroundColor: tokens.color.bg.raised,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.sm,
+  color: tokens.color.text.primary,
+  fontFamily: 'inherit',
+  fontSize: '0.85rem',
+  boxSizing: 'border-box',
+  minHeight: '52px',
+  resize: 'vertical',
+  lineHeight: 1.45,
+  ':focus': {
+    outline: 'none',
+    borderColor: tokens.color.border.focus,
+  },
+  '::placeholder': {
+    color: tokens.color.text.muted,
+  },
+})
+
+export const worldPanelFieldSelect = style({
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  backgroundColor: tokens.color.bg.raised,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.sm,
+  color: tokens.color.text.primary,
+  fontFamily: 'inherit',
+  fontSize: '0.85rem',
+  ':focus': {
+    outline: 'none',
+    borderColor: tokens.color.border.focus,
+  },
+})
+
+export const worldPanelInlineGrid = style({
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: tokens.space['2'],
+})
+
+export const worldPanelActivityList = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: tokens.space['1'],
+  marginTop: tokens.space['2'],
+  maxHeight: '180px',
+  overflowY: 'auto',
+  padding: tokens.space['1'],
+  backgroundColor: tokens.color.bg.base,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.md,
+})
+
+export const worldPanelActivityEntry = style({
+  fontSize: '0.75rem',
+  color: tokens.color.text.secondary,
+  lineHeight: 1.4,
+  display: 'flex',
+  gap: tokens.space['2'],
+  alignItems: 'baseline',
+  flexWrap: 'wrap',
+})
+
+export const worldPanelActivityTime = style({
+  flexShrink: 0,
+  color: tokens.color.text.muted,
+  fontVariantNumeric: 'tabular-nums',
+})
+
+export const worldPanelActivityTool = style({
+  flexShrink: 0,
+  fontFamily: 'monospace',
+  fontSize: '0.7rem',
+  color: tokens.color.text.muted,
+})
+
+export const worldPanelActivitySummary = style({
+  flex: 1,
+  color: tokens.color.text.primary,
+  minWidth: 0,
+  wordBreak: 'break-word',
+})
+
+export const worldPanelActivityStatus = style({
+  flexShrink: 0,
+  fontSize: '0.65rem',
+  fontFamily: 'monospace',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  padding: `0 ${tokens.space['1']}`,
+  borderRadius: tokens.radius.sm,
+  border: '1px solid currentColor',
+  opacity: 0.85,
+})
+
+export const worldPanelActivityStatusApplied = style({
+  color: tokens.color.semantic.success,
+})
+
+export const worldPanelActivityStatusNoop = style({
+  color: tokens.color.text.muted,
+})
+
+export const worldPanelActivityStatusFailed = style({
+  color: tokens.color.semantic.error,
+})
+
+export const worldPanelActivityDetails = style({
+  flexBasis: '100%',
+  marginTop: tokens.space['1'],
+  fontSize: '0.7rem',
+  color: tokens.color.text.muted,
+})
+
+export const worldPanelActivityDetailsSummary = style({
+  cursor: 'pointer',
+  userSelect: 'none',
+  fontFamily: 'monospace',
+  ':hover': {
+    color: tokens.color.text.secondary,
+  },
+})
+
+export const worldPanelActivityArgs = style({
+  marginTop: tokens.space['1'],
+  padding: tokens.space['1'],
+  backgroundColor: tokens.color.bg.raised,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.sm,
+  fontFamily: 'monospace',
+  fontSize: '0.7rem',
+  color: tokens.color.text.secondary,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  overflow: 'auto',
+  maxHeight: '160px',
+})
+
+export const worldPanelActivityError = style({
+  marginTop: tokens.space['1'],
+  fontSize: '0.7rem',
+  color: tokens.color.semantic.error,
+  fontFamily: 'monospace',
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+})
+
+export const worldPanelActivityHeader = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: tokens.space['2'],
+})
+
+export const worldPanelAnalyzingBadge = style({
+  fontSize: '0.7rem',
+  color: tokens.color.text.muted,
+  fontStyle: 'italic',
+})
+
+export const worldPanelLockBanner = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['2'],
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  marginBottom: tokens.space['2'],
+  backgroundColor: tokens.color.bg.raised,
+  border: `1px solid ${tokens.color.border.default}`,
+  borderLeft: `3px solid ${tokens.color.semantic.warning}`,
+  borderRadius: tokens.radius.md,
+  fontSize: '0.8rem',
+  color: tokens.color.text.secondary,
+  lineHeight: 1.4,
 })

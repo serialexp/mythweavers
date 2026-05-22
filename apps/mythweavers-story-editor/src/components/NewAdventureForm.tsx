@@ -136,9 +136,9 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
       const response = client.generate({
         model: settingResolved.model,
         messages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
-          ? Math.min(effectiveSettings.thinkingBudget, Math.floor(effectiveSettings.maxTokens / 2))
+        max_tokens: settingResolved.maxTokens,
+        thinking_budget: settingResolved.thinkingBudget
+          ? Math.min(settingResolved.thinkingBudget, Math.floor(settingResolved.maxTokens / 2))
           : undefined,
         metadata: { callType: 'adventure-setting' },
       })

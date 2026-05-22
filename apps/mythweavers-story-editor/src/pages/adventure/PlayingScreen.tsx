@@ -94,17 +94,31 @@ function renderStreamingContent() {
     )
   }
 
+  // IMPORTANT: render with the EXACT same wrapper + paragraph classes as
+  // a committed turn (`renderNarrative`). On finalize, the streaming
+  // block is replaced by a real turn at the same DOM position; if the
+  // shapes match the swap is visually seamless and the autoscroll
+  // effect has nothing to snap to. The inline cursor at the end is
+  // zero-height (display:inline-block on baseline) so it doesn't add
+  // structural height.
   const paragraphs = displayText.split('\n\n').filter((p) => p.trim())
   return (
-    <div class={styles.streamingContent}>
+    <div class={styles.narrative}>
       <For each={paragraphs}>
-        {(paragraph) => (
-          <p class={styles.streamingParagraph}>{paragraph.trim()}</p>
-        )}
+        {(paragraph, index) => {
+          const isLast = () => index() === paragraphs.length - 1
+          return (
+            <p class={styles.narrativeParagraph}>
+              {paragraph.trim()}
+              <Show when={isLast()}>
+                <span class={styles.streamingCursor} aria-hidden="true">
+                  ▍
+                </span>
+              </Show>
+            </p>
+          )
+        }}
       </For>
-      <div class={styles.streamingIndicator}>
-        <div class={styles.streamingDot} />
-      </div>
     </div>
   )
 }
@@ -429,6 +443,42 @@ export const PlayingScreen: Component = () => {
             {(turnIndex) => renderTurn(turnIndex, engine)}
           </For>
 
+          {/* Gate approval panel — shown while a storyline-gate brief is
+              awaiting accept/reject. The narrative pass is parked behind
+              this; the user picks accept (proceed with brief), reject
+              (proceed without arc context this beat), or cancels via the
+              normal abort button. */}
+          <Show when={adventureStore.pendingGateBrief}>
+            <div class={styles.nonsenseWarning}>
+              <div class={styles.nonsenseWarningHeader}>
+                🧵 Storyline brief — review before {adventureStore.pendingGateKind === 'world-step' ? 'world step' : 'this turn'}
+              </div>
+              <div
+                class={styles.nonsenseWarningContent}
+                style={{ 'white-space': 'pre-wrap' }}
+              >
+                {adventureStore.pendingGateBrief}
+              </div>
+              <div class={styles.nonsenseWarningActions}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => engine.acceptGateBrief()}
+                >
+                  Accept &amp; continue
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => engine.rejectGateBrief()}
+                  title="Generate this turn without forwarding any storyline context"
+                >
+                  Reject (skip arc context)
+                </Button>
+              </div>
+            </div>
+          </Show>
+
           {/* Nonsense warning */}
           <Show when={adventureStore.nonsenseWarning && !adventureStore.isGenerating}>
             <div class={styles.nonsenseWarning}>
@@ -459,15 +509,49 @@ export const PlayingScreen: Component = () => {
 
           {/* Streaming content for current generation */}
           <Show when={adventureStore.isGenerating}>
-            <div class={styles.turn}>
-              <Show when={adventureStore.pendingAction}>
-                <div class={styles.playerAction}>
-                  <span class={styles.playerActionLabel}>You:</span>
-                  {adventureStore.pendingAction}
+            {(() => {
+              const isWorldStepStreaming = () =>
+                adventureStore.streamingKind === 'world-step'
+              return (
+                <div
+                  class={
+                    isWorldStepStreaming() ? styles.worldStepTurn : styles.turn
+                  }
+                >
+                  <Show when={isWorldStepStreaming()}>
+                    <div
+                      class={
+                        adventureStore.autoAdvanceWorld
+                          ? `${styles.worldStepChip} ${styles.worldStepChipAuto}`
+                          : styles.worldStepChip
+                      }
+                    >
+                      — the world moves —
+                    </div>
+                  </Show>
+                  <Show
+                    when={
+                      adventureStore.pendingAction && !isWorldStepStreaming()
+                    }
+                  >
+                    <div class={styles.playerAction}>
+                      <span class={styles.playerActionLabel}>You:</span>
+                      {adventureStore.pendingAction}
+                    </div>
+                  </Show>
+                  <Show when={adventureStore.streamingSteering}>
+                    {(s) => (
+                      <div
+                        class={`${styles.steeringChip} ${steeringClass(s())}`}
+                      >
+                        {steeringLabel(s())}
+                      </div>
+                    )}
+                  </Show>
+                  {renderStreamingContent()}
                 </div>
-              </Show>
-              {renderStreamingContent()}
-            </div>
+              )
+            })()}
           </Show>
         </Show>
 
@@ -533,10 +617,30 @@ export const PlayingScreen: Component = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={engine.handleRegenerate}
-                  title="Regenerate the last turn"
+                  onClick={() =>
+                    engine
+                      .runAnalysisPass()
+                      .then(() => engine.runSynthesisPass())
+                      .catch((err) =>
+                        console.warn(
+                          '[Analysis→Synthesis] manual chain error:',
+                          err,
+                        ),
+                      )
+                  }
+                  disabled={
+                    adventureStore.isAnalyzing ||
+                    adventureStore.isSynthesizing
+                  }
+                  title={
+                    adventureStore.isAnalyzing
+                      ? 'Analysis already running'
+                      : adventureStore.isSynthesizing
+                        ? 'Synthesis already running'
+                        : 'Re-run the analysis + synthesis passes against the current world state and last turn(s)'
+                  }
                 >
-                  ↻
+                  🔍
                 </Button>
               </Show>
               <Button

@@ -32,6 +32,145 @@ export interface AdventureCompaction {
   generatedAt: string
 }
 
+/**
+ * The character's standing stance toward the protagonist, on a 7-step scale
+ * anchored at the extremes. Replaces the old free-text "status" field —
+ * which the analysis model kept padding with redundant scene description
+ * (we already have the narrative; we don't need it parroted into the
+ * world state).
+ *
+ * The scale is ordered: index 0 (hatred) is the most negative, index 6
+ * (love) the most positive. Movement up or down the ladder should track
+ * lasting shifts established by the story, not momentary mood.
+ */
+export type Disposition =
+  | 'hatred'
+  | 'hostility'
+  | 'distrust'
+  | 'indifference'
+  | 'warmth'
+  | 'devotion'
+  | 'love'
+
+export const DISPOSITIONS: ReadonlyArray<Disposition> = [
+  'hatred',
+  'hostility',
+  'distrust',
+  'indifference',
+  'warmth',
+  'devotion',
+  'love',
+]
+
+/**
+ * A single tracked character. Lives in the adventure's living world state
+ * and is injected into the narrative prompt so NPCs stay consistent across
+ * turns. Phase 1 is fully user-edited; later phases let an analysis model
+ * patch these via tool calls.
+ */
+export interface CharacterCard {
+  /** cuid2-style id, generated via generateMessageId() */
+  id: string
+  /** Canonical name as it should appear in prose */
+  name: string
+  /**
+   * One paragraph describing WHO this character IS — identity, not
+   * situation. Appearance, personality, voice, relevant skills,
+   * background, defining relationships. Stays true across many scenes;
+   * recent events / what-they-just-did belong in the prose, not here.
+   */
+  description: string
+  /** One sentence: what this character currently wants */
+  motive: string
+  /**
+   * Standing stance toward the protagonist on the 7-step scale (hatred →
+   * love). This is a *relational* axis, not a momentary mood — what the
+   * narrative just showed them doing belongs in the prose, not here.
+   */
+  disposition: Disposition
+  /**
+   * When true, the character is off-screen / out of the active story and is
+   * NOT injected into the narrative prompt. Kept on the roster for continuity
+   * (e.g. they may return later) and to give the analysis model a memory of
+   * them. Defaults to false (active).
+   */
+  archived?: boolean
+}
+
+/**
+ * A single tracked plot point — something the story has on the books that
+ * may yet pay off. Status is a soft lifecycle, not a strict state machine.
+ *
+ * No `timing` field: the analysis pass runs every turn, so the live state
+ * is always up-to-date by definition. Anything time-bound that genuinely
+ * lives on its own clock belongs in the world agenda instead.
+ */
+export interface PlotPoint {
+  id: string
+  /** Short label, used in lists and as the prompt-side title */
+  title: string
+  /** One paragraph describing the plot point */
+  description: string
+  /**
+   * - `seeded`: introduced or hinted at, no on-screen progress yet
+   * - `active`: currently in motion in the story
+   * - `resolving`: paying off this scene / arc
+   * - `resolved`: finished; kept for continuity
+   * - `abandoned`: explicitly dropped or made impossible (manual UI only —
+   *   the analysis pass must call `remove_plot_point` instead, so the
+   *   model can't accumulate dead plot points in the world state)
+   */
+  status: 'seeded' | 'active' | 'resolving' | 'resolved' | 'abandoned'
+}
+
+/**
+ * A single item on the world's agenda — something that will happen on its
+ * own timeline regardless of the protagonist. Drives the world-step pass.
+ */
+export interface AgendaItem {
+  id: string
+  /** One sentence: what's about to happen */
+  description: string
+  /** Soft timing — "in 30 minutes", "at midnight", "next time the bell rings" */
+  when: string
+}
+
+/**
+ * Outcome status for a single analysis tool call.
+ * - applied: tool succeeded and modified the world state
+ * - noop:    tool succeeded but had nothing to change (already-archived,
+ *           identical patch values, etc.)
+ * - failed:  tool threw — bad args, unknown id, unknown tool name, etc.
+ */
+export type AnalysisLogStatus = 'applied' | 'noop' | 'failed'
+
+/**
+ * One entry in the analysis activity log. Records a tool call the
+ * analysis model requested, the outcome of applying it, and the raw args
+ * the model sent — so the user can audit and debug what the model is
+ * actually trying to do (including failed and silently-dropped calls).
+ *
+ * Capped to a small ring buffer in the store.
+ *
+ * `args`/`status`/`error` are optional only for backward compatibility
+ * with previously persisted entries. New entries always set `args` and
+ * `status`.
+ */
+export interface AnalysisLogEntry {
+  /** ISO timestamp of when the entry was applied. */
+  at: string
+  /** Tool name (add_character, patch_plot_point, etc). */
+  tool: string
+  /** Human-readable summary suitable for the activity log UI. */
+  summary: string
+  /** The raw arguments the LLM sent for this tool call. */
+  args?: unknown
+  /** Outcome of the apply attempt. */
+  status?: AnalysisLogStatus
+  /** Error message when status === 'failed'. */
+  error?: string
+}
+
 export type AdventurePhase = 'setup' | 'playing'
 
 export interface PersistedState {
@@ -58,6 +197,48 @@ export interface PersistedState {
    * (faster turns; useful when the check model is flaky).
    */
   nonsenseCheckEnabled?: boolean
+  /**
+   * When true, every player action gets a hidden steering roll (well /
+   * steady / worse / hell) that biases the protagonist's execution quality
+   * for that turn. Default: true. Disabling makes every action resolve at
+   * face value — useful when the disaster/friction outcomes feel like they
+   * dominate scenes more than the player wants.
+   */
+  steeringEnabled?: boolean
+  /**
+   * When true, the storyline-gate brief is held for user accept/reject
+   * before the narrative pass that uses it kicks off. Default: false
+   * (auto-forward, original behaviour). Useful while iterating on a
+   * storyline that's prone to drift — you can veto bad gate output
+   * before it pollutes a turn, instead of after.
+   */
+  gateApprovalEnabled?: boolean
+  /**
+   * Living world state — characters, plot points, and the world's agenda.
+   * Injected into the narrative prompt after the cache breakpoint so the
+   * model has a structured, evolving view of who/what is in play.
+   *
+   * In Phase 1 these are user-edited only. In Phase 2 a cheap analysis
+   * model patches them via tool calls after each resolution turn.
+   */
+  characters?: Record<string, CharacterCard>
+  plotPoints?: Record<string, PlotPoint>
+  agenda?: AgendaItem[]
+  /**
+   * Recent analysis-pass updates, oldest first. Capped to a small ring
+   * buffer so it doesn't grow unbounded across long adventures.
+   */
+  analysisLog?: AnalysisLogEntry[]
+  /**
+   * A model-synthesized global storyline — a few paragraphs describing
+   * what is *actually* happening across the story so far, taking the
+   * full narrative + all seeded plot points into account. Regenerated
+   * by the synthesis pass that runs after each analysis pass, and fed
+   * back into the narrative prompt as additional context so the
+   * generator has a coherent picture of the larger arc instead of just
+   * the fragments visible from individual plot points.
+   */
+  storyline?: string
 }
 
 // --- localStorage helpers (offline / crash recovery) ---

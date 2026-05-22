@@ -9,6 +9,7 @@ import { LlmCacheDots } from '../../components/LlmCacheDots'
 import { QuickLlmDialog } from '../../components/QuickLlmDialog'
 import { OverlayPanel } from '../../components/OverlayPanel'
 import { useEngine } from './useAdventureEngine'
+import { WorldPanel } from './WorldPanel'
 import * as styles from '../AdventurePage.css'
 
 // --- Header action buttons (shared between desktop and mobile) ---
@@ -115,7 +116,9 @@ export const AdventureHeader: Component<{
             <label class={styles.formLabel}>📖 World Bible</label>
             <div class={styles.directiveHint}>
               Foundational context injected at the start of every LLM call.
-              Use for world background, character lists, personalities, lore, and rules that rarely change.
+              Use for world background, lore, and rules that rarely change.
+              For per-character / per-plot tracking, use the structured
+              sections below — they update during the story.
             </div>
             <textarea
               class={styles.directiveTextarea}
@@ -124,7 +127,41 @@ export const AdventureHeader: Component<{
                 adventureStore.setWorldBible(e.currentTarget.value)
                 engine.persist()
               }}
-              placeholder="Background world info, character lists, personalities, lore, rules of magic..."
+              placeholder="Background world info, lore, rules of magic..."
+              rows={6}
+            />
+          </div>
+
+          {/* Living world state — characters, plot points, agenda */}
+          <WorldPanel />
+
+          {/* Synthesized global storyline */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>
+              🧵 Story Arc
+              <Show when={adventureStore.isSynthesizing}>
+                <span style={{ 'margin-left': '8px', opacity: 0.6, 'font-size': '0.85em' }}>
+                  synthesizing…
+                </span>
+              </Show>
+            </label>
+            <div class={styles.directiveHint}>
+              A model-synthesized paragraph describing what's actually
+              happening across the whole story so far, taking the full
+              narrative + every tracked plot point into account. Regenerated
+              after each turn (right after the analysis pass) and fed back
+              into the narrative prompt so the generator has a coherent
+              throughline. You can edit it; your edits stick until the next
+              synthesis pass overwrites them.
+            </div>
+            <textarea
+              class={styles.directiveTextarea}
+              value={adventureStore.storyline}
+              onInput={(e) => {
+                adventureStore.setStoryline(e.currentTarget.value)
+                engine.persist()
+              }}
+              placeholder="(empty — will be filled in after the first turn's synthesis pass)"
               rows={6}
             />
           </div>
@@ -172,6 +209,58 @@ export const AdventureHeader: Component<{
               can choose to revise. When off, turns finish faster and you
               skip the check entirely — useful if the check model is flaky
               or the spinner gets stuck.
+            </div>
+          </div>
+
+          {/* Storyline-gate approval toggle */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>
+              <input
+                type="checkbox"
+                checked={adventureStore.gateApprovalEnabled}
+                onChange={(e) => {
+                  adventureStore.setGateApprovalEnabled(
+                    e.currentTarget.checked,
+                  )
+                  engine.persist()
+                }}
+                style={{ 'margin-right': '8px' }}
+              />
+              Review storyline-gate brief before each turn
+            </label>
+            <div class={styles.directiveHint}>
+              When on, generation pauses after the storyline-gate pass and
+              shows you the slice of the arc it's about to forward to the
+              narrative. Accept it to continue, or reject it to generate
+              this turn without arc context. Useful while iterating on a
+              storyline that's prone to drift — you can veto bad gate
+              output before it reaches the page, instead of resetting the
+              storyline after the fact.
+            </div>
+          </div>
+
+          {/* Steering toggle */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>
+              <input
+                type="checkbox"
+                checked={adventureStore.steeringEnabled}
+                onChange={(e) => {
+                  adventureStore.setSteeringEnabled(e.currentTarget.checked)
+                  engine.persist()
+                }}
+                style={{ 'margin-right': '8px' }}
+              />
+              Vary execution quality (luck rolls)
+            </label>
+            <div class={styles.directiveHint}>
+              When on, each action gets a hidden roll that biases how
+              gracefully or clumsily the protagonist pulls it off — most
+              turns are neutral, but some land especially well or
+              especially badly. When off, every action resolves at face
+              value with no luck overlay. Turn this off if disaster /
+              friction outcomes feel like they take over scenes more than
+              you'd like.
             </div>
           </div>
 

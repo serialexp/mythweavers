@@ -14,11 +14,16 @@ import {
   buildNonsenseCheckMessages,
   buildRevisionMessages,
   buildCompactionMessages,
+  buildAnalysisMessages,
+  buildSynthesisMessages,
+  buildStorylineGateMessages,
   getCompactionRanges,
   cleanNarrative,
   rollSteering,
+  ANALYSIS_TOOLS,
   type SteeringBucket,
 } from './prompts'
+import { applyAnalysisToolCall } from './applyAnalysisToolCall'
 
 // --- Engine interface & context ---
 
@@ -31,6 +36,14 @@ export interface AdventureEngine {
   handleRetryWorldStep: () => void
   handleAdvanceWorld: () => void
   handleRegenerate: () => void
+  /** Manually re-run the analysis pass against the existing world state + last turns. */
+  runAnalysisPass: () => Promise<void>
+  /** Manually re-run the synthesis pass (rebuild the global storyline). */
+  runSynthesisPass: () => Promise<void>
+  /** Approve the in-flight storyline-gate brief and continue generation. */
+  acceptGateBrief: () => void
+  /** Reject the in-flight storyline-gate brief and continue without arc context. */
+  rejectGateBrief: () => void
   handleEditAndRegenerate: (newAction: string) => void
   handleReviseNarrative: () => void
   handleRewindTo: (turnIndex: number) => void
@@ -64,8 +77,32 @@ export function createAdventureEngine(
   let inputRef: HTMLTextAreaElement | undefined
   let abortController: AbortController | null = null
 
+  /**
+   * Resolver for the in-flight storyline-gate approval, if any. Set when
+   * the gate brief is shown to the user and the engine is parked waiting
+   * for a decision. Cleared as soon as accept/reject/cancel fires.
+   * - accept: resolves with the (possibly edited) brief string
+   * - reject: resolves with undefined (proceed without arc context)
+   * - cancel: rejects with an AbortError (engine catches it like any
+   *   other abort and unwinds the turn cleanly)
+   */
+  let gateApprovalResolve:
+    | ((brief: string | undefined) => void)
+    | null = null
+  let gateApprovalReject: ((reason: unknown) => void) | null = null
+
+  function clearPendingGateApproval() {
+    gateApprovalResolve = null
+    gateApprovalReject = null
+    adventureStore.setPendingGateBrief(null, null)
+  }
+
   onCleanup(() => {
     abortController?.abort()
+    if (gateApprovalReject) {
+      gateApprovalReject(new DOMException('cleanup', 'AbortError'))
+      clearPendingGateApproval()
+    }
   })
 
   // --- Persistence helpers ---
@@ -122,11 +159,11 @@ export function createAdventureEngine(
     const response = client.generate({
       model: resolved.model,
       messages,
-      max_tokens: effectiveSettings.maxTokens,
-      thinking_budget: effectiveSettings.thinkingBudget
+      max_tokens: resolved.maxTokens,
+      thinking_budget: resolved.thinkingBudget
         ? Math.min(
-            effectiveSettings.thinkingBudget,
-            Math.floor(effectiveSettings.maxTokens / 2),
+            resolved.thinkingBudget,
+            Math.floor(resolved.maxTokens / 2),
           )
         : undefined,
       signal: abortController!.signal,
@@ -160,12 +197,27 @@ export function createAdventureEngine(
    */
   async function runWorldStep() {
     adventureStore.setStreamingContent('')
+    adventureStore.setStreamingKind('world-step')
+
+    // Storyline gate — independently filtered for the world-step beat
+    // (no player action; the gate sees the just-finalized resolution
+    // narrative as the most recent turn in history). The brief here may
+    // be a different slice than the resolution brief — the world is
+    // reacting, not the protagonist.
+    const worldStepStorylineBrief = await runStorylineGate(null, 'world-step')
+
     const messages = buildWorldStepMessages(
       adventureStore.turns,
       adventureStore.settingDescription,
       adventureStore.directive,
       adventureStore.compactions,
       adventureStore.worldBible,
+      {
+        characters: adventureStore.characters,
+        plotPoints: adventureStore.plotPoints,
+        agenda: adventureStore.agenda,
+      },
+      worldStepStorylineBrief,
     )
 
     const { narrative, streamErrors } = await streamPass(
@@ -203,22 +255,38 @@ export function createAdventureEngine(
     adventureStore.setNonsenseWarning(null)
     adventureStore.setIsGenerating(true)
     adventureStore.setStreamingContent('')
+    adventureStore.setStreamingKind('resolution')
     adventureStore.setPendingAction(playerAction)
     persistNow()
 
     // Roll steering once for this player input — applied ONLY to the
     // resolution pass, since steering scopes to the protagonist's action
     // execution. The world-step pass runs neutral. Opening turn has no
-    // player action and no steering.
+    // player action and no steering. The user can disable steering
+    // entirely via `steeringEnabled` (in which case every action resolves
+    // at face value, like a permanent `steady` roll without the prompt
+    // overhead).
     const steering: SteeringBucket | undefined =
-      playerAction !== null ? rollSteering() : undefined
+      playerAction !== null && adventureStore.steeringEnabled
+        ? rollSteering()
+        : undefined
     if (steering) {
       console.log(`[Steering] Rolled: ${steering}`)
     }
+    // Reflect the steering bucket in the streaming block so the chip is
+    // already in place when content starts arriving — finalize then
+    // doesn't introduce a chip-shaped height jump.
+    adventureStore.setStreamingSteering(steering)
 
     abortController = new AbortController()
 
     try {
+      // --- Storyline gate (pre-resolution) ---
+      // Filter the author-side storyline against the player's intended
+      // action and the current world state. The narrative pass sees only
+      // the resulting brief — never the full arc.
+      const resolutionStorylineBrief = await runStorylineGate(playerAction, 'resolution')
+
       // --- Pass 1: resolution ---
       const resolutionMessages = buildResolutionMessages(
         adventureStore.turns,
@@ -228,6 +296,12 @@ export function createAdventureEngine(
         adventureStore.directive,
         adventureStore.compactions,
         adventureStore.worldBible,
+        {
+          characters: adventureStore.characters,
+          plotPoints: adventureStore.plotPoints,
+          agenda: adventureStore.agenda,
+        },
+        resolutionStorylineBrief,
       )
 
       const { narrative, streamErrors } = await streamPass(
@@ -318,7 +392,17 @@ export function createAdventureEngine(
         }
       }
 
-      // Run compaction in the background (non-blocking)
+      // Run analysis + compaction in the background (non-blocking).
+      // Analysis goes first so the next turn's prompt sees fresh world
+      // state; compaction is purely retrospective and order doesn't matter.
+      // Synthesis chains AFTER analysis so it sees the freshly-seeded /
+      // patched plot points + characters this turn produced. All three
+      // are fire-and-forget; we don't await.
+      runAnalysisPass()
+        .then(() => runSynthesisPass())
+        .catch((err) => {
+          console.warn('[Analysis→Synthesis] chain error:', err)
+        })
       runPendingCompactions()
 
       // Focus input for next action
@@ -352,6 +436,8 @@ export function createAdventureEngine(
     } finally {
       adventureStore.setIsGenerating(false)
       adventureStore.setStreamingContent('')
+      adventureStore.setStreamingKind(null)
+      adventureStore.setStreamingSteering(undefined)
       adventureStore.setPendingAction(null)
       abortController = null
     }
@@ -401,6 +487,7 @@ export function createAdventureEngine(
     } finally {
       adventureStore.setIsGenerating(false)
       adventureStore.setStreamingContent('')
+      adventureStore.setStreamingKind(null)
       abortController = null
     }
   }
@@ -439,11 +526,11 @@ export function createAdventureEngine(
       const response = client.generate({
         model: resolved.model,
         messages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
           ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
             )
           : undefined,
         metadata: { callType: 'adventure-compaction' },
@@ -477,6 +564,341 @@ export function createAdventureEngine(
   }
 
   /**
+   * Background analysis pass — feeds the most recent narrative + current
+   * world state to the cheap analysis model and applies any tool calls it
+   * emits. Non-blocking, runs after a resolution turn finalizes. Failures
+   * are non-fatal (state simply doesn't update this turn). Aborts cleanly
+   * when the model doesn't support tool calls (e.g. Anthropic, Ollama).
+   *
+   * The analysis call is gated by:
+   *   - At least one turn on the books (nothing to analyze on the empty state)
+   *   - The user hasn't disabled it via the toggle (analysisPassEnabled)
+   *
+   * The model is whatever the user has assigned to `adventure-analysis`,
+   * which falls under the `analysis` category in resolveModel.
+   */
+  async function runAnalysisPass() {
+    if (adventureStore.isAnalyzing) return
+    const turns = adventureStore.turns
+    if (turns.length === 0) return
+
+    // Feed the last several turns of narrative — wide enough that the
+    // analyzer can ground a newly-introduced character in how they
+    // actually showed up in the story (entrance, dialogue, prior beats),
+    // not just react to the most recent paragraph. Walk back from the end
+    // and stop when we have ~6000 chars (~4-6 turns, rough budget).
+    const recentParts: string[] = []
+    let chars = 0
+    for (let i = turns.length - 1; i >= 0; i--) {
+      const t = turns[i]
+      if (t.playerAction) {
+        recentParts.unshift(`> ${t.playerAction}`)
+      }
+      recentParts.unshift(t.narrative)
+      chars += t.narrative.length
+      if (chars >= 6000) break
+    }
+    const recentNarrative = recentParts.join('\n\n')
+    if (!recentNarrative.trim()) return
+
+    const liveWorldState = {
+      characters: adventureStore.characters,
+      plotPoints: adventureStore.plotPoints,
+      agenda: adventureStore.agenda,
+    }
+
+    adventureStore.setIsAnalyzing(true)
+    try {
+      const resolved = resolveModel('adventure-analysis')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      const messages = buildAnalysisMessages(
+        recentNarrative,
+        liveWorldState,
+        adventureStore.protagonistInput,
+        {
+          settingDescription: adventureStore.settingDescription,
+          worldBible: adventureStore.worldBible,
+        },
+      )
+
+      console.log(
+        `[Analysis] Running with ${resolved.provider}/${resolved.model}`,
+      )
+
+      const response = client.generate({
+        model: resolved.model,
+        messages,
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
+          ? Math.min(
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
+            )
+          : undefined,
+        tools: ANALYSIS_TOOLS,
+        tool_choice: 'auto',
+        metadata: { callType: 'adventure-analysis' },
+      })
+
+      const opCount = { applied: 0, noop: 0, failed: 0 }
+      for await (const event of response) {
+        if (event.type === 'tool_call') {
+          const at = new Date().toISOString()
+          try {
+            const outcome = applyAnalysisToolCall(event.name, event.arguments)
+            adventureStore.appendAnalysisLog({
+              at,
+              tool: event.name,
+              args: event.arguments,
+              status: outcome.status,
+              summary: outcome.summary,
+            })
+            if (outcome.status === 'applied') opCount.applied++
+            else opCount.noop++
+          } catch (err: unknown) {
+            opCount.failed++
+            const message =
+              err instanceof Error ? err.message : 'Failed to apply tool call'
+            adventureStore.appendAnalysisLog({
+              at,
+              tool: event.name,
+              args: event.arguments,
+              status: 'failed',
+              summary: `Failed: ${message}`,
+              error: message,
+            })
+            console.warn(
+              `[Analysis] Failed to apply ${event.name}:`,
+              message,
+              event.arguments,
+            )
+          }
+        }
+        // We deliberately ignore `chunk` events — the analysis model's
+        // prose response is a turn-summary at best and we don't show it.
+      }
+
+      if (opCount.applied > 0 || opCount.noop > 0 || opCount.failed > 0) {
+        console.log(
+          `[Analysis] ${opCount.applied} applied, ${opCount.noop} no-op, ${opCount.failed} failed`,
+        )
+        persist()
+      } else {
+        console.log('[Analysis] No tool calls this turn')
+      }
+    } catch (err: unknown) {
+      // Tool-call-unsupported errors come back here — non-fatal, just skip.
+      const message =
+        err instanceof Error ? err.message : 'Analysis pass failed'
+      console.warn('[Analysis] Skipped due to error:', message)
+    } finally {
+      adventureStore.setIsAnalyzing(false)
+    }
+  }
+
+  /**
+   * Background synthesis pass — runs AFTER `runAnalysisPass()` each turn.
+   * Builds the same shared history as the story generator (so the cache
+   * prefix is shared) and asks a model to synthesize the full story-so-far
+   * + the current characters/plot points/agenda into a coherent global
+   * storyline. The result is stored on `adventureStore.storyline` and fed
+   * back into the narrative prompt as additional context, giving the
+   * generator a real throughline rather than just disconnected plot-point
+   * fragments.
+   *
+   * Skipped on the empty state and while another synthesis pass is in
+   * flight. Failures are non-fatal — the previous storyline (if any) just
+   * stays in place this turn.
+   */
+  async function runSynthesisPass() {
+    if (adventureStore.isSynthesizing) return
+    const turns = adventureStore.turns
+    if (turns.length === 0) return
+
+    const liveWorldState = {
+      characters: adventureStore.characters,
+      plotPoints: adventureStore.plotPoints,
+      agenda: adventureStore.agenda,
+    }
+
+    adventureStore.setIsSynthesizing(true)
+    try {
+      const resolved = resolveModel('adventure-synthesis')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      const messages = buildSynthesisMessages(
+        turns,
+        liveWorldState,
+        adventureStore.settingDescription,
+        adventureStore.compactions,
+        {
+          worldBible: adventureStore.worldBible,
+          previousStoryline: adventureStore.storyline,
+        },
+      )
+
+      console.log(
+        `[Synthesis] Running with ${resolved.provider}/${resolved.model}`,
+      )
+
+      let accumulated = ''
+      const response = client.generate({
+        model: resolved.model,
+        messages,
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
+          ? Math.min(
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
+            )
+          : undefined,
+        metadata: { callType: 'adventure-synthesis' },
+      })
+
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          accumulated += event.text
+        }
+      }
+
+      const storyline = accumulated
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/^#+\s+[^\n]+\n+/gm, '')
+        .trim()
+
+      // SAME = explicit no-op. The model is telling us nothing meaningful
+      // has changed since the previous synthesis; reuse the previous
+      // storyline verbatim. Only honored when there's a previous storyline
+      // on file — the prompt forbids SAME on the first pass, but defend
+      // against a misbehaving model anyway.
+      const isSameMarker =
+        /^SAME\.?$/i.test(storyline) && !!adventureStore.storyline.trim()
+
+      if (isSameMarker) {
+        console.log('[Synthesis] SAME — keeping previous storyline verbatim')
+      } else if (storyline) {
+        adventureStore.setStoryline(storyline)
+        persist()
+        console.log(`[Synthesis] Updated storyline (${storyline.length} chars)`)
+      } else {
+        console.log('[Synthesis] Empty response — keeping previous storyline')
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Synthesis pass failed'
+      console.warn('[Synthesis] Skipped due to error:', message)
+    } finally {
+      adventureStore.setIsSynthesizing(false)
+    }
+  }
+
+  /**
+   * Storyline-gate pass — runs SYNCHRONOUSLY before each narrative pass
+   * (resolution and world-step). Takes the full author-side storyline and
+   * filters it down to the slice that's actually visible to / informing
+   * the next beat. The narrative pass receives this brief instead of the
+   * raw storyline; everything else stays off-page.
+   *
+   * Returns the filtered brief as a string, or `undefined` when:
+   * - There is no storyline yet (synthesis hasn't run / first turn).
+   * - The gate model returns "NONE" (or the empty string).
+   * - The gate call errors out (we'd rather narrate without arc context
+   *   than crash the turn).
+   *
+   * Note this is awaited inline by the narrative pipeline — it adds one
+   * sequential LLM call per narrative pass. That cost is the price of
+   * keeping arc information off the page; if it becomes a problem we can
+   * cache or skip strategically later.
+   */
+  async function runStorylineGate(
+    playerAction: string | null,
+    kind: 'resolution' | 'world-step',
+  ): Promise<string | undefined> {
+    const storyline = adventureStore.storyline.trim()
+    if (!storyline) return undefined
+
+    try {
+      const resolved = resolveModel('adventure-storyline-gate')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      const messages = buildStorylineGateMessages(
+        adventureStore.turns,
+        adventureStore.settingDescription,
+        storyline,
+        playerAction,
+        adventureStore.compactions,
+        { worldBible: adventureStore.worldBible },
+      )
+
+      console.log(
+        `[StorylineGate] Running with ${resolved.provider}/${resolved.model} for ${
+          playerAction === null ? 'world-step' : 'resolution'
+        }`,
+      )
+
+      let accumulated = ''
+      const response = client.generate({
+        model: resolved.model,
+        messages,
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
+          ? Math.min(
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
+            )
+          : undefined,
+        metadata: { callType: 'adventure-storyline-gate' },
+      })
+
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          accumulated += event.text
+        }
+      }
+
+      const brief = accumulated
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/^#+\s+[^\n]+\n+/gm, '')
+        .trim()
+
+      // NONE / empty → no relevant arc context this beat. Drop entirely.
+      if (!brief || /^(none|n\/a|nothing)\.?$/i.test(brief)) {
+        console.log('[StorylineGate] NONE — narrating without arc context')
+        return undefined
+      }
+
+      console.log(`[StorylineGate] Brief (${brief.length} chars):\n${brief}`)
+
+      // Approval gate (opt-in). When enabled, hand the brief to the UI
+      // and park here until the user clicks accept/reject. Reject =
+      // proceed without arc context this beat (returns undefined).
+      // Accept = proceed with the (possibly-edited) brief. Cancel
+      // (handleAbort or unmount) rejects the promise with an
+      // AbortError, which the outer try/catch surfaces normally.
+      if (adventureStore.gateApprovalEnabled) {
+        adventureStore.setPendingGateBrief(brief, kind)
+        const approved = await new Promise<string | undefined>(
+          (resolve, reject) => {
+            gateApprovalResolve = resolve
+            gateApprovalReject = reject
+          },
+        )
+        if (approved === undefined) {
+          console.log('[StorylineGate] User rejected brief — proceeding without arc context')
+        } else {
+          console.log('[StorylineGate] User accepted brief')
+        }
+        return approved
+      }
+
+      return brief
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Storyline gate failed'
+      console.warn('[StorylineGate] Skipped due to error:', message)
+      return undefined
+    }
+  }
+
+  /**
    * Check if any new compaction ranges need summaries and generate them.
    * Runs after turn finalization — failures are silent.
    */
@@ -503,11 +925,11 @@ export function createAdventureEngine(
     const response = client.generate({
       model: resolved.model,
       messages,
-      max_tokens: effectiveSettings.maxTokens,
-      thinking_budget: effectiveSettings.thinkingBudget
+      max_tokens: resolved.maxTokens,
+      thinking_budget: resolved.thinkingBudget
         ? Math.min(
-            effectiveSettings.thinkingBudget,
-            Math.floor(effectiveSettings.maxTokens / 2),
+            resolved.thinkingBudget,
+            Math.floor(resolved.maxTokens / 2),
           )
         : undefined,
       signal: abortController!.signal,
@@ -552,7 +974,12 @@ export function createAdventureEngine(
     if (!narrative || narrative.trim().length < 50) return
 
     // The narrative is already a committed turn at this point; show only a
-    // spinner, not the narrative text again.
+    // spinner, not the narrative text again. Match the streaming-kind to
+    // the turn being checked so the chip stays consistent above the spinner.
+    const lastKind =
+      adventureStore.turns[adventureStore.turns.length - 1]?.kind ??
+      'resolution'
+    adventureStore.setStreamingKind(lastKind)
     adventureStore.setStreamingContent('⏳ Checking narrative...')
 
     const nonsenseIssues = await runSingleCheck(
@@ -586,6 +1013,7 @@ export function createAdventureEngine(
     const nonsenseIssues = adventureStore.nonsenseWarning
 
     adventureStore.setIsGenerating(true)
+    adventureStore.setStreamingKind(lastTurn.kind ?? 'resolution')
     adventureStore.setStreamingContent('⏳ Revising narrative...')
     abortController = new AbortController()
 
@@ -601,6 +1029,11 @@ export function createAdventureEngine(
         adventureStore.directive,
         adventureStore.compactions,
         adventureStore.worldBible,
+        {
+          characters: adventureStore.characters,
+          plotPoints: adventureStore.plotPoints,
+          agenda: adventureStore.agenda,
+        },
       )
 
       const revisionResolved = resolveModel('adventure-revision')
@@ -612,11 +1045,11 @@ export function createAdventureEngine(
       const revisionResponse = revisionClient.generate({
         model: revisionResolved.model,
         messages: revisionMessages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
+        max_tokens: revisionResolved.maxTokens,
+        thinking_budget: revisionResolved.thinkingBudget
           ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
+              revisionResolved.thinkingBudget,
+              Math.floor(revisionResolved.maxTokens / 2),
             )
           : undefined,
         signal: abortController!.signal,
@@ -648,6 +1081,7 @@ export function createAdventureEngine(
     } finally {
       adventureStore.setIsGenerating(false)
       adventureStore.setStreamingContent('')
+      adventureStore.setStreamingKind(null)
     }
   }
 
@@ -705,6 +1139,33 @@ export function createAdventureEngine(
 
   function handleAbort() {
     abortController?.abort()
+    // Also unblock any in-flight gate approval so the await unwinds.
+    if (gateApprovalReject) {
+      gateApprovalReject(new DOMException('aborted', 'AbortError'))
+      clearPendingGateApproval()
+    }
+  }
+
+  /**
+   * Accept the in-flight gate brief — the narrative pass proceeds with
+   * the brief as additional context. No-op when no brief is pending.
+   */
+  function acceptGateBrief() {
+    if (!gateApprovalResolve) return
+    const brief = adventureStore.pendingGateBrief ?? undefined
+    gateApprovalResolve(brief)
+    clearPendingGateApproval()
+  }
+
+  /**
+   * Reject the in-flight gate brief — the narrative pass proceeds with
+   * NO arc context this beat. The brief is discarded; the gate will run
+   * fresh next turn. No-op when no brief is pending.
+   */
+  function rejectGateBrief() {
+    if (!gateApprovalResolve) return
+    gateApprovalResolve(undefined)
+    clearPendingGateApproval()
   }
 
   function handleRetry() {
@@ -803,11 +1264,11 @@ export function createAdventureEngine(
       const response = client.generate({
         model: settingResolved.model,
         messages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
+        max_tokens: settingResolved.maxTokens,
+        thinking_budget: settingResolved.thinkingBudget
           ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
+              settingResolved.thinkingBudget,
+              Math.floor(settingResolved.maxTokens / 2),
             )
           : undefined,
         metadata: { callType: 'adventure-setting' },
@@ -893,6 +1354,10 @@ export function createAdventureEngine(
     handleRetryWorldStep,
     handleAdvanceWorld,
     handleRegenerate,
+    runAnalysisPass,
+    runSynthesisPass,
+    acceptGateBrief,
+    rejectGateBrief,
     handleEditAndRegenerate,
     handleReviseNarrative,
     handleRewindTo,
