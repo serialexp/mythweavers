@@ -210,6 +210,81 @@ describe('Auth Endpoints', () => {
       const body = response.json()
       expect(body.error).toBe('Invalid credentials')
     })
+
+    test('default login issues a 3-day session', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: {
+          username: 'testuser',
+          password: 'password123',
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const cookies = response.cookies
+      expect(cookies).toHaveLength(1)
+      expect(cookies[0].name).toBe('sessionToken')
+      // 3 days in seconds, allow a few seconds of slack for execution time
+      const threeDaysSeconds = 3 * 24 * 60 * 60
+      expect(cookies[0].maxAge).toBeGreaterThanOrEqual(threeDaysSeconds - 5)
+      expect(cookies[0].maxAge).toBeLessThanOrEqual(threeDaysSeconds)
+    })
+
+    test('rememberMe=true issues a 30-day session', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: {
+          username: 'testuser',
+          password: 'password123',
+          rememberMe: true,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const cookies = response.cookies
+      expect(cookies).toHaveLength(1)
+      expect(cookies[0].name).toBe('sessionToken')
+      const thirtyDaysSeconds = 30 * 24 * 60 * 60
+      expect(cookies[0].maxAge).toBeGreaterThanOrEqual(thirtyDaysSeconds - 5)
+      expect(cookies[0].maxAge).toBeLessThanOrEqual(thirtyDaysSeconds)
+    })
+
+    test('/auth/session does NOT extend the session expiry', async () => {
+      // Sessions are not rolled forward — the lifetime chosen at login
+      // (3d default, 30d for rememberMe) is the final word. Verify both
+      // paths leave expiresAt untouched.
+      for (const rememberMe of [false, true]) {
+        const loginResponse = await app.inject({
+          method: 'POST',
+          url: '/auth/login',
+          payload: {
+            username: 'testuser',
+            password: 'password123',
+            rememberMe,
+          },
+        })
+        expect(loginResponse.statusCode).toBe(200)
+        const token = loginResponse.cookies[0].value
+
+        const { prisma } = await import('../src/lib/prisma.js')
+        const before = await prisma.session.findUnique({ where: { token } })
+        expect(before).not.toBeNull()
+        const originalExpiry = before!.expiresAt.getTime()
+
+        const sessionResponse = await app.inject({
+          method: 'GET',
+          url: '/auth/session',
+          cookies: { sessionToken: token },
+        })
+        expect(sessionResponse.statusCode).toBe(200)
+        expect(sessionResponse.json().authenticated).toBe(true)
+
+        const after = await prisma.session.findUnique({ where: { token } })
+        expect(after!.expiresAt.getTime()).toBe(originalExpiry)
+      }
+    })
   })
 
   describe('GET /auth/session', () => {

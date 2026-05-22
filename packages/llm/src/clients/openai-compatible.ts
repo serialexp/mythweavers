@@ -169,8 +169,31 @@ function applyThinkingBudget(
   // Otherwise: silently drop. The model probably doesn't reason at all.
 }
 
-/** Map a raw OpenAI-compatible streaming chunk to LLMStreamEvents. */
-function parseStreamChunk(parsed: any): LLMStreamEvent[] {
+/**
+ * Streaming tool-call accumulator. OpenAI streams `delta.tool_calls[i]`
+ * fragments where the same `index` may appear across many chunks: the first
+ * fragment carries `id` and `function.name`; subsequent fragments carry
+ * `function.arguments` deltas that must be concatenated.
+ *
+ * We hold one entry per index, then emit a single `tool_call` event per
+ * index when the stream ends — cleanest contract for consumers (no need to
+ * re-assemble argument deltas themselves).
+ */
+interface ToolCallAccumulator {
+  id: string
+  name: string
+  argumentsRaw: string
+}
+
+/**
+ * Map a raw OpenAI-compatible streaming chunk to LLMStreamEvents. Tool-call
+ * fragments are mutated into the shared `toolCallsByIndex` map so we can
+ * flush them at end-of-stream as a single event per call.
+ */
+function parseStreamChunk(
+  parsed: any,
+  toolCallsByIndex: Map<number, ToolCallAccumulator>,
+): LLMStreamEvent[] {
   const events: LLMStreamEvent[] = []
 
   // Usage info (usually in the final chunk when stream_options.include_usage is set).
@@ -211,6 +234,25 @@ function parseStreamChunk(parsed: any): LLMStreamEvent[] {
       events.push({ type: "chunk", text })
     }
 
+    // Tool-call fragments — accumulate by index, emit on flush.
+    const toolCalls = choice.delta?.tool_calls
+    if (Array.isArray(toolCalls)) {
+      for (const tc of toolCalls) {
+        const idx = typeof tc.index === "number" ? tc.index : 0
+        const existing = toolCallsByIndex.get(idx) ?? {
+          id: "",
+          name: "",
+          argumentsRaw: "",
+        }
+        if (tc.id) existing.id = tc.id
+        if (tc.function?.name) existing.name = tc.function.name
+        if (typeof tc.function?.arguments === "string") {
+          existing.argumentsRaw += tc.function.arguments
+        }
+        toolCallsByIndex.set(idx, existing)
+      }
+    }
+
     // finish_reason signals the end
     if (choice.finish_reason) {
       events.push({ type: "done" })
@@ -226,6 +268,32 @@ function parseStreamChunk(parsed: any): LLMStreamEvent[] {
   }
 
   return events
+}
+
+/**
+ * Flush accumulated tool calls into `tool_call` events. Called once at
+ * end-of-stream. Sorts by index so the order matches what the model emitted.
+ * Arguments are JSON-parsed; if parsing fails we still emit the event with
+ * the raw string so the consumer can decide how to handle malformed output.
+ */
+function flushToolCalls(
+  toolCallsByIndex: Map<number, ToolCallAccumulator>,
+): LLMStreamEvent[] {
+  const sorted = [...toolCallsByIndex.entries()].sort(([a], [b]) => a - b)
+  return sorted.map(([, tc]) => {
+    let parsed: unknown = tc.argumentsRaw
+    try {
+      parsed = tc.argumentsRaw ? JSON.parse(tc.argumentsRaw) : {}
+    } catch {
+      // Leave parsed as the raw string so consumers can surface a useful error.
+    }
+    return {
+      type: "tool_call" as const,
+      id: tc.id,
+      name: tc.name,
+      arguments: parsed,
+    }
+  })
 }
 
 export interface OpenAICompatibleClientConfig extends LLMClientConfig {
@@ -343,6 +411,29 @@ export class OpenAICompatibleClient implements LLMClient {
     // whatever OpenAI-compatible upstream we're talking to.
     applyThinkingBudget(requestBody, options, this.getBaseUrl())
 
+    // Tools — passed through in OpenAI's `function` shape. Empty/undefined
+    // tools means the field is omitted entirely (some providers reject an
+    // empty `tools: []` array).
+    if (options.tools && options.tools.length > 0) {
+      requestBody.tools = options.tools.map((t) => ({
+        type: "function",
+        function: {
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        },
+      }))
+      const choice = options.tool_choice
+      if (choice === "none" || choice === "auto" || choice === "required") {
+        requestBody.tool_choice = choice
+      } else if (choice && typeof choice === "object" && choice.name) {
+        requestBody.tool_choice = {
+          type: "function",
+          function: { name: choice.name },
+        }
+      }
+    }
+
     const response = await fetch(
       this.buildUrl("/chat/completions"),
       {
@@ -373,17 +464,30 @@ export class OpenAICompatibleClient implements LLMClient {
       return
     }
 
+    const toolCallsByIndex = new Map<number, ToolCallAccumulator>()
     let sawDone = false
     for await (const raw of parseSSEStream(response.body)) {
-      for (const event of parseStreamChunk(raw)) {
-        if (event.type === "done") sawDone = true
+      for (const event of parseStreamChunk(raw, toolCallsByIndex)) {
+        // Hold off on emitting `done` until after tool calls are flushed,
+        // so consumers see all tool_call events first.
+        if (event.type === "done") {
+          sawDone = true
+          continue
+        }
         yield event
       }
     }
 
-    // Guarantee done if the stream didn't already produce one
-    if (!sawDone) {
-      yield { type: "done" }
+    // Flush any accumulated tool calls before signaling done.
+    for (const event of flushToolCalls(toolCallsByIndex)) {
+      yield event
     }
+
+    // Guarantee done — covers both the case where finish_reason was sent
+    // (we suppressed that done above so tool calls flush first) and the
+    // case where the stream ended without one. `sawDone` is read so the
+    // linter doesn't flag the captured-but-unused branch.
+    void sawDone
+    yield { type: "done" }
   }
 }

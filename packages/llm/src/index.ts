@@ -5,6 +5,8 @@ export type {
   NormalizedTokenUsage,
   LLMMessage,
   LLMGenerateOptions,
+  ToolDefinition,
+  ToolChoice,
   ModelPricing,
   LLMModel,
   ConfigOrGetter,

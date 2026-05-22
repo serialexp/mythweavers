@@ -29,12 +29,34 @@ const messageSchema = z.object({
     .optional(),
 })
 
+const toolDefinitionSchema = z.object({
+  name: z.string().meta({ description: 'Tool name (function name).' }),
+  description: z.string().meta({
+    description: 'Human-readable description of what the tool does.',
+  }),
+  parameters: z.record(z.string(), z.unknown()).meta({
+    description: 'JSON Schema for the tool parameters, passed through verbatim.',
+  }),
+})
+
+const toolChoiceSchema = z.union([
+  z.literal('auto'),
+  z.literal('required'),
+  z.literal('none'),
+  z.object({ name: z.string() }),
+])
+
 const generateBodySchema = z.object({
   model: z.string().meta({ description: 'Model name from the server allowed list' }),
   messages: z.array(messageSchema).min(1),
   temperature: z.number().min(0).max(2).optional(),
   max_tokens: z.number().int().positive().optional(),
   thinking_budget: z.number().int().positive().optional(),
+  tools: z.array(toolDefinitionSchema).optional().meta({
+    description:
+      "Optional tool definitions the model may invoke. Currently only honored on OpenAI-compatible upstreams; other providers will reject the request.",
+  }),
+  tool_choice: toolChoiceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
@@ -79,6 +101,15 @@ function writeSSE(raw: import('node:http').ServerResponse, event: LLMStreamEvent
       break
     case 'error':
       payload = { type: 'error', error: event.error }
+      break
+    case 'tool_call':
+      // Forward tool calls verbatim to the frontend's ServerLLMClient.
+      payload = {
+        type: 'tool_call',
+        id: event.id,
+        name: event.name,
+        arguments: event.arguments,
+      }
       break
     default: {
       const _exhaustive: never = event
@@ -239,6 +270,8 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
           temperature: request.body.temperature,
           max_tokens: request.body.max_tokens,
           thinking_budget: request.body.thinking_budget,
+          ...(request.body.tools ? { tools: request.body.tools } : {}),
+          ...(request.body.tool_choice ? { tool_choice: request.body.tool_choice } : {}),
           signal: abortController.signal,
         })) {
           if (event.type === 'chunk' && !firstChunkAt) {

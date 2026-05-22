@@ -69,11 +69,11 @@ export const QuickLlmDialog: Component = () => {
       const response = client.generate({
         model: resolved.model,
         messages: llmMessages,
-        max_tokens: effectiveSettings.maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
           ? Math.min(
-              effectiveSettings.thinkingBudget,
-              Math.floor(effectiveSettings.maxTokens / 2),
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
             )
           : undefined,
         metadata: { callType: 'utility' },

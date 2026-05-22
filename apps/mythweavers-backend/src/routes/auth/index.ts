@@ -34,6 +34,11 @@ const loginBodySchema = z.strictObject({
     description: 'Password',
     example: 'secure-password-123',
   }),
+  rememberMe: z.boolean().optional().meta({
+    description:
+      'When true, issue a long-lived (30 day) session instead of the default short-lived one. The chosen lifetime is preserved on every session refresh.',
+    example: true,
+  }),
 })
 
 const userResponseSchema = z.strictObject({
@@ -174,7 +179,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       try {
-        const { username, password } = request.body
+        const { username, password, rememberMe } = request.body
 
         // Find user by username or email
         const user = await prisma.user.findFirst({
@@ -204,9 +209,15 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
           },
         })
 
-        // Create new session
+        // Create new session. The chosen lifetime is the only place it's
+        // recorded — sessions are NOT rolled forward on /auth/session, so
+        // there's no need to remember which length the user picked. After
+        // expiresAt elapses, the user logs in again.
         const sessionToken = randomBytes(32).toString('hex')
-        const expiresAt = new Date(Date.now() + authConfig.sessionDuration)
+        const durationMs = rememberMe
+          ? authConfig.extendedSessionDuration
+          : authConfig.sessionDuration
+        const expiresAt = new Date(Date.now() + durationMs)
 
         await prisma.session.create({
           data: {
@@ -216,10 +227,14 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
           },
         })
 
-        // Set cookie
-        reply.setCookie('sessionToken', sessionToken, getCookieOptions())
+        // Set cookie with the matching maxAge so the browser-side cookie
+        // and DB-side session expire together.
+        reply.setCookie('sessionToken', sessionToken, getCookieOptions(durationMs))
 
-        fastify.log.info({ userId: user.id, username: user.username }, 'User logged in')
+        fastify.log.info(
+          { userId: user.id, username: user.username, rememberMe: !!rememberMe },
+          'User logged in',
+        )
 
         return {
           success: true as const,
@@ -305,20 +320,10 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return { authenticated: false }
         }
 
-        // Refresh session expiry
-        const newExpiresAt = new Date(Date.now() + authConfig.sessionDuration)
-        await prisma.session.update({
-          where: { id: session.id },
-          data: { expiresAt: newExpiresAt },
-        })
-
-        // Check if cookie should be refreshed
-        const sessionAge = Date.now() - session.createdAt.getTime()
-        const timeRemaining = authConfig.sessionDuration - sessionAge
-
-        if (timeRemaining < authConfig.cookieRefreshThreshold) {
-          reply.setCookie('sessionToken', token, getCookieOptions())
-        }
+        // No rolling refresh: the expiresAt set at login is the final
+        // word. Users who want a long-lived session check "remember me"
+        // and get 30 days; otherwise they get 3 days from login and then
+        // log in again. Keeps the auth logic simple and stateless.
 
         return {
           authenticated: true,

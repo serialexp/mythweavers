@@ -93,6 +93,10 @@ export type PostAuthLoginData = {
          * Password
          */
         password: string;
+        /**
+         * When true, issue a long-lived (30 day) session instead of the default short-lived one. The chosen lifetime is preserved on every session refresh.
+         */
+        rememberMe?: boolean;
     };
     path?: never;
     query?: never;
@@ -2225,6 +2229,11 @@ export type GetMyStoriesByIdExportResponses = {
                         chapterId: string;
                         name: string;
                         summary: string | null;
+                        summarySegments: Array<{
+                            startMessageId: string;
+                            endMessageId: string;
+                            summary: string;
+                        }> | null;
                         sortOrder: number;
                         status: string | null;
                         includeInFull: number;
@@ -18491,6 +18500,28 @@ export type PostMyLlmGenerateData = {
         temperature?: number;
         max_tokens?: number;
         thinking_budget?: number;
+        /**
+         * Optional tool definitions the model may invoke. Currently only honored on OpenAI-compatible upstreams; other providers will reject the request.
+         */
+        tools?: Array<{
+            /**
+             * Tool name (function name).
+             */
+            name: string;
+            /**
+             * Human-readable description of what the tool does.
+             */
+            description: string;
+            /**
+             * JSON Schema for the tool parameters, passed through verbatim.
+             */
+            parameters: {
+                [key: string]: unknown;
+            };
+        }>;
+        tool_choice?: 'auto' | 'required' | 'none' | {
+            name: string;
+        };
         metadata?: {
             [key: string]: unknown;
         };

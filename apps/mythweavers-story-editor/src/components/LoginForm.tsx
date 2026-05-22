@@ -16,6 +16,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
   const [username, setUsername] = createSignal('')
   const [password, setPassword] = createSignal('')
   const [confirmPassword, setConfirmPassword] = createSignal('')
+  const [rememberMe, setRememberMe] = createSignal(false)
   const [error, setError] = createSignal('')
   const [isLoading, setIsLoading] = createSignal(false)
   const [showDebug, setShowDebug] = createSignal(false)
@@ -81,6 +82,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             body: JSON.stringify({
               username: username(),
               password: password(),
+              rememberMe: rememberMe(),
             }),
           })
 
@@ -109,6 +111,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             body: {
               username: username(),
               password: password(),
+              rememberMe: rememberMe(),
             },
           })
         } catch (err) {
@@ -190,6 +193,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
     setUsername('')
     setPassword('')
     setConfirmPassword('')
+    setRememberMe(false)
   }
 
   return (
@@ -251,6 +255,29 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                   disabled={isLoading()}
                 />
               </FormField>
+            </Show>
+
+            <Show when={!isRegistering()}>
+              <label
+                style={{
+                  display: 'flex',
+                  'align-items': 'center',
+                  gap: '0.5rem',
+                  margin: '0.5rem 0 0.75rem',
+                  'font-size': '0.875rem',
+                  color: 'var(--text-secondary)',
+                  cursor: isLoading() ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe()}
+                  onChange={(e) => setRememberMe(e.currentTarget.checked)}
+                  disabled={isLoading()}
+                />
+                Remember me for 30 days
+              </label>
             </Show>
 
             <Button type="submit" variant="primary" fullWidth disabled={isLoading()}>

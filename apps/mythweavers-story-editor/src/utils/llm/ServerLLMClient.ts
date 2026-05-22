@@ -68,6 +68,9 @@ export class ServerLLMClient implements LLMClient {
       ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
       ...(options.max_tokens ? { max_tokens: options.max_tokens } : {}),
       ...(options.thinking_budget ? { thinking_budget: options.thinking_budget } : {}),
+      ...(options.tools && options.tools.length > 0
+        ? { tools: options.tools, tool_choice: options.tool_choice ?? 'auto' }
+        : {}),
       ...(options.metadata ? { metadata: options.metadata } : {}),
     }
 
@@ -113,7 +116,15 @@ export class ServerLLMClient implements LLMClient {
     // the backend closes the response.
     let doneYielded = false
     for await (const raw of parseSSEStream(response.body)) {
-      const event = raw as { type: string; response?: string; usage?: any; error?: string }
+      const event = raw as {
+        type: string
+        response?: string
+        usage?: any
+        error?: string
+        id?: string
+        name?: string
+        arguments?: unknown
+      }
 
       switch (event.type) {
         case 'chunk':
@@ -124,6 +135,18 @@ export class ServerLLMClient implements LLMClient {
         case 'usage':
           if (event.usage) {
             yield { type: 'usage', usage: event.usage }
+          }
+          break
+        case 'tool_call':
+          // Forwarded verbatim from the backend, which got it from the
+          // upstream OpenAI-compatible client (already JSON-parsed).
+          if (event.name) {
+            yield {
+              type: 'tool_call',
+              id: event.id ?? '',
+              name: event.name,
+              arguments: event.arguments,
+            }
           }
           break
         case 'done':

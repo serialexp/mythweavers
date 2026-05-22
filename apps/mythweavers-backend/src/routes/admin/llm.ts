@@ -175,7 +175,13 @@ const adminLlmRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async () => {
+      // Provider table is shared with image generation (CLOUDFLARE_IMAGE,
+      // OPENAI_IMAGE). This endpoint is the LLM admin view, and the
+      // response schema's protocolEnum only covers the LLM protocols, so
+      // filter image providers out at the query level. Image providers
+      // are surfaced through the image admin routes.
       const providers = await prisma.provider.findMany({
+        where: { protocol: { in: ['ANTHROPIC', 'OPENAI_COMPATIBLE', 'CLOUDFLARE'] } },
         orderBy: { sortOrder: 'asc' },
       })
       return { providers: providers.map(enrichProvider) }

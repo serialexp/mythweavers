@@ -272,6 +272,11 @@ export class AnthropicClient implements LLMClient {
   async *generate(
     options: LLMGenerateOptions,
   ): AsyncGenerator<LLMStreamEvent> {
+    if (options.tools && options.tools.length > 0) {
+      throw new Error(
+        "Tool calls are not yet supported by the Anthropic client. Switch to an OpenAI-compatible model for this call.",
+      )
+    }
     const apiKey = resolve(this.config.apiKey)
     if (!apiKey) throw new Error("Anthropic API key not configured")
 

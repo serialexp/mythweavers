@@ -129,6 +129,11 @@ export class CloudflareClient implements LLMClient, ImageClient {
   async *generate(
     options: LLMGenerateOptions,
   ): AsyncGenerator<LLMStreamEvent> {
+    if (options.tools && options.tools.length > 0) {
+      throw new Error(
+        "Tool calls are not yet supported by the Cloudflare client. Switch to an OpenAI-compatible model for this call.",
+      )
+    }
     yield* this.openaiClient.generate(options)
   }
 

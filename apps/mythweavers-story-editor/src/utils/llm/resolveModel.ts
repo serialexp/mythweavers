@@ -5,7 +5,12 @@ import type { LLMProvider } from '../../types/llm'
  * Generation categories — groups of call types that share similar cognitive requirements.
  * Users can override the provider+model for each category independently.
  */
-export type GenerationCategory = 'writing' | 'analysis' | 'rewriting' | 'meta'
+export type GenerationCategory =
+  | 'writing'
+  | 'analysis'
+  | 'deep-analysis'
+  | 'rewriting'
+  | 'meta'
 
 export const GENERATION_CATEGORIES: Record<GenerationCategory, { label: string; description: string }> = {
   writing: {
@@ -15,6 +20,11 @@ export const GENERATION_CATEGORIES: Record<GenerationCategory, { label: string; 
   analysis: {
     label: 'Analysis',
     description: 'Nonsense checks, summaries, scene splitting — reasoning tasks',
+  },
+  'deep-analysis': {
+    label: 'Deep Analysis',
+    description:
+      'Synthesis passes that benefit from a stronger model — global storyline reasoning, hidden-architecture inference',
   },
   rewriting: {
     label: 'Rewriting',
@@ -35,8 +45,11 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
 
   // Analysis
   'adventure-nonsense': 'analysis',
+  'adventure-analysis': 'analysis',
   'adventure-revision': 'rewriting',
   'adventure-compaction': 'writing',
+  'adventure-synthesis': 'deep-analysis',
+  'adventure-storyline-gate': 'analysis',
   'cliche:critique': 'analysis',
   'summary:node': 'analysis',
   'summary:sentence': 'analysis',
@@ -61,47 +74,99 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
 }
 
 export interface CategoryOverride {
-  provider: LLMProvider
-  model: string
+  /** Provider override; undefined/null means inherit from global. */
+  provider?: LLMProvider | null
+  /** Model override; undefined/null means inherit from global. */
+  model?: string | null
+  /** Thinking budget override (0 = explicit off); undefined/null means inherit from global. */
+  thinkingBudget?: number | null
+  /**
+   * Max output tokens override for calls in this category.
+   * undefined/null means inherit from the global maxTokens setting.
+   * Lets the user, e.g., give analysis calls a tighter budget than
+   * writing calls without affecting any individual call site.
+   */
+  maxTokens?: number | null
 }
 
 export type CategoryOverrides = Partial<Record<GenerationCategory, CategoryOverride>>
 
+/**
+ * True if this override actually changes anything vs. the global defaults
+ * (i.e. has at least one field set). An empty object should be treated as
+ * "no override" so the UI doesn't show a stale badge.
+ */
+export function isCategoryOverrideActive(override: CategoryOverride | undefined): boolean {
+  if (!override) return false
+  return (
+    !!override.provider ||
+    !!override.model ||
+    override.thinkingBudget != null ||
+    override.maxTokens != null
+  )
+}
+
 export interface ResolvedModel {
   provider: LLMProvider
   model: string
+  /** 0 = off; positive = budget in tokens. */
+  thinkingBudget: number
+  /**
+   * Resolved max output tokens for this call — the category override if
+   * one is set, otherwise the global maxTokens. Always positive. Call
+   * sites should pass this as `max_tokens` rather than reaching into
+   * `effectiveSettings.maxTokens` directly, so per-category overrides
+   * actually apply.
+   */
+  maxTokens: number
   category: GenerationCategory | null
+  /** True if any field of the resolved model came from a category override. */
   isOverride: boolean
 }
 
 /**
- * Resolve which provider+model to use for a given callType.
+ * Resolve which provider+model+thinking-budget to use for a given callType.
  *
- * Resolution order:
- * 1. Category override (story-level if set, else global)
- * 2. Default provider+model (story-level if set, else global)
+ * Resolution is per-field, so a category may override only thinking budget,
+ * only model, or any combination. The category override's provider and
+ * model travel together — overriding the model alone would point at a
+ * model that may not exist on the global provider, so a category that
+ * sets `model` must also set `provider` (the UI enforces this).
  *
- * All reads go through effectiveSettings, which automatically
- * merges story overrides with global defaults.
+ * All reads go through effectiveSettings, which automatically merges
+ * story overrides with global defaults.
  */
 export function resolveModel(callType: string): ResolvedModel {
   const category = CALL_TYPE_CATEGORY[callType] ?? null
-  if (category) {
-    const override = effectiveSettings.categoryOverrides[category]
-    if (override?.provider && override?.model) {
-      return {
-        provider: override.provider,
-        model: override.model,
-        category,
-        isOverride: true,
-      }
-    }
-  }
+  const override = category ? effectiveSettings.categoryOverrides[category] : undefined
+
+  const useOverrideModel = !!(override?.provider && override?.model)
+  const provider = useOverrideModel
+    ? (override!.provider as LLMProvider)
+    : (effectiveSettings.provider as LLMProvider)
+  const model = useOverrideModel ? (override!.model as string) : effectiveSettings.model
+
+  const thinkingBudget =
+    override?.thinkingBudget != null
+      ? override.thinkingBudget
+      : (effectiveSettings.thinkingBudget ?? 0)
+
+  const maxTokens =
+    override?.maxTokens != null
+      ? override.maxTokens
+      : effectiveSettings.maxTokens
+
+  const isOverride =
+    useOverrideModel ||
+    override?.thinkingBudget != null ||
+    override?.maxTokens != null
 
   return {
-    provider: effectiveSettings.provider as LLMProvider,
-    model: effectiveSettings.model,
+    provider,
+    model,
+    thinkingBudget,
+    maxTokens,
     category,
-    isOverride: false,
+    isOverride,
   }
 }

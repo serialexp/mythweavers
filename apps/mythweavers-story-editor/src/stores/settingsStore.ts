@@ -406,7 +406,15 @@ export const settingsStore = {
   getCustomProvider: (id: string): CustomProvider | undefined => {
     return settingsState.customProviders.find((p) => p.id === id)
   },
-  setCategoryOverride: (category: string, override: { provider: string; model: string } | null) => {
+  setCategoryOverride: (
+    category: string,
+    override: {
+      provider?: string | null
+      model?: string | null
+      thinkingBudget?: number | null
+      maxTokens?: number | null
+    } | null,
+  ) => {
     if (override) {
       setSettingsState('categoryOverrides', category as keyof CategoryOverrides, override as any)
     } else {

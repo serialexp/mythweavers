@@ -3,9 +3,14 @@
 /**
  * Discriminated union for all events emitted by LLM streaming generators.
  * Replaces the old bag-of-optional-fields `LLMGenerateResponse`.
+ *
+ * `tool_call` is emitted once per *completed* tool call, after streaming
+ * deltas have been concatenated and the arguments JSON has been parsed by
+ * the client. Consumers that don't pass `tools` will never see this event.
  */
 export type LLMStreamEvent =
   | { type: "chunk"; text: string }
+  | { type: "tool_call"; id: string; name: string; arguments: unknown }
   | { type: "usage"; usage: TokenUsage }
   | { type: "done" }
   | { type: "error"; error: string }
@@ -67,12 +72,49 @@ export interface LLMMessage {
 
 // ---- Generation options ----
 
+/**
+ * Definition of a tool the model may call. Modeled on the OpenAI function
+ * tool shape (Anthropic uses the same JSON Schema for `input_schema`).
+ *
+ * `parameters` is an arbitrary JSON Schema object. The client passes it
+ * through verbatim to the provider; failure modes when the schema is bad
+ * are upstream's problem, not ours.
+ */
+export interface ToolDefinition {
+  name: string
+  description: string
+  parameters: Record<string, unknown>
+}
+
+/**
+ * How the model should pick a tool.
+ * - `"auto"` (default): model decides whether to call a tool
+ * - `"required"`: model must call at least one tool
+ * - `"none"`: model must not call any tool (equivalent to omitting tools)
+ * - `{ name }`: model must call this specific tool
+ */
+export type ToolChoice =
+  | "auto"
+  | "required"
+  | "none"
+  | { name: string }
+
 export interface LLMGenerateOptions {
   model: string
   messages: LLMMessage[]
   temperature?: number
   max_tokens?: number
   thinking_budget?: number
+  /**
+   * Tool definitions the model may invoke. Each call to a tool produces a
+   * `tool_call` event after its arguments JSON has been fully streamed and
+   * parsed. Currently supported only by the OpenAI-compatible client; other
+   * clients throw `Error("Tool calls not supported by provider X")` when
+   * tools are non-empty.
+   */
+  tools?: ToolDefinition[]
+  /** Constrain how aggressively the model picks tools. Default `"auto"`. */
+  tool_choice?: ToolChoice
   /** Provider-specific options (e.g. Ollama num_ctx, repeat_penalty). */
   providerOptions?: Record<string, unknown>
   metadata?: Record<string, unknown>

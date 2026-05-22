@@ -151,6 +151,11 @@ export class OllamaClient implements LLMClient {
   async *generate(
     options: LLMGenerateOptions,
   ): AsyncGenerator<LLMStreamEvent> {
+    if (options.tools && options.tools.length > 0) {
+      throw new Error(
+        "Tool calls are not yet supported by the Ollama client. Switch to an OpenAI-compatible model for this call.",
+      )
+    }
     const messages = options.messages.map((m) => ({
       role: m.role,
       content: m.content,

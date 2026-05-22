@@ -7,15 +7,15 @@
  */
 export const authConfig = {
   /**
-   * Session duration in milliseconds (3 days)
+   * Default session duration in milliseconds (3 days). Used for normal logins.
    */
   sessionDuration: 3 * 24 * 60 * 60 * 1000,
 
   /**
-   * Cookie refresh threshold - refresh cookie when less than this much time remains
-   * (6 hours = 1/12 of the 3-day duration)
+   * Extended session duration in milliseconds (30 days). Used when the user
+   * checks "Remember me" on the login form.
    */
-  cookieRefreshThreshold: 6 * 60 * 60 * 1000,
+  extendedSessionDuration: 30 * 24 * 60 * 60 * 1000,
 
   /**
    * Cookie domain - set to root domain (e.g., '.mythweavers.io') to share across subdomains
@@ -25,13 +25,15 @@ export const authConfig = {
 } as const
 
 /**
- * Get standard cookie options for session cookies
+ * Get standard cookie options for session cookies. Pass `durationMs` to
+ * override the cookie's maxAge — the session row's stored `durationMs`
+ * should always be used so the cookie and DB expiry stay in sync.
  */
-export const getCookieOptions = () => ({
+export const getCookieOptions = (durationMs: number = authConfig.sessionDuration) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
-  maxAge: authConfig.sessionDuration / 1000,
+  maxAge: Math.floor(durationMs / 1000),
   path: '/',
   domain: authConfig.cookieDomain,
 })

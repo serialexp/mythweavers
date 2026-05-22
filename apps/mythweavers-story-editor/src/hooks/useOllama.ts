@@ -448,7 +448,7 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
         model: resolved.model,
         messages,
         max_tokens: maxTokens,
-        thinking_budget: effectiveSettings.thinkingBudget > 0 ? effectiveSettings.thinkingBudget : undefined,
+        thinking_budget: resolved.thinkingBudget > 0 ? resolved.thinkingBudget : undefined,
         providerOptions:
           resolved.provider === 'ollama'
             ? {

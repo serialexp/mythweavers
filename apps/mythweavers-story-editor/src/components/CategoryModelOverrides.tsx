@@ -6,10 +6,55 @@ import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import type { LLMProvider } from '../types/llm'
 import {
   GENERATION_CATEGORIES,
+  isCategoryOverrideActive,
+  type CategoryOverride,
   type GenerationCategory,
 } from '../utils/llm/resolveModel'
 import { ModelSelector } from './ModelSelector'
 import * as overrideStyles from './CategoryModelOverrides.css'
+
+/**
+ * Sentinel for the "inherit from global" option in the thinking budget
+ * dropdown. We can't use the empty string (some providers parse it as 0)
+ * and 0 is a valid explicit value ("Off"), so we use a string sentinel
+ * that's converted back to undefined on save.
+ */
+const INHERIT = 'inherit'
+
+/** Options mirror the global thinking budget dropdown in AISettingsPanel. */
+const THINKING_BUDGET_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Off' },
+  { value: 1024, label: '1024 tokens' },
+  { value: 2048, label: '2048 tokens' },
+  { value: 4096, label: '4096 tokens' },
+  { value: 8192, label: '8192 tokens' },
+  { value: 16384, label: '16384 tokens' },
+]
+
+/**
+ * Per-category max-output-tokens override. Mirrors the global TokenSelector
+ * presets so users see a familiar set of buckets, and lets them, e.g.,
+ * give analysis a tight cap without affecting writing.
+ */
+const MAX_TOKENS_OPTIONS: { value: number; label: string }[] = [
+  { value: 1024, label: '1024 tokens' },
+  { value: 2048, label: '2048 tokens' },
+  { value: 4096, label: '4096 tokens' },
+  { value: 8192, label: '8192 tokens' },
+  { value: 16384, label: '16384 tokens' },
+  { value: 32768, label: '32768 tokens' },
+]
+
+function describeThinkingBudget(v: number | null | undefined): string {
+  if (v == null) return 'inherited'
+  if (v === 0) return 'Off'
+  return `${v} tokens`
+}
+
+function describeMaxTokens(v: number | null | undefined): string {
+  if (v == null) return 'inherited'
+  return `${v} tokens`
+}
 
 const BUILTIN_PROVIDERS: { value: LLMProvider; label: string }[] = [
   { value: 'ollama', label: 'Ollama' },
@@ -49,7 +94,13 @@ function hasApiKey(provider: LLMProvider): boolean {
   }
 }
 
-const CATEGORY_ORDER: GenerationCategory[] = ['writing', 'analysis', 'rewriting', 'meta']
+const CATEGORY_ORDER: GenerationCategory[] = [
+  'writing',
+  'analysis',
+  'deep-analysis',
+  'rewriting',
+  'meta',
+]
 
 interface CategoryModelOverridesProps {
   scope?: 'global' | 'story'
@@ -64,6 +115,14 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
   // Temporary state for the form being edited
   const [editProvider, setEditProvider] = createSignal<LLMProvider>('anthropic')
   const [editModel, setEditModel] = createSignal<string>('')
+  // Thinking budget: 'inherit' sentinel means "fall back to global", number
+  // (including 0) is an explicit override.
+  const [editThinkingBudget, setEditThinkingBudget] = createSignal<
+    number | typeof INHERIT
+  >(INHERIT)
+  const [editMaxTokens, setEditMaxTokens] = createSignal<
+    number | typeof INHERIT
+  >(INHERIT)
 
   // Get the overrides for the current scope
   const getOverrides = () => {
@@ -76,18 +135,23 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
   const startEditing = (category: GenerationCategory) => {
     const overrides = getOverrides()
     const existing = overrides[category]
-    if (existing) {
-      setEditProvider(existing.provider)
-      setEditModel(existing.model)
-    } else {
-      setEditProvider(effectiveSettings.provider as LLMProvider)
-      setEditModel(effectiveSettings.model)
-    }
+    // Pre-fill provider/model from the existing override if it has them, else
+    // from the effective defaults so the user can flip on a model override
+    // without re-entering the current values.
+    const initialProvider = (existing?.provider ?? effectiveSettings.provider) as LLMProvider
+    const initialModel = existing?.model ?? effectiveSettings.model ?? ''
+    setEditProvider(initialProvider)
+    setEditModel(initialModel)
+    setEditThinkingBudget(
+      existing?.thinkingBudget != null ? existing.thinkingBudget : INHERIT,
+    )
+    setEditMaxTokens(
+      existing?.maxTokens != null ? existing.maxTokens : INHERIT,
+    )
     setEditingCategory(category)
 
     // Ensure models are loaded for the selected provider
-    const provider = existing?.provider ?? (effectiveSettings.provider as LLMProvider)
-    modelsStore.fetchModelsForProvider(provider)
+    modelsStore.fetchModelsForProvider(initialProvider)
   }
 
   const handleProviderChange = (provider: LLMProvider) => {
@@ -96,18 +160,57 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
     modelsStore.fetchModelsForProvider(provider)
   }
 
-  const handleSave = (category: GenerationCategory) => {
+  const buildOverridePayload = (
+    category: GenerationCategory,
+  ): CategoryOverride | null => {
+    // The model override is opt-in: only persist provider+model if the user
+    // actually picked a model. If they only changed the thinking budget,
+    // leave provider/model unset so the category inherits.
     const provider = editProvider()
     const model = editModel()
-    if (provider && model) {
-      if (isStoryScope()) {
-        // Update the story's category overrides
-        const current = currentStoryStore.aiOverrides?.categoryOverrides ?? {}
-        const updated = { ...current, [category]: { provider, model } }
-        currentStoryStore.setAIOverride('categoryOverrides', updated)
+    const tb = editThinkingBudget()
+    const mt = editMaxTokens()
+
+    const overrides = getOverrides()
+    const existing = overrides[category]
+    const previouslyHadModel = !!(existing?.provider && existing?.model)
+
+    const payload: CategoryOverride = {}
+    if (model) {
+      payload.provider = provider
+      payload.model = model
+    } else if (previouslyHadModel) {
+      // The user opened an existing model override and cleared the model
+      // (provider switch with no model selected yet). Drop the model fields
+      // entirely rather than persisting half a model.
+    }
+    if (tb !== INHERIT) {
+      payload.thinkingBudget = tb
+    }
+    if (mt !== INHERIT) {
+      payload.maxTokens = mt
+    }
+
+    return isCategoryOverrideActive(payload) ? payload : null
+  }
+
+  const handleSave = (category: GenerationCategory) => {
+    const payload = buildOverridePayload(category)
+    if (isStoryScope()) {
+      const current = currentStoryStore.aiOverrides?.categoryOverrides ?? {}
+      const updated = { ...current }
+      if (payload) {
+        updated[category] = payload
       } else {
-        settingsStore.setCategoryOverride(category, { provider, model })
+        delete updated[category]
       }
+      if (Object.keys(updated).length === 0) {
+        currentStoryStore.setAIOverride('categoryOverrides', null)
+      } else {
+        currentStoryStore.setAIOverride('categoryOverrides', updated)
+      }
+    } else {
+      settingsStore.setCategoryOverride(category, payload)
     }
     setEditingCategory(null)
   }
@@ -131,13 +234,35 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
   const getEffectiveProvider = (category: GenerationCategory) => {
     const overrides = getOverrides()
     const override = overrides[category]
-    return override?.provider ?? effectiveSettings.provider
+    // Provider+model are linked — only show the override's provider when the
+    // override actually carries a model.
+    return override?.provider && override?.model
+      ? override.provider
+      : effectiveSettings.provider
   }
 
   const getEffectiveModel = (category: GenerationCategory) => {
     const overrides = getOverrides()
     const override = overrides[category]
-    return override?.model ?? effectiveSettings.model ?? 'none'
+    return override?.provider && override?.model
+      ? override.model
+      : effectiveSettings.model ?? 'none'
+  }
+
+  const getEffectiveThinkingBudget = (category: GenerationCategory) => {
+    const overrides = getOverrides()
+    const override = overrides[category]
+    return override?.thinkingBudget != null
+      ? override.thinkingBudget
+      : (effectiveSettings.thinkingBudget ?? 0)
+  }
+
+  const getEffectiveMaxTokens = (category: GenerationCategory) => {
+    const overrides = getOverrides()
+    const override = overrides[category]
+    return override?.maxTokens != null
+      ? override.maxTokens
+      : effectiveSettings.maxTokens
   }
 
   // For story scope: check if the override is inherited from global
@@ -145,7 +270,7 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
     if (!isStoryScope()) return false
     const storyOverrides = currentStoryStore.aiOverrides?.categoryOverrides
     if (!storyOverrides) return true
-    return !storyOverrides[category]
+    return !isCategoryOverrideActive(storyOverrides[category])
   }
 
   return (
@@ -162,6 +287,7 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
           {(category) => {
             const meta = () => GENERATION_CATEGORIES[category]
             const override = () => getOverrides()[category]
+            const hasActiveOverride = () => isCategoryOverrideActive(override())
             const isEditing = () => editingCategory() === category
 
             return (
@@ -170,11 +296,11 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
                   <div class={overrideStyles.categoryInfo}>
                     <div class={overrideStyles.categoryLabel}>
                       {meta().label}
-                      <Show when={override()}>
+                      <Show when={hasActiveOverride()}>
                         {' '}
                         <span class={overrideStyles.overrideBadge}>override</span>
                       </Show>
-                      <Show when={isStoryScope() && isInheritedFromGlobal(category) && settingsStore.categoryOverrides[category]}>
+                      <Show when={isStoryScope() && isInheritedFromGlobal(category) && isCategoryOverrideActive(settingsStore.categoryOverrides[category])}>
                         {' '}
                         <span class={overrideStyles.overrideBadge} style={{ opacity: 0.5 }}>global</span>
                       </Show>
@@ -186,6 +312,24 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
                     <div class={overrideStyles.currentModel}>
                       <span class={overrideStyles.currentModelLabel}>Model:</span> {getEffectiveModel(category)}
                     </div>
+                    <div class={overrideStyles.currentModel}>
+                      <span class={overrideStyles.currentModelLabel}>Thinking:</span>{' '}
+                      {describeThinkingBudget(getEffectiveThinkingBudget(category))}
+                      <Show when={override()?.thinkingBudget == null}>
+                        <span style={{ opacity: 0.6, 'margin-left': '0.4em' }}>
+                          (inherited)
+                        </span>
+                      </Show>
+                    </div>
+                    <div class={overrideStyles.currentModel}>
+                      <span class={overrideStyles.currentModelLabel}>Max tokens:</span>{' '}
+                      {describeMaxTokens(getEffectiveMaxTokens(category))}
+                      <Show when={override()?.maxTokens == null}>
+                        <span style={{ opacity: 0.6, 'margin-left': '0.4em' }}>
+                          (inherited)
+                        </span>
+                      </Show>
+                    </div>
                   </div>
                   <div class={overrideStyles.actions}>
                     <Show when={!isEditing()}>
@@ -193,9 +337,9 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
                         class={overrideStyles.actionButton}
                         onClick={() => startEditing(category)}
                       >
-                        {override() ? 'Edit' : 'Override'}
+                        {hasActiveOverride() ? 'Edit' : 'Override'}
                       </button>
-                      <Show when={override()}>
+                      <Show when={hasActiveOverride()}>
                         <button
                           class={overrideStyles.clearButton}
                           onClick={() => handleClear(category)}
@@ -245,11 +389,53 @@ export const CategoryModelOverrides: Component<CategoryModelOverridesProps> = (p
                       />
                     </div>
 
+                    <div class={overrideStyles.formRow}>
+                      <label class={overrideStyles.formLabel}>Thinking Budget</label>
+                      <select
+                        class={overrideStyles.select}
+                        value={editThinkingBudget() === INHERIT ? INHERIT : String(editThinkingBudget())}
+                        onChange={(e) => {
+                          const v = e.currentTarget.value
+                          setEditThinkingBudget(v === INHERIT ? INHERIT : Number(v))
+                        }}
+                      >
+                        <option value={INHERIT}>
+                          Inherit (currently {describeThinkingBudget(effectiveSettings.thinkingBudget ?? 0)})
+                        </option>
+                        <For each={THINKING_BUDGET_OPTIONS}>
+                          {(opt) => <option value={String(opt.value)}>{opt.label}</option>}
+                        </For>
+                      </select>
+                    </div>
+
+                    <div class={overrideStyles.formRow}>
+                      <label class={overrideStyles.formLabel}>Max Tokens</label>
+                      <select
+                        class={overrideStyles.select}
+                        value={editMaxTokens() === INHERIT ? INHERIT : String(editMaxTokens())}
+                        onChange={(e) => {
+                          const v = e.currentTarget.value
+                          setEditMaxTokens(v === INHERIT ? INHERIT : Number(v))
+                        }}
+                      >
+                        <option value={INHERIT}>
+                          Inherit (currently {describeMaxTokens(effectiveSettings.maxTokens)})
+                        </option>
+                        <For each={MAX_TOKENS_OPTIONS}>
+                          {(opt) => <option value={String(opt.value)}>{opt.label}</option>}
+                        </For>
+                      </select>
+                    </div>
+
                     <div class={overrideStyles.actions}>
                       <button
                         class={overrideStyles.actionButton}
                         onClick={() => handleSave(category)}
-                        disabled={!editModel()}
+                        disabled={
+                          !editModel() &&
+                          editThinkingBudget() === INHERIT &&
+                          editMaxTokens() === INHERIT
+                        }
                       >
                         Save
                       </button>
