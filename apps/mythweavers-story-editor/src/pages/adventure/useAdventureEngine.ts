@@ -144,6 +144,28 @@ export function createAdventureEngine(
   // --- Generation ---
 
   /**
+   * Returns the live world state object passed to writer/director/revision
+   * prompt builders — or `undefined` when the living-world subsystem is
+   * disabled. The four prompt builders all treat `liveWorldState` as
+   * optional and skip the `appendLiveWorldState` injection if undefined,
+   * so this is the single chokepoint that cleanly elides the characters /
+   * plot points / agenda block from every prompt when the toggle is off.
+   *
+   * (Internal usages inside `runAnalysisPass` / `runSynthesisPass` build
+   * the same object directly — those passes themselves are gated above
+   * and won't run when the toggle is off, so their construction site
+   * doesn't need this guard.)
+   */
+  function liveWorldStateForPrompt() {
+    if (!adventureStore.livingWorldEnabled) return undefined
+    return {
+      characters: adventureStore.characters,
+      plotPoints: adventureStore.plotPoints,
+      agenda: adventureStore.agenda,
+    }
+  }
+
+  /**
    * Run the optional "director" pass: a grounded analysis-class model that
    * produces a structured plan (SCENE STATE / BEATS / NPC REACTIONS /
    * ENDING BEAT / DO NOT) for the writer call that follows. Output is
@@ -176,11 +198,7 @@ export function createAdventureEngine(
       adventureStore.directive,
       adventureStore.compactions,
       adventureStore.worldBible,
-      {
-        characters: adventureStore.characters,
-        plotPoints: adventureStore.plotPoints,
-        agenda: adventureStore.agenda,
-      },
+      liveWorldStateForPrompt(),
       storylineBrief,
     )
 
@@ -308,11 +326,7 @@ export function createAdventureEngine(
       adventureStore.directive,
       adventureStore.compactions,
       adventureStore.worldBible,
-      {
-        characters: adventureStore.characters,
-        plotPoints: adventureStore.plotPoints,
-        agenda: adventureStore.agenda,
-      },
+      liveWorldStateForPrompt(),
       worldStepStorylineBrief,
       worldStepDirectorBrief,
     )
@@ -408,11 +422,7 @@ export function createAdventureEngine(
         adventureStore.directive,
         adventureStore.compactions,
         adventureStore.worldBible,
-        {
-          characters: adventureStore.characters,
-          plotPoints: adventureStore.plotPoints,
-          agenda: adventureStore.agenda,
-        },
+        liveWorldStateForPrompt(),
         resolutionStorylineBrief,
         resolutionDirectorBrief,
       )
@@ -512,11 +522,13 @@ export function createAdventureEngine(
       // Synthesis chains AFTER analysis so it sees the freshly-seeded /
       // patched plot points + characters this turn produced. All three
       // are fire-and-forget; we don't await.
-      runAnalysisPass()
-        .then(() => runSynthesisPass())
-        .catch((err) => {
-          console.warn('[Analysis→Synthesis] chain error:', err)
-        })
+      if (adventureStore.livingWorldEnabled) {
+        runAnalysisPass()
+          .then(() => runSynthesisPass())
+          .catch((err) => {
+            console.warn('[Analysis→Synthesis] chain error:', err)
+          })
+      }
       runPendingCompactions()
 
       // Focus input for next action
@@ -693,6 +705,7 @@ export function createAdventureEngine(
    * which falls under the `analysis` category in resolveModel.
    */
   async function runAnalysisPass() {
+    if (!adventureStore.livingWorldEnabled) return
     if (adventureStore.isAnalyzing) return
     const turns = adventureStore.turns
     if (turns.length === 0) return
@@ -826,6 +839,7 @@ export function createAdventureEngine(
    * stays in place this turn.
    */
   async function runSynthesisPass() {
+    if (!adventureStore.livingWorldEnabled) return
     if (adventureStore.isSynthesizing) return
     const turns = adventureStore.turns
     if (turns.length === 0) return
@@ -1144,11 +1158,7 @@ export function createAdventureEngine(
         adventureStore.directive,
         adventureStore.compactions,
         adventureStore.worldBible,
-        {
-          characters: adventureStore.characters,
-          plotPoints: adventureStore.plotPoints,
-          agenda: adventureStore.agenda,
-        },
+        liveWorldStateForPrompt(),
       )
 
       const revisionResolved = resolveModel('adventure-revision')

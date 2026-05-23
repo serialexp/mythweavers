@@ -627,7 +627,12 @@ export const PlayingScreen: Component = () => {
                 </Button>
               }
             >
-              <Show when={adventureStore.turns.length > 0}>
+              <Show
+                when={
+                  adventureStore.turns.length > 0 &&
+                  adventureStore.livingWorldEnabled
+                }
+              >
                 <Button
                   variant="ghost"
                   size="sm"

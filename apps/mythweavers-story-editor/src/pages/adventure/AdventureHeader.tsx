@@ -290,6 +290,36 @@ export const AdventureHeader: Component<{
             </div>
           </div>
 
+          {/* Living world toggle */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>
+              <input
+                type="checkbox"
+                checked={adventureStore.livingWorldEnabled}
+                onChange={(e) => {
+                  adventureStore.setLivingWorldEnabled(
+                    e.currentTarget.checked,
+                  )
+                  engine.persist()
+                }}
+                style={{ 'margin-right': '8px' }}
+              />
+              Track living world (characters / plot points / agenda)
+            </label>
+            <div class={styles.directiveHint}>
+              When on, a background analysis pass runs after each turn to
+              patch the cast, plot points and NPC agendas, a synthesis
+              pass rebuilds the model-side storyline summary, and that
+              live world state is injected into every writer prompt. Turn
+              this off for shorter / more freeform sessions where you
+              don't want the extra background LLM traffic or the prompt
+              bloat from auto-tracked world state. Off-mode still
+              respects the world bible, the author storyline and per-turn
+              directives — it just stops the engine from maintaining its
+              own evolving picture of the cast.
+            </div>
+          </div>
+
           {/* Directive section */}
           <div class={styles.storyPanelSection}>
             <label class={styles.formLabel}>Per-Turn Directive</label>

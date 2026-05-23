@@ -34,6 +34,15 @@ interface AdventureState {
    * default. Persisted alongside the other per-adventure toggles.
    */
   directorEnabled: boolean
+  /**
+   * When false, the engine skips the entire living-world subsystem:
+   * the analysis + synthesis background passes don't run, and the
+   * characters / plot points / agenda block is NOT injected into any
+   * writer prompt. Defaults to true to match prior behaviour. Useful
+   * for short or test adventures where the world-tracking overhead
+   * isn't worth its cost.
+   */
+  livingWorldEnabled: boolean
 
   // Living world state
   characters: Record<string, CharacterCard>
@@ -145,6 +154,7 @@ const [state, setState] = createStore<AdventureState>({
   nonsenseCheckEnabled: true,
   steeringEnabled: true,
   directorEnabled: false,
+  livingWorldEnabled: true,
 
   characters: {},
   plotPoints: {},
@@ -219,6 +229,9 @@ export const adventureStore = {
   },
   get directorEnabled() {
     return state.directorEnabled
+  },
+  get livingWorldEnabled() {
+    return state.livingWorldEnabled
   },
   get characters() {
     return state.characters
@@ -349,6 +362,9 @@ export const adventureStore = {
   },
   setDirectorEnabled(v: boolean) {
     setState('directorEnabled', v)
+  },
+  setLivingWorldEnabled(v: boolean) {
+    setState('livingWorldEnabled', v)
   },
 
   // --- Living world state CRUD ---
@@ -569,6 +585,7 @@ export const adventureStore = {
       nonsenseCheckEnabled: state.nonsenseCheckEnabled,
       steeringEnabled: state.steeringEnabled,
       directorEnabled: state.directorEnabled,
+      livingWorldEnabled: state.livingWorldEnabled,
       gateApprovalEnabled: state.gateApprovalEnabled,
       characters: { ...state.characters },
       plotPoints: { ...state.plotPoints },
@@ -622,6 +639,7 @@ export const adventureStore = {
         nonsenseCheckEnabled: saved?.nonsenseCheckEnabled ?? true,
         steeringEnabled: saved?.steeringEnabled ?? true,
         directorEnabled: saved?.directorEnabled ?? false,
+        livingWorldEnabled: saved?.livingWorldEnabled ?? true,
         gateApprovalEnabled: saved?.gateApprovalEnabled ?? false,
         pendingGateBrief: null,
         pendingGateKind: null,
@@ -677,6 +695,7 @@ export const adventureStore = {
         nonsenseCheckEnabled: true,
         steeringEnabled: true,
         directorEnabled: false,
+        livingWorldEnabled: true,
         gateApprovalEnabled: false,
         pendingGateBrief: null,
         pendingGateKind: null,

@@ -225,6 +225,18 @@ export interface PersistedState {
    */
   directorEnabled?: boolean
   /**
+   * When true (default), the engine maintains a "living world state" in
+   * the background: an analysis pass runs after each turn and patches
+   * characters / plot points / agenda via tool calls, a synthesis pass
+   * rebuilds the model-synthesized storyline, and the resulting state
+   * is injected into every writer prompt (`appendLiveWorldState`).
+   * When false, all three are skipped — no background LLM calls fire,
+   * and the writer prompts contain no characters/plot points/agenda
+   * block. The user can still hand-author a story arc; the
+   * storyline-gate continues to run against whatever's in the textarea.
+   */
+  livingWorldEnabled?: boolean
+  /**
    * When true, the storyline-gate brief is held for user accept/reject
    * before the narrative pass that uses it kicks off. Default: false
    * (auto-forward, original behaviour). Useful while iterating on a
