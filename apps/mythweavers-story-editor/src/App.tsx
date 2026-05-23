@@ -978,6 +978,19 @@ const App: Component = () => {
             status: number
           } | null>(null)
 
+          // Clear the active story (and related stores) when leaving the
+          // /story/:id route. Without this, navigating "back to story list"
+          // leaves currentStoryStore populated, so the Settings dialog and
+          // other store-driven components keep showing stale data from the
+          // story we just left. SolidJS Router reuses the same component
+          // when navigating between two /story/:id routes (only the params
+          // signal changes), so this onCleanup only fires on a true unmount
+          // — switching between two stories is still handled by
+          // loadStoryById -> resetStoryState.
+          onCleanup(() => {
+            void resetStoryState()
+          })
+
           createEffect(() => {
             const storyId = params.id
             if (!storyId) return
