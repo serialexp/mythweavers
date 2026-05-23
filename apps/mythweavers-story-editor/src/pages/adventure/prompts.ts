@@ -228,6 +228,66 @@ RULES:
 - NPCs must act consistently with their established personalities, goals, and current motivations. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.
 - The world is neither for nor against the protagonist. NPCs and the environment behave the way their established nature and pre-existing agenda dictate — not what would be most dramatic for the protagonist, and not what the protagonist would prefer. Do NOT manufacture brand-new coincidences, surprise antagonists, lucky breaks, or hostile turns of fate. DO let the live world state's existing characters, plot points, and agenda items move forward on their own timing — that is *not* the world turning against the protagonist, that is the world simply continuing to exist.`
 
+/**
+ * Role-specific instruction for the optional director pass.
+ *
+ * The director runs BEFORE the writer (resolution or world-step) when the
+ * `directorEnabled` toggle is on. It produces a short, structured plan
+ * that the writer is then told to render faithfully. The point is to keep
+ * a strong-prose / weak-plot model from drifting: the grounded analysis
+ * model decides what happens, the prose model just writes it.
+ *
+ * Output is markdown text — NOT prose. The writer's prompt requires it
+ * to follow these beats exactly.
+ */
+const DIRECTOR_COMMON_RULES = `OUTPUT FORMAT — you MUST follow this exactly:
+SCENE STATE: <one sentence — where we are, who is on-screen, the current held beat or mood>
+BEATS:
+1. <concrete thing that happens, named actor + named action; no "tension rises" handwaves>
+2. <next concrete beat>
+3. <optional third beat>
+4. <optional fourth beat>
+NPC REACTIONS:
+- <NPC name>: <one line, grounded in their disposition + motive from the live world state>
+- <NPC name>: <...>
+ENDING BEAT: <the specific beat the narrative should land on>
+DO NOT:
+- <a specific plot drift to avoid this turn, grounded in the storyline brief or active plot points>
+- <another>
+- <optional third>
+
+HARD RULES:
+- Do NOT write prose. Do NOT use second person. Do NOT narrate sensory detail. Your output is a plan, not a scene.
+- 2–4 BEATS. Each beat is one short sentence naming an actor and what they concretely do.
+- NPC REACTIONS only for NPCs actually on-screen in this beat. Skip the section entirely (omit it) if no NPCs are present.
+- Stay strictly inside the current scene — do not jump ahead, do not stage events the writer would need to invent travel/time to reach.
+- Respect the storyline brief and the live world state. If a plot point is "active" or "resolving", at least one beat should plausibly touch it unless the scene's geography makes that impossible.`
+
+export const DIRECTOR_RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the resolution of the player's action.
+
+A separate "writer" model will render your plan as prose. Your job is to decide WHAT HAPPENS — concretely, grounded in the established world, characters, and storyline — so the writer can focus entirely on HOW to write it.
+
+SCOPE OF THIS TURN (resolution):
+- Plan the direct, immediate consequences of the player action. NPCs may REACT but do NOT pursue their own agendas yet — that's the world-step's job.
+- The environment only responds to what the action actually touched.
+- The ending beat should be a HELD BEAT — a reply half-finished, a held breath, a pause — the scene waiting, not closed.
+- Steering, if provided, scopes ONLY to the QUALITY of the protagonist's execution. It does NOT change what NPCs do or how the world feels about the protagonist.
+
+${DIRECTOR_COMMON_RULES}`
+
+export const DIRECTOR_WORLD_STEP_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the world step.
+
+A separate "writer" model will render your plan as prose. The player's most recent action has already been resolved (see the narrative above). The scene is on a held beat. NOW NPCs and the environment move on their own.
+
+SCOPE OF THIS TURN (world-step):
+- Plan how on-screen NPCs act IN CHARACTER — pursuing their own goals, not just reacting.
+- Plan natural environmental shifts only where they would happen anyway (a guard rounding a corner, a tide coming in).
+- Most beats are small and ambient. Do NOT advance every plot point or agenda item every turn — only advance one when the current scene gives it a natural opening, or when an agenda item's stated timing has come due.
+- NPCs who are OFF-SCREEN do NOT appear just to push their hook. Do not invent reasons for them to be here.
+- The ending beat should be an OPEN PROMPT — a moment where the protagonist has space to act next.
+
+${DIRECTOR_COMMON_RULES}`
+
 export const NONSENSE_CHECK_INSTRUCTION = `YOUR ROLE: Check ONLY the text above for things that don't make sense.
 
 IMPORTANT: You are reviewing a SINGLE turn of narrative — the text immediately above this message. Do NOT flag anything that isn't explicitly written in that text. If the text references events you haven't seen, that's fine — those happened in earlier turns. Only flag statements that are physically or logically impossible AS WRITTEN in the text above.
@@ -507,17 +567,48 @@ ${trimmed}
   })
 }
 
+/**
+ * Append a director brief as a system message that the writer pass MUST
+ * follow. Lives outside the cached prefix (every turn produces a fresh
+ * brief) and BELOW the role instruction in the message list so it lands
+ * close to the final user message — i.e. the model reads it last before
+ * generating prose.
+ */
+function appendDirectorBrief(messages: LLMMessage[], brief?: string): void {
+  const trimmed = brief?.trim()
+  if (!trimmed) return
+  messages.push({
+    role: 'system',
+    content: `[DIRECTOR BRIEF — a separate, more grounded model has planned the beats of this turn for you. Render this plan as prose. Follow the BEATS in the order listed. Honour every NPC REACTION. Land the narrative on the listed ENDING BEAT. Respect every item in the DO NOT list. Do NOT invent new beats not listed here, do NOT skip beats listed here, do NOT have NPCs do things the brief did not authorize. If the director brief and the arc brief disagree on a detail, prefer the director brief — it was written with both in view. Your remaining job is purely the prose: voice, sensory detail, dialogue rhythm, paragraph shape.]
+
+<director-brief>
+${trimmed}
+</director-brief>`,
+  })
+}
+
 // --- Prompt construction helpers ---
 
-/** Append the user directive as the final user message if present. */
+/**
+ * Append the author directive as a system message near the end of the
+ * prompt, so it keeps recency over the cached history but doesn't sit in
+ * the user-role slot. (Earlier versions injected this as a user message;
+ * instruction-tuned models read that as a turn they were expected to
+ * respond to, and we'd see acknowledgements like "[Acknowledged —
+ * following directive for this turn]" leak into the narrative.)
+ *
+ * The wrapper text is deliberately terse and contains no language the
+ * model could mistake for content it should comply-with-and-confirm.
+ */
 function appendDirective(messages: LLMMessage[], directive?: string): void {
   const trimmed = directive?.trim()
-  if (trimmed) {
-    messages.push({
-      role: 'user',
-      content: `[AUTHOR DIRECTIVE — follow these instructions for this and all subsequent turns]\n${trimmed}`,
-    })
-  }
+  if (!trimmed) return
+  messages.push({
+    role: 'system',
+    content: `Standing author directive — apply these constraints silently to the narrative you are about to produce. Do not acknowledge, restate, summarize, or reply to this message; output prose only.
+
+${trimmed}`,
+  })
 }
 
 /**
@@ -640,6 +731,7 @@ export function buildResolutionMessages(
   worldBible?: string,
   liveWorldState?: LiveWorldState,
   storylineBrief?: string,
+  directorBrief?: string,
 ): LLMMessage[] {
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
@@ -661,6 +753,11 @@ export function buildResolutionMessages(
     content: `${RESOLUTION_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
   })
 
+  // Director brief (if the two-model flow is enabled) lands AFTER the role
+  // instruction and BEFORE the user message, so the model reads its
+  // explicit plan last before generating prose.
+  appendDirectorBrief(messages, directorBrief)
+
   // Author directive first, so the player action remains the message the
   // model is actually replying to.
   appendDirective(messages, turnDirective)
@@ -676,6 +773,76 @@ export function buildResolutionMessages(
 The opening should introduce the protagonist through action and detail — show what they look like, how they carry themselves, and hint at their personality through their behavior or inner thoughts. Don't state traits outright; reveal them through the scene.
 
 ${settingDescription}`,
+    })
+  }
+
+  return messages
+}
+
+/**
+ * Build messages for the optional director pass.
+ *
+ * Same context as the writer (`buildResolutionMessages` or
+ * `buildWorldStepMessages` — shared history, live world state, storyline
+ * brief, author directive), but the system instruction asks for a
+ * structured plan instead of prose. The writer call on the same turn then
+ * re-uses the shared history's cached prefix.
+ *
+ * For `'resolution'` the player action lands as the final user message.
+ * For `'world-step'` we end with a terse user nudge mirroring
+ * `buildWorldStepMessages` — the director sees the freshly-finalized
+ * resolution narrative as the last assistant message in the shared
+ * history and plans the world's response to it.
+ *
+ * The director receives the steering bucket so it can frame BEATS to
+ * reflect the protagonist's execution quality, but it must NOT use
+ * steering to change NPC dispositions or world neutrality (the
+ * `DIRECTOR_RESOLUTION_INSTRUCTION` enforces this).
+ */
+export function buildDirectorMessages(
+  turns: AdventureTurn[],
+  settingDescription: string,
+  playerAction: string | null,
+  steering: SteeringBucket | undefined,
+  kind: 'resolution' | 'world-step',
+  turnDirective?: string,
+  compactions?: Record<string, AdventureCompaction>,
+  worldBible?: string,
+  liveWorldState?: LiveWorldState,
+  storylineBrief?: string,
+): LLMMessage[] {
+  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
+
+  appendLiveWorldState(messages, liveWorldState)
+  appendStorylineBrief(messages, storylineBrief)
+
+  const instruction =
+    kind === 'world-step'
+      ? DIRECTOR_WORLD_STEP_INSTRUCTION
+      : DIRECTOR_RESOLUTION_INSTRUCTION
+  // Steering only frames the protagonist's execution quality on the
+  // resolution pass — world-step is neutral and gets no steering block.
+  const steeringBlock =
+    kind === 'resolution' && steering ? `\n\n${steeringGuidance(steering)}` : ''
+  messages.push({
+    role: 'system',
+    content: `${instruction}${steeringBlock}`,
+  })
+
+  appendDirective(messages, turnDirective)
+
+  if (kind === 'resolution' && playerAction !== null) {
+    messages.push({ role: 'user', content: playerAction })
+  } else {
+    // World-step or resolution-opening: terse nudge keeps the
+    // assistant/user alternation legal and tells the model which beat
+    // it is planning.
+    messages.push({
+      role: 'user',
+      content:
+        kind === 'world-step'
+          ? 'Plan the world step. The scene above just ended on a held beat. What concretely happens next, in plan form?'
+          : 'Plan the opening turn. Establish the protagonist in the scene; produce the plan in the format above.',
     })
   }
 
@@ -703,6 +870,7 @@ export function buildWorldStepMessages(
   worldBible?: string,
   liveWorldState?: LiveWorldState,
   storylineBrief?: string,
+  directorBrief?: string,
 ): LLMMessage[] {
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
 
@@ -713,6 +881,11 @@ export function buildWorldStepMessages(
     role: 'system',
     content: WORLD_STEP_INSTRUCTION,
   })
+
+  // Director brief (if the two-model flow is enabled) lands AFTER the role
+  // instruction and BEFORE the user nudge, so the writer reads the plan
+  // last before producing prose.
+  appendDirectorBrief(messages, directorBrief)
 
   // Author directive first, so the world-step nudge remains the message the
   // model is actually replying to.

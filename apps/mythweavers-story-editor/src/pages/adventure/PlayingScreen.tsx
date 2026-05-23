@@ -248,6 +248,20 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
 
       {renderNarrative(turn().narrative)}
 
+      {/* Director brief — present when the two-model flow ran for this
+          turn. Closed by default; expand to audit the plan against the
+          prose when the prose drifts. */}
+      <Show when={turn().directorBrief}>
+        {(brief) => (
+          <details class={styles.directorBrief}>
+            <summary class={styles.directorBriefSummary}>
+              Director brief
+            </summary>
+            <pre class={styles.directorBriefBody}>{brief()}</pre>
+          </details>
+        )}
+      </Show>
+
       {/* Empty/failed generation — offer retry on the last turn */}
       <Show
         when={

@@ -50,6 +50,7 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   'adventure-compaction': 'writing',
   'adventure-synthesis': 'deep-analysis',
   'adventure-storyline-gate': 'analysis',
+  'adventure-director': 'analysis',
   'cliche:critique': 'analysis',
   'summary:node': 'analysis',
   'summary:sentence': 'analysis',

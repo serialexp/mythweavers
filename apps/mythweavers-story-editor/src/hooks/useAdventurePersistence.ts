@@ -25,6 +25,15 @@ export interface AdventureTurn {
    *   "Advance world" button.
    */
   kind?: 'resolution' | 'world-step'
+  /**
+   * Director brief that drove this turn's prose, when the two-model flow
+   * was enabled. Plain markdown — sections like SCENE STATE / BEATS /
+   * NPC REACTIONS / ENDING BEAT / DO NOT. Undefined when the director
+   * toggle was off, for the opening turn, or when the director call
+   * failed and the writer ran un-briefed. Persisted so a drifted turn
+   * can be diagnosed against the plan that produced it.
+   */
+  directorBrief?: string
 }
 
 export interface AdventureCompaction {
@@ -205,6 +214,16 @@ export interface PersistedState {
    * dominate scenes more than the player wants.
    */
   steeringEnabled?: boolean
+  /**
+   * When true, every turn (resolution AND world-step, except the opening
+   * turn) gets an additional "director" LLM pass before the writer call.
+   * The director uses the `analysis` category model and produces a short
+   * structured plan (beats, NPC reactions, ending beat, things to avoid);
+   * the writer then renders that plan as prose. Costs roughly one extra
+   * model call per turn — off by default. Useful when the writer model
+   * has great prose but loses the plot.
+   */
+  directorEnabled?: boolean
   /**
    * When true, the storyline-gate brief is held for user accept/reject
    * before the narrative pass that uses it kicks off. Default: false

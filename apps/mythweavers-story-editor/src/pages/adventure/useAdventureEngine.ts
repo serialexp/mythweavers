@@ -11,6 +11,7 @@ import {
   pickRandom,
   buildResolutionMessages,
   buildWorldStepMessages,
+  buildDirectorMessages,
   buildNonsenseCheckMessages,
   buildRevisionMessages,
   buildCompactionMessages,
@@ -143,6 +144,94 @@ export function createAdventureEngine(
   // --- Generation ---
 
   /**
+   * Run the optional "director" pass: a grounded analysis-class model that
+   * produces a structured plan (SCENE STATE / BEATS / NPC REACTIONS /
+   * ENDING BEAT / DO NOT) for the writer call that follows. Output is
+   * NOT streamed to the UI — the brief is plumbing for the writer, and
+   * we keep the visible streaming block tied to actual prose.
+   *
+   * Returns the trimmed plan text, or `undefined` if the call fails
+   * non-fatally. Aborts propagate (AbortError) so the parent try/catch
+   * around `generate()` handles them uniformly.
+   *
+   * Errors here are intentionally non-fatal — the writer can still run
+   * un-briefed (same behaviour as when the toggle is off), so a transient
+   * provider hiccup on the director shouldn't cost the player their turn.
+   */
+  async function runDirector(
+    playerAction: string | null,
+    kind: 'resolution' | 'world-step',
+    steering: SteeringBucket | undefined,
+    storylineBrief: string | undefined,
+  ): Promise<string | undefined> {
+    const resolved = resolveModel('adventure-director')
+    const client = LLMClientFactory.getClient(resolved.provider)
+
+    const messages = buildDirectorMessages(
+      adventureStore.turns,
+      adventureStore.settingDescription,
+      playerAction,
+      steering,
+      kind,
+      adventureStore.directive,
+      adventureStore.compactions,
+      adventureStore.worldBible,
+      {
+        characters: adventureStore.characters,
+        plotPoints: adventureStore.plotPoints,
+        agenda: adventureStore.agenda,
+      },
+      storylineBrief,
+    )
+
+    let accumulated = ''
+    try {
+      const response = client.generate({
+        model: resolved.model,
+        messages,
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
+          ? Math.min(
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
+            )
+          : undefined,
+        signal: abortController!.signal,
+        metadata: { callType: 'adventure-director' },
+      })
+
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          accumulated += event.text
+        }
+        if (event.type === 'error') {
+          // Mid-stream provider errors abort the director pass but don't
+          // abort the parent — we fall through to the empty-result path.
+          console.warn(
+            '[Director] Stream error, skipping brief:',
+            (event as { type: 'error'; error: string }).error,
+          )
+          accumulated = ''
+          break
+        }
+      }
+    } catch (err) {
+      // Re-throw aborts so the parent generate()/runWorldStep() catch
+      // handles them like any other aborted call.
+      if (err instanceof DOMException && err.name === 'AbortError') throw err
+      const message = err instanceof Error ? err.message : 'Director call failed'
+      console.warn('[Director] Skipped due to error:', message)
+      return undefined
+    }
+
+    // Strip thinking tags / stray XML the model may have introduced. Don't
+    // run the full `cleanNarrative` (it's tuned for prose); just strip
+    // <think> blocks and trim.
+    const brief = accumulated.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    return brief.length > 0 ? brief : undefined
+  }
+
+  /**
    * Stream a single LLM generation into `streamingContent`. Returns the
    * cleaned narrative, or null if the model returned nothing (error surfaces
    * via streamErrors / empty-narrative handling by the caller).
@@ -206,6 +295,13 @@ export function createAdventureEngine(
     // reacting, not the protagonist.
     const worldStepStorylineBrief = await runStorylineGate(null, 'world-step')
 
+    // Optional director pass — grounded plan for the writer to render.
+    // No steering on world-step (the world is neutral). Failures are
+    // non-fatal: writer just runs un-briefed.
+    const worldStepDirectorBrief = adventureStore.directorEnabled
+      ? await runDirector(null, 'world-step', undefined, worldStepStorylineBrief)
+      : undefined
+
     const messages = buildWorldStepMessages(
       adventureStore.turns,
       adventureStore.settingDescription,
@@ -218,6 +314,7 @@ export function createAdventureEngine(
         agenda: adventureStore.agenda,
       },
       worldStepStorylineBrief,
+      worldStepDirectorBrief,
     )
 
     const { narrative, streamErrors } = await streamPass(
@@ -243,6 +340,7 @@ export function createAdventureEngine(
       playerAction: null,
       narrative,
       kind: 'world-step',
+      ...(worldStepDirectorBrief ? { directorBrief: worldStepDirectorBrief } : {}),
     })
     persist()
   }
@@ -280,12 +378,26 @@ export function createAdventureEngine(
 
     abortController = new AbortController()
 
+    // Declared outside the try block so the AbortError catch below can
+    // attach the brief to a partial-aborted resolution turn (the brief
+    // was finalized BEFORE the stream that got aborted; the partial prose
+    // followed it, so the brief is still the honest record of intent).
+    let resolutionDirectorBrief: string | undefined
+
     try {
       // --- Storyline gate (pre-resolution) ---
       // Filter the author-side storyline against the player's intended
       // action and the current world state. The narrative pass sees only
       // the resulting brief — never the full arc.
       const resolutionStorylineBrief = await runStorylineGate(playerAction, 'resolution')
+
+      // --- Optional director pass (pre-resolution) ---
+      // Skipped for the opening turn (no player action to direct yet).
+      // Failures are non-fatal — the writer just runs un-briefed.
+      resolutionDirectorBrief =
+        adventureStore.directorEnabled && playerAction !== null
+          ? await runDirector(playerAction, 'resolution', steering, resolutionStorylineBrief)
+          : undefined
 
       // --- Pass 1: resolution ---
       const resolutionMessages = buildResolutionMessages(
@@ -302,6 +414,7 @@ export function createAdventureEngine(
           agenda: adventureStore.agenda,
         },
         resolutionStorylineBrief,
+        resolutionDirectorBrief,
       )
 
       const { narrative, streamErrors } = await streamPass(
@@ -335,6 +448,7 @@ export function createAdventureEngine(
         narrative,
         kind: 'resolution',
         ...(steering ? { steering } : {}),
+        ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
       })
       persist()
 
@@ -420,6 +534,7 @@ export function createAdventureEngine(
             narrative,
             kind: 'resolution',
             ...(steering ? { steering } : {}),
+            ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
           })
           persist()
         } else {

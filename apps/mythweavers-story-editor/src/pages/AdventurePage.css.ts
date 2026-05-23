@@ -204,6 +204,58 @@ export const worldStepChipAuto = style({
 })
 
 /**
+ * Collapsed disclosure shown under a turn's narrative when the two-model
+ * (director → writer) flow produced a brief for that turn. Lets the
+ * author audit the plan against the prose when the prose drifts.
+ *
+ * Built on a native <details> element — no JS state, accessible by
+ * default. Closed by default so the brief never competes visually with
+ * the narrative itself.
+ */
+export const directorBrief = style({
+  marginTop: tokens.space['2'],
+  marginBottom: tokens.space['2'],
+  fontSize: '0.85rem',
+  color: tokens.color.text.muted,
+  borderLeft: `2px solid ${tokens.color.border.default}`,
+  paddingLeft: tokens.space['3'],
+
+  selectors: {
+    '&[open]': {
+      paddingBottom: tokens.space['2'],
+    },
+  },
+})
+
+export const directorBriefSummary = style({
+  cursor: 'pointer',
+  userSelect: 'none',
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
+  color: tokens.color.text.muted,
+  paddingTop: tokens.space['1'],
+  paddingBottom: tokens.space['1'],
+
+  selectors: {
+    '&:hover': {
+      color: tokens.color.text.primary,
+    },
+  },
+})
+
+export const directorBriefBody = style({
+  margin: 0,
+  marginTop: tokens.space['2'],
+  whiteSpace: 'pre-wrap',
+  fontFamily: 'inherit',
+  fontSize: '0.85rem',
+  lineHeight: 1.5,
+  color: tokens.color.text.muted,
+})
+
+/**
  * Tiny inline indicator shown on each turn that had a steering roll.
  * Lets the writer eyeball whether the rolled bucket lined up with the
  * narrative the model produced. Hidden from players in the reader, only

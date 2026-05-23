@@ -264,6 +264,32 @@ export const AdventureHeader: Component<{
             </div>
           </div>
 
+          {/* Director toggle — two-model flow */}
+          <div class={styles.storyPanelSection}>
+            <label class={styles.formLabel}>
+              <input
+                type="checkbox"
+                checked={adventureStore.directorEnabled}
+                onChange={(e) => {
+                  adventureStore.setDirectorEnabled(e.currentTarget.checked)
+                  engine.persist()
+                }}
+                style={{ 'margin-right': '8px' }}
+              />
+              Use director model (two-pass writing)
+            </label>
+            <div class={styles.directiveHint}>
+              When on, every turn first runs a "director" pass on the
+              Analysis-category model — it produces a structured plan
+              (beats, NPC reactions, ending beat, things to avoid) — and
+              then the writer model renders that plan as prose. Useful
+              when the writer model has great prose but drifts off plot.
+              Roughly doubles the per-turn LLM cost and latency. The
+              brief is saved with each turn so you can inspect it if the
+              prose still drifts.
+            </div>
+          </div>
+
           {/* Directive section */}
           <div class={styles.storyPanelSection}>
             <label class={styles.formLabel}>Per-Turn Directive</label>

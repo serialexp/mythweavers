@@ -27,6 +27,13 @@ interface AdventureState {
   autoAdvanceWorld: boolean
   nonsenseCheckEnabled: boolean
   steeringEnabled: boolean
+  /**
+   * When true, every non-opening resolution/world-step turn runs a
+   * "director" LLM pass before the writer call. The director (analysis
+   * category model) plans the beats; the writer renders them. Off by
+   * default. Persisted alongside the other per-adventure toggles.
+   */
+  directorEnabled: boolean
 
   // Living world state
   characters: Record<string, CharacterCard>
@@ -137,6 +144,7 @@ const [state, setState] = createStore<AdventureState>({
   autoAdvanceWorld: false,
   nonsenseCheckEnabled: true,
   steeringEnabled: true,
+  directorEnabled: false,
 
   characters: {},
   plotPoints: {},
@@ -208,6 +216,9 @@ export const adventureStore = {
   },
   get steeringEnabled() {
     return state.steeringEnabled
+  },
+  get directorEnabled() {
+    return state.directorEnabled
   },
   get characters() {
     return state.characters
@@ -335,6 +346,9 @@ export const adventureStore = {
   },
   setSteeringEnabled(v: boolean) {
     setState('steeringEnabled', v)
+  },
+  setDirectorEnabled(v: boolean) {
+    setState('directorEnabled', v)
   },
 
   // --- Living world state CRUD ---
@@ -554,6 +568,7 @@ export const adventureStore = {
       autoAdvanceWorld: state.autoAdvanceWorld,
       nonsenseCheckEnabled: state.nonsenseCheckEnabled,
       steeringEnabled: state.steeringEnabled,
+      directorEnabled: state.directorEnabled,
       gateApprovalEnabled: state.gateApprovalEnabled,
       characters: { ...state.characters },
       plotPoints: { ...state.plotPoints },
@@ -606,6 +621,7 @@ export const adventureStore = {
         autoAdvanceWorld: saved?.autoAdvanceWorld ?? false,
         nonsenseCheckEnabled: saved?.nonsenseCheckEnabled ?? true,
         steeringEnabled: saved?.steeringEnabled ?? true,
+        directorEnabled: saved?.directorEnabled ?? false,
         gateApprovalEnabled: saved?.gateApprovalEnabled ?? false,
         pendingGateBrief: null,
         pendingGateKind: null,
@@ -660,6 +676,7 @@ export const adventureStore = {
         autoAdvanceWorld: false,
         nonsenseCheckEnabled: true,
         steeringEnabled: true,
+        directorEnabled: false,
         gateApprovalEnabled: false,
         pendingGateBrief: null,
         pendingGateKind: null,
