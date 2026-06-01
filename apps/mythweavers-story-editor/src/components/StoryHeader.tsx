@@ -35,7 +35,7 @@ import { StoryStats } from './StoryStats'
 import { QuickLlmDialog } from './QuickLlmDialog'
 import { quickLlmStore } from '../stores/quickLlmStore'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
-import { PhArrowsOutCardinalIcon, PhBookIcon, PhBookOpenIcon, PhCalendarBlankIcon, PhCaretDownIcon, PhCaretUpIcon, PhChatDotsIcon, PhCodeIcon, PhCpuIcon, PhDotsThreeIcon, PhFilmSlateIcon, PhGearIcon, PhGlobeIcon, PhMagnifyingGlassIcon, PhMapTrifoldIcon, PhMoonIcon, PhPlusIcon, PhSignOutIcon, PhSunIcon, PhTranslateIcon, PhUsersIcon } from 'solidjs-phosphor'
+import { PhArrowsOutCardinalIcon, PhBookIcon, PhBookOpenIcon, PhCalendarBlankIcon, PhCaretDownIcon, PhCaretUpIcon, PhChatDotsIcon, PhCodeIcon, PhCpuIcon, PhDotsThreeIcon, PhFilmSlateIcon, PhGearIcon, PhGlobeIcon, PhMagnifyingGlassIcon, PhMapTrifoldIcon, PhMoonIcon, PhPlusIcon, PhSignOutIcon, PhSunIcon, PhTranslateIcon, PhTreeStructureIcon, PhUsersIcon } from 'solidjs-phosphor'
 
 interface StoryHeaderProps {
   onLoadStory: (
@@ -316,6 +316,14 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               <DropdownItem icon={<PhFilmSlateIcon />} onClick={() => episodeViewerStore.toggle()}>
                 Episode Viewer
               </DropdownItem>
+              <Show when={currentStoryStore.id}>
+                <DropdownItem
+                  icon={<PhTreeStructureIcon />}
+                  onClick={() => navigate(`/story/${currentStoryStore.id}/snowflake`)}
+                >
+                  Snowflake Outline
+                </DropdownItem>
+              </Show>
               <DropdownItem icon={<PhCpuIcon />} onClick={() => llmActivityStore.show()}>
                 LLM Activity
               </DropdownItem>

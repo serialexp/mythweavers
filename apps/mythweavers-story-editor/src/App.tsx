@@ -26,6 +26,7 @@ import { StoryInput } from './components/StoryInput'
 import { StoryLandingPage } from './components/StoryLandingPage'
 import { StoryManager } from './components/StoryManager'
 import { StoryNavigation } from './components/StoryNavigation'
+import { SnowflakeView } from './components/snowflake/SnowflakeView'
 import { useCacheManagement } from './hooks/useCacheManagement'
 import { useOllama } from './hooks/useOllama'
 import { useStoryGeneration } from './hooks/useStoryGeneration'
@@ -1239,6 +1240,123 @@ const App: Component = () => {
 
                         {/* StoryManager modal */}
                         <StoryManager />
+                      </div>
+                    </Show>
+                  </Show>
+                </Show>
+              </Show>
+            </Show>
+          )
+        }}
+      />
+
+      {/* Snowflake outline - top-down story planning over the same node tree */}
+      <Route
+        path="/story/:id/snowflake"
+        component={() => {
+          const params = useParams()
+          const navigate = useNavigate()
+          const [loadingStory, setLoadingStory] = createSignal(true)
+          const [storyNotFound, setStoryNotFound] = createSignal(false)
+
+          // Mirror the /story/:id route: reset on true unmount, load on entry
+          // (skipping if the story is already in the stores).
+          onCleanup(() => {
+            void resetStoryState()
+          })
+
+          createEffect(() => {
+            const storyId = params.id
+            if (!storyId) return
+
+            let disposed = false
+            onCleanup(() => {
+              disposed = true
+            })
+
+            const alreadyLoaded = untrack(() => currentStoryStore.isInitialized && currentStoryStore.id === storyId)
+            if (alreadyLoaded) {
+              setLoadingStory(false)
+              return
+            }
+
+            setLoadingStory(true)
+            setStoryNotFound(false)
+
+            void loadStoryById(storyId)
+              .then((loaded) => {
+                if (disposed) return
+                if (!loaded) {
+                  setStoryNotFound(true)
+                  setTimeout(() => navigate('/stories'), 2000)
+                }
+              })
+              .finally(() => {
+                if (!disposed) setLoadingStory(false)
+              })
+          })
+
+          return (
+            <Show
+              when={!authStore.isLoading}
+              fallback={
+                <div class={styles.loadingContainer}>
+                  <Spinner size="lg" />
+                  <div class={styles.loadingText}>Loading...</div>
+                </div>
+              }
+            >
+              <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
+                <Show
+                  when={!loadingStory()}
+                  fallback={
+                    <div class={styles.loadingContainer}>
+                      <Spinner size="lg" />
+                      <div class={styles.loadingText}>Loading story...</div>
+                    </div>
+                  }
+                >
+                  <Show
+                    when={!storyNotFound()}
+                    fallback={
+                      <div class={styles.loadingContainer}>
+                        <div class={styles.errorText}>Story not found. Redirecting to stories page...</div>
+                      </div>
+                    }
+                  >
+                    <Show
+                      when={storyLoaded()}
+                      fallback={
+                        <div class={styles.loadingContainer}>
+                          <Spinner size="lg" />
+                          <div class={styles.loadingText}>Preparing story...</div>
+                        </div>
+                      }
+                    >
+                      <div class={styles.app}>
+                        <GlobalStatusIndicator />
+
+                        <StoryHeader
+                          onLoadStory={handleLoadStory}
+                          onBulkSummarize={handleBulkSummarize}
+                          onMigrateInstructions={handleMigrateInstructions}
+                          onRemoveUserMessages={handleRemoveUserMessages}
+                          onCleanupThinkTags={handleCleanupThinkTags}
+                          onRewriteMessages={handleRewriteMessages}
+                          onImportClaudeChat={handleImportClaudeChat}
+                          onImportClaudeChatWithBranches={handleImportClaudeChatWithBranches}
+                          serverAvailable={serverStore.isAvailable}
+                          isGenerating={isGenerating() || ollamaExternallyBusy()}
+                          contextSize={effectiveContextSize()}
+                          charsPerToken={settingsStore.charsPerToken}
+                        />
+
+                        <div class={styles.mainContent}>
+                          <SnowflakeView onBack={() => navigate(`/story/${params.id}`)} />
+                        </div>
+
+                        <ErrorNotifications />
+                        <ServerStatusIndicator />
                       </div>
                     </Show>
                   </Show>

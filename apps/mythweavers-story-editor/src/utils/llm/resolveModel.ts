@@ -5,12 +5,7 @@ import type { LLMProvider } from '../../types/llm'
  * Generation categories — groups of call types that share similar cognitive requirements.
  * Users can override the provider+model for each category independently.
  */
-export type GenerationCategory =
-  | 'writing'
-  | 'analysis'
-  | 'deep-analysis'
-  | 'rewriting'
-  | 'meta'
+export type GenerationCategory = 'writing' | 'analysis' | 'deep-analysis' | 'rewriting' | 'meta'
 
 export const GENERATION_CATEGORIES: Record<GenerationCategory, { label: string; description: string }> = {
   writing: {
@@ -42,6 +37,7 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   'story:generate': 'writing',
   'story:generate+summary': 'writing',
   adventure: 'writing',
+  'outline:expand': 'writing',
 
   // Analysis
   'adventure-nonsense': 'analysis',
@@ -57,6 +53,7 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   'summary:multi': 'analysis',
   'summary:paragraph': 'analysis',
   'scene-split': 'analysis',
+  'outline:summarize': 'analysis',
 
   // Rewriting
   'rewrite:single': 'rewriting',
@@ -65,6 +62,7 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   'rewrite:selection': 'rewriting',
   'cliche:refine': 'rewriting',
   translation: 'rewriting',
+  'outline:refine': 'rewriting',
 
   // Meta
   'story:title': 'meta',
@@ -99,12 +97,7 @@ export type CategoryOverrides = Partial<Record<GenerationCategory, CategoryOverr
  */
 export function isCategoryOverrideActive(override: CategoryOverride | undefined): boolean {
   if (!override) return false
-  return (
-    !!override.provider ||
-    !!override.model ||
-    override.thinkingBudget != null ||
-    override.maxTokens != null
-  )
+  return !!override.provider || !!override.model || override.thinkingBudget != null || override.maxTokens != null
 }
 
 export interface ResolvedModel {
@@ -142,25 +135,15 @@ export function resolveModel(callType: string): ResolvedModel {
   const override = category ? effectiveSettings.categoryOverrides[category] : undefined
 
   const useOverrideModel = !!(override?.provider && override?.model)
-  const provider = useOverrideModel
-    ? (override!.provider as LLMProvider)
-    : (effectiveSettings.provider as LLMProvider)
+  const provider = useOverrideModel ? (override!.provider as LLMProvider) : (effectiveSettings.provider as LLMProvider)
   const model = useOverrideModel ? (override!.model as string) : effectiveSettings.model
 
   const thinkingBudget =
-    override?.thinkingBudget != null
-      ? override.thinkingBudget
-      : (effectiveSettings.thinkingBudget ?? 0)
+    override?.thinkingBudget != null ? override.thinkingBudget : (effectiveSettings.thinkingBudget ?? 0)
 
-  const maxTokens =
-    override?.maxTokens != null
-      ? override.maxTokens
-      : effectiveSettings.maxTokens
+  const maxTokens = override?.maxTokens != null ? override.maxTokens : effectiveSettings.maxTokens
 
-  const isOverride =
-    useOverrideModel ||
-    override?.thinkingBudget != null ||
-    override?.maxTokens != null
+  const isOverride = useOverrideModel || override?.thinkingBudget != null || override?.maxTokens != null
 
   return {
     provider,
