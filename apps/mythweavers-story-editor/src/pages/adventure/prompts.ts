@@ -1,88 +1,116 @@
-import type { ToolDefinition } from '@mythweavers/llm'
-import type { LLMMessage } from '../../types/llm'
+import type { ToolDefinition } from "@mythweavers/llm";
+import type { LLMMessage } from "../../types/llm";
 import type {
   AdventureTurn,
   AdventureCompaction,
   CharacterCard,
   PlotPoint,
   AgendaItem,
-} from '../../hooks/useAdventurePersistence'
-import { DISPOSITIONS } from '../../hooks/useAdventurePersistence'
+} from "../../hooks/useAdventurePersistence";
+import { DISPOSITIONS } from "../../hooks/useAdventurePersistence";
 
 // --- Setting generation knobs ---
 
 export interface SettingKnob {
-  id: string
-  label: string
-  options: string[]
+  id: string;
+  label: string;
+  options: string[];
 }
 
 export const SETTING_KNOBS: SettingKnob[] = [
   {
-    id: 'era',
-    label: 'Era',
+    id: "era",
+    label: "Era",
     options: [
-      'Antiquity', 'Medieval', 'Renaissance', 'Victorian', 'Modern',
-      'Near Future', 'Far Future', 'Stone Age', 'Mythic',
+      "Antiquity",
+      "Medieval",
+      "Renaissance",
+      "Victorian",
+      "Modern",
+      "Near Future",
+      "Far Future",
+      "Stone Age",
+      "Mythic",
     ],
   },
   {
-    id: 'location',
-    label: 'Start',
+    id: "location",
+    label: "Start",
     options: [
-      'City', 'Village', 'Wilderness', 'Underground', 'Coastal',
-      'Space', 'Desert', 'Mountains', 'Island', 'Floating',
+      "City",
+      "Village",
+      "Wilderness",
+      "Underground",
+      "Coastal",
+      "Space",
+      "Desert",
+      "Mountains",
+      "Island",
+      "Floating",
     ],
   },
   {
-    id: 'tone',
-    label: 'Tone',
+    id: "tone",
+    label: "Tone",
     options: [
-      'Dark', 'Whimsical', 'Gritty', 'Heroic', 'Horror',
-      'Mystery', 'Comedic', 'Melancholic', 'Surreal',
+      "Dark",
+      "Whimsical",
+      "Gritty",
+      "Heroic",
+      "Horror",
+      "Mystery",
+      "Comedic",
+      "Melancholic",
+      "Surreal",
     ],
   },
   {
-    id: 'magictech',
-    label: 'Power',
+    id: "magictech",
+    label: "Power",
     options: [
-      'No magic', 'Low magic', 'High magic', 'Steampunk',
-      'Sci-fi tech', 'Post-apocalyptic', 'Biopunk', 'Divine',
+      "No magic",
+      "Low magic",
+      "High magic",
+      "Steampunk",
+      "Sci-fi tech",
+      "Post-apocalyptic",
+      "Biopunk",
+      "Divine",
     ],
   },
   {
-    id: 'scale',
-    label: 'Scale',
-    options: ['Intimate', 'Local', 'Regional', 'Epic', 'Cosmic'],
+    id: "scale",
+    label: "Scale",
+    options: ["Intimate", "Local", "Regional", "Epic", "Cosmic"],
   },
-]
+];
 
 export function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 // --- Steering roll ---
 
-export type SteeringBucket = 'well' | 'steady' | 'worse' | 'hell'
+export type SteeringBucket = "well" | "steady" | "worse" | "hell";
 
 // Weights: 15% well / 50% steady / 25% worse / 10% hell.
 // Biased toward "steady" so the world is mostly neutral, extremes are memorable.
 const STEERING_WEIGHTS: ReadonlyArray<readonly [SteeringBucket, number]> = [
-  ['well', 0.15],
-  ['steady', 0.50],
-  ['worse', 0.25],
-  ['hell', 0.10],
-]
+  ["well", 0.15],
+  ["steady", 0.5],
+  ["worse", 0.25],
+  ["hell", 0.1],
+];
 
 /** Roll a hidden steering bucket for the next agent turn. */
 export function rollSteering(): SteeringBucket {
-  const r = Math.random()
-  let acc = 0
+  const r = Math.random();
+  let acc = 0;
   for (const [bucket, weight] of STEERING_WEIGHTS) {
-    acc += weight
-    if (r < acc) return bucket
+    acc += weight;
+    if (r < acc) return bucket;
   }
-  return 'steady'
+  return "steady";
 }
 
 /**
@@ -109,7 +137,7 @@ export function rollSteering(): SteeringBucket {
  */
 export function steeringGuidance(b: SteeringBucket): string {
   switch (b) {
-    case 'well':
+    case "well":
       return `STEERING (hidden from player): The protagonist executes their action GRACEFULLY. Whatever they were trying to do, they pull it off with more poise, precision, eloquence, or luck than they had any right to expect. A persuasion attempt finds exactly the right words. A leap lands cleanly. A lie comes out smooth and unhesitating. A fight move connects with form. Their craft, this once, is at its peak.
 
 This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about:
@@ -120,10 +148,10 @@ This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about
 
 NPCs respond to the well-executed action exactly as their established personality dictates. A skeptical merchant hearing a brilliantly-worded pitch is still a skeptical merchant — but now they are visibly considering it instead of dismissing it. A trained guard parrying a perfectly-timed strike is still a trained guard — but now they are momentarily on the back foot. The protagonist's excellence narrows the NPC's options; it does not change who the NPC is.
 
-If the player's action was vague, pick the most natural concrete attempt and let THAT be executed gracefully.`
-    case 'steady':
-      return `STEERING (hidden from player): The protagonist executes their action competently and honestly — neither lucky nor unlucky. Their performance is in their normal range. Resolve the action at face value. NPCs respond exactly as their established personalities would respond to a workmanlike attempt at this thing.`
-    case 'worse':
+If the player's action was vague, pick the most natural concrete attempt and let THAT be executed gracefully.`;
+    case "steady":
+      return `STEERING (hidden from player): The protagonist executes their action competently and honestly — neither lucky nor unlucky. Their performance is in their normal range. Resolve the action at face value. NPCs respond exactly as their established personalities would respond to a workmanlike attempt at this thing.`;
+    case "worse":
       return `STEERING (hidden from player): The protagonist executes their action CLUMSILY. Whatever they were trying to do, their performance is awkward, halting, or partial. A persuasion attempt comes out stilted, missing the mark or hitting only part of it. A leap clears the gap but lands badly. A lie has a tell — a stutter, a glance, a detail that doesn't quite track. A fight move telegraphs. They get most of it, or some of it, but the craft is visibly off.
 
 This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about:
@@ -134,8 +162,8 @@ This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about
 
 NPCs respond to the clumsy execution exactly as their established personality dictates. A friendly bartender hearing a fumbled question is still a friendly bartender — but now they're confused, asking the protagonist to repeat themselves, or politely brushing past the awkwardness. A wary captain hearing a stilted bluff is still a wary captain — but now they're notably less convinced than they otherwise would have been. The protagonist's stumble narrows their own options; it does not change who the NPC is.
 
-The friction comes from the protagonist, not the world. No cliffhanger unless the scene already earned it.`
-    case 'hell':
+The friction comes from the protagonist, not the world. No cliffhanger unless the scene already earned it.`;
+    case "hell":
       return `STEERING (hidden from player): The protagonist BUNGLES their action. Whatever they were trying to do, their execution backfires on its own terms. A persuasion attempt comes out so wrongly-pitched it actively offends, embarrasses, or gives the game away. A leap falls short or trips on the takeoff. A lie contradicts itself mid-sentence or names a detail that's plainly wrong. A fight move overcommits and leaves them open. They make a fool of themselves, or a mess of the attempt, on their own merits.
 
 This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about:
@@ -146,7 +174,7 @@ This is purely about the QUALITY OF THE PROTAGONIST'S EXECUTION. It is NOT about
 
 NPCs respond to the bungled execution exactly as their established personality dictates. A kindly priest hearing a deeply offensive accidental insult is still a kindly priest — but now they are hurt, withdrawn, or coolly redirecting the conversation. A hot-tempered guard hearing the same insult is still a hot-tempered guard — and may well respond in kind. The disaster IS the protagonist's bad performance; the NPC's reaction follows naturally from THEIR character meeting THAT performance.
 
-The disaster comes from the protagonist, not the world. Stay inside the world's logic. NPC reactions must remain in character: a cautious NPC does not suddenly charge in, a friendly NPC does not suddenly betray, regardless of how badly the protagonist bungled.`
+The disaster comes from the protagonist, not the world. Stay inside the world's logic. NPC reactions must remain in character: a cautious NPC does not suddenly charge in, a friendly NPC does not suddenly betray, regardless of how badly the protagonist bungled.`;
   }
 }
 
@@ -158,16 +186,16 @@ The "Location" parameter describes the STARTING LOCATION where the adventure beg
 
 Be creative and specific — don't just restate the parameters. Invent names, places, and details that make the setting feel alive.
 
-Respond with ONLY the setting description, no other text.`
+Respond with ONLY the setting description, no other text.`;
 
 // Shared system prompt — identical first message for all calls enables provider-side caching
 export const BASE_SYSTEM_PROMPT = `You are a collaborative storyteller running an interactive adventure. You create vivid, engaging fiction that responds to the player's choices. The world is alive — NPCs have their own personalities and motivations — but the story follows the player, not its own independent agenda.
 
-The story is told in second person ("you"), present tense. The player controls only the protagonist. You control all NPCs, the environment, and world events.`
+The story is told in second person ("you"), present tense. The player controls only the protagonist. You control all NPCs, the environment, and world events.`;
 
 export const CORE_DIRECTIVE = `The player's input describes their INTENT, not exact words or actions. Interpret it as the general direction or tone they want to take. Only treat text in "quotes" as literal dialogue or exact phrasing. Everything else is shorthand for what the protagonist is trying to do — translate it into natural, in-character behavior.
 
-The player's action is the starting point of each turn. Resolve it first and honestly, then let the world react to it in the same narrative — do not wait for another turn to show consequences.`
+The player's action is the starting point of each turn. Resolve it first and honestly, then let the world react to it in the same narrative — do not wait for another turn to show consequences.`;
 
 /**
  * Role-specific instruction for pass 1 (resolution).
@@ -182,21 +210,59 @@ export const RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Resolve the player's
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
 
 SCOPE OF THIS TURN:
-- Narrate the immediate, direct consequences of what the protagonist just did. That's it.
-- NPCs present in the scene may REACT to the action (flinch, reply, look up) but do NOT pursue their own plans or agendas — that's a later beat, not this one.
-- The environment responds only insofar as it was touched by the action (the door the protagonist pushed, the glass they knocked over).
-- End the turn on a beat where the world WAITS — a reply half-finished, a held breath, a pause — so the scene can either be moved forward deliberately or left for the next player input.
+- Advance the story based on what the protagonist just did.
 
 RULES:
-- POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you". Never "he/she/they" for the protagonist, never "I", never past tense. Example: "You step onto the porch. The boards groan under your weight." NOT "She stepped onto the porch" and NOT "I step onto the porch".
+- POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
-- Player input is intent, not literal text. Translate it into natural in-character actions and dialogue. Only text in "quotes" should be used verbatim.
 - 2-4 paragraphs.
-- Do NOT end with an open prompt for the next action — the scene ends mid-beat, waiting.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
-- NPCs must react consistently with their established personalities and current motivations. A cautious NPC does not suddenly charge in; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not yet been established, make a reasonable choice and let that become their personality going forward.
-- The steering guidance below describes ONLY the QUALITY of the protagonist's own execution this turn — how gracefully or clumsily they pulled off their attempt. It does NOT describe the world's mood toward the protagonist, NPC dispositions, or whether convenient/inconvenient events occur. The world is what it is; only the protagonist's craft varies.`
+- NPCs react consistently with their established personalities and current motivations.`;
+
+/**
+ * Instruction for the deuteragonist action LLM call.
+ *
+ * Runs before the resolution pass when a partner character is configured.
+ * Queries the LLM to determine what the partner wants to do, given the
+ * story state, their personality, and what the protagonist just did.
+ * The output is a short action description that will be passed alongside
+ * the player's action into the resolution prompt.
+ */
+export const PARTNER_ACTION_INSTRUCTION = `You are determining what a deuteragonist (partner character accompanying the protagonist) intends to do this turn.
+
+Given the story so far, the deuteragonist's personality, and what the protagonist just did, write ONE SHORT SENTENCE describing the deuteragonist's intended action — what they want to accomplish, say, or signal this turn. This is NOT prose. It is a beat summary that a writer model will later render as narrative alongside the protagonist's action.
+
+Rules:
+- ONE sentence only, at most a sentence and a half. Do NOT write dialogue, sensory detail, or narrative prose.
+- State the GOAL or ACTION, not the execution: "She intends to confront him about the missing money" NOT "She spins around, her eyes blazing as she grabs his collar and shouts..."
+- Write in third person using the deuteragonist's name or pronoun.
+- The protagonist is addressed as "the protagonist" or "him/her/them" — never "you".
+
+Output ONLY the sentence. No labels, no formatting, no meta-commentary.`;
+
+/**
+ * Role-specific instruction for the deuteragonist resolution pass.
+ *
+ * Runs when the party is split — generates a parallel narrative showing
+ * what happens with the deuteragonist while the protagonist is elsewhere.
+ * Written in third person, focused on the deuteragonist's experience.
+ */
+export const DEUTERAGONIST_RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Narrate what happens with the deuteragonist while the protagonist is elsewhere.
+
+Write ONLY the story narrative — no metadata, no headings, no XML tags.
+
+SCOPE OF THIS TURN:
+- The deuteragonist is separated from the protagonist right now. Narrate what they are doing, seeing, and experiencing in their own location.
+
+RULES:
+- POINT OF VIEW: Write in **third person, present tense** about the deuteragonist. Use their name.
+- The protagonist is NOT present. Do NOT narrate what the protagonist is doing — that happens in a separate narrative.
+- Show, don't tell. Vivid sensory details, dialogue, action.
+- 1-3 paragraphs.
+- Only include events the deuteragonist could plausibly observe.
+- Everything must be physically plausible within the established world.
+- NPCs react consistently with their established personalities and current motivations.`;
 
 /**
  * Role-specific instruction for pass 2 (world step).
@@ -208,25 +274,19 @@ RULES:
  */
 export const WORLD_STEP_INSTRUCTION = `YOUR ROLE THIS TURN: Let the world move.
 
-The player's most recent action has already been resolved (see the preceding narrative). The scene is currently on a held beat. Now NPCs and the environment move on their own agenda.
-
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
 
 SCOPE OF THIS TURN:
 - NPCs present in the scene act in character (drawing on their established personalities from the World Bible, the live character roster, and prior turns). They pursue their own goals, not just react to the protagonist.
-- The environment shifts where it would naturally — a guard turns a corner, the tide comes in, a door opens elsewhere.
 - Continue directly from where the resolution narrative left off. Do not recap or restate events that were just narrated.
-- A world step does NOT need to advance every plot point or agenda item every turn. Most beats are small and ambient — a sound, a glance, a passing rumour. Only advance a specific plot point or agenda item when the current scene gives it a natural moment, or when an agenda item's stated timing has actually come due. NPCs who are off-screen or have no plausible reason to be present should NOT show up again just to push their hook.
-- End with an open prompt for the protagonist's next action. No numbered options.
 
 RULES:
-- POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you". This is the SAME POV as the resolution narrative you're continuing from — do NOT switch to third person just because the camera is now on NPCs. NPCs are described as the protagonist sees and hears them: "The bartender wipes the same glass twice, watching you." NOT "The bartender wipes the same glass twice, watching the stranger." The protagonist remains "you" even when other characters are the active subject of a sentence.
+- POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
 - 2-4 paragraphs.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
-- NPCs must act consistently with their established personalities, goals, and current motivations. A cautious NPC does not suddenly charge in; a greedy one does not suddenly share; a friendly one does not suddenly turn hostile without a clear in-world cause. If an NPC's personality has not been established, make a reasonable choice and let that become their personality going forward.
-- The world is neither for nor against the protagonist. NPCs and the environment behave the way their established nature and pre-existing agenda dictate — not what would be most dramatic for the protagonist, and not what the protagonist would prefer. Do NOT manufacture brand-new coincidences, surprise antagonists, lucky breaks, or hostile turns of fate. DO let the live world state's existing characters, plot points, and agenda items move forward on their own timing — that is *not* the world turning against the protagonist, that is the world simply continuing to exist.`
+- NPCs must act consistently with their established personalities, goals, and current motivations.`;
 
 /**
  * Role-specific instruction for the optional director pass.
@@ -241,39 +301,30 @@ RULES:
  * to follow these beats exactly.
  */
 const DIRECTOR_COMMON_RULES = `OUTPUT FORMAT — you MUST follow this exactly:
-SCENE STATE: <one sentence — where we are, who is on-screen, the current held beat or mood>
 BEATS:
-1. <concrete thing that happens, named actor + named action; no "tension rises" handwaves>
-2. <next concrete beat>
-3. <optional third beat>
-4. <optional fourth beat>
-NPC REACTIONS:
-- <NPC name>: <one line, grounded in their disposition + motive from the live world state>
-- <NPC name>: <...>
-ENDING BEAT: <the specific beat the narrative should land on>
-DO NOT:
-- <a specific plot drift to avoid this turn, grounded in the storyline brief or active plot points>
-- <another>
-- <optional third>
+1. <beat>
+2. <beat>
+3. <beat>
+4. <beat>
 
 HARD RULES:
-- Do NOT write prose. Do NOT use second person. Do NOT narrate sensory detail. Your output is a plan, not a scene.
-- 2–4 BEATS. Each beat is one short sentence naming an actor and what they concretely do.
-- NPC REACTIONS only for NPCs actually on-screen in this beat. Skip the section entirely (omit it) if no NPCs are present.
-- Stay strictly inside the current scene — do not jump ahead, do not stage events the writer would need to invent travel/time to reach.
-- Respect the storyline brief and the live world state. If a plot point is "active" or "resolving", at least one beat should plausibly touch it unless the scene's geography makes that impossible.`
+- Output ONLY the numbered BEATS list
+- Plan SUBSTANCE, not staging. Each beat names an actor and what they do or communicate at the level of INTENT — what changes, what's revealed, what's demanded. The writer invents the actual words, gestures, movement, and sensory detail that render it.
+  GOOD: "He tells her she remembers nothing." / "He makes clear she's safe but not free to leave yet." / "He refuses to say who tied her up."
+  BAD:  "He rubs his eyes with thumb and forefinger, pulls a dented flask from his coat, and mutters 'You don't remember a damn thing, do you?'"
+- Do NOT script the prose: no quoted or paraphrased dialogue lines, no specific gestures (rubbing eyes, scraping a chair, shoving hands in pockets), no choreographed movement or distances, no sensory description. If you catch yourself writing the sentence the character would say or the move they'd make, stop — state what it ACCOMPLISHES instead.
+- 2–4 beats. Each beat is one short sentence: an actor and the gist of their action or message.
+- When an on-screen NPC acts or reacts, that IS a beat — name the NPC and the gist of what they do, grounded in their established disposition + motive. Do not break reactions out into a separate list.
+- The beats are the whole plan: the writer renders them faithfully and will not invent new beats or fix wonky ones. Make them coherent, in-character, and self-sufficient.`;
 
 export const DIRECTOR_RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the resolution of the player's action.
 
 A separate "writer" model will render your plan as prose. Your job is to decide WHAT HAPPENS — concretely, grounded in the established world, characters, and storyline — so the writer can focus entirely on HOW to write it.
 
 SCOPE OF THIS TURN (resolution):
-- Plan the direct, immediate consequences of the player action. NPCs may REACT but do NOT pursue their own agendas yet — that's the world-step's job.
-- The environment only responds to what the action actually touched.
-- The ending beat should be a HELD BEAT — a reply half-finished, a held breath, a pause — the scene waiting, not closed.
-- Steering, if provided, scopes ONLY to the QUALITY of the protagonist's execution. It does NOT change what NPCs do or how the world feels about the protagonist.
+- Plan the direct, immediate consequences of the player action.
 
-${DIRECTOR_COMMON_RULES}`
+${DIRECTOR_COMMON_RULES}`;
 
 export const DIRECTOR_WORLD_STEP_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the world step.
 
@@ -281,12 +332,10 @@ A separate "writer" model will render your plan as prose. The player's most rece
 
 SCOPE OF THIS TURN (world-step):
 - Plan how on-screen NPCs act IN CHARACTER — pursuing their own goals, not just reacting.
-- Plan natural environmental shifts only where they would happen anyway (a guard rounding a corner, a tide coming in).
-- Most beats are small and ambient. Do NOT advance every plot point or agenda item every turn — only advance one when the current scene gives it a natural opening, or when an agenda item's stated timing has come due.
-- NPCs who are OFF-SCREEN do NOT appear just to push their hook. Do not invent reasons for them to be here.
-- The ending beat should be an OPEN PROMPT — a moment where the protagonist has space to act next.
+- MOVE THE SITUATION FORWARD. Each world-step should leave the protagonist's circumstances actually changed — a step closer to a consequence, a decision forced, a fact revealed, a stakes shift — not just re-dressed with fresh atmosphere. Lean slightly toward progress over ambiance, but don't lurch: one real development per turn is plenty.
+- Do NOT loop or stall. If a kind of beat has already played in this scene (another stranger looms in to threaten, the same menace gets restated), do something DIFFERENT with it — escalate, resolve, or move past it. Repeating the same beat with new faces is treading water, not pacing.
 
-${DIRECTOR_COMMON_RULES}`
+${DIRECTOR_COMMON_RULES}`;
 
 export const NONSENSE_CHECK_INSTRUCTION = `YOUR ROLE: Check ONLY the text above for things that don't make sense.
 
@@ -306,14 +355,14 @@ If not:
 INCONSISTENT
 1. [One sentence explaining what's nonsensical and why]
 2. ...
-Maximum 5 items.`
+Maximum 5 items.`;
 
 // --- Compaction ---
 
-export const COMPACTION_CHUNK_SIZE = 10
-export const VERBATIM_TURN_COUNT = 30
+export const COMPACTION_CHUNK_SIZE = 10;
+export const VERBATIM_TURN_COUNT = 30;
 
-export const COMPACTION_SYSTEM_INSTRUCTION = `You are summarizing sections of an interactive adventure story. You produce concise, thorough narrative summaries in second person present tense.`
+export const COMPACTION_SYSTEM_INSTRUCTION = `You are summarizing sections of an interactive adventure story. You produce concise, thorough narrative summaries in second person present tense.`;
 
 export const COMPACTION_INSTRUCTION = `Summarize ALL events in the preceding story section. This summary will replace the original turns in context, so be thorough.
 
@@ -335,12 +384,12 @@ Include:
 - Significant dialogue or revelations
 - Changes in the situation or stakes
 
-Write 2-4 paragraphs as a flowing narrative summary in present tense.`
+Write 2-4 paragraphs as a flowing narrative summary in present tense.`;
 
 export interface CompactionRange {
-  start: number
-  end: number
-  key: string
+  start: number;
+  end: number;
+  key: string;
 }
 
 /**
@@ -349,16 +398,16 @@ export interface CompactionRange {
  * Only full chunks (exactly COMPACTION_CHUNK_SIZE turns) are returned.
  */
 export function getCompactionRanges(turnCount: number): CompactionRange[] {
-  const ranges: CompactionRange[] = []
-  const compactableCount = Math.max(0, turnCount - VERBATIM_TURN_COUNT)
+  const ranges: CompactionRange[] = [];
+  const compactableCount = Math.max(0, turnCount - VERBATIM_TURN_COUNT);
   for (let i = 0; i < compactableCount; i += COMPACTION_CHUNK_SIZE) {
-    const end = Math.min(i + COMPACTION_CHUNK_SIZE - 1, compactableCount - 1)
+    const end = Math.min(i + COMPACTION_CHUNK_SIZE - 1, compactableCount - 1);
     // Only create a range if we have a full chunk
     if (end - i >= COMPACTION_CHUNK_SIZE - 1) {
-      ranges.push({ start: i, end, key: `${i}-${end}` })
+      ranges.push({ start: i, end, key: `${i}-${end}` });
     }
   }
-  return ranges
+  return ranges;
 }
 
 /** Build the messages for a compaction LLM call. */
@@ -366,33 +415,33 @@ export function buildCompactionMessages(
   turns: AdventureTurn[],
   range: CompactionRange,
 ): LLMMessage[] {
-  const rangeTurns = turns.slice(range.start, range.end + 1)
+  const rangeTurns = turns.slice(range.start, range.end + 1);
 
   const messages: LLMMessage[] = [
-    { role: 'system', content: COMPACTION_SYSTEM_INSTRUCTION },
-  ]
+    { role: "system", content: COMPACTION_SYSTEM_INSTRUCTION },
+  ];
 
   for (const turn of rangeTurns) {
     if (turn.playerAction) {
-      messages.push({ role: 'user', content: turn.playerAction })
+      messages.push({ role: "user", content: turn.playerAction });
     }
-    messages.push({ role: 'assistant', content: turn.narrative })
+    messages.push({ role: "assistant", content: turn.narrative });
   }
 
   messages.push({
-    role: 'user',
+    role: "user",
     content: `${COMPACTION_INSTRUCTION}\n\nThe preceding section contains ${rangeTurns.length} turns (turns ${range.start + 1}–${range.end + 1}).`,
-  })
+  });
 
-  return messages
+  return messages;
 }
 
 // --- Live world state ---
 
 export interface LiveWorldState {
-  characters?: Record<string, CharacterCard>
-  plotPoints?: Record<string, PlotPoint>
-  agenda?: AgendaItem[]
+  characters?: Record<string, CharacterCard>;
+  plotPoints?: Record<string, PlotPoint>;
+  agenda?: AgendaItem[];
 }
 
 export interface FormatLiveWorldStateOptions {
@@ -402,7 +451,7 @@ export interface FormatLiveWorldStateOptions {
    * The narrative passes don't need this — they don't call tools — and
    * leaving ids out keeps their prompts a little leaner.
    */
-  includeIds?: boolean
+  includeIds?: boolean;
 }
 
 /**
@@ -416,64 +465,73 @@ export function formatLiveWorldState(
   state: LiveWorldState,
   options: FormatLiveWorldStateOptions = {},
 ): string | null {
-  const { includeIds = false } = options
-  const idPrefix = (id: string) => (includeIds ? `[id: ${id}] ` : '')
+  const { includeIds = false } = options;
+  const idPrefix = (id: string) => (includeIds ? `[id: ${id}] ` : "");
 
   const activeChars = Object.values(state.characters ?? {}).filter(
     (c) => !c.archived,
-  )
+  );
   const activePoints = Object.values(state.plotPoints ?? {}).filter(
-    (p) => p.status === 'seeded' || p.status === 'active' || p.status === 'resolving',
-  )
-  const agenda = state.agenda ?? []
+    (p) =>
+      p.status === "seeded" ||
+      p.status === "active" ||
+      p.status === "resolving",
+  );
+  const agenda = state.agenda ?? [];
 
-  if (activeChars.length === 0 && activePoints.length === 0 && agenda.length === 0) {
-    return null
+  if (
+    activeChars.length === 0 &&
+    activePoints.length === 0 &&
+    agenda.length === 0
+  ) {
+    return null;
   }
 
-  const parts: string[] = []
+  const parts: string[] = [];
 
   if (activeChars.length > 0) {
     const lines = activeChars.map((c) => {
-      const motive = c.motive?.trim() || '—'
-      const disposition = c.disposition ?? 'indifference'
-      const desc = c.description?.trim() || '—'
-      return `- ${idPrefix(c.id)}${c.name} (motive: ${motive}; disposition: ${disposition}): ${desc}`
-    })
+      const motive = c.motive?.trim() || "—";
+      const disposition = c.disposition ?? "indifference";
+      const desc = c.description?.trim() || "—";
+      return `- ${idPrefix(c.id)}${c.name} (motive: ${motive}; disposition: ${disposition}): ${desc}`;
+    });
     parts.push(
-      `[CHARACTER ROSTER — currently in or near the story. Disposition is on a 7-step scale toward the protagonist: hatred → hostility → distrust → indifference → warmth → devotion → love.]\n${lines.join('\n')}`,
-    )
+      `[CHARACTER ROSTER — currently in or near the story. Disposition is on a 7-step scale toward the protagonist: hatred → hostility → distrust → indifference → warmth → devotion → love.]\n${lines.join("\n")}`,
+    );
   }
 
   if (activePoints.length > 0) {
     // Sort by status order: resolving > active > seeded
-    const order = { resolving: 0, active: 1, seeded: 2 } as const
+    const order = { resolving: 0, active: 1, seeded: 2 } as const;
     const sorted = [...activePoints].sort(
       (a, b) =>
         (order[a.status as keyof typeof order] ?? 99) -
         (order[b.status as keyof typeof order] ?? 99),
-    )
+    );
     const lines = sorted.map((p) => {
-      const desc = p.description?.trim() || '—'
-      return `- ${idPrefix(p.id)}(${p.status}) ${p.title}: ${desc}`
-    })
-    parts.push(`[ACTIVE PLOT POINTS]\n${lines.join('\n')}`)
+      const desc = p.description?.trim() || "—";
+      return `- ${idPrefix(p.id)}(${p.status}) ${p.title}: ${desc}`;
+    });
+    parts.push(`[ACTIVE PLOT POINTS]\n${lines.join("\n")}`);
   }
 
   if (agenda.length > 0) {
     const lines = agenda.map((a) => {
-      const when = a.when?.trim() || 'soon'
-      const desc = a.description?.trim() || '—'
-      return `- ${idPrefix(a.id)}(${when}) ${desc}`
-    })
-    parts.push(`[WORLD AGENDA — what's already in motion]\n${lines.join('\n')}`)
+      const when = a.when?.trim() || "soon";
+      const desc = a.description?.trim() || "—";
+      return `- ${idPrefix(a.id)}(${when}) ${desc}`;
+    });
+    parts.push(
+      `[WORLD AGENDA — what's already in motion]\n${lines.join("\n")}`,
+    );
   }
 
   parts.push(
-    'The narrative must respect this state. NPC dispositions, motives, and the world agenda do not flex to the protagonist\'s preferences. Carry items forward; do not invent contradictions. Agenda items WILL happen on the timing shown unless the protagonist directly intervenes.',
-  )
+    "The narrative must respect this state. NPC dispositions, motives, and the world agenda do not flex to the protagonist's preferences. Carry items forward; do not invent contradictions. Agenda items WILL happen on the timing shown unless the protagonist directly intervenes.",
+  );
 
-  return parts.join('\n\n')
+  return parts.join("\n\n");
 }
 
 /** Append a system message with the live world state, if any. */
@@ -481,13 +539,13 @@ function appendLiveWorldState(
   messages: LLMMessage[],
   state: LiveWorldState | undefined,
 ): void {
-  if (!state) return
-  const block = formatLiveWorldState(state)
-  if (!block) return
+  if (!state) return;
+  const block = formatLiveWorldState(state);
+  if (!block) return;
   messages.push({
-    role: 'system',
+    role: "system",
     content: `[LIVE WORLD STATE — current as of this turn]\n\n${block}`,
-  })
+  });
 }
 
 /**
@@ -512,10 +570,10 @@ export function appendStoryline(
   messages: LLMMessage[],
   storyline?: string,
 ): void {
-  const trimmed = storyline?.trim()
-  if (!trimmed) return
+  const trimmed = storyline?.trim();
+  if (!trimmed) return;
   messages.push({
-    role: 'system',
+    role: "system",
     content: `[STORY ARC — the hidden architecture of what is actually going on across this story: who runs the antagonist machinery, why this matters to them, how it operates, what the protagonist has actually walked into. The plot points above show only the visible fragments; this section is the worldbuilding scaffolding underneath them.
 
 The arc itself is wrapped in <story-arc>...</story-arc> tags below. Read the contents as authoritative author-side knowledge that INFORMS your narration but is NOT itself something the protagonist or any on-screen character knows. Treat it the way a novelist treats their own series bible: it shapes every scene, but it never appears as exposition the characters can recite.
@@ -537,7 +595,7 @@ Reveal pieces of this on screen ONLY as the scene naturally allows — through e
 <story-arc>
 ${trimmed}
 </story-arc>`,
-  })
+  });
 }
 
 /**
@@ -552,19 +610,19 @@ ${trimmed}
  * The gate is allowed (and encouraged) to return nothing.
  */
 function appendStorylineBrief(messages: LLMMessage[], brief?: string): void {
-  const trimmed = brief?.trim()
-  if (!trimmed) return
+  const trimmed = brief?.trim();
+  if (!trimmed) return;
   // Guard against the gate echoing "NONE" or similar in-band sentinels —
   // we expect the engine to have stripped these, but defend anyway.
-  if (/^(none|n\/a|nothing)\.?$/i.test(trimmed)) return
+  if (/^(none|n\/a|nothing)\.?$/i.test(trimmed)) return;
   messages.push({
-    role: 'system',
-    content: `[ARC BRIEF — a turn-scoped slice of the story arc that an upstream pass has judged relevant or visible to the next beat. The full author-side arc is NOT in this prompt; only what's listed here is safe to factor into your narration. Treat the items below as either (a) facts the protagonist or current scene has earned and may surface, or (b) off-screen pressures that may shape NPC behaviour and ambient detail without being named on-page. Use the brief, but do not invent additional arc detail beyond it — anything not in this brief stays off the page this turn. If the brief is empty/short, that means little or nothing from the arc applies right now; narrate accordingly.]
+    role: "system",
+    content: `[BACKGROUND INFORMATION — context an upstream pass has judged relevant or visible to the next beat, drawn from the story so far. The full author-side arc is NOT in this prompt; only what's listed here is safe to factor into your narration. Treat the items below as either (a) facts the protagonist or current scene has earned and may surface, or (b) off-screen pressures that may shape NPC behaviour and ambient detail without being named on-page. Use this, but do not invent additional detail beyond it — anything not listed here stays off the page this turn. If it's empty/short, that means little or nothing applies right now; narrate accordingly.]
 
-<arc-brief>
+<background-information>
 ${trimmed}
-</arc-brief>`,
-  })
+</background-information>`,
+  });
 }
 
 /**
@@ -575,16 +633,16 @@ ${trimmed}
  * generating prose.
  */
 function appendDirectorBrief(messages: LLMMessage[], brief?: string): void {
-  const trimmed = brief?.trim()
-  if (!trimmed) return
+  const trimmed = brief?.trim();
+  if (!trimmed) return;
   messages.push({
-    role: 'system',
-    content: `[DIRECTOR BRIEF — a separate, more grounded model has planned the beats of this turn for you. Render this plan as prose. Follow the BEATS in the order listed. Honour every NPC REACTION. Land the narrative on the listed ENDING BEAT. Respect every item in the DO NOT list. Do NOT invent new beats not listed here, do NOT skip beats listed here, do NOT have NPCs do things the brief did not authorize. If the director brief and the arc brief disagree on a detail, prefer the director brief — it was written with both in view. Your remaining job is purely the prose: voice, sensory detail, dialogue rhythm, paragraph shape.]
+    role: "system",
+    content: `[DIRECTOR BRIEF — a separate, more grounded model has planned the beats of this turn for you. Render this plan as prose. Follow the BEATS in the order listed. Do NOT invent new beats not listed here, do NOT skip beats listed here, do NOT have NPCs do things the brief did not authorize. The listed beats decide what happens and roughly where the scene lands; everything else — voice, sensory detail, dialogue rhythm, paragraph shape, and how the scene comes to rest beyond the final beat — is yours. If the director brief and the background information disagree on a detail, prefer the director brief — it was written with both in view.]
 
 <director-brief>
 ${trimmed}
 </director-brief>`,
-  })
+  });
 }
 
 // --- Prompt construction helpers ---
@@ -601,14 +659,14 @@ ${trimmed}
  * model could mistake for content it should comply-with-and-confirm.
  */
 function appendDirective(messages: LLMMessage[], directive?: string): void {
-  const trimmed = directive?.trim()
-  if (!trimmed) return
+  const trimmed = directive?.trim();
+  if (!trimmed) return;
   messages.push({
-    role: 'system',
+    role: "system",
     content: `Standing author directive — apply these constraints silently to the narrative you are about to produce. Do not acknowledge, restate, summarize, or reply to this message; output prose only.
 
 ${trimmed}`,
-  })
+  });
 }
 
 /**
@@ -626,92 +684,165 @@ export function buildSharedHistory(
   compactions?: Record<string, AdventureCompaction>,
   settingDescription?: string,
   worldBible?: string,
+  /** When true, prefer the deuteragonist's narrative for split turns. */
+  forDeuteragonist?: boolean,
 ): LLMMessage[] {
-  const messages: LLMMessage[] = []
+  const messages: LLMMessage[] = [];
 
   // Shared system prompt — cache breakpoint: static across all calls and turns
   // If there's a world bible, combine it with the base prompt under the same
   // cache breakpoint so the entire static prefix is cached together.
-  const worldBibleTrimmed = worldBible?.trim()
+  const worldBibleTrimmed = worldBible?.trim();
   messages.push({
-    role: 'system',
+    role: "system",
     content: worldBibleTrimmed
       ? `${BASE_SYSTEM_PROMPT}\n\n[WORLD BIBLE — persistent reference for the world, characters, and lore]\n${worldBibleTrimmed}`
       : BASE_SYSTEM_PROMPT,
-    cache_control: { type: 'ephemeral', ttl: '1h' },
-  })
+    cache_control: { type: "ephemeral", ttl: "1h" },
+  });
 
-  const ranges = getCompactionRanges(turns.length)
-  const recentStart = Math.max(0, turns.length - VERBATIM_TURN_COUNT)
+  const ranges = getCompactionRanges(turns.length);
+  const recentStart = Math.max(0, turns.length - VERBATIM_TURN_COUNT);
 
   // Older turns: use compaction summaries where available, otherwise verbatim
   for (const range of ranges) {
-    const comp = compactions?.[range.key]
+    const comp = compactions?.[range.key];
     if (comp?.summary) {
       // Compacted: insert summary as a user/assistant pair
       messages.push({
-        role: 'user',
+        role: "user",
         content: `[Previous events summary]: ${comp.summary}`,
-      })
+      });
       messages.push({
-        role: 'assistant',
-        content: '[Acknowledged — continuing story]',
-      })
+        role: "assistant",
+        content: "[Acknowledged — continuing story]",
+      });
     } else {
       // Not yet compacted: include original turns
       for (let i = range.start; i <= range.end; i++) {
-        addTurnToMessages(messages, turns, i, false, settingDescription)
+        addTurnToMessages(messages, turns, i, false, settingDescription);
       }
     }
   }
 
   // Gap turns: between the last compaction range and the verbatim window
   // (partial chunk not yet eligible for compaction)
-  const compactedEnd = ranges.length > 0 ? ranges[ranges.length - 1].end + 1 : 0
+  const compactedEnd =
+    ranges.length > 0 ? ranges[ranges.length - 1].end + 1 : 0;
   for (let i = compactedEnd; i < recentStart; i++) {
-    addTurnToMessages(messages, turns, i, false, settingDescription)
+    addTurnToMessages(messages, turns, i, false, settingDescription, forDeuteragonist);
   }
 
   // Recent turns: always verbatim
   for (let i = recentStart; i < turns.length; i++) {
-    const isLastTurn = i === turns.length - 1
-    addTurnToMessages(messages, turns, i, isLastTurn, settingDescription)
+    const isLastTurn = i === turns.length - 1;
+    addTurnToMessages(messages, turns, i, isLastTurn, settingDescription, forDeuteragonist);
   }
 
-  return messages
+  return messages;
 }
 
-/** Helper: append a single turn's messages to the array. */
+/** Helper: append a single turn's messages to the array.
+ *
+ * @param forDeuteragonist - When true, for split turns the deuteragonist's
+ *   narrative is used as the primary assistant message instead of the
+ *   protagonist's, and the protagonist's narrative is omitted (the
+ *   deuteragonist wouldn't know what happened to the protagonist while
+ *   they were apart). The `[Meanwhile, with the deuteragonist:]` message
+ *   is also skipped since the deuteragonist's story IS the main story here.
+ */
 function addTurnToMessages(
   messages: LLMMessage[],
   turns: AdventureTurn[],
   i: number,
   addCacheBreakpoint: boolean,
   settingDescription?: string,
+  forDeuteragonist?: boolean,
 ): void {
-  const turn = turns[i]
+  const turn = turns[i];
 
-  if (turn.playerAction) {
-    messages.push({ role: 'user', content: turn.playerAction })
+  // When building context for the deuteragonist, use their narrative for
+  // split turns — they wouldn't know what the protagonist did while apart.
+  const useDeuteragonistView = forDeuteragonist && turn.deuteragonistNarrative;
+
+  if (turn.playerAction && !useDeuteragonistView) {
+    messages.push({ role: "user", content: turn.playerAction });
   } else if (i === 0) {
     // Include the setting description in the opening turn so all consumers
     // see the world context.
     const openingContent = settingDescription
       ? `Begin the adventure.\n\n${settingDescription}`
-      : 'Begin the adventure.'
+      : "Begin the adventure.";
     messages.push({
-      role: 'user',
+      role: "user",
       content: openingContent,
-    })
+    });
+  } else if (useDeuteragonistView) {
+    // For the deuteragonist's view of a split turn: nudge that time passed
+    // while they were apart, rather than showing the protagonist's action.
+    messages.push({
+      role: "user",
+      content: "[The deuteragonist acts independently while separated from the protagonist.]",
+    });
   }
 
   messages.push({
-    role: 'assistant',
-    content: turn.narrative,
+    role: "assistant",
+    content: useDeuteragonistView ? turn.deuteragonistNarrative! : turn.narrative,
     ...(addCacheBreakpoint
-      ? { cache_control: { type: 'ephemeral' as const, ttl: '1h' as const } }
+      ? { cache_control: { type: "ephemeral" as const, ttl: "1h" as const } }
       : {}),
-  })
+  });
+
+  // Append the opposite narrative as context only when NOT in deuteragonist
+  // view — the protagonist's future turns benefit from knowing what happened
+  // with the deuteragonist. But when building the deuteragonist's own
+  // history, skip the protagonist's narrative (they don't know it).
+  if (turn.deuteragonistNarrative && !forDeuteragonist) {
+    messages.push({
+      role: "assistant",
+      content: `[Meanwhile, with the deuteragonist:]\n${turn.deuteragonistNarrative}`,
+    });
+  } else if (useDeuteragonistView) {
+    // In deuteragonist view, the protagonist's narrative is the "other side"
+    // — omit it since the deuteragonist wouldn't know it.
+  }
+}
+
+/**
+ * Build messages for the deuteragonist action LLM call.
+ *
+ * This call asks the LLM what the partner character wants to do, given
+ * the story history, their personality, the player's current action,
+ * and the current world state. The result is fed into the resolution
+ * pass alongside the player's action so both play out in the same scene.
+ */
+export function buildPartnerActionMessages(
+  turns: AdventureTurn[],
+  settingDescription: string,
+  playerAction: string,
+  deuteragonistInput: string,
+  compactions?: Record<string, AdventureCompaction>,
+  worldBible?: string,
+  liveWorldState?: LiveWorldState,
+): LLMMessage[] {
+  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible);
+
+  appendLiveWorldState(messages, liveWorldState);
+
+  // Show what the protagonist just did — the partner responds to this
+  messages.push({ role: "user", content: `Protagonist action this turn: ${playerAction}` });
+
+  // Provide the deuteragonist personality for context
+  messages.push({
+    role: "system",
+    content: `Deuteragonist: ${deuteragonistInput}`,
+  });
+
+  // Instruction message (as a user message for recency)
+  messages.push({ role: "user", content: PARTNER_ACTION_INSTRUCTION });
+
+  return messages;
 }
 
 /**
@@ -732,51 +863,185 @@ export function buildResolutionMessages(
   liveWorldState?: LiveWorldState,
   storylineBrief?: string,
   directorBrief?: string,
+  /** The deuteragonist's intended action for this turn, if one is configured. */
+  partnerAction?: string,
+  /** Live protagonist description from the store (always injected). */
+  protagonistInput?: string,
+  /** Live deuteragonist description from the store (always injected). */
+  deuteragonistInput?: string,
+  /** When true, the party is split — the deuteragonist is NOT present in this scene. */
+  partySplit?: boolean,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
+  const messages = buildSharedHistory(
+    turns,
+    compactions,
+    settingDescription,
+    worldBible,
+  );
 
-  const isOpeningTurn = turns.length === 0 && playerAction === null
+  const isOpeningTurn = turns.length === 0 && playerAction === null;
+
+  // Live protagonist & deuteragonist descriptions — always injected, even
+  // without the living-world toggle. Edits from the Story panel reach
+  // every turn because we read the store's current values, not the frozen
+  // setting description.
+  {
+    const parts: string[] = [];
+    if (protagonistInput?.trim()) {
+      parts.push(`PROTAGONIST: ${protagonistInput.trim()}`);
+    }
+    if (deuteragonistInput?.trim()) {
+      parts.push(`DEUTERAGONIST: ${deuteragonistInput.trim()}`);
+    }
+    if (parts.length > 0) {
+      messages.push({
+        role: "system",
+        content: `[CHARACTER PROFILES — live descriptions; prefer these over any stale version in the opening turn]\n\n${parts.join('\n\n')}`,
+      });
+    }
+  }
 
   // Live world state goes BEFORE the role-specific system message so the
   // model sees current characters, plot points, and agenda right next to
   // its instructions for the turn. Lives outside the cache breakpoint
   // because it changes turn-to-turn.
-  appendLiveWorldState(messages, liveWorldState)
-  appendStorylineBrief(messages, storylineBrief)
+  appendLiveWorldState(messages, liveWorldState);
+  appendStorylineBrief(messages, storylineBrief);
 
-  // Role instruction + core directive + steering guidance (if any) in one
-  // system message that lives AFTER the cacheable history — the steering
-  // text changes every turn, so it must not be inside the cached prefix.
-  const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : ''
+  // Role instruction + core directive + steering guidance (if any) + party-split
+  // context (if applicable) in one system message that lives AFTER the cacheable
+  // history — the steering text changes every turn, so it must not be inside the
+  // cached prefix.
+  const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : "";
+  const partySplitBlock = partySplit
+    ? `\n\nPARTY STATE: The deuteragonist is NOT present in this scene — they are elsewhere, pursuing their own goals. Only narrate what the protagonist experiences. Do NOT cut to the deuteragonist or describe what they are doing.`
+    : "";
   messages.push({
-    role: 'system',
-    content: `${RESOLUTION_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
-  })
+    role: "system",
+    content: `${RESOLUTION_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}${partySplitBlock}`,
+  });
 
   // Director brief (if the two-model flow is enabled) lands AFTER the role
   // instruction and BEFORE the user message, so the model reads its
   // explicit plan last before generating prose.
-  appendDirectorBrief(messages, directorBrief)
+  appendDirectorBrief(messages, directorBrief);
 
   // Author directive first, so the player action remains the message the
   // model is actually replying to.
-  appendDirective(messages, turnDirective)
+  appendDirective(messages, turnDirective);
+
+  // Deuteragonist action (if any) — tells the model what the partner
+  // intends to do, so both actions are woven into the same scene.
+  // When the party is split, skip this — the deuteragonist's action
+  // is rendered in their own separate narrative pass.
+  if (partnerAction && !partySplit) {
+    messages.push({
+      role: "system",
+      content: `[The deuteragonist intends: ${partnerAction}]\n\nWeave this into the narrative alongside the protagonist's action. Both characters' actions play out simultaneously — they may cooperate, conflict, talk to each other, pursue separate goals, or react to each other's words and deeds. Write naturally in second person for the protagonist, and refer to the deuteragonist by their name or description.`,
+    });
+  }
 
   // Final user message
   if (playerAction !== null) {
-    messages.push({ role: 'user', content: playerAction })
+    messages.push({ role: "user", content: `Protagonist action: ${playerAction}` });
   } else if (isOpeningTurn) {
     messages.push({
-      role: 'user',
+      role: "user",
       content: `Begin the adventure. Here is the setting — use it as a springboard, expand on it with your own details, and establish the protagonist in the world.
 
 The opening should introduce the protagonist through action and detail — show what they look like, how they carry themselves, and hint at their personality through their behavior or inner thoughts. Don't state traits outright; reveal them through the scene.
 
 ${settingDescription}`,
-    })
+    });
   }
 
-  return messages
+  return messages;
+}
+
+/**
+ * Build messages for the deuteragonist's solo resolution pass.
+ *
+ * Only called when the party is split. Generates a parallel narrative
+ * showing what happens with the deuteragonist while the protagonist is
+ * elsewhere. Written in third person, focused solely on the partner.
+ *
+ * Shares the same history prefix as the resolution pass (cached), plus
+ * the same live world state, storyline brief, and director brief. The
+ * deuteragonist's intended action (from `runPartnerAction`) is injected
+ * as the primary driver of the scene rather than woven alongside the
+ * protagonist's action.
+ */
+export function buildDeuteragonistResolutionMessages(
+  turns: AdventureTurn[],
+  settingDescription: string,
+  playerAction: string,
+  deuteragonistInput: string,
+  partnerAction: string | undefined,
+  compactions?: Record<string, AdventureCompaction>,
+  worldBible?: string,
+  liveWorldState?: LiveWorldState,
+  storylineBrief?: string,
+  directorBrief?: string,
+  turnDirective?: string,
+  protagonistInput?: string,
+): LLMMessage[] {
+  const messages = buildSharedHistory(
+    turns,
+    compactions,
+    settingDescription,
+    worldBible,
+    true, // forDeuteragonist — prefer their narrative on split turns
+  );
+
+  // Character profiles — same as the resolution pass
+  {
+    const parts: string[] = [];
+    if (protagonistInput?.trim()) {
+      parts.push(`PROTAGONIST: ${protagonistInput.trim()}`);
+    }
+    if (deuteragonistInput?.trim()) {
+      parts.push(`DEUTERAGONIST: ${deuteragonistInput.trim()}`);
+    }
+    if (parts.length > 0) {
+      messages.push({
+        role: "system",
+        content: `[CHARACTER PROFILES — live descriptions; prefer these over any stale version in the opening turn]\n\n${parts.join('\n\n')}`,
+      });
+    }
+  }
+
+  appendLiveWorldState(messages, liveWorldState);
+  appendStorylineBrief(messages, storylineBrief);
+
+  // Role instruction
+  messages.push({
+    role: "system",
+    content: DEUTERAGONIST_RESOLUTION_INSTRUCTION,
+  });
+
+  // Director brief (if available)
+  appendDirectorBrief(messages, directorBrief);
+
+  // Author directive
+  appendDirective(messages, turnDirective);
+
+  // The deuteragonist's intended action — this IS their "player action"
+  if (partnerAction) {
+    messages.push({
+      role: "system",
+      content: `[The deuteragonist intends: ${partnerAction}]\n\nUse this as the deuteragonist's driving action for this turn — what they are trying to do, say, or accomplish. Render it as natural third-person narrative.`,
+    });
+  }
+
+  // Final user message — the deuteragonist was present for the
+  // protagonist's action (the split happens during this turn), so they
+  // know what the protagonist is doing as they separate.
+  messages.push({
+    role: "user",
+    content: `The protagonist is: ${playerAction}\n\nThe deuteragonist is now separating from the protagonist. Narrate what happens with the deuteragonist — where they go, what they do. Their scene unfolds independently from here.`,
+  });
+
+  return messages;
 }
 
 /**
@@ -804,49 +1069,63 @@ export function buildDirectorMessages(
   settingDescription: string,
   playerAction: string | null,
   steering: SteeringBucket | undefined,
-  kind: 'resolution' | 'world-step',
+  kind: "resolution" | "world-step",
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
   liveWorldState?: LiveWorldState,
   storylineBrief?: string,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
+  const messages = buildSharedHistory(
+    turns,
+    compactions,
+    settingDescription,
+    worldBible,
+  );
 
-  appendLiveWorldState(messages, liveWorldState)
-  appendStorylineBrief(messages, storylineBrief)
+  appendLiveWorldState(messages, liveWorldState);
+  appendStorylineBrief(messages, storylineBrief);
 
   const instruction =
-    kind === 'world-step'
+    kind === "world-step"
       ? DIRECTOR_WORLD_STEP_INSTRUCTION
-      : DIRECTOR_RESOLUTION_INSTRUCTION
+      : DIRECTOR_RESOLUTION_INSTRUCTION;
   // Steering only frames the protagonist's execution quality on the
   // resolution pass — world-step is neutral and gets no steering block.
   const steeringBlock =
-    kind === 'resolution' && steering ? `\n\n${steeringGuidance(steering)}` : ''
-  messages.push({
-    role: 'system',
-    content: `${instruction}${steeringBlock}`,
-  })
+    kind === "resolution" && steering
+      ? `\n\n${steeringGuidance(steering)}`
+      : "";
 
-  appendDirective(messages, turnDirective)
+  // Standing author directive first — it constrains the plan but doesn't drive
+  // the turn.
+  appendDirective(messages, turnDirective);
 
-  if (kind === 'resolution' && playerAction !== null) {
-    messages.push({ role: 'user', content: playerAction })
+  // Then the player action (or a terse nudge naming the beat to plan when there
+  // is no action).
+  if (kind === "resolution" && playerAction !== null) {
+    messages.push({ role: "user", content: playerAction });
   } else {
-    // World-step or resolution-opening: terse nudge keeps the
-    // assistant/user alternation legal and tells the model which beat
-    // it is planning.
     messages.push({
-      role: 'user',
+      role: "user",
       content:
-        kind === 'world-step'
-          ? 'Plan the world step. The scene above just ended on a held beat. What concretely happens next, in plan form?'
-          : 'Plan the opening turn. Establish the protagonist in the scene; produce the plan in the format above.',
-    })
+        kind === "world-step"
+          ? "Plan the world step. The scene above just ended on a held beat. What concretely happens next, in plan form?"
+          : "Plan the opening turn. Establish the protagonist in the scene; produce the plan in the requested format.",
+    });
   }
 
-  return messages
+  // Director role instruction LAST, as a USER message rather than a system
+  // message at the end of the prompt. As a trailing system message the director
+  // loses track of it and just continues the story; as the final user turn it
+  // sits right behind the action and the standing directive, where the model
+  // reliably treats it as the task for this turn.
+  messages.push({
+    role: "user",
+    content: `${instruction}${steeringBlock}`,
+  });
+
+  return messages;
 }
 
 /**
@@ -871,35 +1150,61 @@ export function buildWorldStepMessages(
   liveWorldState?: LiveWorldState,
   storylineBrief?: string,
   directorBrief?: string,
+  /** Live protagonist description from the store (always injected). */
+  protagonistInput?: string,
+  /** Live deuteragonist description from the store (always injected). */
+  deuteragonistInput?: string,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
+  const messages = buildSharedHistory(
+    turns,
+    compactions,
+    settingDescription,
+    worldBible,
+  );
 
-  appendLiveWorldState(messages, liveWorldState)
-  appendStorylineBrief(messages, storylineBrief)
+  // Live protagonist & deuteragonist descriptions — always injected.
+  {
+    const parts: string[] = [];
+    if (protagonistInput?.trim()) {
+      parts.push(`PROTAGONIST: ${protagonistInput.trim()}`);
+    }
+    if (deuteragonistInput?.trim()) {
+      parts.push(`DEUTERAGONIST: ${deuteragonistInput.trim()}`);
+    }
+    if (parts.length > 0) {
+      messages.push({
+        role: "system",
+        content: `[CHARACTER PROFILES — live descriptions; prefer these over any stale version in the opening turn]\n\n${parts.join('\n\n')}`,
+      });
+    }
+  }
+
+  appendLiveWorldState(messages, liveWorldState);
+  appendStorylineBrief(messages, storylineBrief);
 
   messages.push({
-    role: 'system',
+    role: "system",
     content: WORLD_STEP_INSTRUCTION,
-  })
+  });
 
   // Director brief (if the two-model flow is enabled) lands AFTER the role
   // instruction and BEFORE the user nudge, so the writer reads the plan
   // last before producing prose.
-  appendDirectorBrief(messages, directorBrief)
+  appendDirectorBrief(messages, directorBrief);
 
   // Author directive first, so the world-step nudge remains the message the
   // model is actually replying to.
-  appendDirective(messages, turnDirective)
+  appendDirective(messages, turnDirective);
 
   // Terse user nudge — keeps the assistant/user alternation legal and
   // signals the phase change explicitly to the model.
   messages.push({
-    role: 'user',
+    role: "user",
     content:
       'Now let the world respond. NPCs act in character; the environment shifts only where it would naturally. Continue in second person, present tense — the protagonist remains "you", just as in the resolution narrative above.',
-  })
+  });
 
-  return messages
+  return messages;
 }
 
 export function buildNonsenseCheckMessages(
@@ -907,21 +1212,23 @@ export function buildNonsenseCheckMessages(
   settingDescription?: string,
   directive?: string,
 ): LLMMessage[] {
-  const messages: LLMMessage[] = []
+  const messages: LLMMessage[] = [];
 
   // Provide world context so the checker knows what's possible in this story
-  const worldContext = [settingDescription, directive].filter(Boolean).join('\n\n')
+  const worldContext = [settingDescription, directive]
+    .filter(Boolean)
+    .join("\n\n");
   if (worldContext) {
     messages.push({
-      role: 'system',
+      role: "system",
       content: `This is the world context for the story being checked. Use it to understand what is possible in this setting — magic, technology, supernatural abilities, etc. Only flag things that don't make sense even within these rules.\n\n${worldContext}`,
-    })
+    });
   }
 
-  messages.push({ role: 'assistant', content: latestNarrative })
-  messages.push({ role: 'user', content: NONSENSE_CHECK_INSTRUCTION })
+  messages.push({ role: "assistant", content: latestNarrative });
+  messages.push({ role: "user", content: NONSENSE_CHECK_INSTRUCTION });
 
-  return messages
+  return messages;
 }
 
 export function buildRevisionMessages(
@@ -931,61 +1238,69 @@ export function buildRevisionMessages(
   originalNarrative: string,
   inconsistencies: string,
   steering: SteeringBucket | undefined,
-  kind: 'resolution' | 'world-step',
+  kind: "resolution" | "world-step",
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
   liveWorldState?: LiveWorldState,
 ): LLMMessage[] {
-  const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible)
+  const messages = buildSharedHistory(
+    turns,
+    compactions,
+    settingDescription,
+    worldBible,
+  );
 
-  appendLiveWorldState(messages, liveWorldState)
+  appendLiveWorldState(messages, liveWorldState);
 
   // Steering only applies to resolution passes — it describes the quality
   // of the protagonist's execution, which world-step passes don't generate.
   const steeringBlock =
-    kind === 'resolution' && steering ? `\n\n${steeringGuidance(steering)}` : ''
-  const roleInstruction = kind === 'world-step' ? WORLD_STEP_INSTRUCTION : RESOLUTION_INSTRUCTION
+    kind === "resolution" && steering
+      ? `\n\n${steeringGuidance(steering)}`
+      : "";
+  const roleInstruction =
+    kind === "world-step" ? WORLD_STEP_INSTRUCTION : RESOLUTION_INSTRUCTION;
   messages.push({
-    role: 'system',
+    role: "system",
     content: `${roleInstruction}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
-  })
+  });
 
-  const isOpeningTurn = turns.length === 0 && playerAction === null
+  const isOpeningTurn = turns.length === 0 && playerAction === null;
 
   // Author directive first, so the player action remains the message the
   // model originally responded to (matches the live build order).
-  appendDirective(messages, turnDirective)
+  appendDirective(messages, turnDirective);
 
   if (playerAction !== null) {
-    messages.push({ role: 'user', content: playerAction })
+    messages.push({ role: "user", content: playerAction });
   } else if (isOpeningTurn) {
     messages.push({
-      role: 'user',
+      role: "user",
       content: `Begin the adventure. Here is the setting — use it as a springboard, expand on it with your own details, and establish the protagonist in the world.
 
 The opening should introduce the protagonist through action and detail — show what they look like, how they carry themselves, and hint at their personality through their behavior or inner thoughts. Don't state traits outright; reveal them through the scene.
 
 ${settingDescription}`,
-    })
+    });
   }
 
   // Place the original narrative as an assistant message, then ask for revision
   messages.push({
-    role: 'assistant',
+    role: "assistant",
     content: originalNarrative,
-  })
+  });
 
   messages.push({
-    role: 'user',
+    role: "user",
     content: `REVISION REQUIRED — the narrative above contains factual inconsistencies with the established story:
 
 ${inconsistencies}
 
 Please rewrite the narrative, fixing ONLY the listed inconsistencies. Keep the same overall scene, pacing, and events — just correct the contradictions. Write the complete revised narrative.`,
-  })
+  });
 
-  return messages
+  return messages;
 }
 
 // --- Parse helpers ---
@@ -993,9 +1308,9 @@ Please rewrite the narrative, fixing ONLY the listed inconsistencies. Keep the s
 export function cleanNarrative(raw: string): string {
   // Strip any XML tags the model might still produce out of habit
   return raw
-    .replace(/<\/?narrative>/g, '')
-    .replace(/<think>[\s\S]*?<\/think>/g, '')
-    .trim()
+    .replace(/<\/?narrative>/g, "")
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .trim();
 }
 
 // --- Analysis pass (Phase 2) ---
@@ -1063,13 +1378,13 @@ PRINCIPLES (read carefully — these are the rules of your job):
 
     The tool edits in place; there is no add/remove variant. Always write the COMPLETE replacement description, not a diff.
 
-If you have nothing to change, respond with NO tool calls. A turn-summary text response is allowed but optional and ignored.`
+If you have nothing to change, respond with NO tool calls. A turn-summary text response is allowed but optional and ignored.`;
 
 export interface BuildAnalysisOptions {
   /** Adventure setting / world block — primary grounding for invention. */
-  settingDescription?: string
+  settingDescription?: string;
   /** Optional persistent world bible if the user has authored one. */
-  worldBible?: string
+  worldBible?: string;
 }
 
 export function buildAnalysisUserMessage(
@@ -1080,36 +1395,40 @@ export function buildAnalysisUserMessage(
 ): string {
   const stateBlock =
     formatLiveWorldState(liveWorldState, { includeIds: true }) ??
-    '(empty — no characters, plot points, or agenda items yet)'
+    "(empty — no characters, plot points, or agenda items yet)";
 
-  const sections: string[] = []
+  const sections: string[] = [];
 
   // World grounding first so the model has the setting in mind when it
   // decides what to invent for new characters/plot points.
-  const settingTrimmed = options.settingDescription?.trim()
+  const settingTrimmed = options.settingDescription?.trim();
   if (settingTrimmed) {
-    sections.push(`[SETTING — the world this story takes place in]\n${settingTrimmed}`)
+    sections.push(
+      `[SETTING — the world this story takes place in]\n${settingTrimmed}`,
+    );
   }
-  const worldBibleTrimmed = options.worldBible?.trim()
+  const worldBibleTrimmed = options.worldBible?.trim();
   if (worldBibleTrimmed) {
-    sections.push(`[WORLD BIBLE — persistent reference for the world, characters, and lore]\n${worldBibleTrimmed}`)
+    sections.push(
+      `[WORLD BIBLE — persistent reference for the world, characters, and lore]\n${worldBibleTrimmed}`,
+    );
   }
 
   // Protagonist block is shown verbatim. When the description is missing or
   // a thin stub, the analysis pass is the natural place to fold in concrete
   // details the narrative has now established (principle 10, case a).
-  const protagonistTrimmed = protagonist?.trim()
+  const protagonistTrimmed = protagonist?.trim();
   sections.push(
     protagonistTrimmed
       ? `[PROTAGONIST DESCRIPTION — currently set]\n${protagonistTrimmed}`
-      : '[PROTAGONIST DESCRIPTION — not set]\n(no description on file. If the narrative has now established who the protagonist is in concrete terms, this is exactly the case where patch_protagonist should fill it in.)',
-  )
+      : "[PROTAGONIST DESCRIPTION — not set]\n(no description on file. If the narrative has now established who the protagonist is in concrete terms, this is exactly the case where patch_protagonist should fill it in.)",
+  );
 
-  sections.push(`CURRENT WORLD STATE:\n\n${stateBlock}`)
+  sections.push(`CURRENT WORLD STATE:\n\n${stateBlock}`);
 
   sections.push(
     `MOST RECENT NARRATIVE (the latest few turns of the story):\n\n${recentNarrative.trim()}`,
-  )
+  );
 
   sections.push(
     `Read the narrative against the world above. Two distinct jobs:
@@ -1119,9 +1438,9 @@ export function buildAnalysisUserMessage(
 (b) PATCHES — stay quiet unless something STANDING actually changed (a lasting relational shift, a plot-status advance, an agenda time-shift, a plot-point situation that has materially moved). Momentary reactions belong in the prose, not in patches. **Plot-point description refresh is part of this job, not separate from it:** if a tracker is destroyed, a hostage moved, a deadline tightened, an anonymous threat now has a name, evidence gained or lost — patch_plot_point the description even when the status holds. "Status didn't change" is not a reason to skip the patch when the description is now factually stale. **Identity catch-up — also mandatory:** if an existing roster entry uses a placeholder name ("the girl with zip ties", "the bartender", "Stranger") and the narrative has now revealed the real name or a defining identity detail, patch_character it immediately — update \`name\` and tighten \`description\` if the new identity reframes them. Same for placeholder-titled plot points.
 
 When you patch, archive, or remove an entry, copy its id verbatim from the \`[id: ...]\` prefix in the world-state block above. Ids are opaque tokens — never invent one from a name, title, or description. If you cannot find a matching \`[id: ...]\` for the entry you want to change, treat it as not on file (use add_ instead) rather than guessing.`,
-  )
+  );
 
-  return sections.join('\n\n---\n\n')
+  return sections.join("\n\n---\n\n");
 }
 
 export function buildAnalysisMessages(
@@ -1131,9 +1450,9 @@ export function buildAnalysisMessages(
   options: BuildAnalysisOptions = {},
 ): LLMMessage[] {
   return [
-    { role: 'system', content: ANALYSIS_SYSTEM_PROMPT },
+    { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
     {
-      role: 'user',
+      role: "user",
       content: buildAnalysisUserMessage(
         recentNarrative,
         liveWorldState,
@@ -1141,7 +1460,7 @@ export function buildAnalysisMessages(
         options,
       ),
     },
-  ]
+  ];
 }
 
 // --- Synthesis pass ---
@@ -1211,13 +1530,13 @@ RULES:
 - **NO-OP SHORTCUT**: If a previous storyline exists and nothing meaningful has changed since it was written — no new factions implied, no new motives revealed, no contradiction of prior assumptions, no new named figures with stakes, just a continuation of beats already covered — output the single token SAME (uppercase, on its own, nothing else). The previous storyline will be reused verbatim. Only rewrite when there is actually new architecture to commit to or revise. When in doubt, prefer SAME over a near-identical rewrite. SAME is forbidden when there is no previous storyline — write the first one in full.
 - Output ONLY the storyline text (or SAME). No headers, no preamble, no "here is the synthesis", no XML tags.
 
-If the story is too early for this kind of architecture (only an opening turn, nothing meaningful established yet), write one paragraph naming the immediate situation and the most plausible underlying shape of it — and stop there. Subsequent passes will fill it in as the story gives you more to anchor on.`
+If the story is too early for this kind of architecture (only an opening turn, nothing meaningful established yet), write one paragraph naming the immediate situation and the most plausible underlying shape of it — and stop there. Subsequent passes will fill it in as the story gives you more to anchor on.`;
 
 export interface BuildSynthesisOptions {
-  settingDescription?: string
-  worldBible?: string
+  settingDescription?: string;
+  worldBible?: string;
   /** The current storyline, if any — for incremental evolution. */
-  previousStoryline?: string
+  previousStoryline?: string;
 }
 
 /**
@@ -1234,34 +1553,34 @@ export function buildSynthesisUserMessage(
 ): string {
   const stateBlock =
     formatLiveWorldState(liveWorldState) ??
-    '(no characters or plot points are tracked yet — work from the narrative alone)'
+    "(no characters or plot points are tracked yet — work from the narrative alone)";
 
-  const sections: string[] = []
+  const sections: string[] = [];
 
-  sections.push(`CURRENT TRACKED STATE:\n\n${stateBlock}`)
+  sections.push(`CURRENT TRACKED STATE:\n\n${stateBlock}`);
 
-  const prevTrimmed = options.previousStoryline?.trim()
+  const prevTrimmed = options.previousStoryline?.trim();
   if (prevTrimmed) {
     sections.push(
       `[PREVIOUS STORYLINE — LOCKED CANON. Every named person, faction, role, and attributed motive in here is the truth of the world. You may ADD to it and EXTEND into spaces it left blank. You may NOT rename, replace, or substitute its specifics for "better" alternatives — that is a failure mode, not an improvement. If nothing meaningful has changed, output SAME.]\n\n${prevTrimmed}`,
-    )
+    );
   } else {
     sections.push(
-      '[PREVIOUS STORYLINE — none on file yet. Write the first one. SAME is not a valid response on the first pass.]',
-    )
+      "[PREVIOUS STORYLINE — none on file yet. Write the first one. SAME is not a valid response on the first pass.]",
+    );
   }
 
   if (prevTrimmed) {
     sections.push(
-      'Update the storyline now. STARTING POINT: the previous storyline above. Your output must preserve every named person, faction, role, and attributed motive from it verbatim — the same Kyle is still in the sedan, the same financier is still financing, the same magistrate is still on the take. You are extending the canon into blank space, not reshuffling it. If the latest turns have NOT meaningfully changed the hidden architecture, output the single token SAME on its own and nothing else — the previous storyline will be reused verbatim. Otherwise output the new storyline: three to five paragraphs of dense prose, third person present tense, covering the hidden architecture — who, why, how. New invention goes into gaps the previous storyline left open OR into parts where the new turns have actually shifted things. Stay consistent with the world bible and tracked characters. If you are about to rename or replace a previously-named NPC/faction/motive without an explicit on-screen contradiction, STOP — keep the old version. Output ONLY the storyline (or SAME) — no headers, no preamble.',
-    )
+      "Update the storyline now. STARTING POINT: the previous storyline above. Your output must preserve every named person, faction, role, and attributed motive from it verbatim — the same Kyle is still in the sedan, the same financier is still financing, the same magistrate is still on the take. You are extending the canon into blank space, not reshuffling it. If the latest turns have NOT meaningfully changed the hidden architecture, output the single token SAME on its own and nothing else — the previous storyline will be reused verbatim. Otherwise output the new storyline: three to five paragraphs of dense prose, third person present tense, covering the hidden architecture — who, why, how. New invention goes into gaps the previous storyline left open OR into parts where the new turns have actually shifted things. Stay consistent with the world bible and tracked characters. If you are about to rename or replace a previously-named NPC/faction/motive without an explicit on-screen contradiction, STOP — keep the old version. Output ONLY the storyline (or SAME) — no headers, no preamble.",
+    );
   } else {
     sections.push(
-      'Write the storyline now. Three to five paragraphs of dense prose, third person present tense. Cover the hidden architecture — who, why, how — not just what is visible on screen. Commit to specific names, factions, structures, and motives where the story implies them but has not yet shown them. Be deliberate: every name and faction you commit to here becomes LOCKED CANON for every subsequent pass, so pick names and motives you want to live with. Stay consistent with the world bible and tracked characters. Output ONLY the storyline — no headers, no preamble.',
-    )
+      "Write the storyline now. Three to five paragraphs of dense prose, third person present tense. Cover the hidden architecture — who, why, how — not just what is visible on screen. Commit to specific names, factions, structures, and motives where the story implies them but has not yet shown them. Be deliberate: every name and faction you commit to here becomes LOCKED CANON for every subsequent pass, so pick names and motives you want to live with. Stay consistent with the world bible and tracked characters. Output ONLY the storyline — no headers, no preamble.",
+    );
   }
 
-  return sections.join('\n\n---\n\n')
+  return sections.join("\n\n---\n\n");
 }
 
 /**
@@ -1282,22 +1601,22 @@ export function buildSynthesisMessages(
     compactions,
     settingDescription,
     options.worldBible,
-  )
+  );
 
   // The synthesis system message lives AFTER the cached prefix because the
   // shared history's first system message (BASE_SYSTEM_PROMPT + worldBible)
   // is the cache breakpoint we want to share with the story generator.
   messages.push({
-    role: 'system',
+    role: "system",
     content: SYNTHESIS_SYSTEM_PROMPT,
-  })
+  });
 
   messages.push({
-    role: 'user',
+    role: "user",
     content: buildSynthesisUserMessage(liveWorldState, options),
-  })
+  });
 
-  return messages
+  return messages;
 }
 
 // --- Storyline gate pass ---
@@ -1408,11 +1727,11 @@ Output format:
 - Either the literal string "NONE" on its own line, or
 - 1-5 lines, each starting with "[VISIBLE]" or "[INFORMING]" followed by one short sentence.
 
-That's it. No other shape. No JSON, no XML, no headers.`
+That's it. No other shape. No JSON, no XML, no headers.`;
 
 export interface BuildStorylineGateOptions {
-  settingDescription?: string
-  worldBible?: string
+  settingDescription?: string;
+  worldBible?: string;
 }
 
 /**
@@ -1433,13 +1752,13 @@ function buildStorylineGateUserMessage(
   const intentBlock =
     playerAction === null
       ? "[NEXT BEAT — world-step phase. No player action this beat; the world is reacting to the most recent resolution narrative shown in the history above. Filter the arc against what would plausibly bear on the world's reaction here.]"
-      : `[NEXT BEAT — resolution phase. The player intends the following action; filter the arc against what would plausibly bear on resolving this action and its immediate consequences.]\n\n${playerAction}`
+      : `[NEXT BEAT — resolution phase. The player intends the following action; filter the arc against what would plausibly bear on resolving this action and its immediate consequences.]\n\n${playerAction}`;
 
   return [
     `[FULL STORY ARC — author-side architecture. Filter THIS against the next beat below.]\n\n<story-arc>\n${storyline.trim()}\n</story-arc>`,
     intentBlock,
     'Emit the brief now. Either "NONE" on its own, or up to 5 short lines tagged [VISIBLE] or [INFORMING]. Ask, for each candidate fact: "would this fact change how THIS specific beat plays out?" If yes, forward it. If it\'s arc detail about a different location, a different character\'s parallel thread, or wider faction architecture that doesn\'t directly land on this exchange — drop it, even if it feels thematically relevant. The brief is a turn-scoped slice, not a recap of the antagonist organisation. If the arc is genuinely disconnected from this beat, output NONE; do not output NONE merely because the question feels uncertain.',
-  ].join('\n\n---\n\n')
+  ].join("\n\n---\n\n");
 }
 
 /**
@@ -1465,236 +1784,255 @@ export function buildStorylineGateMessages(
     compactions,
     settingDescription,
     options.worldBible,
-  )
+  );
 
   messages.push({
-    role: 'system',
+    role: "system",
     content: STORYLINE_GATE_SYSTEM_PROMPT,
-  })
+  });
 
   messages.push({
-    role: 'user',
+    role: "user",
     content: buildStorylineGateUserMessage(storyline, playerAction),
-  })
+  });
 
-  return messages
+  return messages;
 }
 
 /** Tool definitions for the analysis pass (OpenAI function-tool shape). */
 export const ANALYSIS_TOOLS: ToolDefinition[] = [
   {
-    name: 'add_character',
+    name: "add_character",
     description:
-      'Add a brand-new named character to the roster. Only use for a character who has spoken or taken meaningful action AND is not already on the roster (re-check existing names for variants).',
+      "Add a brand-new named character to the roster. Only use for a character who has spoken or taken meaningful action AND is not already on the roster (re-check existing names for variants).",
     parameters: {
-      type: 'object',
+      type: "object",
       additionalProperties: false,
       properties: {
-        name: { type: 'string', description: 'Canonical name as it should appear in prose.' },
+        name: {
+          type: "string",
+          description: "Canonical name as it should appear in prose.",
+        },
         description: {
-          type: 'string',
+          type: "string",
           description:
             "One paragraph describing WHO this character IS — identity, not situation. Cover: appearance, age range, build, voice, mannerisms, dress; personality; relevant skills, training, profession; defining background or relationships; the kind of person they are when nothing is happening to them. DO NOT summarize what they just did in this scene, what they're carrying, or how they're reacting right now — that is event-log content and belongs in the prose, not in the description. The description should remain true across many future scenes; recent events should not appear here.",
         },
         motive: {
-          type: 'string',
-          description: 'One sentence: what this character currently wants.',
+          type: "string",
+          description: "One sentence: what this character currently wants.",
         },
         disposition: {
-          type: 'string',
+          type: "string",
           enum: [...DISPOSITIONS],
           description:
-            'Standing stance toward the protagonist on the 7-step scale: hatred → hostility → distrust → indifference → warmth → devotion → love. Pick the value that matches what the narrative has SHOWN of this character\'s relational stance — not their momentary mood. Default to `indifference` for strangers with no established feeling.',
+            "Standing stance toward the protagonist on the 7-step scale: hatred → hostility → distrust → indifference → warmth → devotion → love. Pick the value that matches what the narrative has SHOWN of this character's relational stance — not their momentary mood. Default to `indifference` for strangers with no established feeling.",
         },
       },
-      required: ['name', 'description', 'motive', 'disposition'],
+      required: ["name", "description", "motive", "disposition"],
     },
   },
   {
-    name: 'patch_character',
+    name: "patch_character",
     description:
       "Update one or more fields on an existing character. Omit fields that didn't change — they are left as-is. Use the exact id from the [id: ...] prefix in the world-state block; never invent an id from a name. IMPORTANT — name updates: if the existing entry uses a placeholder like 'the girl with zip ties', 'the bartender', 'Stranger', etc. and the narrative has since revealed the real name (or profession / role / defining identity), patch the `name` field to the real one immediately. Do not leave placeholders on the roster once the story has named the character.",
     parameters: {
-      type: 'object',
+      type: "object",
       additionalProperties: false,
       properties: {
         id: {
-          type: 'string',
+          type: "string",
           description:
-            'The character id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT the character name.',
+            "The character id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT the character name.",
         },
-        name: { type: 'string' },
+        name: { type: "string" },
         description: {
-          type: 'string',
+          type: "string",
           description:
             "Replacement description (full text, not a diff). Same rules as add_character: identity, not situation. Appearance, personality, voice, skills, background, defining relationships — the durable WHO. Do NOT patch this just to summarize recent events; if the only update would be 'after X, she now...', skip the patch. If the existing description has drifted into situation-summary, DO patch to clean it back into identity.",
         },
-        motive: { type: 'string' },
+        motive: { type: "string" },
         disposition: {
-          type: 'string',
+          type: "string",
           enum: [...DISPOSITIONS],
           description:
-            'New disposition on the 7-step scale (hatred → hostility → distrust → indifference → warmth → devotion → love). Only patch when the narrative has established a STANDING shift — a relational change that will persist past this scene. Do NOT patch for momentary reactions, fleeting moods, or in-scene tactical shifts.',
+            "New disposition on the 7-step scale (hatred → hostility → distrust → indifference → warmth → devotion → love). Only patch when the narrative has established a STANDING shift — a relational change that will persist past this scene. Do NOT patch for momentary reactions, fleeting moods, or in-scene tactical shifts.",
         },
       },
-      required: ['id'],
+      required: ["id"],
     },
   },
   {
-    name: 'archive_character',
+    name: "archive_character",
     description:
-      'Move a character off-screen (kept on file but not shown to the narrative model). Use when the character explicitly departs, dies, or otherwise leaves active play.',
+      "Move a character off-screen (kept on file but not shown to the narrative model). Use when the character explicitly departs, dies, or otherwise leaves active play.",
     parameters: {
-      type: 'object',
+      type: "object",
       additionalProperties: false,
       properties: {
         id: {
-          type: 'string',
+          type: "string",
           description:
-            'The character id, copied verbatim from the [id: ...] prefix in the world-state block. NOT the character name.',
+            "The character id, copied verbatim from the [id: ...] prefix in the world-state block. NOT the character name.",
         },
-        reason: { type: 'string', description: 'One sentence why (for the activity log).' },
+        reason: {
+          type: "string",
+          description: "One sentence why (for the activity log).",
+        },
       },
-      required: ['id', 'reason'],
+      required: ["id", "reason"],
     },
   },
   {
-    name: 'add_plot_point',
+    name: "add_plot_point",
     description:
-      'Seed a new plot point — a clear, named hook the story is plausibly going to return to. Avoid for vague atmosphere or one-off observations.',
+      "Seed a new plot point — a clear, named hook the story is plausibly going to return to. Avoid for vague atmosphere or one-off observations.",
     parameters: {
-      type: 'object',
+      type: "object",
       additionalProperties: false,
       properties: {
-        title: { type: 'string', description: 'Short label.' },
-        description: { type: 'string', description: 'One paragraph describing the plot point.' },
+        title: { type: "string", description: "Short label." },
+        description: {
+          type: "string",
+          description: "One paragraph describing the plot point.",
+        },
         status: {
-          type: 'string',
-          enum: ['seeded', 'active', 'resolving'],
-          description: 'Lifecycle stage. New plot points are usually `seeded`.',
+          type: "string",
+          enum: ["seeded", "active", "resolving"],
+          description: "Lifecycle stage. New plot points are usually `seeded`.",
         },
       },
-      required: ['title', 'description', 'status'],
+      required: ["title", "description", "status"],
     },
   },
   {
-    name: 'patch_plot_point',
+    name: "patch_plot_point",
     description:
       'Update one or more fields on an existing plot point. TWO independent reasons to call this — either alone is sufficient: (a) STATUS ADVANCE — the lifecycle stage has shifted (seeded → active → resolving → resolved). (b) DESCRIPTION REFRESH — the situation inside the plot point has materially shifted (a key fact added, removed, or reframed by the narrative: tracker destroyed, hostage moved, deadline tightened, anonymous threat now has a face, evidence gained, ally lost) such that the existing description is now factually stale, EVEN IF the status itself does not change. Description-only patches are valid and common; do not skip them just because the status held. Do NOT patch for cosmetic rewrites of the same situation. To drop a plot point that has been abandoned or made impossible, call remove_plot_point instead — there is no "abandoned" status. Use the exact id from the [id: ...] prefix in the world-state block; never invent an id from a title.',
     parameters: {
-      type: 'object',
+      type: "object",
       additionalProperties: false,
       properties: {
         id: {
-          type: 'string',
+          type: "string",
           description:
-            'The plot point id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT the plot point title.',
+            "The plot point id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT the plot point title.",
         },
-        title: { type: 'string' },
+        title: { type: "string" },
         description: {
-          type: 'string',
+          type: "string",
           description:
-            'Replacement description — full text, not a diff. Use this when the situation inside the plot point has materially shifted (key fact added, removed, or reframed) and the current description is now factually stale, even if status is unchanged. Do not use for cosmetic rewrites of the same situation.',
+            "Replacement description — full text, not a diff. Use this when the situation inside the plot point has materially shifted (key fact added, removed, or reframed) and the current description is now factually stale, even if status is unchanged. Do not use for cosmetic rewrites of the same situation.",
         },
         status: {
-          type: 'string',
-          enum: ['seeded', 'active', 'resolving', 'resolved'],
+          type: "string",
+          enum: ["seeded", "active", "resolving", "resolved"],
         },
       },
-      required: ['id'],
+      required: ["id"],
     },
   },
   {
-    name: 'remove_plot_point',
+    name: "remove_plot_point",
     description:
-      'Drop a plot point entirely — use when the narrative has made the plot point impossible, irrelevant, or explicitly walked away from it. Removed plot points are gone, not archived. Do NOT use this for plot points that paid off — those are `resolved` via patch_plot_point.',
+      "Drop a plot point entirely — use when the narrative has made the plot point impossible, irrelevant, or explicitly walked away from it. Removed plot points are gone, not archived. Do NOT use this for plot points that paid off — those are `resolved` via patch_plot_point.",
     parameters: {
-      type: 'object',
+      type: "object",
       additionalProperties: false,
       properties: {
         id: {
-          type: 'string',
+          type: "string",
           description:
-            'The plot point id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT the plot point title.',
+            "The plot point id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT the plot point title.",
         },
         reason: {
-          type: 'string',
-          description: 'One sentence why (for the activity log).',
+          type: "string",
+          description: "One sentence why (for the activity log).",
         },
       },
-      required: ['id', 'reason'],
+      required: ["id", "reason"],
     },
   },
   {
-    name: 'add_agenda_item',
+    name: "add_agenda_item",
     description:
       "Add a concrete, scheduled event the world has in motion (e.g. 'the watch arrives at midnight'). Use sparingly — agenda items are commitments the world WILL act on.",
     parameters: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        description: { type: 'string', description: "One sentence: what's about to happen." },
-        when: { type: 'string', description: 'Soft timing, e.g. "in 30 minutes", "at midnight".' },
-      },
-      required: ['description', 'when'],
-    },
-  },
-  {
-    name: 'patch_agenda_item',
-    description:
-      'Update an existing agenda item — e.g. push back its timing or refine its description. Use the exact id from the [id: ...] prefix in the world-state block; never invent an id from the description.',
-    parameters: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        id: {
-          type: 'string',
-          description:
-            'The agenda item id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT a paraphrase of the description.',
-        },
-        description: { type: 'string' },
-        when: { type: 'string' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'remove_agenda_item',
-    description:
-      'Remove an agenda item — either because it has happened in the narrative, or because the protagonist pre-empted it.',
-    parameters: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        id: {
-          type: 'string',
-          description:
-            'The agenda item id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT a paraphrase of the description.',
-        },
-        reason: { type: 'string', description: 'One sentence why (for the activity log).' },
-      },
-      required: ['id', 'reason'],
-    },
-  },
-  {
-    name: 'patch_protagonist',
-    description:
-      "Replace the protagonist's description in place. The description describes WHO the protagonist IS (identity), not what just happened to them (situation). Use in three cases: (a) IDENTITY CATCH-UP — the narrative has anchored appearance / age / build / voice / mannerisms / profession / training / background / defining relationships in ways the existing description doesn't capture; expand a stub like 'A young woman' or fill in an empty description. (b) IDENTITY CORRECTION — the existing description has drifted into situation-summary ('a paramedic now hunted by traffickers', 'a woman fleeing the warehouse'); rewrite it to describe the person and let the situation live in plot points / storyline. (c) FUNDAMENTAL IDENTITY CHANGE — permanent injury, profession change, transformation, gain/loss of a defining capability. NEVER patch to summarize recent events, mood, what they're carrying, or who they just killed — those are situation, not identity. If the only update you'd make is an event recap, do not patch. Always write the COMPLETE replacement description, not a diff.",
-    parameters: {
-      type: 'object',
+      type: "object",
       additionalProperties: false,
       properties: {
         description: {
-          type: 'string',
+          type: "string",
+          description: "One sentence: what's about to happen.",
+        },
+        when: {
+          type: "string",
+          description: 'Soft timing, e.g. "in 30 minutes", "at midnight".',
+        },
+      },
+      required: ["description", "when"],
+    },
+  },
+  {
+    name: "patch_agenda_item",
+    description:
+      "Update an existing agenda item — e.g. push back its timing or refine its description. Use the exact id from the [id: ...] prefix in the world-state block; never invent an id from the description.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "The agenda item id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT a paraphrase of the description.",
+        },
+        description: { type: "string" },
+        when: { type: "string" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "remove_agenda_item",
+    description:
+      "Remove an agenda item — either because it has happened in the narrative, or because the protagonist pre-empted it.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "The agenda item id, copied verbatim from the [id: ...] prefix of the matching entry in the world-state block. NOT a paraphrase of the description.",
+        },
+        reason: {
+          type: "string",
+          description: "One sentence why (for the activity log).",
+        },
+      },
+      required: ["id", "reason"],
+    },
+  },
+  {
+    name: "patch_protagonist",
+    description:
+      "Replace the protagonist's description in place. The description describes WHO the protagonist IS (identity), not what just happened to them (situation). Use in three cases: (a) IDENTITY CATCH-UP — the narrative has anchored appearance / age / build / voice / mannerisms / profession / training / background / defining relationships in ways the existing description doesn't capture; expand a stub like 'A young woman' or fill in an empty description. (b) IDENTITY CORRECTION — the existing description has drifted into situation-summary ('a paramedic now hunted by traffickers', 'a woman fleeing the warehouse'); rewrite it to describe the person and let the situation live in plot points / storyline. (c) FUNDAMENTAL IDENTITY CHANGE — permanent injury, profession change, transformation, gain/loss of a defining capability. NEVER patch to summarize recent events, mood, what they're carrying, or who they just killed — those are situation, not identity. If the only update you'd make is an event recap, do not patch. Always write the COMPLETE replacement description, not a diff.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        description: {
+          type: "string",
           description:
             "The full new protagonist description — WHO they are, not what just happened. Cover identity content: appearance, age, build, voice, mannerisms, dress, personality, skills, training, profession, defining background and relationships. Exclude situation content: recent events, current pursuers, what they're carrying, this scene's mood. Write the COMPLETE replacement, not a diff or addition.",
         },
         reason: {
-          type: 'string',
-          description: 'One sentence: what in the narrative warrants this change (for the activity log).',
+          type: "string",
+          description:
+            "One sentence: what in the narrative warrants this change (for the activity log).",
         },
       },
-      required: ['description', 'reason'],
+      required: ["description", "reason"],
     },
   },
-]
+];

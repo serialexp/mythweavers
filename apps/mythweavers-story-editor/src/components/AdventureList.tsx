@@ -147,14 +147,19 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
     if (result.protagonistInput.trim()) {
       settingDescription += `\n\nPROTAGONIST: ${result.protagonistInput.trim()}`
     }
+    if (result.deuteragonistInput.trim()) {
+      settingDescription += `\n\nDEUTERAGONIST: ${result.deuteragonistInput.trim()}`
+    }
 
     const initialState: PersistedState = {
       phase: 'playing',
       settingInput: result.settingInput,
       protagonistInput: result.protagonistInput,
+      deuteragonistInput: result.deuteragonistInput || undefined,
       settingDescription,
       turns: [],
       directive: result.directive,
+      ...result.settings,
     }
 
     // Generate a title via LLM, fall back to truncated setting text

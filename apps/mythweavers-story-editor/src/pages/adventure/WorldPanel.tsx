@@ -135,28 +135,6 @@ export const WorldPanel: Component = () => {
         </div>
       </Show>
 
-      {/* Protagonist */}
-      <div class={styles.storyPanelSection}>
-        <label class={styles.formLabel}>🧍 Protagonist</label>
-        <div class={styles.directiveHint}>
-          The player's character — injected into every narrative turn. The
-          analysis pass may extend this as the story pins down concrete
-          details (appearance, profession, circumstances). Keep it concise —
-          a sentence or two.
-        </div>
-        <textarea
-          class={styles.worldPanelFieldTextarea}
-          value={adventureStore.protagonistInput}
-          onInput={(e) => {
-            adventureStore.setProtagonistInput(e.currentTarget.value)
-            persist()
-          }}
-          placeholder="e.g., A retired soldier with a mysterious past."
-          rows={3}
-          disabled={isLocked()}
-        />
-      </div>
-
       {/* Characters */}
       <div class={styles.storyPanelSection}>
         <div class={styles.storyPanelSectionHeader}>

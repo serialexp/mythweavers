@@ -253,6 +253,12 @@ export function calculateActivePath(
   messages: Message[],
   nodes: Node[],
   branchChoices: Record<string, string>,
+  // When provided, the walk stops once it has fully processed this node. This
+  // matters for context gathering: we only care about the active path UP TO the
+  // node we're sitting on. A branch that is *downstream* of the current node
+  // (still unselected because the reader hasn't gotten there) must NOT be able
+  // to truncate the active sets and silently drop everything before it.
+  untilNodeId?: string,
 ): { activeMessageIds: Set<string>; activeNodeIds: Set<string> } {
   const activeMessageIds = new Set<string>()
   const activeNodeIds = new Set<string>()
@@ -285,6 +291,16 @@ export function calculateActivePath(
 
   // Track visited branches to detect loops
   const visitedBranches = new Set<string>()
+
+  // When a boundary node is set we are gathering "the active path up to and
+  // including the current node" for context generation. In that mode an
+  // unselected (or broken) branch that we hit *before* reaching the boundary is
+  // not on the way to the current node — it just happens to sort earlier in
+  // story order. Skipping it and continuing (instead of aborting the whole
+  // walk) is what lets us still collect the marked scenes the user is sitting
+  // after. Without a boundary (preview mode) we keep the strict semantics: an
+  // unselected branch genuinely ends the forward reading path.
+  const bounded = untilNodeId !== undefined
 
   console.log('[calculateActivePath] Starting path calculation', {
     totalNodes: nodesInOrder.length,
@@ -325,7 +341,14 @@ export function calculateActivePath(
         const selectedOptionId = branchChoices[message.id]
 
         if (!selectedOptionId) {
-          // No choice selected - path stops here
+          // No choice selected. In a bounded walk this branch isn't on the path
+          // to the current node — skip it and keep walking. In an unbounded
+          // (preview) walk the forward path genuinely ends here.
+          if (bounded) {
+            console.log('[calculateActivePath] Skipping unselected branch (bounded walk):', message.id)
+            currentMessageIndex = nodeMessages.length
+            break
+          }
           console.log('[calculateActivePath] Path stops at unselected branch:', message.id)
           return { activeMessageIds, activeNodeIds }
         }
@@ -335,6 +358,10 @@ export function calculateActivePath(
 
         if (!selectedOption) {
           console.warn('[calculateActivePath] Selected option not found:', selectedOptionId, 'in branch:', message.id)
+          if (bounded) {
+            currentMessageIndex = nodeMessages.length
+            break
+          }
           // Treat as if no choice selected - stop here
           return { activeMessageIds, activeNodeIds }
         }
@@ -346,11 +373,19 @@ export function calculateActivePath(
 
         if (targetNodeIndex === -1) {
           console.warn('[calculateActivePath] Branch target node not found:', selectedOption.targetNodeId)
+          if (bounded) {
+            currentMessageIndex = nodeMessages.length
+            break
+          }
           return { activeMessageIds, activeNodeIds }
         }
 
         if (targetMessageIndex === -1) {
           console.warn('[calculateActivePath] Branch target message not found:', selectedOption.targetMessageId)
+          if (bounded) {
+            currentMessageIndex = nodeMessages.length
+            break
+          }
           return { activeMessageIds, activeNodeIds }
         }
 
@@ -368,6 +403,13 @@ export function calculateActivePath(
 
     // If we've processed all messages in this node, move to next node
     if (currentMessageIndex >= nodeMessages.length) {
+      // Stop once the current node has been fully walked. Anything after it in
+      // story order (including downstream unselected branches) is irrelevant to
+      // the context that precedes/includes this node.
+      if (untilNodeId && currentNode.id === untilNodeId) {
+        console.log('[calculateActivePath] Reached boundary node, stopping walk:', untilNodeId)
+        return { activeMessageIds, activeNodeIds }
+      }
       currentNodeIndex++
       currentMessageIndex = 0
     }

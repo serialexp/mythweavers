@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal } from 'solid-js'
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { saveService } from '../services/saveService'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
@@ -40,6 +40,136 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
   const [draggedItem, setDraggedItem] = createSignal<any>(null)
   const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null)
   const [expandedItems, setExpandedItems] = createSignal<Set<string>>(new Set())
+
+  // --- Touch (mobile) long-press drag-to-reorder ---
+  // HTML5 drag events never fire on touch devices, so we add an iOS-style
+  // "press and hold to lift, then drag" gesture that reuses the same
+  // reorderItems() signal the desktop drag path writes to.
+  const [touchDragId, setTouchDragId] = createSignal<string | null>(null)
+  let listEl: HTMLUListElement | undefined
+  let longPressTimer: ReturnType<typeof setTimeout> | null = null
+  let touchStartY = 0
+  let touchArmed = false
+  let scrollParent: HTMLElement | Window = window
+
+  const LONG_PRESS_MS = 450
+  const MOVE_CANCEL_PX = 10
+  const EDGE_ZONE_PX = 60
+  const AUTO_SCROLL_PX = 10
+
+  const getScrollParent = (el: HTMLElement | null): HTMLElement | Window => {
+    let node = el?.parentElement ?? null
+    while (node) {
+      const overflowY = getComputedStyle(node).overflowY
+      if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+        return node
+      }
+      node = node.parentElement
+    }
+    return window
+  }
+
+  const clearLongPress = () => {
+    if (longPressTimer !== null) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  }
+
+  const endTouchDrag = () => {
+    clearLongPress()
+    touchArmed = false
+    setTouchDragId(null)
+  }
+
+  const autoScroll = (clientY: number) => {
+    const parent = scrollParent
+    if (parent === window) {
+      if (clientY < EDGE_ZONE_PX) window.scrollBy(0, -AUTO_SCROLL_PX)
+      else if (clientY > window.innerHeight - EDGE_ZONE_PX) window.scrollBy(0, AUTO_SCROLL_PX)
+    } else {
+      const rect = (parent as HTMLElement).getBoundingClientRect()
+      if (clientY < rect.top + EDGE_ZONE_PX) (parent as HTMLElement).scrollTop -= AUTO_SCROLL_PX
+      else if (clientY > rect.bottom - EDGE_ZONE_PX) (parent as HTMLElement).scrollTop += AUTO_SCROLL_PX
+    }
+  }
+
+  const handleTouchStart = (e: TouchEvent) => {
+    if (e.touches.length !== 1) return
+    const target = e.target as HTMLElement | null
+    // Let the action buttons (cut / move up / move down) handle their own taps.
+    if (target?.closest('button')) return
+    const row = target?.closest('[data-reorder-index]') as HTMLElement | null
+    if (!row) return
+
+    const id = row.dataset.reorderId
+    if (!id) return
+
+    touchStartY = e.touches[0].clientY
+    touchArmed = false
+    scrollParent = getScrollParent(listEl ?? null)
+
+    clearLongPress()
+    longPressTimer = setTimeout(() => {
+      touchArmed = true
+      setTouchDragId(id)
+      // Haptic feedback where supported (no-op on iOS Safari).
+      navigator.vibrate?.(10)
+    }, LONG_PRESS_MS)
+  }
+
+  const handleTouchMove = (e: TouchEvent) => {
+    const touch = e.touches[0]
+    if (!touch) return
+
+    // Before the long-press fires, a real move means the user is scrolling.
+    if (!touchArmed) {
+      if (Math.abs(touch.clientY - touchStartY) > MOVE_CANCEL_PX) clearLongPress()
+      return
+    }
+
+    // Armed: we own this gesture now — stop the page from scrolling.
+    e.preventDefault()
+    autoScroll(touch.clientY)
+
+    const draggedId = touchDragId()
+    if (!draggedId) return
+
+    const el = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null
+    const overRow = el?.closest('[data-reorder-index]') as HTMLElement | null
+    if (!overRow) return
+
+    const targetIndex = Number(overRow.dataset.reorderIndex)
+    if (Number.isNaN(targetIndex)) return
+
+    const items = reorderItems()
+    const fromIndex = items.findIndex((item) => item.id === draggedId)
+    if (fromIndex === -1 || fromIndex === targetIndex) return
+
+    const next = [...items]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(targetIndex, 0, moved)
+    setReorderItems(next)
+    setHasReorderChanges(true)
+  }
+
+  onMount(() => {
+    if (!listEl) return
+    // Bind natively with passive:false so touchmove can call preventDefault.
+    listEl.addEventListener('touchstart', handleTouchStart, { passive: false })
+    listEl.addEventListener('touchmove', handleTouchMove, { passive: false })
+    listEl.addEventListener('touchend', endTouchDrag)
+    listEl.addEventListener('touchcancel', endTouchDrag)
+  })
+
+  onCleanup(() => {
+    if (!listEl) return
+    listEl.removeEventListener('touchstart', handleTouchStart)
+    listEl.removeEventListener('touchmove', handleTouchMove)
+    listEl.removeEventListener('touchend', endTouchDrag)
+    listEl.removeEventListener('touchcancel', endTouchDrag)
+    clearLongPress()
+  })
 
   // Get the last message ID for insert controls at the bottom
   const lastMessageId = createMemo(() => {
@@ -291,19 +421,21 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
         <InsertControls afterMessageId={null} nodeId={selectedNode()?.id} />
       </Show>
 
-      <ul class={styles.reorderList}>
+      <ul class={`${styles.reorderList} ${touchDragId() ? styles.reorderListDragging : ''}`} ref={listEl}>
         <For each={reorderItems()}>
           {(item, index) => (
             <li
               draggable={true}
+              data-reorder-index={index()}
+              data-reorder-id={item.id}
               onDragStart={(e) => handleDragStart(e, item)}
               onDragOver={(e) => handleDragOver(e, index())}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, index())}
               onDragEnd={handleDragEnd}
               class={`${styles.reorderItem} ${draggedItem()?.id === item.id ? styles.isDragging : ''} ${
-                dragOverIndex() === index() ? styles.isOver : ''
-              } ${uiStore.isCut(item.id) ? styles.reorderItemCut : ''}`}
+                touchDragId() === item.id ? styles.touchDragging : ''
+              } ${dragOverIndex() === index() ? styles.isOver : ''} ${uiStore.isCut(item.id) ? styles.reorderItemCut : ''}`}
             >
               <div class={styles.itemContent} onClick={() => toggleExpanded(item.id)} style={{ cursor: 'pointer' }}>
                 {expandedItems().has(item.id) ? (

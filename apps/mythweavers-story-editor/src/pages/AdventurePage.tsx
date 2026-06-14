@@ -1,4 +1,4 @@
-import { type Component, Show } from 'solid-js'
+import { type Component, Show, onMount } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Button, Spinner, Text } from '@mythweavers/ui'
 import {
@@ -11,7 +11,6 @@ import {
   createAdventureEngine,
 } from './adventure/useAdventureEngine'
 import { AdventureHeader } from './adventure/AdventureHeader'
-import { SetupScreen } from './adventure/SetupScreen'
 import { PlayingScreen } from './adventure/PlayingScreen'
 import * as styles from './AdventurePage.css'
 
@@ -82,6 +81,14 @@ const AdventurePageInner: Component<{ persistence: AdventurePersistence }> = (
   // Initialize the store from persisted state
   adventureStore.initialize(props.persistence.initialState())
 
+  // If still in setup phase (e.g. navigated directly to /adventure/new),
+  // redirect to the stories list where the "New Adventure" popup lives.
+  onMount(() => {
+    if (adventureStore.phase === 'setup') {
+      navigate('/stories', { replace: true })
+    }
+  })
+
   // Create the engine (sets up effects, scroll management, etc.)
   const engine = createAdventureEngine(props.persistence, navigate)
 
@@ -91,10 +98,23 @@ const AdventurePageInner: Component<{ persistence: AdventurePersistence }> = (
         <AdventureHeader onBack={() => navigate('/stories')} />
 
         <Show
-          when={adventureStore.phase === 'setup'}
-          fallback={<PlayingScreen />}
+          when={adventureStore.phase === 'playing'}
+          fallback={
+            <div
+              style={{
+                display: 'flex',
+                'flex-direction': 'column',
+                'justify-content': 'center',
+                'align-items': 'center',
+                flex: 1,
+                gap: '1rem',
+              }}
+            >
+              <Spinner size="lg" />
+            </div>
+          }
         >
-          <SetupScreen />
+          <PlayingScreen />
         </Show>
       </div>
     </AdventureEngineContext.Provider>

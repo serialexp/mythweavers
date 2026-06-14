@@ -103,6 +103,14 @@ export const reorderList = style({
   margin: 0,
 })
 
+// Applied to the list while a touch drag is active: suppress text selection and
+// the iOS long-press callout/magnifier so the drag gesture isn't fighting them.
+export const reorderListDragging = style({
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTouchCallout: 'none',
+})
+
 export const reorderItem = style({
   display: 'flex',
   alignItems: 'center',
@@ -114,6 +122,9 @@ export const reorderItem = style({
   borderRadius: tokens.radius.md,
   cursor: 'move',
   transition: `all ${tokens.duration.normal} ${tokens.easing.default}`,
+  // Allow vertical scrolling normally; our long-press gesture takes over only
+  // once it's armed (and calls preventDefault at that point).
+  touchAction: 'pan-y',
 
   ':hover': {
     background: tokens.color.bg.elevated,
@@ -124,6 +135,17 @@ export const reorderItem = style({
 export const isDragging = style({
   opacity: 0.5,
   transform: 'scale(0.95)',
+})
+
+// Touch "lifted" state while long-press dragging on mobile.
+export const touchDragging = style({
+  opacity: 0.95,
+  transform: 'scale(1.03)',
+  boxShadow: tokens.shadow.lg,
+  background: tokens.color.bg.elevated,
+  borderColor: tokens.color.accent.primary,
+  position: 'relative',
+  zIndex: tokens.zIndex.sticky,
 })
 
 export const isOver = style({

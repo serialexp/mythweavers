@@ -7,6 +7,7 @@ vi.mock('../services/saveService', () => ({
   saveService: {
     saveNode: vi.fn(),
     saveNodesBulk: vi.fn(),
+    saveStorySettings: vi.fn(),
     setCallbacks: vi.fn(),
   },
 }))

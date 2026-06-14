@@ -37,6 +37,19 @@ function steeringClass(b: SteeringBucket): string {
   }
 }
 
+/** Extract a short display name from the deuteragonist description. */
+function partnerDisplayName(): string {
+  const input = adventureStore.deuteragonistInput.trim()
+  if (!input) return 'Partner'
+  // Take the first 1-2 words that look like a name
+  const words = input.split(/\s+/)
+  // If first word looks like "A" or "The" or "a" article, skip it
+  if (words.length > 1 && /^(a|an|the)$/i.test(words[0])) {
+    return words.slice(0, 2).join(' ')
+  }
+  return words[0]
+}
+
 function renderNarrative(text: string) {
   const paragraphs = text.split('\n\n').filter((p) => p.trim())
   return (
@@ -207,6 +220,45 @@ function EditablePlayerAction(props: {
   )
 }
 
+/**
+ * Tabbed view for split-party turns — shows protagonist and deuteragonist
+ * narratives in separate tabs so the player can flip between perspectives.
+ */
+function SplitNarrativeView(props: {
+  protagonistNarrative: string
+  deuteragonistNarrative: string
+}) {
+  const [activeTab, setActiveTab] = createSignal<'protagonist' | 'deuteragonist'>('protagonist')
+  const partnerName = partnerDisplayName()
+
+  return (
+    <div class={styles.splitNarrative}>
+      <div class={styles.splitTabs}>
+        <button
+          class={activeTab() === 'protagonist' ? styles.splitTabActive : styles.splitTab}
+          onClick={() => setActiveTab('protagonist')}
+        >
+          You
+        </button>
+        <button
+          class={activeTab() === 'deuteragonist' ? styles.splitTabActive : styles.splitTab}
+          onClick={() => setActiveTab('deuteragonist')}
+        >
+          {partnerName}
+        </button>
+      </div>
+      <div class={styles.splitTabContent}>
+        <Show when={activeTab() === 'protagonist'}>
+          {renderNarrative(props.protagonistNarrative)}
+        </Show>
+        <Show when={activeTab() === 'deuteragonist'}>
+          {renderNarrative(props.deuteragonistNarrative)}
+        </Show>
+      </div>
+    </div>
+  )
+}
+
 function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
   const turn = () => adventureStore.turns[index]
   if (!turn()) return null
@@ -246,7 +298,26 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
         )}
       </Show>
 
-      {renderNarrative(turn().narrative)}
+      {/* Deuteragonist action — what the partner intended to do this turn */}
+      <Show when={turn().partnerAction}>
+        {(pa) => (
+          <div class={styles.partnerActionChip}>
+            <span class={styles.partnerActionLabel}>Partner intends:</span>
+            {pa()}
+          </div>
+        )}
+      </Show>
+
+      {/* Narrative — tabbed when the party was split and both perspectives exist */}
+      <Show
+        when={turn().deuteragonistNarrative}
+        fallback={<>{renderNarrative(turn().narrative)}</>}
+      >
+        <SplitNarrativeView
+          protagonistNarrative={turn().narrative}
+          deuteragonistNarrative={turn().deuteragonistNarrative!}
+        />
+      </Show>
 
       {/* Director brief — present when the two-model flow ran for this
           turn. Closed by default; expand to audit the plan against the
@@ -526,6 +597,8 @@ export const PlayingScreen: Component = () => {
             {(() => {
               const isWorldStepStreaming = () =>
                 adventureStore.streamingKind === 'world-step'
+              const isDeuteragonistStreaming = () =>
+                adventureStore.streamingKind === 'deuteragonist-resolution'
               return (
                 <div
                   class={
@@ -545,7 +618,7 @@ export const PlayingScreen: Component = () => {
                   </Show>
                   <Show
                     when={
-                      adventureStore.pendingAction && !isWorldStepStreaming()
+                      adventureStore.pendingAction && !isWorldStepStreaming() && !isDeuteragonistStreaming()
                     }
                   >
                     <div class={styles.playerAction}>
@@ -553,14 +626,30 @@ export const PlayingScreen: Component = () => {
                       {adventureStore.pendingAction}
                     </div>
                   </Show>
-                  <Show when={adventureStore.streamingSteering}>
-                    {(s) => (
-                      <div
-                        class={`${styles.steeringChip} ${steeringClass(s())}`}
-                      >
-                        {steeringLabel(s())}
-                      </div>
-                    )}
+                  <Show when={!isDeuteragonistStreaming()}>
+                    <Show when={adventureStore.streamingSteering}>
+                      {(s) => (
+                        <div
+                          class={`${styles.steeringChip} ${steeringClass(s())}`}
+                        >
+                          {steeringLabel(s())}
+                        </div>
+                      )}
+                    </Show>
+                    <Show when={adventureStore.streamingPartnerAction}>
+                      {(pa) => (
+                        <div class={styles.partnerActionChip}>
+                          <span class={styles.partnerActionLabel}>Partner intends:</span>
+                          {pa()}
+                        </div>
+                      )}
+                    </Show>
+                  </Show>
+                  {/* Deuteragonist streaming label */}
+                  <Show when={isDeuteragonistStreaming()}>
+                    <div class={styles.deuteragonistStreamLabel}>
+                      Meanwhile, {partnerDisplayName()}...
+                    </div>
                   </Show>
                   {renderStreamingContent()}
                 </div>
@@ -671,6 +760,17 @@ export const PlayingScreen: Component = () => {
               </Button>
             </Show>
           </div>
+          {/* Partner active toggle — below the submit button, only when a deuteragonist is configured */}
+          <Show when={adventureStore.deuteragonistInput.trim() && !adventureStore.isGenerating}>
+            <label class={styles.deuteragonistActiveLabel} title="Uncheck when the partner is asleep, unconscious, or otherwise inactive this turn.">
+              <input
+                type="checkbox"
+                checked={adventureStore.deuteragonistActive}
+                onChange={(e) => adventureStore.setDeuteragonistActive(e.currentTarget.checked)}
+              />
+              {' '}Partner active
+            </label>
+          </Show>
         </div>
     </>
   )

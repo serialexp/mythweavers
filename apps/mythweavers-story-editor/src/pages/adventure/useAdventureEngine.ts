@@ -18,6 +18,8 @@ import {
   buildAnalysisMessages,
   buildSynthesisMessages,
   buildStorylineGateMessages,
+  buildPartnerActionMessages,
+  buildDeuteragonistResolutionMessages,
   getCompactionRanges,
   cleanNarrative,
   rollSteering,
@@ -167,8 +169,7 @@ export function createAdventureEngine(
 
   /**
    * Run the optional "director" pass: a grounded analysis-class model that
-   * produces a structured plan (SCENE STATE / BEATS / NPC REACTIONS /
-   * ENDING BEAT / DO NOT) for the writer call that follows. Output is
+   * produces a numbered BEATS plan for the writer call that follows. Output is
    * NOT streamed to the UI — the brief is plumbing for the writer, and
    * we keep the visible streaming block tied to actual prose.
    *
@@ -329,6 +330,8 @@ export function createAdventureEngine(
       liveWorldStateForPrompt(),
       worldStepStorylineBrief,
       worldStepDirectorBrief,
+      adventureStore.protagonistInput || undefined,
+      adventureStore.deuteragonistInput || undefined,
     )
 
     const { narrative, streamErrors } = await streamPass(
@@ -357,6 +360,74 @@ export function createAdventureEngine(
       ...(worldStepDirectorBrief ? { directorBrief: worldStepDirectorBrief } : {}),
     })
     persist()
+  }
+
+  /**
+   * Run the deuteragonist action call: ask the LLM what the partner
+   * character wants to do this turn, given the story so far, their
+   * personality, and what the player just did.
+   *
+   * Returns the action text, or undefined if the call fails non-fatally
+   * (the resolution pass proceeds without a partner action). Aborts
+   * propagate so the parent catch in generate() handles them uniformly.
+   */
+  async function runPartnerAction(
+    playerAction: string,
+  ): Promise<string | undefined> {
+    const deuteragonistInput = adventureStore.deuteragonistInput.trim()
+    if (!deuteragonistInput) return undefined
+
+    const resolved = resolveModel('adventure-analysis')
+    const client = LLMClientFactory.getClient(resolved.provider)
+
+    const messages = buildPartnerActionMessages(
+      adventureStore.turns,
+      adventureStore.settingDescription,
+      playerAction,
+      deuteragonistInput,
+      adventureStore.compactions,
+      adventureStore.worldBible,
+      liveWorldStateForPrompt(),
+    )
+
+    let accumulated = ''
+    try {
+      const response = client.generate({
+        model: resolved.model,
+        messages,
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
+          ? Math.min(
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
+            )
+          : undefined,
+        signal: abortController!.signal,
+        metadata: { callType: 'adventure-partner-action' },
+      })
+
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          accumulated += event.text
+        }
+        if (event.type === 'error') {
+          console.warn(
+            '[Partner] Stream error, skipping partner action:',
+            (event as { type: 'error'; error: string }).error,
+          )
+          accumulated = ''
+          break
+        }
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err
+      const message = err instanceof Error ? err.message : 'Partner action call failed'
+      console.warn('[Partner] Skipped due to error:', message)
+      return undefined
+    }
+
+    const action = accumulated.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    return action.length > 0 ? action : undefined
   }
 
   async function generate(playerAction: string | null) {
@@ -393,12 +464,33 @@ export function createAdventureEngine(
     abortController = new AbortController()
 
     // Declared outside the try block so the AbortError catch below can
-    // attach the brief to a partial-aborted resolution turn (the brief
-    // was finalized BEFORE the stream that got aborted; the partial prose
-    // followed it, so the brief is still the honest record of intent).
+    // attach metadata to a partial-aborted resolution turn (data that was
+    // finalized BEFORE the stream that got aborted is still the honest
+    // record of intent).
     let resolutionDirectorBrief: string | undefined
+    let partnerAction: string | undefined
+    let deuteragonistNarrative: string | undefined
+    let resolutionNarrative: string | undefined
 
     try {
+      // --- Deuteragonist action (pre-resolution) ---
+      // Ask the LLM what the partner character wants to do, given the
+      // story state, their personality, and the player's action. Runs
+      // before the resolution so both actions can be woven together.
+      // Only when a deuteragonist is configured and this is not the
+      // opening turn. Failures are non-fatal — the resolution proceeds
+      // without a partner action.
+      if (playerAction !== null && adventureStore.deuteragonistInput.trim() && adventureStore.deuteragonistActive) {
+        adventureStore.setStreamingPartnerAction('…')
+        const pa = await runPartnerAction(playerAction)
+        if (pa) {
+          partnerAction = pa
+          adventureStore.setStreamingPartnerAction(pa)
+        } else {
+          adventureStore.setStreamingPartnerAction(null)
+        }
+      }
+
       // --- Storyline gate (pre-resolution) ---
       // Filter the author-side storyline against the player's intended
       // action and the current world state. The narrative pass sees only
@@ -425,6 +517,10 @@ export function createAdventureEngine(
         liveWorldStateForPrompt(),
         resolutionStorylineBrief,
         resolutionDirectorBrief,
+        partnerAction,
+        adventureStore.protagonistInput || undefined,
+        adventureStore.deuteragonistInput || undefined,
+        adventureStore.partySplit || undefined,
       )
 
       const { narrative, streamErrors } = await streamPass(
@@ -448,17 +544,75 @@ export function createAdventureEngine(
         return
       }
 
-      // Finalize the resolution turn FIRST. The narrative is committed to
+      resolutionNarrative = narrative
+
+      // --- Pass 1b: deuteragonist resolution (only when party is split) ---
+      // The deuteragonist is elsewhere — generate their separate narrative.
+      // Runs after the protagonist resolution so the player sees their own
+      // story first, then the partner's. Failures are non-fatal.
+      if (
+        adventureStore.partySplit &&
+        playerAction !== null &&
+        adventureStore.deuteragonistInput.trim() &&
+        adventureStore.deuteragonistActive
+      ) {
+        adventureStore.setStreamingKind('deuteragonist-resolution')
+        adventureStore.setStreamingContent('')
+
+        const deuteragonistMessages = buildDeuteragonistResolutionMessages(
+          adventureStore.turns,
+          adventureStore.settingDescription,
+          playerAction,
+          adventureStore.deuteragonistInput,
+          partnerAction,
+          adventureStore.compactions,
+          adventureStore.worldBible,
+          liveWorldStateForPrompt(),
+          resolutionStorylineBrief,
+          resolutionDirectorBrief,
+          adventureStore.directive || undefined,
+          adventureStore.protagonistInput || undefined,
+        )
+
+        try {
+          const deutResult = await streamPass(
+            deuteragonistMessages,
+            'adventure',
+          )
+          if (deutResult.narrative && deutResult.narrative.trim().length > 0) {
+            deuteragonistNarrative = deutResult.narrative
+          }
+          if (deutResult.streamErrors.length > 0) {
+            console.warn(
+              '[Deuteragonist resolution] Stream errors:',
+              deutResult.streamErrors,
+            )
+          }
+        } catch (deutErr: unknown) {
+          if (deutErr instanceof DOMException && deutErr.name === 'AbortError') {
+            throw deutErr // propagate abort
+          }
+          console.warn(
+            '[Deuteragonist resolution] Failed:',
+            deutErr instanceof Error ? deutErr.message : deutErr,
+          )
+        }
+      }
+
+      // Finalize the resolution turn. The narrative is committed to
       // the turn list and persisted before any optional post-processing
       // runs, so a stuck or erroring nonsense check can no longer lose the
       // narrative on reload or abort. Opening turn is stored as 'resolution'
-      // (acts as the establishing beat).
+      // (acts as the establishing beat). When the party is split, both the
+      // protagonist and deuteragonist narratives are stored.
       adventureStore.finalizeTurn({
         playerAction,
-        narrative,
+        narrative: resolutionNarrative,
         kind: 'resolution',
         ...(steering ? { steering } : {}),
         ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
+        ...(partnerAction ? { partnerAction } : {}),
+        ...(deuteragonistNarrative ? { deuteragonistNarrative } : {}),
       })
       persist()
 
@@ -468,7 +622,7 @@ export function createAdventureEngine(
       // the spinner and move on.
       if (adventureStore.nonsenseCheckEnabled) {
         try {
-          await runNarrativeChecks(narrative, playerAction)
+          await runNarrativeChecks(resolutionNarrative, playerAction)
         } catch (checkErr: unknown) {
           if (
             !(checkErr instanceof DOMException && checkErr.name === 'AbortError')
@@ -537,16 +691,38 @@ export function createAdventureEngine(
       })
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        // User aborted during pass 1 — if we have partial narrative, save it
+        // User aborted — if we have partial narrative, save it.
+        // Check streamingKind to determine WHICH pass was aborted.
+        const streamKind = adventureStore.streamingKind
         const partial = adventureStore.streamingContent
-        const narrative = partial ? cleanNarrative(partial) : ''
-        if (narrative && !narrative.startsWith('⏳')) {
+        const partialNarrative = partial ? cleanNarrative(partial) : ''
+
+        if (streamKind === 'deuteragonist-resolution') {
+          // Aborted during deuteragonist pass — save protagonist narrative
+          // as normal and capture partial deuteragonist content.
+          if (resolutionNarrative) {
+            adventureStore.finalizeAbort({
+              playerAction,
+              narrative: resolutionNarrative,
+              kind: 'resolution',
+              ...(steering ? { steering } : {}),
+              ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
+              ...(partnerAction ? { partnerAction } : {}),
+              ...(partialNarrative && !partialNarrative.startsWith('⏳')
+                ? { deuteragonistNarrative: partialNarrative }
+                : {}),
+            })
+            persist()
+          }
+        } else if (partialNarrative && !partialNarrative.startsWith('⏳')) {
           adventureStore.finalizeAbort({
             playerAction,
-            narrative,
+            narrative: partialNarrative,
             kind: 'resolution',
             ...(steering ? { steering } : {}),
             ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
+            ...(partnerAction ? { partnerAction } : {}),
+            ...(deuteragonistNarrative ? { deuteragonistNarrative } : {}),
           })
           persist()
         } else {
@@ -565,6 +741,7 @@ export function createAdventureEngine(
       adventureStore.setStreamingContent('')
       adventureStore.setStreamingKind(null)
       adventureStore.setStreamingSteering(undefined)
+      adventureStore.setStreamingPartnerAction(null)
       adventureStore.setPendingAction(null)
       abortController = null
     }
@@ -942,6 +1119,12 @@ export function createAdventureEngine(
     playerAction: string | null,
     kind: 'resolution' | 'world-step',
   ): Promise<string | undefined> {
+    // The storyline gate is a living-world pre-pass: it slices the synthesized/
+    // authored storyline for the next beat. When living world is off there is no
+    // advancing storyline to gate (the field is hidden and never synthesized), so
+    // skip the pass entirely rather than gating against stale hand-authored text.
+    if (!adventureStore.livingWorldEnabled) return undefined
+
     const storyline = adventureStore.storyline.trim()
     if (!storyline) return undefined
 
@@ -1224,6 +1407,9 @@ export function createAdventureEngine(
     if (adventureStore.protagonistInput.trim()) {
       description += `\n\nPROTAGONIST: ${adventureStore.protagonistInput.trim()}`
     }
+    if (adventureStore.deuteragonistInput.trim()) {
+      description += `\n\nDEUTERAGONIST: ${adventureStore.deuteragonistInput.trim()}`
+    }
     adventureStore.setSettingDescription(description)
     adventureStore.setPhase('playing')
     persist()
@@ -1346,7 +1532,7 @@ export function createAdventureEngine(
     persistence.clearState()
 
     if (persistence.isBackendMode) {
-      navigate('/adventure/new', { replace: true })
+      navigate('/stories', { replace: true })
     }
   }
 

@@ -19,6 +19,7 @@ interface AdventureState {
   phase: AdventurePhase
   settingInput: string
   protagonistInput: string
+  deuteragonistInput: string
   settingDescription: string
   turns: AdventureTurn[]
   compactions: Record<string, AdventureCompaction>
@@ -70,6 +71,12 @@ interface AdventureState {
    */
   gateApprovalEnabled: boolean
   /**
+   * When true and a deuteragonist is configured, the party is separated —
+   * each turn generates two parallel narratives (protagonist + deuteragonist).
+   * Persisted per-adventure; toggled via the Story panel.
+   */
+  partySplit: boolean
+  /**
    * The brief produced by the storyline-gate pass that is currently
    * awaiting user approval. Null when nothing is pending. Transient — not
    * persisted; if the user navigates away mid-approval, the engine call
@@ -94,7 +101,7 @@ interface AdventureState {
    * Null when nothing is streaming or the stream is unrelated to a turn
    * (e.g. nonsense-check spinner).
    */
-  streamingKind: 'resolution' | 'world-step' | null
+  streamingKind: 'resolution' | 'world-step' | 'deuteragonist-resolution' | null
   /**
    * Steering bucket already rolled for the resolution pass currently
    * streaming. Rendered as the same chip that appears on the committed
@@ -102,6 +109,14 @@ interface AdventureState {
    * height-wise. Undefined for world-step / no-action streams.
    */
   streamingSteering: SteeringBucket | undefined
+  streamingPartnerAction: string | null
+  /**
+   * Streaming content for the deuteragonist's solo narrative when the
+   * party is split. Mirrors `streamingContent` but for the partner's
+   * parallel resolution pass. Null when the party is together or no
+   * deuteragonist pass is active.
+   */
+  streamingDeuteragonistContent: string
   pendingAction: string | null
   lastFailedAction: string | null | undefined
   error: string | null
@@ -120,6 +135,10 @@ interface AdventureState {
 
   // UI state
   playerInput: string
+  /** When false, the deuteragonist is inactive this turn (asleep, etc.).
+   *  Skips both the partner intent call and any deuteragonist narrative.
+   *  Transient — resets to true on every load. */
+  deuteragonistActive: boolean
   showStoryPanel: boolean
   showMenu: boolean
   showKnobs: boolean
@@ -145,6 +164,7 @@ const [state, setState] = createStore<AdventureState>({
   phase: 'setup',
   settingInput: '',
   protagonistInput: '',
+  deuteragonistInput: '',
   settingDescription: '',
   turns: [],
   compactions: {},
@@ -164,6 +184,7 @@ const [state, setState] = createStore<AdventureState>({
   storyline: '',
   isSynthesizing: false,
   gateApprovalEnabled: false,
+  partySplit: false,
   pendingGateBrief: null,
   pendingGateKind: null,
 
@@ -171,6 +192,8 @@ const [state, setState] = createStore<AdventureState>({
   streamingContent: '',
   streamingKind: null,
   streamingSteering: undefined,
+  streamingPartnerAction: null,
+  streamingDeuteragonistContent: '',
   pendingAction: null,
   lastFailedAction: undefined,
   error: null,
@@ -185,6 +208,7 @@ const [state, setState] = createStore<AdventureState>({
   nonsenseWarning: null,
 
   playerInput: '',
+  deuteragonistActive: true,
   showStoryPanel: false,
   showMenu: false,
   showKnobs: false,
@@ -202,6 +226,9 @@ export const adventureStore = {
   },
   get protagonistInput() {
     return state.protagonistInput
+  },
+  get deuteragonistInput() {
+    return state.deuteragonistInput
   },
   get settingDescription() {
     return state.settingDescription
@@ -257,6 +284,9 @@ export const adventureStore = {
   get gateApprovalEnabled() {
     return state.gateApprovalEnabled
   },
+  get partySplit() {
+    return state.partySplit
+  },
   get pendingGateBrief() {
     return state.pendingGateBrief
   },
@@ -275,6 +305,12 @@ export const adventureStore = {
   },
   get streamingSteering() {
     return state.streamingSteering
+  },
+  get streamingPartnerAction() {
+    return state.streamingPartnerAction
+  },
+  get streamingDeuteragonistContent() {
+    return state.streamingDeuteragonistContent
   },
   get pendingAction() {
     return state.pendingAction
@@ -314,6 +350,9 @@ export const adventureStore = {
   get playerInput() {
     return state.playerInput
   },
+  get deuteragonistActive() {
+    return state.deuteragonistActive
+  },
   get showStoryPanel() {
     return state.showStoryPanel
   },
@@ -337,6 +376,9 @@ export const adventureStore = {
   },
   setProtagonistInput(v: string) {
     setState('protagonistInput', v)
+  },
+  setDeuteragonistInput(v: string) {
+    setState('deuteragonistInput', v)
   },
   setSettingDescription(v: string) {
     setState('settingDescription', v)
@@ -448,6 +490,9 @@ export const adventureStore = {
   setGateApprovalEnabled(v: boolean) {
     setState('gateApprovalEnabled', v)
   },
+  setPartySplit(v: boolean) {
+    setState('partySplit', v)
+  },
   setPendingGateBrief(brief: string | null, kind: 'resolution' | 'world-step' | null) {
     batch(() => {
       setState('pendingGateBrief', brief)
@@ -461,11 +506,17 @@ export const adventureStore = {
   setStreamingContent(v: string) {
     setState('streamingContent', v)
   },
-  setStreamingKind(v: 'resolution' | 'world-step' | null) {
+  setStreamingKind(v: 'resolution' | 'world-step' | 'deuteragonist-resolution' | null) {
     setState('streamingKind', v)
   },
   setStreamingSteering(v: SteeringBucket | undefined) {
     setState('streamingSteering', v)
+  },
+  setStreamingPartnerAction(v: string | null) {
+    setState('streamingPartnerAction', v)
+  },
+  setStreamingDeuteragonistContent(v: string) {
+    setState('streamingDeuteragonistContent', v)
   },
   setPendingAction(v: string | null) {
     setState('pendingAction', v)
@@ -501,6 +552,9 @@ export const adventureStore = {
 
   setPlayerInput(v: string) {
     setState('playerInput', v)
+  },
+  setDeuteragonistActive(v: boolean) {
+    setState('deuteragonistActive', v)
   },
   setShowStoryPanel(v: boolean) {
     setState('showStoryPanel', v)
@@ -576,6 +630,7 @@ export const adventureStore = {
       phase: state.phase,
       settingInput: state.settingInput,
       protagonistInput: state.protagonistInput,
+      deuteragonistInput: state.deuteragonistInput || undefined,
       settingDescription: state.settingDescription,
       turns: [...state.turns],
       compactions: { ...state.compactions },
@@ -587,6 +642,7 @@ export const adventureStore = {
       directorEnabled: state.directorEnabled,
       livingWorldEnabled: state.livingWorldEnabled,
       gateApprovalEnabled: state.gateApprovalEnabled,
+      partySplit: state.partySplit || undefined,
       characters: { ...state.characters },
       plotPoints: { ...state.plotPoints },
       agenda: [...state.agenda],
@@ -603,8 +659,10 @@ export const adventureStore = {
   finalizeTurn(turn: AdventureTurn) {
     batch(() => {
       setState('streamingContent', '')
+      setState('streamingDeuteragonistContent', '')
       setState('streamingKind', null)
       setState('streamingSteering', undefined)
+      setState('streamingPartnerAction', null)
       setState('pendingAction', null)
       setState('isGenerating', false)
       setState('turns', state.turns.length, turn)
@@ -617,8 +675,10 @@ export const adventureStore = {
   finalizeAbort(turn: AdventureTurn) {
     batch(() => {
       setState('streamingContent', '')
+      setState('streamingDeuteragonistContent', '')
       setState('streamingKind', null)
       setState('streamingSteering', undefined)
+      setState('streamingPartnerAction', null)
       setState('pendingAction', null)
       setState('isGenerating', false)
       setState('turns', state.turns.length, turn)
@@ -632,6 +692,7 @@ export const adventureStore = {
         phase: saved?.phase ?? 'setup',
         settingInput: saved?.settingInput ?? '',
         protagonistInput: saved?.protagonistInput ?? '',
+        deuteragonistInput: saved?.deuteragonistInput ?? '',
         settingDescription: saved?.settingDescription ?? '',
         directive: saved?.directive ?? '',
         worldBible: saved?.worldBible ?? '',
@@ -648,6 +709,8 @@ export const adventureStore = {
         streamingContent: '',
         streamingKind: null,
         streamingSteering: undefined,
+        streamingPartnerAction: null,
+        streamingDeuteragonistContent: '',
         pendingAction: saved?.pendingAction ?? null,
         lastFailedAction: saved?.pendingAction
           ? saved.pendingAction
@@ -660,6 +723,7 @@ export const adventureStore = {
         nonsenseWarning: null,
 
         playerInput: '',
+        deuteragonistActive: true,
         showStoryPanel: false,
         showMenu: false,
         showKnobs: false,
@@ -688,6 +752,7 @@ export const adventureStore = {
         phase: 'setup' as const,
         settingInput: '',
         protagonistInput: '',
+        deuteragonistInput: '',
         settingDescription: '',
         directive: '',
         worldBible: '',
@@ -704,6 +769,8 @@ export const adventureStore = {
         streamingContent: '',
         streamingKind: null,
         streamingSteering: undefined,
+        streamingPartnerAction: null,
+        streamingDeuteragonistContent: '',
         pendingAction: null,
         lastFailedAction: undefined,
         error: null,
@@ -714,6 +781,7 @@ export const adventureStore = {
         nonsenseWarning: null,
 
         playerInput: '',
+        deuteragonistActive: true,
         showStoryPanel: false,
         showMenu: false,
         showKnobs: false,

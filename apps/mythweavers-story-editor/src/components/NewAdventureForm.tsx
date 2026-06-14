@@ -4,6 +4,11 @@ import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
 import type { LLMMessage } from '../types/llm'
+import {
+  AdventureSettings,
+  ADVENTURE_SETTING_DEFAULTS,
+  type AdventureSettingsValues,
+} from './AdventureSettings'
 import * as styles from '../pages/AdventurePage.css'
 
 // --- Setting generation knobs ---
@@ -59,7 +64,9 @@ Respond with ONLY the setting description, no other text.`
 export interface NewAdventureResult {
   settingInput: string
   protagonistInput: string
+  deuteragonistInput: string
   directive: string
+  settings: AdventureSettingsValues
 }
 
 interface NewAdventureFormProps {
@@ -70,9 +77,14 @@ interface NewAdventureFormProps {
 export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
   const [settingInput, setSettingInput] = createSignal('')
   const [protagonistInput, setProtagonistInput] = createSignal('')
+  const [deuteragonistInput, setDeuteragonistInput] = createSignal('')
   const [directive, setDirective] = createSignal('')
   const [showDirective, setShowDirective] = createSignal(false)
   const [showKnobs, setShowKnobs] = createSignal(false)
+  const [showSettings, setShowSettings] = createSignal(false)
+  const [advSettings, setAdvSettings] = createSignal<AdventureSettingsValues>({
+    ...ADVENTURE_SETTING_DEFAULTS,
+  })
   const [isGeneratingSetting, setIsGeneratingSetting] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [settingGenFailed, setSettingGenFailed] = createSignal(false)
@@ -181,7 +193,9 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
     props.onStart({
       settingInput: settingInput(),
       protagonistInput: protagonistInput(),
+      deuteragonistInput: deuteragonistInput(),
       directive: directive(),
+      settings: advSettings(),
     })
   }
 
@@ -272,6 +286,20 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
         />
       </div>
 
+      <div class={styles.formGroup}>
+        <label class={styles.formLabel}>Partner / Deuteragonist (optional)</label>
+        <input
+          class={styles.formInput}
+          type="text"
+          value={deuteragonistInput()}
+          onInput={(e) => setDeuteragonistInput(e.currentTarget.value)}
+          placeholder="e.g., A quick-witted rogue named Lyra"
+        />
+        <div class={styles.directiveHint}>
+          If filled in, this character will accompany you and take their own actions each turn, driven by AI.
+        </div>
+      </div>
+
       <div>
         <button
           class={styles.directiveToggle}
@@ -291,6 +319,25 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
             <div class={styles.directiveHint}>
               This instruction is injected into the system prompt on every turn.
             </div>
+          </div>
+        </Show>
+      </div>
+
+      <div>
+        <button
+          class={styles.directiveToggle}
+          onClick={() => setShowSettings(!showSettings())}
+        >
+          {showSettings() ? '▾ Adventure Settings' : '▸ Adventure Settings'}
+        </button>
+        <Show when={showSettings()}>
+          <div class={styles.directivePanel}>
+            <AdventureSettings
+              values={advSettings()}
+              onChange={(key, value) =>
+                setAdvSettings((prev) => ({ ...prev, [key]: value }))
+              }
+            />
           </div>
         </Show>
       </div>

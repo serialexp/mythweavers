@@ -22,6 +22,22 @@ const createChapter = (overrides: Partial<Node>): Node => {
   }
 }
 
+const createScene = (overrides: Partial<Node>): Node => {
+  const now = new Date()
+  return {
+    id: 'scene-id',
+    storyId: 'story-1',
+    parentId: 'chapter-id',
+    type: 'scene',
+    title: 'Untitled scene',
+    order: 0,
+    includeInFull: 2,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  }
+}
+
 const createMessage = (overrides: Partial<Message>): Message => {
   const now = new Date()
   return {
@@ -93,24 +109,33 @@ describe('buildPrecedingContextMarkdown', () => {
         createdAt: now,
         updatedAt: now,
       },
-      createChapter({
-        id: 'ch-1',
+      createChapter({ id: 'ch-1', title: 'Chapter One', order: 0 }),
+      createScene({
+        id: 'scene-1',
+        parentId: 'ch-1',
         title: 'Opening',
         order: 0,
+        includeInFull: 1,
         summary: 'Opening summary',
         activeCharacterIds: ['char-1'],
         activeContextItemIds: ['ctx-2'],
       }),
-      createChapter({
-        id: 'ch-2',
+      createChapter({ id: 'ch-2', title: 'Chapter Two', order: 1 }),
+      createScene({
+        id: 'scene-2',
+        parentId: 'ch-2',
         title: 'Second Act',
-        order: 1,
+        order: 0,
+        includeInFull: 2,
         activeCharacterIds: ['char-2'],
       }),
-      createChapter({
-        id: 'ch-3',
+      createChapter({ id: 'ch-3', title: 'Chapter Three', order: 2 }),
+      createScene({
+        id: 'scene-3',
+        parentId: 'ch-3',
         title: 'Climax',
-        order: 2,
+        order: 0,
+        includeInFull: 2,
       }),
     ])
 
@@ -119,19 +144,19 @@ describe('buildPrecedingContextMarkdown', () => {
         id: 'm-1',
         content: 'Opening scene content',
         order: 0,
-        sceneId: 'ch-1',
+        sceneId: 'scene-1',
       }),
       createMessage({
         id: 'm-2',
         content: 'Second act moment one.\n\nSecond act moment two.',
         order: 1,
-        sceneId: 'ch-2',
+        sceneId: 'scene-2',
       }),
       createMessage({
         id: 'm-3',
         content: 'Climax scene content',
         order: 2,
-        sceneId: 'ch-3',
+        sceneId: 'scene-3',
       }),
     ])
   })

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Message } from '../types/core'
+import type { Message, Node } from '../types/core'
 import { type ContextGenerationOptions, generateContextMessages } from './contextGeneration'
 
 // Mock dependencies
@@ -56,18 +56,21 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      expect(result).toHaveLength(5) // system + 3 messages + user
+      // system + 3 messages + instructions user message + direction user message
+      expect(result).toHaveLength(6)
       expect(result[0]).toEqual({
         role: 'system',
-        content: 'System prompt for fantasy story',
+        content:
+          'You are an assistant helping with creative story writing. You can continue the narrative, refine existing content, or answer questions about the story.',
       })
       expect(result[1]).toEqual({
         role: 'assistant',
         content: 'First message',
       })
-      expect(result[4]).toEqual({
+      expect(result[5]).toEqual({
         role: 'user',
-        content: 'User direction: Continue the story\n\nContinue the story directly below (no labels or formatting):',
+        content:
+          'The following is an instruction describing what to write next. It is NOT part of the story - write the content it describes:\n\n"Continue the story"\n\nContinue the story directly below (no labels or formatting):',
       })
     })
 
@@ -110,7 +113,7 @@ describe('generateContextMessages', () => {
       expect(result[20].content).toBe('Message 20 content')
     })
 
-    it('should always use full content for Claude models', async () => {
+    it('applies tiered summarization in the legacy path for Claude too, with cache control on recent turns', async () => {
       const messages: Message[] = []
 
       for (let i = 1; i <= 20; i++) {
@@ -133,10 +136,17 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      // All messages should use full content for Claude
-      for (let i = 1; i <= 20; i++) {
-        expect(result[i].content).toBe(`Message ${i} content`)
-      }
+      // Same tiers as the non-Claude path: sentence summaries, then paragraph
+      // summaries, then full content for the most recent turns.
+      expect(result[1].content).toBe('Message 1 summary')
+      expect(result[5].content).toBe('Message 5 summary')
+      expect(result[6].content).toBe('Message 6 paragraph summary')
+      expect(result[12].content).toBe('Message 12 paragraph summary')
+      expect(result[13].content).toBe('Message 13 content')
+      expect(result[20].content).toBe('Message 20 content')
+
+      // Cache control is applied to the last few turns for Claude models.
+      expect(result[20].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' })
     })
 
     it('should handle compacted messages', async () => {
@@ -178,9 +188,9 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      const contextMessage = result.find((msg) => msg.role === 'user' && msg.content.includes('Active story context'))
+      const contextMessage = result.find((msg) => msg.role === 'user' && msg.content.includes('<story-context>'))
       expect(contextMessage).toBeDefined()
-      expect(contextMessage?.content).toBe('Active story context:\nMain character: Alice, a brave knight')
+      expect(contextMessage?.content).toBe('<story-context>\nMain character: Alice, a brave knight\n</story-context>')
     })
   })
 
@@ -339,7 +349,15 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      expect(buildSmartContext).toHaveBeenCalledWith('Continue', messages, [], [], [], expect.any(Function), undefined)
+      expect(buildSmartContext).toHaveBeenCalledWith(
+        'Continue',
+        messages,
+        [],
+        [],
+        expect.any(Function),
+        undefined,
+        undefined,
+      )
 
       // Should use messages from smart context
       expect(result[1].content).toBe('Smart content 1')
@@ -396,7 +414,7 @@ describe('generateContextMessages', () => {
       expect(result[2].cache_control).toBeUndefined()
     })
 
-    it('should add cache control to character context for Claude models', async () => {
+    it('includes a story-context block and caches the recent story turn for Claude models', async () => {
       const options: ContextGenerationOptions = {
         inputText: 'Continue',
         messages: [createMessage({})],
@@ -407,8 +425,12 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      const contextMessage = result.find((m) => m.role === 'user' && m.content.includes('Active story context'))
-      expect(contextMessage?.cache_control).toEqual({ type: 'ephemeral', ttl: '1h' })
+      const contextMessage = result.find((m) => m.role === 'user' && m.content.includes('<story-context>'))
+      expect(contextMessage).toBeDefined()
+
+      // Cache control now sits on the recent assistant story turn(s).
+      const cachedAssistant = result.find((m) => m.role === 'assistant' && m.cache_control)
+      expect(cachedAssistant?.cache_control).toEqual({ type: 'ephemeral', ttl: '1h' })
     })
   })
 
@@ -422,8 +444,9 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      expect(result).toHaveLength(2) // system + user
-      expect(result[1].content).toContain('Begin the story')
+      // system + instructions user message + direction user message
+      expect(result).toHaveLength(3)
+      expect(result[2].content).toContain('Begin the story')
     })
 
     it('should filter out chapter markers from story messages', async () => {
@@ -462,9 +485,160 @@ describe('generateContextMessages', () => {
       const result = await generateContextMessages(options)
 
       // Should only include messages with content
-      expect(result).toHaveLength(4) // system + 2 valid messages + user
+      // system + 2 valid messages + instructions user message + direction user message
+      expect(result).toHaveLength(5)
       expect(result[1].content).toBe('Valid content')
       expect(result[2].content).toBe('More valid content')
+    })
+  })
+
+  // Node-based context generation: this is the path exercised when the story is
+  // organized into scenes and the user marks scenes for inclusion via the story
+  // navigation (includeInFull). None of the tests above pass `nodes`, so they
+  // all hit the legacy fallback; these cover the real path.
+  describe('Node-based context (scenes marked includeInFull)', () => {
+    const now = new Date('2024-01-01')
+
+    const createScene = (n: number, includeInFull: number | undefined = 2): Node => ({
+      id: `scene-${n}`,
+      storyId: 'story-1',
+      parentId: `chapter-${n}`,
+      type: 'scene',
+      title: `Scene ${n}`,
+      order: 0,
+      includeInFull,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const createChapter = (n: number): Node => ({
+      id: `chapter-${n}`,
+      storyId: 'story-1',
+      parentId: 'book-1',
+      type: 'chapter',
+      title: `Chapter ${n}`,
+      order: n - 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    // Build a story shaped like Bart's: one book, N chapters, each with exactly
+    // one scene, and one message per scene. No branches.
+    const buildStory = (sceneCount: number, includeInFull: number | undefined = 2) => {
+      const nodes: Node[] = [
+        {
+          id: 'book-1',
+          storyId: 'story-1',
+          type: 'book',
+          title: 'Book',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]
+      const messages: Message[] = []
+      for (let n = 1; n <= sceneCount; n++) {
+        nodes.push(createChapter(n))
+        nodes.push(createScene(n, includeInFull))
+        messages.push(
+          createMessage({
+            id: `msg-${n}`,
+            content: `Scene ${n} content`,
+            sceneId: `scene-${n}`,
+            order: n,
+          }),
+        )
+      }
+      return { nodes, messages }
+    }
+
+    const assistantContents = (result: Awaited<ReturnType<typeof generateContextMessages>>) =>
+      result.filter((m) => m.role === 'assistant').map((m) => m.content)
+
+    it('includes every prior scene marked includeInFull=2 when sitting on the 10th scene (the optimal case)', async () => {
+      const { nodes, messages } = buildStory(10, 2)
+
+      const result = await generateContextMessages({
+        inputText: 'Continue',
+        messages,
+        contextType: 'story',
+        nodes,
+        targetMessageId: 'msg-10', // current = scene 10
+        model: 'claude-3-opus',
+        forceMissingSummaries: true,
+      })
+
+      const contents = assistantContents(result)
+      // Scenes 1-9 are marked-history; scene 10 is the current node.
+      for (let n = 1; n <= 10; n++) {
+        expect(contents.some((c) => c?.includes(`Scene ${n} content`))).toBe(true)
+      }
+    })
+
+    it('includes prior scenes via summary when marked includeInFull=1', async () => {
+      const { nodes, messages } = buildStory(3, 1)
+      // Give the prior scenes summaries (summary mode needs them).
+      for (const node of nodes) {
+        if (node.type === 'scene') node.summary = `${node.title} summary`
+      }
+
+      const result = await generateContextMessages({
+        inputText: 'Continue',
+        messages,
+        contextType: 'story',
+        nodes,
+        targetMessageId: 'msg-3',
+        model: 'claude-3-opus',
+        forceMissingSummaries: true,
+      })
+
+      const contents = assistantContents(result)
+      // Scenes 1-2 contribute summaries; scene 3 (current) contributes full content.
+      expect(contents.some((c) => c?.includes('Scene 1 summary'))).toBe(true)
+      expect(contents.some((c) => c?.includes('Scene 2 summary'))).toBe(true)
+      expect(contents.some((c) => c?.includes('Scene 3 content'))).toBe(true)
+    })
+
+    it('documents the failure mode: prior scenes omitted from the passed-in messages array are silently dropped', async () => {
+      // This reproduces the divergence Bart observed: the story-navigation token
+      // counter reports the prior scenes' content, but generation/preview omit it.
+      //
+      // The counter (StoryNavigation -> buildNodeMarkdown -> getNodeMessageContents)
+      // reads the FULL messagesStore.messages and counts every includeInFull=2
+      // scene. generateContextMessages instead trusts the `messages` array its
+      // CALLER passes — which is `messagesStore.messages.slice(0, targetIndex + 1)`.
+      // If that array isn't in perfect story order, the slice omits prior scenes'
+      // messages, and each such scene hits `nodeMessages.length === 0 -> continue`
+      // and vanishes from the context — even though it's marked includeInFull=2.
+      const { nodes } = buildStory(10, 2)
+
+      // Simulate a bad slice: only the current scene's message survives; scenes
+      // 1-9 (still marked includeInFull=2 on the nodes, still counted by the
+      // navigation) are missing from the array handed to the builder.
+      const messages: Message[] = [
+        createMessage({ id: 'msg-10', content: 'Scene 10 content', sceneId: 'scene-10', order: 10 }),
+      ]
+
+      const result = await generateContextMessages({
+        inputText: 'Continue',
+        messages,
+        contextType: 'story',
+        nodes,
+        targetMessageId: 'msg-10',
+        model: 'claude-3-opus',
+        forceMissingSummaries: true,
+      })
+
+      const contents = assistantContents(result)
+      // The current scene still shows...
+      expect(contents.some((c) => c?.includes('Scene 10 content'))).toBe(true)
+      // ...but every prior scene is gone. This is the reported symptom, captured
+      // as current behaviour so a future fix (feed story-ordered messages, or
+      // gather marked-scene content independently of the slice) flips it.
+      const priorShown = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter((n) =>
+        contents.some((c) => c?.includes(`Scene ${n} content`)),
+      )
+      expect(priorShown).toEqual([])
     })
   })
 })

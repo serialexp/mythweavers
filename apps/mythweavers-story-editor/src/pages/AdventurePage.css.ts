@@ -297,6 +297,112 @@ export const steeringChipHell = style({
   color: '#a83232',
 })
 
+/**
+ * Chip that displays the deuteragonist's intended action for a turn.
+ * Uses a purple/violet accent to distinguish from the blue player-action
+ * block and the green/orange/red steering chips.
+ */
+export const partnerActionChip = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
+  fontSize: '0.65rem',
+  fontWeight: 600,
+  letterSpacing: '0.04em',
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  borderRadius: tokens.radius.sm,
+  marginBottom: tokens.space['2'],
+  border: `1px solid #8b5cf6`,
+  backgroundColor: 'color-mix(in srgb, #8b5cf6 6%, transparent)',
+  color: '#8b5cf6',
+})
+
+export const partnerActionLabel = style({
+  fontWeight: 700,
+  marginRight: tokens.space['1'],
+})
+
+export const partySplitLabel = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
+  fontSize: '0.8rem',
+  color: tokens.color.text.muted,
+  cursor: 'pointer',
+  marginTop: tokens.space['2'],
+  userSelect: 'none',
+})
+
+/* ── Split-party tabbed narrative ── */
+
+export const splitNarrative = style({
+  marginTop: tokens.space['2'],
+})
+
+export const splitTabs = style({
+  display: 'flex',
+  gap: 0,
+  borderBottom: `1px solid ${tokens.color.border.default}`,
+  marginBottom: tokens.space['3'],
+})
+
+export const splitTab = style({
+  padding: `${tokens.space['1']} ${tokens.space['3']}`,
+  fontSize: '0.8rem',
+  fontWeight: 500,
+  color: tokens.color.text.muted,
+  background: 'none',
+  border: 'none',
+  borderBottom: '2px solid transparent',
+  cursor: 'pointer',
+  transition: 'color 0.15s, border-color 0.15s',
+  ':hover': {
+    color: tokens.color.text.primary,
+  },
+})
+
+export const splitTabActive = style({
+  padding: `${tokens.space['1']} ${tokens.space['3']}`,
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  color: tokens.color.text.primary,
+  background: 'none',
+  border: 'none',
+  borderBottom: `2px solid ${tokens.color.accent.primary}`,
+  cursor: 'pointer',
+})
+
+export const splitTabContent = style({
+  // Same spacing as a normal narrative block
+})
+
+/* Deuteragonist streaming label — shown above the streaming content when
+   the deuteragonist's solo narrative is being generated. */
+export const deuteragonistStreamLabel = style({
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  color: '#8b5cf6',
+  letterSpacing: '0.04em',
+  marginBottom: tokens.space['2'],
+})
+
+/** Small checkbox label in the input area — toggles whether the partner
+ *  acts this turn. Only visible when a deuteragonist is configured. */
+export const deuteragonistActiveLabel = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
+  fontSize: '0.7rem',
+  color: tokens.color.text.muted,
+  cursor: 'pointer',
+  userSelect: 'none',
+  whiteSpace: 'nowrap',
+  padding: `${tokens.space['1']} 0`,
+  maxWidth: '800px',
+  margin: '0 auto',
+  width: '100%',
+})
+
 export const turnFooter = style({
   display: 'flex',
   alignItems: 'flex-start',
@@ -858,6 +964,15 @@ export const storyPanelSection = style({
       borderTop: `1px solid ${tokens.color.border.default}`,
     },
   },
+})
+
+// A dependent sub-setting: indented and marked with a left accent rule so it
+// reads as nested under the setting it hangs off (e.g. storyline-gate under
+// living world).
+export const storyPanelSubSection = style({
+  marginLeft: tokens.space['4'],
+  paddingLeft: tokens.space['3'],
+  borderLeft: `2px solid ${tokens.color.border.default}`,
 })
 
 export const storyPanelSectionHeader = style({

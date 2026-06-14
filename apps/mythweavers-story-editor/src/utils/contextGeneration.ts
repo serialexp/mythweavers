@@ -121,12 +121,30 @@ export async function generateContextMessages(options: ContextGenerationOptions)
   let activeNodeIds: Set<string> | null = null
 
   if (nodes.length > 0 && Object.keys(branchChoices).length > 0) {
-    const activePath = calculateActivePath(messages, nodes, branchChoices)
+    // Bound the active-path walk at the node we're generating for. Branches that
+    // sit *after* the current node in story order are not yet on any decided
+    // path, but they must never truncate the active sets we use to gather the
+    // history that PRECEDES the current node. Derive the boundary node from the
+    // target message (the message we're inserting/regenerating at), falling back
+    // to the last message that carries a sceneId — mirroring how currentNodeId is
+    // resolved below. Without a boundary the walk reverts to the strict
+    // abort-at-unselected-branch semantics, which is exactly the bug we're fixing.
+    let boundaryNodeId = targetMessageId ? messages.find((m) => m.id === targetMessageId)?.sceneId : undefined
+    if (!boundaryNodeId) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].sceneId) {
+          boundaryNodeId = messages[i].sceneId
+          break
+        }
+      }
+    }
+    const activePath = calculateActivePath(messages, nodes, branchChoices, boundaryNodeId)
     activeMessageIds = activePath.activeMessageIds
     activeNodeIds = activePath.activeNodeIds
     console.log('[generateContextMessages] Active path:', {
       activeMessages: activeMessageIds.size,
       activeNodes: activeNodeIds.size,
+      boundaryNodeId,
     })
   }
 
