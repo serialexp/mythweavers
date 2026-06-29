@@ -143,13 +143,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
 
   const handleNewAdventure = async (result: NewAdventureResult) => {
     // Build the initial state
-    let settingDescription = result.settingInput.trim()
-    if (result.protagonistInput.trim()) {
-      settingDescription += `\n\nPROTAGONIST: ${result.protagonistInput.trim()}`
-    }
-    if (result.deuteragonistInput.trim()) {
-      settingDescription += `\n\nDEUTERAGONIST: ${result.deuteragonistInput.trim()}`
-    }
+    const settingDescription = result.settingInput.trim()
 
     const initialState: PersistedState = {
       phase: 'playing',

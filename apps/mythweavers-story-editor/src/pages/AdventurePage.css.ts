@@ -476,6 +476,26 @@ export const playerActionLabel = style({
   whiteSpace: 'nowrap',
 })
 
+export const narrativeWrapper = style({
+  position: 'relative',
+})
+
+export const settingBlock = style({
+  position: 'relative',
+  padding: `${tokens.space['3']} ${tokens.space['4']}`,
+  marginBottom: tokens.space['4'],
+  backgroundColor: tokens.color.bg.base,
+  borderRadius: tokens.radius.md,
+  border: `1px solid ${tokens.color.border.default}`,
+})
+
+export const settingText = style({
+  fontSize: '0.8rem',
+  color: tokens.color.text.muted,
+  lineHeight: 1.6,
+  whiteSpace: 'pre-wrap',
+})
+
 export const editActionButton = style({
   background: 'none',
   border: 'none',
@@ -488,6 +508,12 @@ export const editActionButton = style({
   flexShrink: 0,
   selectors: {
     [`${playerAction}:hover &`]: {
+      opacity: 0.7,
+    },
+    [`${narrativeWrapper}:hover &`]: {
+      opacity: 0.7,
+    },
+    [`${settingBlock}:hover &`]: {
       opacity: 0.7,
     },
     '&:hover': {
@@ -516,7 +542,8 @@ export const playerActionTextarea = style({
   borderRadius: tokens.radius.sm,
   fontFamily: 'inherit',
   fontSize: 'inherit',
-  resize: 'vertical',
+  resize: 'none',
+  overflow: 'hidden',
   boxSizing: 'border-box',
   ':focus': {
     outline: 'none',

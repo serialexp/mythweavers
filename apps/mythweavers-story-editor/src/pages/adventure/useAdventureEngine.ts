@@ -19,7 +19,7 @@ import {
   buildSynthesisMessages,
   buildStorylineGateMessages,
   buildPartnerActionMessages,
-  buildDeuteragonistResolutionMessages,
+  parseSplitNarrative,
   getCompactionRanges,
   cleanNarrative,
   rollSteering,
@@ -48,6 +48,10 @@ export interface AdventureEngine {
   /** Reject the in-flight storyline-gate brief and continue without arc context. */
   rejectGateBrief: () => void
   handleEditAndRegenerate: (newAction: string) => void
+  /** Replace the last turn's narrative text in-place (no regeneration). */
+  handleEditNarrative: (newNarrative: string, field?: 'narrative' | 'deuteragonistNarrative') => void
+  /** Edit the setting description and optionally regenerate the opening turn. */
+  handleEditSetting: (newSetting: string) => void
   handleReviseNarrative: () => void
   handleRewindTo: (turnIndex: number) => void
   handleReset: () => void
@@ -258,7 +262,7 @@ export function createAdventureEngine(
   async function streamPass(
     messages: LLMMessage[],
     callType: string,
-  ): Promise<{ narrative: string; streamErrors: string[] }> {
+  ): Promise<{ narrative: string; raw: string; streamErrors: string[] }> {
     const resolved = resolveModel('adventure')
     const client = LLMClientFactory.getClient(resolved.provider)
 
@@ -283,7 +287,7 @@ export function createAdventureEngine(
         accumulated += event.text
         const displayContent = accumulated
           .replace(/<think>[\s\S]*?<\/think>/g, '')
-          .replace(/<\/?narrative>/g, '')
+          .replace(/<\/?(?:narrative|protagonist|deuteragonist)>/g, '')
           .trim()
         adventureStore.setStreamingContent(displayContent)
       }
@@ -292,7 +296,7 @@ export function createAdventureEngine(
       }
     }
 
-    return { narrative: cleanNarrative(accumulated), streamErrors }
+    return { narrative: cleanNarrative(accumulated), raw: accumulated, streamErrors }
   }
 
   /**
@@ -523,7 +527,7 @@ export function createAdventureEngine(
         adventureStore.partySplit || undefined,
       )
 
-      const { narrative, streamErrors } = await streamPass(
+      const { narrative, raw, streamErrors } = await streamPass(
         resolutionMessages,
         'adventure',
       )
@@ -546,57 +550,20 @@ export function createAdventureEngine(
 
       resolutionNarrative = narrative
 
-      // --- Pass 1b: deuteragonist resolution (only when party is split) ---
-      // The deuteragonist is elsewhere — generate their separate narrative.
-      // Runs after the protagonist resolution so the player sees their own
-      // story first, then the partner's. Failures are non-fatal.
+      // --- Parse split narrative (when party is split) ---
+      // The resolution pass generates both protagonist and deuteragonist
+      // narratives in a single response wrapped in XML tags. Parse them out.
+      // Use `raw` (before cleanNarrative strips tags) so the XML markers
+      // are still present.
       if (
         adventureStore.partySplit &&
         playerAction !== null &&
         adventureStore.deuteragonistInput.trim() &&
         adventureStore.deuteragonistActive
       ) {
-        adventureStore.setStreamingKind('deuteragonist-resolution')
-        adventureStore.setStreamingContent('')
-
-        const deuteragonistMessages = buildDeuteragonistResolutionMessages(
-          adventureStore.turns,
-          adventureStore.settingDescription,
-          playerAction,
-          adventureStore.deuteragonistInput,
-          partnerAction,
-          adventureStore.compactions,
-          adventureStore.worldBible,
-          liveWorldStateForPrompt(),
-          resolutionStorylineBrief,
-          resolutionDirectorBrief,
-          adventureStore.directive || undefined,
-          adventureStore.protagonistInput || undefined,
-        )
-
-        try {
-          const deutResult = await streamPass(
-            deuteragonistMessages,
-            'adventure',
-          )
-          if (deutResult.narrative && deutResult.narrative.trim().length > 0) {
-            deuteragonistNarrative = deutResult.narrative
-          }
-          if (deutResult.streamErrors.length > 0) {
-            console.warn(
-              '[Deuteragonist resolution] Stream errors:',
-              deutResult.streamErrors,
-            )
-          }
-        } catch (deutErr: unknown) {
-          if (deutErr instanceof DOMException && deutErr.name === 'AbortError') {
-            throw deutErr // propagate abort
-          }
-          console.warn(
-            '[Deuteragonist resolution] Failed:',
-            deutErr instanceof Error ? deutErr.message : deutErr,
-          )
-        }
+        const split = parseSplitNarrative(raw)
+        resolutionNarrative = split.protagonist
+        deuteragonistNarrative = split.deuteragonist
       }
 
       // Finalize the resolution turn. The narrative is committed to
@@ -692,37 +659,31 @@ export function createAdventureEngine(
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         // User aborted — if we have partial narrative, save it.
-        // Check streamingKind to determine WHICH pass was aborted.
-        const streamKind = adventureStore.streamingKind
+        // If party is split, parse the partial to capture both narratives.
         const partial = adventureStore.streamingContent
         const partialNarrative = partial ? cleanNarrative(partial) : ''
 
-        if (streamKind === 'deuteragonist-resolution') {
-          // Aborted during deuteragonist pass — save protagonist narrative
-          // as normal and capture partial deuteragonist content.
-          if (resolutionNarrative) {
-            adventureStore.finalizeAbort({
-              playerAction,
-              narrative: resolutionNarrative,
-              kind: 'resolution',
-              ...(steering ? { steering } : {}),
-              ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
-              ...(partnerAction ? { partnerAction } : {}),
-              ...(partialNarrative && !partialNarrative.startsWith('⏳')
-                ? { deuteragonistNarrative: partialNarrative }
-                : {}),
-            })
-            persist()
+        if (partialNarrative && !partialNarrative.startsWith('⏳')) {
+          let protagonistNarrative = resolutionNarrative ?? partialNarrative
+          let deutNarrative = deuteragonistNarrative
+
+          if (
+            adventureStore.partySplit &&
+            playerAction !== null
+          ) {
+            const split = parseSplitNarrative(partialNarrative)
+            protagonistNarrative = split.protagonist || protagonistNarrative
+            deutNarrative = split.deuteragonist || deutNarrative
           }
-        } else if (partialNarrative && !partialNarrative.startsWith('⏳')) {
+
           adventureStore.finalizeAbort({
             playerAction,
-            narrative: partialNarrative,
+            narrative: protagonistNarrative,
             kind: 'resolution',
             ...(steering ? { steering } : {}),
             ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
             ...(partnerAction ? { partnerAction } : {}),
-            ...(deuteragonistNarrative ? { deuteragonistNarrative } : {}),
+            ...(deutNarrative ? { deuteragonistNarrative: deutNarrative } : {}),
           })
           persist()
         } else {
@@ -1520,6 +1481,32 @@ export function createAdventureEngine(
     generate(newAction)
   }
 
+  function handleEditNarrative(
+    newNarrative: string,
+    field: 'narrative' | 'deuteragonistNarrative' = 'narrative',
+  ) {
+    if (adventureStore.isGenerating) return
+    if (adventureStore.turns.length === 0) return
+    adventureStore.updateLastTurn({ [field]: newNarrative })
+    persist()
+  }
+
+  function handleEditSetting(newSetting: string) {
+    if (adventureStore.isGenerating) return
+    const trimmed = newSetting.trim()
+    if (!trimmed) return
+    adventureStore.setSettingDescription(trimmed)
+    // If there's exactly one turn (the opening turn), regenerate it with
+    // the updated setting so the prose reflects the changes.
+    if (adventureStore.turns.length === 1) {
+      adventureStore.removeLastTurn()
+      persist()
+      generate(null)
+    } else {
+      persist()
+    }
+  }
+
   function handleRewindTo(turnIndex: number) {
     if (adventureStore.isGenerating) return
     adventureStore.rewindTo(turnIndex)
@@ -1670,6 +1657,8 @@ export function createAdventureEngine(
     acceptGateBrief,
     rejectGateBrief,
     handleEditAndRegenerate,
+    handleEditNarrative,
+    handleEditSetting,
     handleReviseNarrative,
     handleRewindTo,
     handleReset,

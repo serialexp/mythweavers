@@ -242,29 +242,6 @@ Rules:
 Output ONLY the sentence. No labels, no formatting, no meta-commentary.`;
 
 /**
- * Role-specific instruction for the deuteragonist resolution pass.
- *
- * Runs when the party is split — generates a parallel narrative showing
- * what happens with the deuteragonist while the protagonist is elsewhere.
- * Written in third person, focused on the deuteragonist's experience.
- */
-export const DEUTERAGONIST_RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Narrate what happens with the deuteragonist while the protagonist is elsewhere.
-
-Write ONLY the story narrative — no metadata, no headings, no XML tags.
-
-SCOPE OF THIS TURN:
-- The deuteragonist is separated from the protagonist right now. Narrate what they are doing, seeing, and experiencing in their own location.
-
-RULES:
-- POINT OF VIEW: Write in **third person, present tense** about the deuteragonist. Use their name.
-- The protagonist is NOT present. Do NOT narrate what the protagonist is doing — that happens in a separate narrative.
-- Show, don't tell. Vivid sensory details, dialogue, action.
-- 1-3 paragraphs.
-- Only include events the deuteragonist could plausibly observe.
-- Everything must be physically plausible within the established world.
-- NPCs react consistently with their established personalities and current motivations.`;
-
-/**
  * Role-specific instruction for pass 2 (world step).
  *
  * Fires after the resolution turn is finalized. The shared history ends with
@@ -914,7 +891,19 @@ export function buildResolutionMessages(
   // cached prefix.
   const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : "";
   const partySplitBlock = partySplit
-    ? `\n\nPARTY STATE: The deuteragonist is NOT present in this scene — they are elsewhere, pursuing their own goals. Only narrate what the protagonist experiences. Do NOT cut to the deuteragonist or describe what they are doing.`
+    ? `\n\nPARTY STATE: The party is split — the protagonist and deuteragonist are in different locations, each experiencing their own scene simultaneously.
+
+Generate BOTH scenes in a single response. Wrap each in its own XML tag:
+
+<protagonist>
+[Narrative of what the protagonist experiences — second person, present tense, addressing the protagonist as "you". 2-4 paragraphs.]
+</protagonist>
+
+<deuteragonist>
+[Narrative of what the deuteragonist experiences simultaneously — third person, present tense, using the deuteragonist's name. 1-3 paragraphs.]
+</deuteragonist>
+
+Each section must be a complete, self-contained narrative. Do NOT add any text outside the tags. Do NOT nest the tags.`
     : "";
   messages.push({
     role: "system",
@@ -931,19 +920,29 @@ export function buildResolutionMessages(
   appendDirective(messages, turnDirective);
 
   // Deuteragonist action (if any) — tells the model what the partner
-  // intends to do, so both actions are woven into the same scene.
-  // When the party is split, skip this — the deuteragonist's action
-  // is rendered in their own separate narrative pass.
-  if (partnerAction && !partySplit) {
-    messages.push({
-      role: "system",
-      content: `[The deuteragonist intends: ${partnerAction}]\n\nWeave this into the narrative alongside the protagonist's action. Both characters' actions play out simultaneously — they may cooperate, conflict, talk to each other, pursue separate goals, or react to each other's words and deeds. Write naturally in second person for the protagonist, and refer to the deuteragonist by their name or description.`,
-    });
+  // intends to do. When the party is together, weave both actions into
+  // the same scene. When split, the deuteragonist's action drives the
+  // <deuteragonist> section.
+  if (partnerAction) {
+    if (partySplit) {
+      messages.push({
+        role: "system",
+        content: `[The deuteragonist intends: ${partnerAction}]\n\nUse this as the deuteragonist's driving action for the <deuteragonist> section.`,
+      });
+    } else {
+      messages.push({
+        role: "system",
+        content: `[The deuteragonist intends: ${partnerAction}]\n\nWeave this into the narrative alongside the protagonist's action. Both characters' actions play out simultaneously — they may cooperate, conflict, talk to each other, pursue separate goals, or react to each other's words and deeds. Write naturally in second person for the protagonist, and refer to the deuteragonist by their name or description.`,
+      });
+    }
   }
 
   // Final user message
   if (playerAction !== null) {
-    messages.push({ role: "user", content: `Protagonist action: ${playerAction}` });
+    const splitHint = partySplit
+      ? `\n\nThe protagonist and deuteragonist are now splitting up. Render both scenes as described above.`
+      : "";
+    messages.push({ role: "user", content: `Protagonist action: ${playerAction}${splitHint}` });
   } else if (isOpeningTurn) {
     messages.push({
       role: "user",
@@ -954,92 +953,6 @@ The opening should introduce the protagonist through action and detail — show 
 ${settingDescription}`,
     });
   }
-
-  return messages;
-}
-
-/**
- * Build messages for the deuteragonist's solo resolution pass.
- *
- * Only called when the party is split. Generates a parallel narrative
- * showing what happens with the deuteragonist while the protagonist is
- * elsewhere. Written in third person, focused solely on the partner.
- *
- * Shares the same history prefix as the resolution pass (cached), plus
- * the same live world state, storyline brief, and director brief. The
- * deuteragonist's intended action (from `runPartnerAction`) is injected
- * as the primary driver of the scene rather than woven alongside the
- * protagonist's action.
- */
-export function buildDeuteragonistResolutionMessages(
-  turns: AdventureTurn[],
-  settingDescription: string,
-  playerAction: string,
-  deuteragonistInput: string,
-  partnerAction: string | undefined,
-  compactions?: Record<string, AdventureCompaction>,
-  worldBible?: string,
-  liveWorldState?: LiveWorldState,
-  storylineBrief?: string,
-  directorBrief?: string,
-  turnDirective?: string,
-  protagonistInput?: string,
-): LLMMessage[] {
-  const messages = buildSharedHistory(
-    turns,
-    compactions,
-    settingDescription,
-    worldBible,
-    true, // forDeuteragonist — prefer their narrative on split turns
-  );
-
-  // Character profiles — same as the resolution pass
-  {
-    const parts: string[] = [];
-    if (protagonistInput?.trim()) {
-      parts.push(`PROTAGONIST: ${protagonistInput.trim()}`);
-    }
-    if (deuteragonistInput?.trim()) {
-      parts.push(`DEUTERAGONIST: ${deuteragonistInput.trim()}`);
-    }
-    if (parts.length > 0) {
-      messages.push({
-        role: "system",
-        content: `[CHARACTER PROFILES — live descriptions; prefer these over any stale version in the opening turn]\n\n${parts.join('\n\n')}`,
-      });
-    }
-  }
-
-  appendLiveWorldState(messages, liveWorldState);
-  appendStorylineBrief(messages, storylineBrief);
-
-  // Role instruction
-  messages.push({
-    role: "system",
-    content: DEUTERAGONIST_RESOLUTION_INSTRUCTION,
-  });
-
-  // Director brief (if available)
-  appendDirectorBrief(messages, directorBrief);
-
-  // Author directive
-  appendDirective(messages, turnDirective);
-
-  // The deuteragonist's intended action — this IS their "player action"
-  if (partnerAction) {
-    messages.push({
-      role: "system",
-      content: `[The deuteragonist intends: ${partnerAction}]\n\nUse this as the deuteragonist's driving action for this turn — what they are trying to do, say, or accomplish. Render it as natural third-person narrative.`,
-    });
-  }
-
-  // Final user message — the deuteragonist was present for the
-  // protagonist's action (the split happens during this turn), so they
-  // know what the protagonist is doing as they separate.
-  messages.push({
-    role: "user",
-    content: `The protagonist is: ${playerAction}\n\nThe deuteragonist is now separating from the protagonist. Narrate what happens with the deuteragonist — where they go, what they do. Their scene unfolds independently from here.`,
-  });
 
   return messages;
 }
@@ -1305,10 +1218,41 @@ Please rewrite the narrative, fixing ONLY the listed inconsistencies. Keep the s
 
 // --- Parse helpers ---
 
+/**
+ * Parse a split-party response into protagonist and deuteragonist narratives.
+ * Expects `<protagonist>...</protagonist>` and `<deuteragonist>...</deuteragonist>`
+ * tags. Falls back to treating the whole text as protagonist narrative if tags
+ * are missing or malformed.
+ */
+export function parseSplitNarrative(
+  raw: string,
+): { protagonist: string; deuteragonist: string | undefined } {
+  const protagMatch = raw.match(/<protagonist>([\s\S]*?)<\/protagonist>/i);
+  const deutMatch = raw.match(/<deuteragonist>([\s\S]*?)<\/deuteragonist>/i);
+
+  const stripThink = (s: string) => s.replace(/<think>[\s\S]*?<\/think>/g, "");
+
+  const protagonist = protagMatch
+    ? stripThink(protagMatch[1]).trim()
+    : // No tags found — treat the whole thing as protagonist narrative
+      raw
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .replace(/<\/?(?:protagonist|deuteragonist|narrative)>/g, "")
+        .trim();
+
+  const deuteragonist = deutMatch
+    ? stripThink(deutMatch[1]).trim() || undefined
+    : undefined;
+
+  return { protagonist, deuteragonist };
+}
+
 export function cleanNarrative(raw: string): string {
   // Strip any XML tags the model might still produce out of habit
   return raw
     .replace(/<\/?narrative>/g, "")
+    .replace(/<\/?protagonist>/g, "")
+    .replace(/<\/?deuteragonist>/g, "")
     .replace(/<think>[\s\S]*?<\/think>/g, "")
     .trim();
 }

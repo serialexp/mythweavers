@@ -101,7 +101,7 @@ interface AdventureState {
    * Null when nothing is streaming or the stream is unrelated to a turn
    * (e.g. nonsense-check spinner).
    */
-  streamingKind: 'resolution' | 'world-step' | 'deuteragonist-resolution' | null
+  streamingKind: 'resolution' | 'world-step' | null
   /**
    * Steering bucket already rolled for the resolution pass currently
    * streaming. Rendered as the same chip that appears on the committed
@@ -506,7 +506,7 @@ export const adventureStore = {
   setStreamingContent(v: string) {
     setState('streamingContent', v)
   },
-  setStreamingKind(v: 'resolution' | 'world-step' | 'deuteragonist-resolution' | null) {
+  setStreamingKind(v: 'resolution' | 'world-step' | null) {
     setState('streamingKind', v)
   },
   setStreamingSteering(v: SteeringBucket | undefined) {

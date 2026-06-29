@@ -11,6 +11,12 @@ import * as styles from '../AdventurePage.css'
 
 // --- Render helpers ---
 
+/** Auto-resize a textarea to fit its content. */
+function autoresize(el: HTMLTextAreaElement) {
+  el.style.height = '0'
+  el.style.height = `${el.scrollHeight}px`
+}
+
 function steeringLabel(b: SteeringBucket): string {
   switch (b) {
     case 'well':
@@ -151,8 +157,10 @@ function EditablePlayerAction(props: {
   function startEditing() {
     setEditText(props.action)
     setEditing(true)
-    // Focus after render
-    requestAnimationFrame(() => textareaRef?.focus())
+    requestAnimationFrame(() => {
+      textareaRef?.focus()
+      if (textareaRef) autoresize(textareaRef)
+    })
   }
 
   function save() {
@@ -203,13 +211,107 @@ function EditablePlayerAction(props: {
           ref={textareaRef}
           class={styles.playerActionTextarea}
           value={editText()}
-          onInput={(e) => setEditText(e.currentTarget.value)}
+          onInput={(e) => {
+            setEditText(e.currentTarget.value)
+            autoresize(e.currentTarget)
+          }}
           onKeyDown={handleKeyDown}
-          rows={2}
+          rows={1}
         />
         <div class={styles.playerActionEditButtons}>
           <Button variant="primary" size="sm" onClick={save}>
             Save & Regenerate
+          </Button>
+          <Button variant="ghost" size="sm" onClick={cancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </Show>
+  )
+}
+
+/**
+ * Inline-editable narrative block for the last turn. Shows an ✏️ button
+ * on hover/focus; clicking it opens a textarea to trim or adjust the
+ * generated prose. On save the turn's narrative is replaced in-place
+ * (no regeneration). Works for both regular and split narratives.
+ */
+function EditableNarrative(props: {
+  narrative: string
+  isLastTurn: boolean
+  isGenerating: boolean
+  onSave: (newText: string) => void
+}) {
+  const [editing, setEditing] = createSignal(false)
+  const [editText, setEditText] = createSignal('')
+  let textareaRef: HTMLTextAreaElement | undefined
+
+  function startEditing() {
+    setEditText(props.narrative)
+    setEditing(true)
+    requestAnimationFrame(() => {
+      textareaRef?.focus()
+      if (textareaRef) autoresize(textareaRef)
+    })
+  }
+
+  function save() {
+    const trimmed = editText().trim()
+    if (!trimmed || trimmed === props.narrative) {
+      setEditing(false)
+      return
+    }
+    setEditing(false)
+    props.onSave(trimmed)
+  }
+
+  function cancel() {
+    setEditing(false)
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      save()
+    } else if (e.key === 'Escape') {
+      cancel()
+    }
+  }
+
+  return (
+    <Show
+      when={editing()}
+      fallback={
+        <div class={styles.narrativeWrapper}>
+          {renderNarrative(props.narrative)}
+          <Show when={props.isLastTurn && !props.isGenerating}>
+            <button
+              class={styles.editActionButton}
+              onClick={startEditing}
+              title="Edit narrative text"
+            >
+              ✏️
+            </button>
+          </Show>
+        </div>
+      }
+    >
+      <div class={styles.playerActionEdit}>
+        <textarea
+          ref={textareaRef}
+          class={styles.playerActionTextarea}
+          value={editText()}
+          onInput={(e) => {
+            setEditText(e.currentTarget.value)
+            autoresize(e.currentTarget)
+          }}
+          onKeyDown={handleKeyDown}
+          rows={1}
+        />
+        <div class={styles.playerActionEditButtons}>
+          <Button variant="primary" size="sm" onClick={save}>
+            Save
           </Button>
           <Button variant="ghost" size="sm" onClick={cancel}>
             Cancel
@@ -227,9 +329,14 @@ function EditablePlayerAction(props: {
 function SplitNarrativeView(props: {
   protagonistNarrative: string
   deuteragonistNarrative: string
+  isLastTurn: boolean
+  isGenerating: boolean
+  engine: ReturnType<typeof useEngine>
 }) {
   const [activeTab, setActiveTab] = createSignal<'protagonist' | 'deuteragonist'>('protagonist')
   const partnerName = partnerDisplayName()
+
+  const canEdit = () => props.isLastTurn && !props.isGenerating
 
   return (
     <div class={styles.splitNarrative}>
@@ -249,10 +356,30 @@ function SplitNarrativeView(props: {
       </div>
       <div class={styles.splitTabContent}>
         <Show when={activeTab() === 'protagonist'}>
-          {renderNarrative(props.protagonistNarrative)}
+          <Show
+            when={canEdit()}
+            fallback={<>{renderNarrative(props.protagonistNarrative)}</>}
+          >
+            <EditableNarrative
+              narrative={props.protagonistNarrative}
+              isLastTurn={true}
+              isGenerating={false}
+              onSave={(text) => props.engine.handleEditNarrative(text, 'narrative')}
+            />
+          </Show>
         </Show>
         <Show when={activeTab() === 'deuteragonist'}>
-          {renderNarrative(props.deuteragonistNarrative)}
+          <Show
+            when={canEdit()}
+            fallback={<>{renderNarrative(props.deuteragonistNarrative)}</>}
+          >
+            <EditableNarrative
+              narrative={props.deuteragonistNarrative}
+              isLastTurn={true}
+              isGenerating={false}
+              onSave={(text) => props.engine.handleEditNarrative(text, 'deuteragonistNarrative')}
+            />
+          </Show>
         </Show>
       </div>
     </div>
@@ -311,11 +438,26 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
       {/* Narrative — tabbed when the party was split and both perspectives exist */}
       <Show
         when={turn().deuteragonistNarrative}
-        fallback={<>{renderNarrative(turn().narrative)}</>}
+        fallback={
+          <Show
+            when={isLastTurn()}
+            fallback={<>{renderNarrative(turn().narrative)}</>}
+          >
+            <EditableNarrative
+              narrative={turn().narrative}
+              isLastTurn={true}
+              isGenerating={adventureStore.isGenerating}
+              onSave={(text) => engine.handleEditNarrative(text)}
+            />
+          </Show>
+        }
       >
         <SplitNarrativeView
           protagonistNarrative={turn().narrative}
           deuteragonistNarrative={turn().deuteragonistNarrative!}
+          isLastTurn={isLastTurn()}
+          isGenerating={adventureStore.isGenerating}
+          engine={engine}
         />
       </Show>
 
@@ -398,6 +540,96 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
         </Show>
       </div>
     </div>
+  )
+}
+
+/**
+ * Inline-editable setting description block, displayed above the first turn.
+ * Editing and saving regenerates the opening turn when there's only one turn.
+ */
+function EditableSetting(props: { engine: ReturnType<typeof useEngine> }) {
+  const [editing, setEditing] = createSignal(false)
+  const [editText, setEditText] = createSignal('')
+  let textareaRef: HTMLTextAreaElement | undefined
+
+  const canRegenerate = () => adventureStore.turns.length === 1
+
+  function startEditing() {
+    setEditText(adventureStore.settingDescription)
+    setEditing(true)
+    requestAnimationFrame(() => {
+      textareaRef?.focus()
+      if (textareaRef) autoresize(textareaRef)
+    })
+  }
+
+  function save() {
+    const trimmed = editText().trim()
+    if (!trimmed || trimmed === adventureStore.settingDescription) {
+      setEditing(false)
+      return
+    }
+    setEditing(false)
+    props.engine.handleEditSetting(trimmed)
+  }
+
+  function cancel() {
+    setEditing(false)
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      save()
+    } else if (e.key === 'Escape') {
+      cancel()
+    }
+  }
+
+  return (
+    <Show
+      when={editing()}
+      fallback={
+        <div class={styles.settingBlock}>
+          <div class={styles.settingText}>
+            {adventureStore.settingDescription.split('\n').map((line) => (
+              <>{line}<br /></>
+            ))}
+          </div>
+          <Show when={!adventureStore.isGenerating}>
+            <button
+              class={styles.editActionButton}
+              onClick={startEditing}
+              title={canRegenerate() ? 'Edit setting and regenerate opening turn' : 'Edit setting description'}
+            >
+              ✏️
+            </button>
+          </Show>
+        </div>
+      }
+    >
+      <div class={styles.playerActionEdit}>
+        <textarea
+          ref={textareaRef}
+          class={styles.playerActionTextarea}
+          value={editText()}
+          onInput={(e) => {
+            setEditText(e.currentTarget.value)
+            autoresize(e.currentTarget)
+          }}
+          onKeyDown={handleKeyDown}
+          rows={1}
+        />
+        <div class={styles.playerActionEditButtons}>
+          <Button variant="primary" size="sm" onClick={save}>
+            {canRegenerate() ? 'Save & Regenerate' : 'Save'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={cancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </Show>
   )
 }
 
@@ -513,6 +745,11 @@ export const PlayingScreen: Component = () => {
             </div>
           }
         >
+          {/* Setting description — editable, displayed above the first turn */}
+          <Show when={adventureStore.settingDescription}>
+            <EditableSetting engine={engine} />
+          </Show>
+
           {/* Compacted ranges */}
           <For each={ranges()}>
             {(range) => <CompactionBlock range={range} />}
@@ -597,8 +834,6 @@ export const PlayingScreen: Component = () => {
             {(() => {
               const isWorldStepStreaming = () =>
                 adventureStore.streamingKind === 'world-step'
-              const isDeuteragonistStreaming = () =>
-                adventureStore.streamingKind === 'deuteragonist-resolution'
               return (
                 <div
                   class={
@@ -618,7 +853,7 @@ export const PlayingScreen: Component = () => {
                   </Show>
                   <Show
                     when={
-                      adventureStore.pendingAction && !isWorldStepStreaming() && !isDeuteragonistStreaming()
+                      adventureStore.pendingAction && !isWorldStepStreaming()
                     }
                   >
                     <div class={styles.playerAction}>
@@ -626,7 +861,7 @@ export const PlayingScreen: Component = () => {
                       {adventureStore.pendingAction}
                     </div>
                   </Show>
-                  <Show when={!isDeuteragonistStreaming()}>
+                  <Show when={!isWorldStepStreaming()}>
                     <Show when={adventureStore.streamingSteering}>
                       {(s) => (
                         <div
@@ -644,12 +879,6 @@ export const PlayingScreen: Component = () => {
                         </div>
                       )}
                     </Show>
-                  </Show>
-                  {/* Deuteragonist streaming label */}
-                  <Show when={isDeuteragonistStreaming()}>
-                    <div class={styles.deuteragonistStreamLabel}>
-                      Meanwhile, {partnerDisplayName()}...
-                    </div>
                   </Show>
                   {renderStreamingContent()}
                 </div>
@@ -696,9 +925,10 @@ export const PlayingScreen: Component = () => {
               ref={engine.setInputRef}
               class={styles.input}
               value={adventureStore.playerInput}
-              onInput={(e) =>
+              onInput={(e) => {
                 adventureStore.setPlayerInput(e.currentTarget.value)
-              }
+                autoresize(e.currentTarget)
+              }}
               onKeyDown={engine.handleKeyDown}
               placeholder={
                 adventureStore.isGenerating
