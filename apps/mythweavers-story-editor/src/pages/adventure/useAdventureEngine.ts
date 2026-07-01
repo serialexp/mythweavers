@@ -1364,13 +1364,7 @@ export function createAdventureEngine(
       return
     }
 
-    let description = adventureStore.settingInput.trim()
-    if (adventureStore.protagonistInput.trim()) {
-      description += `\n\nPROTAGONIST: ${adventureStore.protagonistInput.trim()}`
-    }
-    if (adventureStore.deuteragonistInput.trim()) {
-      description += `\n\nDEUTERAGONIST: ${adventureStore.deuteragonistInput.trim()}`
-    }
+    const description = adventureStore.settingInput.trim()
     adventureStore.setSettingDescription(description)
     adventureStore.setPhase('playing')
     persist()

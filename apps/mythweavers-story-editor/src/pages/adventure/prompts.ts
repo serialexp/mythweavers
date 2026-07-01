@@ -9,6 +9,25 @@ import type {
 } from "../../hooks/useAdventurePersistence";
 import { DISPOSITIONS } from "../../hooks/useAdventurePersistence";
 
+// --- Name extraction ---
+
+/**
+ * Extract a short display name from a free-text character description.
+ * Handles descriptions like "Kael, a brooding ranger...", "A young woman
+ * named Lyra...", "The mysterious stranger...".
+ * Falls back to the provided default if nothing usable is found.
+ */
+export function extractName(description: string | undefined, fallback: string): string {
+  const trimmed = description?.trim();
+  if (!trimmed) return fallback;
+  const words = trimmed.split(/\s+/);
+  // Skip leading articles ("A", "An", "The")
+  const start = words.length > 1 && /^(a|an|the)$/i.test(words[0]) ? 1 : 0;
+  // Take the first word, strip trailing punctuation (commas, etc.)
+  const name = words[start]?.replace(/[,;:.]+$/, "");
+  return name || fallback;
+}
+
 // --- Setting generation knobs ---
 
 export interface SettingKnob {
@@ -778,7 +797,7 @@ function addTurnToMessages(
   if (turn.deuteragonistNarrative && !forDeuteragonist) {
     messages.push({
       role: "assistant",
-      content: `[Meanwhile, with the deuteragonist:]\n${turn.deuteragonistNarrative}`,
+      content: `[Meanwhile, elsewhere:]\n${turn.deuteragonistNarrative}`,
     });
   } else if (useDeuteragonistView) {
     // In deuteragonist view, the protagonist's narrative is the "other side"
@@ -803,6 +822,7 @@ export function buildPartnerActionMessages(
   worldBible?: string,
   liveWorldState?: LiveWorldState,
 ): LLMMessage[] {
+  const deutName = extractName(deuteragonistInput, "the deuteragonist");
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible);
 
   appendLiveWorldState(messages, liveWorldState);
@@ -813,7 +833,7 @@ export function buildPartnerActionMessages(
   // Provide the deuteragonist personality for context
   messages.push({
     role: "system",
-    content: `Deuteragonist: ${deuteragonistInput}`,
+    content: `${deutName} (deuteragonist): ${deuteragonistInput}`,
   });
 
   // Instruction message (as a user message for recency)
@@ -861,14 +881,17 @@ export function buildResolutionMessages(
   // Live protagonist & deuteragonist descriptions — always injected, even
   // without the living-world toggle. Edits from the Story panel reach
   // every turn because we read the store's current values, not the frozen
-  // setting description.
+  // setting description. Uses extracted names as labels so the model
+  // consistently refers to characters by name.
   {
     const parts: string[] = [];
     if (protagonistInput?.trim()) {
-      parts.push(`PROTAGONIST: ${protagonistInput.trim()}`);
+      const protagName = extractName(protagonistInput, "the protagonist");
+      parts.push(`${protagName.toUpperCase()} (protagonist): ${protagonistInput.trim()}`);
     }
     if (deuteragonistInput?.trim()) {
-      parts.push(`DEUTERAGONIST: ${deuteragonistInput.trim()}`);
+      const deutName = extractName(deuteragonistInput, "the deuteragonist");
+      parts.push(`${deutName.toUpperCase()} (deuteragonist): ${deuteragonistInput.trim()}`);
     }
     if (parts.length > 0) {
       messages.push({
@@ -890,17 +913,19 @@ export function buildResolutionMessages(
   // history — the steering text changes every turn, so it must not be inside the
   // cached prefix.
   const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : "";
+  const protagName = extractName(protagonistInput, "the protagonist");
+  const deutName = extractName(deuteragonistInput, "the deuteragonist");
   const partySplitBlock = partySplit
-    ? `\n\nPARTY STATE: The party is split — the protagonist and deuteragonist are in different locations, each experiencing their own scene simultaneously.
+    ? `\n\nPARTY STATE: The party is split — ${protagName} and ${deutName} are in different locations, each experiencing their own scene simultaneously.
 
 Generate BOTH scenes in a single response. Wrap each in its own XML tag:
 
 <protagonist>
-[Narrative of what the protagonist experiences — second person, present tense, addressing the protagonist as "you". 2-4 paragraphs.]
+[Narrative of what ${protagName} experiences — second person, present tense, addressing ${protagName} as "you". 2-4 paragraphs.]
 </protagonist>
 
 <deuteragonist>
-[Narrative of what the deuteragonist experiences simultaneously — third person, present tense, using the deuteragonist's name. 1-3 paragraphs.]
+[Narrative of what ${deutName} experiences simultaneously — third person, present tense, using ${deutName}'s name. 1-3 paragraphs.]
 </deuteragonist>
 
 Each section must be a complete, self-contained narrative. Do NOT add any text outside the tags. Do NOT nest the tags.`
@@ -927,12 +952,12 @@ Each section must be a complete, self-contained narrative. Do NOT add any text o
     if (partySplit) {
       messages.push({
         role: "system",
-        content: `[The deuteragonist intends: ${partnerAction}]\n\nUse this as the deuteragonist's driving action for the <deuteragonist> section.`,
+        content: `[${deutName} intends: ${partnerAction}]\n\nUse this as ${deutName}'s driving action for the <deuteragonist> section.`,
       });
     } else {
       messages.push({
         role: "system",
-        content: `[The deuteragonist intends: ${partnerAction}]\n\nWeave this into the narrative alongside the protagonist's action. Both characters' actions play out simultaneously — they may cooperate, conflict, talk to each other, pursue separate goals, or react to each other's words and deeds. Write naturally in second person for the protagonist, and refer to the deuteragonist by their name or description.`,
+        content: `[${deutName} intends: ${partnerAction}]\n\nWeave this into the narrative alongside ${protagName}'s action. Both characters' actions play out simultaneously — they may cooperate, conflict, talk to each other, pursue separate goals, or react to each other's words and deeds. Write naturally in second person for ${protagName}, and refer to ${deutName} by their name or description.`,
       });
     }
   }
@@ -1079,10 +1104,12 @@ export function buildWorldStepMessages(
   {
     const parts: string[] = [];
     if (protagonistInput?.trim()) {
-      parts.push(`PROTAGONIST: ${protagonistInput.trim()}`);
+      const protagName = extractName(protagonistInput, "the protagonist");
+      parts.push(`${protagName.toUpperCase()} (protagonist): ${protagonistInput.trim()}`);
     }
     if (deuteragonistInput?.trim()) {
-      parts.push(`DEUTERAGONIST: ${deuteragonistInput.trim()}`);
+      const deutName = extractName(deuteragonistInput, "the deuteragonist");
+      parts.push(`${deutName.toUpperCase()} (deuteragonist): ${deuteragonistInput.trim()}`);
     }
     if (parts.length > 0) {
       messages.push({
