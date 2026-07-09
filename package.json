@@ -5,7 +5,7 @@
   "description": "Writer monorepo",
   "packageManager": "pnpm@11.2.2",
   "scripts": {
-    "dev": "pnpm build:shared && concurrently --kill-others-on-fail -n backend,reader,editor,admin,stripe -c blue,green,magenta,cyan,red \"pnpm --filter @mythweavers/backend dev\" \"pnpm --filter @mythweavers/reading-frontend-astro dev\" \"pnpm --filter @mythweavers/story-editor dev\" \"pnpm --filter @mythweavers/admin dev\" \"stripe listen --forward-to http://localhost:3201/webhooks/stripe\"",
+    "dev": "pnpm build:shared && concurrently --kill-others-on-fail -n backend,reader,editor,admin -c blue,green,magenta,cyan \"pnpm --filter @mythweavers/backend dev\" \"pnpm --filter @mythweavers/reading-frontend-astro dev\" \"pnpm --filter @mythweavers/story-editor dev\" \"pnpm --filter @mythweavers/admin dev\"",
     "dev:reader": "pnpm build:shared && pnpm --filter @mythweavers/reading-frontend-astro dev",
     "dev:backend": "pnpm --filter @mythweavers/backend dev",
     "dev:editor": "pnpm build:shared && pnpm --filter @mythweavers/story-editor dev",

@@ -1,13 +1,13 @@
-import { Component, For, Show, createEffect, createResource, createSignal, on, onCleanup } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
 import { Button, Fieldset, Modal } from '@mythweavers/ui'
-import { authStore } from '../stores/authStore'
-import { PasswordForEncryptionDialog } from './PasswordForEncryptionDialog'
-import { loadStripe, type Stripe, type StripeElements } from '@stripe/stripe-js'
+import { useNavigate } from '@solidjs/router'
+import { type Stripe, type StripeElements, loadStripe } from '@stripe/stripe-js'
+import { Component, For, Show, createEffect, createResource, createSignal, on, onCleanup } from 'solid-js'
 import { getMyBalance, getMyLlmModels, postMyBalanceTopup } from '../client/config'
-import { settingsStore } from '../stores/settingsStore'
+import { authStore } from '../stores/authStore'
 import { modelsStore } from '../stores/modelsStore'
+import { settingsStore } from '../stores/settingsStore'
 import { ModelSelector } from './ModelSelector'
+import { PasswordForEncryptionDialog } from './PasswordForEncryptionDialog'
 import * as styles from './ProviderModelSelector.css'
 
 /**
@@ -45,10 +45,14 @@ const isProviderAvailable = (value: string): boolean => {
   }
 
   switch (value) {
-    case 'openrouter': return !!settingsStore.openrouterApiKey
-    case 'anthropic': return !!settingsStore.anthropicApiKey
-    case 'openai': return !!settingsStore.openaiApiKey
-    default: return true
+    case 'openrouter':
+      return !!settingsStore.openrouterApiKey
+    case 'anthropic':
+      return !!settingsStore.anthropicApiKey
+    case 'openai':
+      return !!settingsStore.openaiApiKey
+    default:
+      return true
   }
 }
 
@@ -59,12 +63,9 @@ export const ProviderSelector: Component<ProviderSelectorProps> = (props) => {
   // Auto-fetch models when provider changes (if enabled)
   if (props.autoFetchModels) {
     createEffect(
-      on(
-        currentProvider,
-        () => {
-          modelsStore.fetchModels()
-        },
-      ),
+      on(currentProvider, () => {
+        modelsStore.fetchModels()
+      }),
     )
   }
 
@@ -72,17 +73,25 @@ export const ProviderSelector: Component<ProviderSelectorProps> = (props) => {
     <div class={styles.section}>
       <div class={styles.settingRow}>
         <label class={styles.label}>Provider</label>
-        <select
-          value={currentProvider()}
-          onChange={(e) => setCurrentProvider(e.target.value)}
-          class={styles.select}
-        >
-          <option value="ollama" disabled={!isProviderAvailable('ollama')}>Ollama</option>
-          <option value="openrouter" disabled={!isProviderAvailable('openrouter')}>OpenRouter</option>
-          <option value="anthropic" disabled={!isProviderAvailable('anthropic')}>Anthropic</option>
-          <option value="openai" disabled={!isProviderAvailable('openai')}>OpenAI</option>
-          <option value="cloudflare" disabled={!isProviderAvailable('cloudflare')}>Cloudflare Workers AI</option>
-          <option value="server" disabled={!isProviderAvailable('server')}>Mythweavers</option>
+        <select value={currentProvider()} onChange={(e) => setCurrentProvider(e.target.value)} class={styles.select}>
+          <option value="ollama" disabled={!isProviderAvailable('ollama')}>
+            Ollama
+          </option>
+          <option value="openrouter" disabled={!isProviderAvailable('openrouter')}>
+            OpenRouter
+          </option>
+          <option value="anthropic" disabled={!isProviderAvailable('anthropic')}>
+            Anthropic
+          </option>
+          <option value="openai" disabled={!isProviderAvailable('openai')}>
+            OpenAI
+          </option>
+          <option value="cloudflare" disabled={!isProviderAvailable('cloudflare')}>
+            Cloudflare Workers AI
+          </option>
+          <option value="server" disabled={!isProviderAvailable('server')}>
+            Mythweavers
+          </option>
           <For each={settingsStore.customProviders}>
             {(p) => (
               <option value={`custom:${p.id}`} disabled={!isProviderAvailable(`custom:${p.id}`)}>
@@ -115,11 +124,7 @@ const SecretInput: Component<{
         class={styles.secretInput}
         placeholder={props.placeholder}
       />
-      <button
-        type="button"
-        class={styles.secretToggle}
-        onClick={() => setVisible(!visible())}
-      >
+      <button type="button" class={styles.secretToggle} onClick={() => setVisible(!visible())}>
         {visible() ? 'Hide' : 'Show'}
       </button>
     </div>
@@ -169,10 +174,10 @@ export const ApiKeys: Component = () => {
     if (!amount || !models?.length) return []
 
     return models.map((m) => {
-      const costPerOutputToken = (m.pricing.output / 1_000_000)
-      const costPerInputToken = (m.pricing.input / 1_000_000)
+      const costPerOutputToken = m.pricing.output / 1_000_000
+      const costPerInputToken = m.pricing.input / 1_000_000
       // Cost per output token including the input that generated it
-      const effectiveCostPerOutputToken = costPerOutputToken + (costPerInputToken * INPUT_OUTPUT_RATIO)
+      const effectiveCostPerOutputToken = costPerOutputToken + costPerInputToken * INPUT_OUTPUT_RATIO
       const outputTokens = amount / effectiveCostPerOutputToken
       const words = Math.floor(outputTokens / TOKENS_PER_WORD)
       return {
@@ -221,8 +226,8 @@ export const ApiKeys: Component = () => {
       }
 
       const publishableKey =
-        ((window as any).RUNTIME_CONFIG?.STRIPE_PUBLISHABLE_KEY as string | undefined)
-        || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+        ((window as any).RUNTIME_CONFIG?.STRIPE_PUBLISHABLE_KEY as string | undefined) ||
+        import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
       if (!publishableKey) {
         setPaymentError('Stripe publishable key not configured')
         return
@@ -388,10 +393,7 @@ export const ApiKeys: Component = () => {
       <Fieldset legend="Mythweavers">
         <div class={styles.settingRow}>
           <label class={styles.label}>Balance</label>
-          <Show
-            when={balance() !== undefined}
-            fallback={<span class={styles.balanceValue}>Loading...</span>}
-          >
+          <Show when={balance() !== undefined} fallback={<span class={styles.balanceValue}>Loading...</span>}>
             <div class={styles.balanceRow}>
               <span class={styles.balanceValue}>
                 {balance() !== null ? `$${balance()!.toFixed(2)}` : 'Unavailable'}
@@ -413,70 +415,72 @@ export const ApiKeys: Component = () => {
 
         <Show when={showTopUp()}>
           <div class={styles.settingRow}>
-              <label class={styles.label}>Amount</label>
-              <div class={styles.topUpPresets}>
-                <For each={TOPUP_PRESETS}>
-                  {(preset) => (
-                    <button
-                      class={`${styles.presetButton} ${topUpAmount() === preset ? styles.presetButtonActive : ''}`}
-                      onClick={() => selectPreset(preset)}
-                    >
-                      ${preset}
-                    </button>
+            <label class={styles.label}>Amount</label>
+            <div class={styles.topUpPresets}>
+              <For each={TOPUP_PRESETS}>
+                {(preset) => (
+                  <button
+                    class={`${styles.presetButton} ${topUpAmount() === preset ? styles.presetButtonActive : ''}`}
+                    onClick={() => selectPreset(preset)}
+                  >
+                    ${preset}
+                  </button>
+                )}
+              </For>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                step="0.01"
+                value={customAmount()}
+                onInput={(e) => handleCustomInput(e.target.value)}
+                class={styles.customAmountInput}
+                placeholder="Custom"
+              />
+            </div>
+          </div>
+
+          <Show when={effectiveAmount() && modelEstimates().length > 0}>
+            <div class={styles.settingRow}>
+              <label class={styles.label}>Estimated output</label>
+              <div class={styles.estimatesTable}>
+                <For each={modelEstimates()}>
+                  {(est) => (
+                    <div class={styles.estimateRow}>
+                      <span class={styles.estimateModel}>{est.name}</span>
+                      <span class={styles.estimateValue}>
+                        ~
+                        {est.words >= 1_000_000
+                          ? `${(est.words / 1_000_000).toFixed(1)}m`
+                          : est.words >= 1_000
+                            ? `${(est.words / 1_000).toFixed(0)}k`
+                            : est.words}{' '}
+                        words
+                      </span>
+                    </div>
                   )}
                 </For>
-                <input
-                  type="number"
-                  min="1"
-                  max="500"
-                  step="0.01"
-                  value={customAmount()}
-                  onInput={(e) => handleCustomInput(e.target.value)}
-                  class={styles.customAmountInput}
-                  placeholder="Custom"
-                />
               </div>
             </div>
+          </Show>
 
-            <Show when={effectiveAmount() && modelEstimates().length > 0}>
-              <div class={styles.settingRow}>
-                <label class={styles.label}>Estimated output</label>
-                <div class={styles.estimatesTable}>
-                  <For each={modelEstimates()}>
-                    {(est) => (
-                      <div class={styles.estimateRow}>
-                        <span class={styles.estimateModel}>{est.name}</span>
-                        <span class={styles.estimateValue}>
-                          ~{est.words >= 1_000_000
-                            ? `${(est.words / 1_000_000).toFixed(1)}m`
-                            : est.words >= 1_000
-                              ? `${(est.words / 1_000).toFixed(0)}k`
-                              : est.words} words
-                        </span>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </div>
-            </Show>
-
-            <div class={styles.balanceRow}>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleContinueToPayment}
-                disabled={!effectiveAmount() || isProcessing()}
-              >
-                {isProcessing()
-                  ? 'Loading...'
-                  : effectiveAmount()
-                    ? `Continue — $${effectiveAmount()!.toFixed(2)}`
-                    : 'Select an amount'}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={resetTopUp}>
-                Cancel
-              </Button>
-            </div>
+          <div class={styles.balanceRow}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleContinueToPayment}
+              disabled={!effectiveAmount() || isProcessing()}
+            >
+              {isProcessing()
+                ? 'Loading...'
+                : effectiveAmount()
+                  ? `Continue — $${effectiveAmount()!.toFixed(2)}`
+                  : 'Select an amount'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={resetTopUp}>
+              Cancel
+            </Button>
+          </div>
 
           <Show when={paymentError() && !showPaymentModal()}>
             <div class={styles.errorText}>{paymentError()}</div>
@@ -495,14 +499,8 @@ export const ApiKeys: Component = () => {
             <Show when={paymentError()}>
               <div class={styles.errorText}>{paymentError()}</div>
             </Show>
-            <Button
-              variant="primary"
-              onClick={handleConfirmPayment}
-              disabled={paymentStatus() === 'processing'}
-            >
-              {paymentStatus() === 'processing'
-                ? 'Processing...'
-                : `Pay $${effectiveAmount()?.toFixed(2) ?? '0.00'}`}
+            <Button variant="primary" onClick={handleConfirmPayment} disabled={paymentStatus() === 'processing'}>
+              {paymentStatus() === 'processing' ? 'Processing...' : `Pay $${effectiveAmount()?.toFixed(2) ?? '0.00'}`}
             </Button>
           </Show>
 
@@ -569,29 +567,59 @@ export const ApiKeys: Component = () => {
         </div>
       </Fieldset>
 
-      {/* Encryption prompt — shown when authenticated, has keys, but no encryption key in memory */}
-      <Show when={
-        authStore.isAuthenticated &&
-        !authStore.isOfflineMode &&
-        !settingsStore.hasEncryptionKey() &&
-        (settingsStore.openrouterApiKey || settingsStore.anthropicApiKey ||
-         settingsStore.openaiApiKey || settingsStore.cloudflareApiKey)
-      }>
-        <div class={styles.settingRow} style={{ 'margin-top': '0.5rem' }}>
-          <div class={styles.successText} style={{ color: 'var(--color-text-secondary)', 'text-align': 'left' }}>
-            Your API keys are only stored on this device. Enter your password to encrypt them locally and sync the encrypted keys to the server.
-          </div>
-          <Button variant="primary" size="sm" onClick={() => setShowEncryptPrompt(true)}>
-            Encrypt & Sync Keys
-          </Button>
-        </div>
-      </Show>
+      {(() => {
+        const hasKeys = () =>
+          !!(
+            settingsStore.openrouterApiKey ||
+            settingsStore.anthropicApiKey ||
+            settingsStore.openaiApiKey ||
+            settingsStore.cloudflareApiKey
+          )
+        return (
+          <>
+            {/* Encryption prompt — shown when authenticated, has keys, but no encryption key in memory */}
+            <Show
+              when={
+                authStore.isAuthenticated &&
+                !authStore.isOfflineMode &&
+                settingsStore.isEncryptionAvailable() &&
+                !settingsStore.hasEncryptionKey() &&
+                hasKeys()
+              }
+            >
+              <div class={styles.settingRow} style={{ 'margin-top': '0.5rem' }}>
+                <div class={styles.successText} style={{ color: 'var(--color-text-secondary)', 'text-align': 'left' }}>
+                  Your API keys are only stored on this device. Enter your password to encrypt them locally and sync the
+                  encrypted keys to the server.
+                </div>
+                <Button variant="primary" size="sm" onClick={() => setShowEncryptPrompt(true)}>
+                  Encrypt & Sync Keys
+                </Button>
+              </div>
+            </Show>
+
+            {/* Insecure origin — encryption unavailable, keys stay device-local */}
+            <Show
+              when={
+                authStore.isAuthenticated &&
+                !authStore.isOfflineMode &&
+                !settingsStore.isEncryptionAvailable() &&
+                hasKeys()
+              }
+            >
+              <div class={styles.settingRow} style={{ 'margin-top': '0.5rem' }}>
+                <div class={styles.successText} style={{ color: 'var(--color-text-secondary)', 'text-align': 'left' }}>
+                  Encrypted key sync is unavailable on this connection (requires HTTPS or localhost). Your API keys are
+                  kept on this device only and are not synced to the server.
+                </div>
+              </div>
+            </Show>
+          </>
+        )
+      })()}
 
       <Show when={showEncryptPrompt()}>
-        <PasswordForEncryptionDialog
-          mode="encrypt"
-          onClose={() => setShowEncryptPrompt(false)}
-        />
+        <PasswordForEncryptionDialog mode="encrypt" onClose={() => setShowEncryptPrompt(false)} />
       </Show>
     </div>
   )

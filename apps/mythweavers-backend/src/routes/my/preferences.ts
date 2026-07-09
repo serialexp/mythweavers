@@ -1,5 +1,5 @@
-import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import type { Prisma } from '@prisma/client'
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
@@ -10,7 +10,11 @@ const customProviderSchema = z.object({
   id: z.string(),
   name: z.string(),
   endpoint: z.string(),
-  apiKey: z.string(),
+  // API keys are NOT stored here in plaintext — they live in the client-side
+  // encrypted `encryptedSecrets` blob (keyed by provider id). Optional so the
+  // client can sync provider metadata without the key. Kept in the schema for
+  // forward-compat with legacy rows that still carry a plaintext key.
+  apiKey: z.string().optional(),
 })
 
 const categoryOverrideSchema = z.object({
@@ -22,33 +26,37 @@ const categoryOverrideSchema = z.object({
  * The shape of user preferences stored as JSON on the User entity.
  * Uses passthrough so we don't reject unknown keys (forward-compat).
  */
-export const preferencesSchema = z.object({
-  provider: z.string().optional(),
-  model: z.string().optional(),
-  maxTokens: z.number().optional(),
-  thinkingBudget: z.number().optional(),
-  contextSize: z.number().optional(),
+export const preferencesSchema = z
+  .object({
+    provider: z.string().optional(),
+    model: z.string().optional(),
+    maxTokens: z.number().optional(),
+    thinkingBudget: z.number().optional(),
+    contextSize: z.number().optional(),
 
-  // Provider API keys
-  openrouterApiKey: z.string().optional(),
-  anthropicApiKey: z.string().optional(),
-  openaiApiKey: z.string().optional(),
-  cloudflareApiKey: z.string().optional(),
-  cloudflareEndpoint: z.string().optional(),
+    // Provider API keys
+    openrouterApiKey: z.string().optional(),
+    anthropicApiKey: z.string().optional(),
+    openaiApiKey: z.string().optional(),
+    cloudflareApiKey: z.string().optional(),
+    cloudflareEndpoint: z.string().optional(),
 
-  // Custom providers
-  customProviders: z.array(customProviderSchema).optional(),
+    // Custom providers
+    customProviders: z.array(customProviderSchema).optional(),
 
-  // Per-category model overrides (e.g. { summary: { provider: "openai", model: "gpt-4o" } })
-  categoryOverrides: z.record(z.string(), categoryOverrideSchema).optional(),
+    // Per-category model overrides (e.g. { summary: { provider: "openai", model: "gpt-4o" } })
+    categoryOverrides: z.record(z.string(), categoryOverrideSchema).optional(),
 
-  // Client-side encrypted API keys blob
-  encryptedSecrets: z.object({
-    salt: z.string(),
-    iv: z.string(),
-    ciphertext: z.string(),
-  }).optional(),
-}).passthrough()
+    // Client-side encrypted API keys blob
+    encryptedSecrets: z
+      .object({
+        salt: z.string(),
+        iv: z.string(),
+        ciphertext: z.string(),
+      })
+      .optional(),
+  })
+  .passthrough()
 
 export type UserPreferences = z.infer<typeof preferencesSchema>
 

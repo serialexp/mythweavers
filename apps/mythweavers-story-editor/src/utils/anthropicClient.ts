@@ -1,5 +1,18 @@
 import { settingsStore } from '../stores/settingsStore'
 
+/** Detect newer Claude models (opus-4-1+, haiku-4-5+, etc.) that require
+ * the "adaptive" thinking API instead of the legacy "enabled" + budget_tokens. */
+function usesAdaptiveThinking(model: string): boolean {
+  const match = model.match(/claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/)
+  if (!match) return false
+  const major = parseInt(match[1], 10)
+  const minorStr = match[2]
+  // Date suffixes (e.g., 20250514) are not minor versions
+  if (minorStr.length >= 6) return false
+  const minor = parseInt(minorStr, 10)
+  return major >= 5 || (major === 4 && minor >= 1)
+}
+
 interface AnthropicMessage {
   role: 'user' | 'assistant' | 'system'
   content:
@@ -278,6 +291,8 @@ export class AnthropicClient {
     // Disable thinking for very small token budgets
     const maxTokens = genOptions?.num_ctx || 8192
     const isThinkingEnabled = (model.includes('sonnet') || model.includes('opus')) && maxTokens > 128
+    // Newer models (opus-4-1+, haiku-4-5+, etc.) use adaptive thinking
+    const isAdaptive = usesAdaptiveThinking(model)
 
     const requestBody = {
       model: model,
@@ -289,12 +304,15 @@ export class AnthropicClient {
       // Add thinking budget for models that support it
       // Only enable if we have enough tokens for the minimum budget (1024)
       ...(isThinkingEnabled &&
-        maxTokens >= 4096 && {
-          thinking: {
-            type: 'enabled' as const,
-            budget_tokens: Math.max(1024, Math.floor(maxTokens / 4)),
-          },
-        }),
+        maxTokens >= 4096 &&
+        (isAdaptive
+          ? { thinking: { type: 'adaptive' as const } }
+          : {
+              thinking: {
+                type: 'enabled' as const,
+                budget_tokens: Math.max(1024, Math.floor(maxTokens / 4)),
+              },
+            })),
     }
 
     // Log cache control points for debugging

@@ -1,13 +1,13 @@
 import { createEffect, createSignal } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
-import { DEFAULT_CHARS_PER_TOKEN, DEFAULT_CONTEXT_SIZE } from '../constants'
 import { putMyPreferences } from '../client/config'
+import { DEFAULT_CHARS_PER_TOKEN, DEFAULT_CONTEXT_SIZE } from '../constants'
 import {
   type EncryptedSecrets,
   type SecretKeys,
   deriveKey as cryptoDeriveKey,
-  encryptSecrets,
   decryptSecrets,
+  encryptSecrets,
   extractSalt,
   generateSalt,
 } from '../lib/crypto'
@@ -165,15 +165,17 @@ createEffect(() => {
 
 /** Non-secret keys synced to the backend in plaintext. */
 const SYNCED_KEYS = [
-  'provider', 'model', 'maxTokens', 'thinkingBudget', 'contextSize',
+  'provider',
+  'model',
+  'maxTokens',
+  'thinkingBudget',
+  'contextSize',
   'cloudflareEndpoint',
   'categoryOverrides',
 ] as const
 
 /** Secret keys that are encrypted before syncing to the backend. */
-const SECRET_KEYS: (keyof SecretKeys)[] = [
-  'openrouterApiKey', 'anthropicApiKey', 'openaiApiKey', 'cloudflareApiKey',
-]
+const SECRET_KEYS: (keyof SecretKeys)[] = ['openrouterApiKey', 'anthropicApiKey', 'openaiApiKey', 'cloudflareApiKey']
 
 /** Whether we've loaded preferences from the backend (prevents saving defaults back on boot). */
 let backendLoaded = false
@@ -190,6 +192,17 @@ let _encryptionSalt: Uint8Array | null = null
 let _pendingEncryptedSecrets: EncryptedSecrets | null = null
 
 const [needsDecryption, setNeedsDecryption] = createSignal(false)
+
+/**
+ * Whether Web Crypto (SubtleCrypto) is usable in this context. It is only
+ * exposed in a secure context (HTTPS, localhost, or file://). On a plain-HTTP
+ * origin (e.g. a LAN/Tailscale IP) `crypto.subtle` is undefined and any
+ * encrypt/decrypt/deriveKey call throws. When this is false we keep API keys
+ * device-local (plaintext localStorage) and never prompt for a password.
+ */
+function isEncryptionAvailable(): boolean {
+  return typeof window !== 'undefined' && window.isSecureContext === true && !!window.crypto?.subtle
+}
 
 function collectSecretKeys(): SecretKeys {
   const secrets: SecretKeys = {}
@@ -438,18 +451,25 @@ export const settingsStore = {
     if (prefs.thinkingBudget != null) setSettingsState('thinkingBudget', prefs.thinkingBudget as number)
     if (prefs.contextSize != null) setSettingsState('contextSize', prefs.contextSize as number)
     if (prefs.cloudflareEndpoint != null) setSettingsState('cloudflareEndpoint', prefs.cloudflareEndpoint as string)
-    if (prefs.categoryOverrides != null) setSettingsState('categoryOverrides', reconcile(prefs.categoryOverrides as CategoryOverrides))
+    if (prefs.categoryOverrides != null)
+      setSettingsState('categoryOverrides', reconcile(prefs.categoryOverrides as CategoryOverrides))
 
-    // Custom providers (without API keys — those are in the encrypted blob)
+    // Custom providers (metadata only — API keys live in the encrypted blob).
+    // Union-merge backend + local by id so a locally-defined provider is never
+    // dropped just because the backend copy is missing/stale, and any local
+    // API key is preserved. This is what keeps a provider from vanishing when
+    // decryption is skipped/unavailable — you lose the key, not the provider.
     if (prefs.customProviders != null) {
       const backendProviders = prefs.customProviders as Array<Omit<CustomProvider, 'apiKey'> & { apiKey?: string }>
-      // Merge with localStorage custom providers to preserve API keys
-      const localProviders = settingsState.customProviders
-      const merged = backendProviders.map((bp) => {
-        const local = localProviders.find((lp) => lp.id === bp.id)
-        return { ...bp, apiKey: local?.apiKey ?? bp.apiKey ?? '' }
-      })
-      setSettingsState('customProviders', merged as CustomProvider[])
+      const byId = new Map<string, CustomProvider>()
+      // Seed with local providers (preserves local-only entries and their keys)
+      for (const lp of settingsState.customProviders) byId.set(lp.id, { ...lp })
+      // Overlay backend metadata, keeping any local API key
+      for (const bp of backendProviders) {
+        const local = byId.get(bp.id)
+        byId.set(bp.id, { ...bp, apiKey: local?.apiKey ?? bp.apiKey ?? '' })
+      }
+      setSettingsState('customProviders', reconcile(Array.from(byId.values())))
     }
 
     // Handle encrypted secrets
@@ -458,9 +478,11 @@ export const settingsStore = {
       _pendingEncryptedSecrets = encrypted
       _encryptionSalt = extractSalt(encrypted)
 
-      // Check if localStorage already has keys — if so, no decryption needed
-      if (hasAnySecretKeys()) {
-        // Local keys exist, use those. Don't prompt for decryption.
+      // Check if localStorage already has keys — if so, no decryption needed.
+      // Also skip the prompt when Web Crypto is unavailable (insecure origin) —
+      // we cannot decrypt here, so prompting would only ever fail.
+      if (hasAnySecretKeys() || !isEncryptionAvailable()) {
+        // Local keys exist (or we can't decrypt anyway). Don't prompt.
       } else {
         // No local keys and backend has encrypted secrets → need decryption
         setNeedsDecryption(true)
@@ -484,6 +506,20 @@ export const settingsStore = {
 
   /** Whether the backend has encrypted secrets that need the user's password to decrypt. */
   needsDecryption,
+
+  /**
+   * Whether Web Crypto is usable here (secure context). When false, encrypted
+   * key sync is disabled and keys stay device-local — used to hide the
+   * encrypt/decrypt prompts on plain-HTTP origins.
+   */
+  isEncryptionAvailable,
+
+  /**
+   * Dismiss the decryption prompt for the rest of this session without decrypting.
+   * Used when the user closes/skips the unlock dialog. The encrypted blob is kept
+   * in memory so the prompt can be re-triggered later if needed.
+   */
+  dismissDecryption: () => setNeedsDecryption(false),
 
   /** Whether we currently have an encryption key in memory. */
   hasEncryptionKey: () => _encryptionKey !== null,

@@ -22,6 +22,7 @@ const SETTERS: Record<
   steeringEnabled: adventureStore.setSteeringEnabled,
   directorEnabled: adventureStore.setDirectorEnabled,
   livingWorldEnabled: adventureStore.setLivingWorldEnabled,
+  conditionTrackingEnabled: adventureStore.setConditionTrackingEnabled,
 }
 
 /**
@@ -49,6 +50,7 @@ export const AdventureSettingsModal: Component<AdventureSettingsModalProps> = (
           steeringEnabled: adventureStore.steeringEnabled,
           directorEnabled: adventureStore.directorEnabled,
           livingWorldEnabled: adventureStore.livingWorldEnabled,
+          conditionTrackingEnabled: adventureStore.conditionTrackingEnabled,
         }}
         onChange={(key, value) => {
           SETTERS[key](value)

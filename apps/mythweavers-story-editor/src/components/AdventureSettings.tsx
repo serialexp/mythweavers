@@ -14,6 +14,7 @@ export interface AdventureSettingsValues {
   steeringEnabled: boolean
   directorEnabled: boolean
   livingWorldEnabled: boolean
+  conditionTrackingEnabled: boolean
 }
 
 /**
@@ -29,6 +30,7 @@ export const ADVENTURE_SETTING_DEFAULTS: AdventureSettingsValues = {
   steeringEnabled: true,
   directorEnabled: false,
   livingWorldEnabled: true,
+  conditionTrackingEnabled: false,
 }
 
 interface SettingDescriptor {
@@ -113,6 +115,19 @@ const ADVENTURE_SETTINGS: SettingDescriptor[] = [
       'respects the world bible, the author storyline and per-turn ' +
       'directives — it just stops the engine from maintaining its own ' +
       'evolving picture of the cast.',
+  },
+  {
+    key: 'conditionTrackingEnabled',
+    label: 'Track physical state (injuries / conditions / gear)',
+    hint:
+      'When on, a short background pass after each turn maintains a ledger ' +
+      'of who is hurt, exhausted, soaked, unarmed, bound, and so on — for ' +
+      'the protagonist and any named characters in the scene. That ledger ' +
+      'is injected into every writer prompt as a reminder, so the model ' +
+      "can't quietly forget that a character can't use a broken arm, no " +
+      'longer has their sword, or is too spent to sprint. Independent of ' +
+      'living world: it tracks the protagonist even when the cast / plot ' +
+      'subsystem is off. Costs one extra cheap model call per turn.',
   },
 ]
 

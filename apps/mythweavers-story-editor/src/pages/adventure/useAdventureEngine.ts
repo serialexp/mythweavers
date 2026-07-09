@@ -17,6 +17,7 @@ import {
   buildCompactionMessages,
   buildAnalysisMessages,
   buildSynthesisMessages,
+  buildConditionsMessages,
   buildStorylineGateMessages,
   buildPartnerActionMessages,
   parseSplitNarrative,
@@ -43,6 +44,8 @@ export interface AdventureEngine {
   runAnalysisPass: () => Promise<void>
   /** Manually re-run the synthesis pass (rebuild the global storyline). */
   runSynthesisPass: () => Promise<void>
+  /** Manually re-run the conditions pass (rebuild the physical-state ledger). */
+  runConditionsPass: () => Promise<void>
   /** Approve the in-flight storyline-gate brief and continue generation. */
   acceptGateBrief: () => void
   /** Reject the in-flight storyline-gate brief and continue without arc context. */
@@ -172,6 +175,19 @@ export function createAdventureEngine(
   }
 
   /**
+   * Returns the current physical-state ledger for injection into a narrative
+   * prompt, or `undefined` when condition tracking is off (so the prompt
+   * builders' `conditions` param is simply omitted). The single chokepoint
+   * that elides the `[CHARACTER CONDITIONS]` block from every prompt when the
+   * toggle is off — mirrors `liveWorldStateForPrompt()`.
+   */
+  function conditionsForPrompt() {
+    if (!adventureStore.conditionTrackingEnabled) return undefined
+    const trimmed = adventureStore.conditions.trim()
+    return trimmed.length > 0 ? trimmed : undefined
+  }
+
+  /**
    * Run the optional "director" pass: a grounded analysis-class model that
    * produces a numbered BEATS plan for the writer call that follows. Output is
    * NOT streamed to the UI — the brief is plumbing for the writer, and
@@ -204,6 +220,7 @@ export function createAdventureEngine(
       adventureStore.compactions,
       adventureStore.worldBible,
       liveWorldStateForPrompt(),
+      conditionsForPrompt(),
       storylineBrief,
     )
 
@@ -332,6 +349,7 @@ export function createAdventureEngine(
       adventureStore.compactions,
       adventureStore.worldBible,
       liveWorldStateForPrompt(),
+      conditionsForPrompt(),
       worldStepStorylineBrief,
       worldStepDirectorBrief,
       adventureStore.protagonistInput || undefined,
@@ -392,6 +410,7 @@ export function createAdventureEngine(
       adventureStore.compactions,
       adventureStore.worldBible,
       liveWorldStateForPrompt(),
+      conditionsForPrompt(),
     )
 
     let accumulated = ''
@@ -519,6 +538,7 @@ export function createAdventureEngine(
         adventureStore.compactions,
         adventureStore.worldBible,
         liveWorldStateForPrompt(),
+        conditionsForPrompt(),
         resolutionStorylineBrief,
         resolutionDirectorBrief,
         partnerAction,
@@ -649,6 +669,15 @@ export function createAdventureEngine(
           .catch((err) => {
             console.warn('[Analysis→Synthesis] chain error:', err)
           })
+      }
+
+      // Physical-state ledger — independent of living world; tracks the
+      // protagonist even when the cast/plot subsystem is off. Fire-and-forget;
+      // non-fatal on error (keeps the previous ledger).
+      if (adventureStore.conditionTrackingEnabled) {
+        runConditionsPass().catch((err) => {
+          console.warn('[Conditions] pass error:', err)
+        })
       }
       runPendingCompactions()
 
@@ -1059,6 +1088,108 @@ export function createAdventureEngine(
   }
 
   /**
+   * Background conditions pass — maintains the physical-state ledger for the
+   * protagonist + on-page named characters. Runs after each finalized turn
+   * (when `conditionTrackingEnabled`), independent of the living-world
+   * subsystem: it tracks the protagonist even when the cast/plot roster is
+   * off. Reads the most recent few turns of narrative + the current ledger +
+   * (if living world is on) the character roster, and writes an updated
+   * ledger back to the store. The result is injected into every narrative
+   * pass via `conditionsForPrompt()`.
+   *
+   * Modelled on `runAnalysisPass` — small, recent-narrative-only prompt, no
+   * shared-history cache prefix. Skipped on the empty state and while another
+   * conditions pass is in flight. Failures are non-fatal: the previous
+   * ledger (if any) just stays in place this turn.
+   */
+  async function runConditionsPass() {
+    if (!adventureStore.conditionTrackingEnabled) return
+    if (adventureStore.isTrackingConditions) return
+    const turns = adventureStore.turns
+    if (turns.length === 0) return
+
+    // Recent narrative — same window as the analysis pass. Wide enough to
+    // ground a new injury in how it actually happened, not just the latest
+    // paragraph.
+    const recentParts: string[] = []
+    let chars = 0
+    for (let i = turns.length - 1; i >= 0; i--) {
+      const t = turns[i]
+      if (t.playerAction) {
+        recentParts.unshift(`> ${t.playerAction}`)
+      }
+      recentParts.unshift(t.narrative)
+      chars += t.narrative.length
+      if (chars >= 6000) break
+    }
+    const recentNarrative = recentParts.join('\n\n')
+    if (!recentNarrative.trim()) return
+
+    adventureStore.setIsTrackingConditions(true)
+    try {
+      const resolved = resolveModel('adventure-conditions')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      const messages = buildConditionsMessages(
+        recentNarrative,
+        adventureStore.conditions,
+        adventureStore.protagonistInput || undefined,
+        // Hand over the roster only when living world is on — otherwise the
+        // model tracks the protagonist + whoever it can detect in the prose.
+        liveWorldStateForPrompt(),
+        {
+          settingDescription: adventureStore.settingDescription,
+          worldBible: adventureStore.worldBible,
+        },
+      )
+
+      console.log(
+        `[Conditions] Running with ${resolved.provider}/${resolved.model}`,
+      )
+
+      let accumulated = ''
+      const response = client.generate({
+        model: resolved.model,
+        messages,
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
+          ? Math.min(
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
+            )
+          : undefined,
+        metadata: { callType: 'adventure-conditions' },
+      })
+
+      for await (const event of response) {
+        if (event.type === 'chunk') {
+          accumulated += event.text
+        }
+      }
+
+      const conditions = accumulated
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/^#+\s+[^\n]+\n+/gm, '')
+        .trim()
+
+      if (conditions) {
+        adventureStore.setConditions(conditions)
+        persist()
+        console.log(
+          `[Conditions] Updated ledger (${conditions.length} chars)`,
+        )
+      } else {
+        console.log('[Conditions] Empty response — keeping previous ledger')
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Conditions pass failed'
+      console.warn('[Conditions] Skipped due to error:', message)
+    } finally {
+      adventureStore.setIsTrackingConditions(false)
+    }
+  }
+
+  /**
    * Storyline-gate pass — runs SYNCHRONOUSLY before each narrative pass
    * (resolution and world-step). Takes the full author-side storyline and
    * filters it down to the slice that's actually visible to / informing
@@ -1303,6 +1434,7 @@ export function createAdventureEngine(
         adventureStore.compactions,
         adventureStore.worldBible,
         liveWorldStateForPrompt(),
+        conditionsForPrompt(),
       )
 
       const revisionResolved = resolveModel('adventure-revision')
@@ -1648,6 +1780,7 @@ export function createAdventureEngine(
     handleRegenerate,
     runAnalysisPass,
     runSynthesisPass,
+    runConditionsPass,
     acceptGateBrief,
     rejectGateBrief,
     handleEditAndRegenerate,

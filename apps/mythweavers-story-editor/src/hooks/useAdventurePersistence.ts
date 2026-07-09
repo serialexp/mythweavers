@@ -293,6 +293,25 @@ export interface PersistedState {
    * partner's action is woven into it. Persisted per-adventure.
    */
   partySplit?: boolean
+  /**
+   * When true, a dedicated per-turn "conditions" pass runs after each
+   * turn to maintain a ledger of the physical state of the protagonist
+   * and any named characters in the scene (injuries, exhaustion,
+   * equipment, position). The ledger is injected into every narrative
+   * pass as a reminder so the model can't quietly forget that a
+   * character is wounded / unarmed / soaked / etc. Default: false.
+   * Independent of `livingWorldEnabled` — works for the protagonist even
+   * when the living-world subsystem is off.
+   */
+  conditionTrackingEnabled?: boolean
+  /**
+   * Model-maintained ledger of physical state for the protagonist +
+   * on-page named characters. One concise line per character,
+   * protagonist first. Regenerated each turn by the conditions pass;
+   * empty until the first pass produces output. User-editable (the
+   * World panel exposes it) so a bad entry can be corrected in place.
+   */
+  conditions?: string
 }
 
 // --- localStorage helpers (offline / crash recovery) ---

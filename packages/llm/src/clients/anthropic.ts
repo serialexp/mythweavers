@@ -217,6 +217,19 @@ interface AnthropicFormattedMessage {
   content: AnthropicContentBlock[]
 }
 
+/** Detect newer Claude models (opus-4-1+, haiku-4-5+, etc.) that require
+ * the "adaptive" thinking API instead of the legacy "enabled" + budget_tokens. */
+function usesAdaptiveThinking(model: string): boolean {
+  const match = model.match(/claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/);
+  if (!match) return false;
+  const major = parseInt(match[1], 10);
+  const minorStr = match[2];
+  // Date suffixes (e.g., 20250514) are not minor versions
+  if (minorStr.length >= 6) return false;
+  const minor = parseInt(minorStr, 10);
+  return major >= 5 || (major === 4 && minor >= 1);
+}
+
 export class AnthropicClient implements LLMClient {
   private config: LLMClientConfig
 
@@ -304,9 +317,13 @@ export class AnthropicClient implements LLMClient {
     }
 
     if (options.thinking_budget && options.thinking_budget > 0) {
-      requestBody.thinking = {
-        type: "enabled",
-        budget_tokens: options.thinking_budget,
+      if (usesAdaptiveThinking(options.model)) {
+        requestBody.thinking = { type: "adaptive" };
+      } else {
+        requestBody.thinking = {
+          type: "enabled",
+          budget_tokens: options.thinking_budget,
+        };
       }
     }
 

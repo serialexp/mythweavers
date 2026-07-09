@@ -821,11 +821,13 @@ export function buildPartnerActionMessages(
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
   liveWorldState?: LiveWorldState,
+  conditions?: string,
 ): LLMMessage[] {
   const deutName = extractName(deuteragonistInput, "the deuteragonist");
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible);
 
   appendLiveWorldState(messages, liveWorldState);
+  appendConditions(messages, conditions);
 
   // Show what the protagonist just did — the partner responds to this
   messages.push({ role: "user", content: `Protagonist action this turn: ${playerAction}` });
@@ -858,6 +860,7 @@ export function buildResolutionMessages(
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
   liveWorldState?: LiveWorldState,
+  conditions?: string,
   storylineBrief?: string,
   directorBrief?: string,
   /** The deuteragonist's intended action for this turn, if one is configured. */
@@ -906,6 +909,7 @@ export function buildResolutionMessages(
   // its instructions for the turn. Lives outside the cache breakpoint
   // because it changes turn-to-turn.
   appendLiveWorldState(messages, liveWorldState);
+  appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
 
   // Role instruction + core directive + steering guidance (if any) + party-split
@@ -1012,6 +1016,7 @@ export function buildDirectorMessages(
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
   liveWorldState?: LiveWorldState,
+  conditions?: string,
   storylineBrief?: string,
 ): LLMMessage[] {
   const messages = buildSharedHistory(
@@ -1022,6 +1027,7 @@ export function buildDirectorMessages(
   );
 
   appendLiveWorldState(messages, liveWorldState);
+  appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
 
   const instruction =
@@ -1086,6 +1092,7 @@ export function buildWorldStepMessages(
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
   liveWorldState?: LiveWorldState,
+  conditions?: string,
   storylineBrief?: string,
   directorBrief?: string,
   /** Live protagonist description from the store (always injected). */
@@ -1120,6 +1127,7 @@ export function buildWorldStepMessages(
   }
 
   appendLiveWorldState(messages, liveWorldState);
+  appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
 
   messages.push({
@@ -1183,6 +1191,7 @@ export function buildRevisionMessages(
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
   liveWorldState?: LiveWorldState,
+  conditions?: string,
 ): LLMMessage[] {
   const messages = buildSharedHistory(
     turns,
@@ -1192,6 +1201,7 @@ export function buildRevisionMessages(
   );
 
   appendLiveWorldState(messages, liveWorldState);
+  appendConditions(messages, conditions);
 
   // Steering only applies to resolution passes — it describes the quality
   // of the protagonist's execution, which world-step passes don't generate.
@@ -1432,6 +1442,158 @@ export function buildAnalysisMessages(
       ),
     },
   ];
+}
+
+// --- Conditions pass (physical-state ledger) ---
+
+/**
+ * System prompt for the conditions pass. A cheap, focused curator that
+ * maintains a short ledger of the PHYSICAL state of the protagonist and the
+ * named characters in the scene — the bodily facts that persist across turns
+ * and that the narrative is liable to forget over a long adventure (a broken
+ * wrist, a lost weapon, exhaustion, soaked clothes). Runs after each turn and
+ * its output is injected into every narrative pass as a reminder.
+ *
+ * Deliberately narrow: injuries, stamina, intoxication, exposure, restraint,
+ * senses, and gating gear ONLY. Everything else (relationships, motive, plot,
+ * mood, recaps) is either another subsystem's job or belongs in the prose.
+ */
+export const CONDITIONS_SYSTEM_PROMPT = `You are the physical-state curator for an interactive adventure. You maintain a short ledger of the PHYSICAL condition of the protagonist and the named characters currently in the scene — the bodily facts that persist across turns and change what a character can actually DO, and that the prose is liable to forget over many turns.
+
+You read the most recent narrative against the existing ledger and output the UPDATED ledger. Nothing else.
+
+═══════════════════════════════════════════════════════════════════════════
+WHAT BELONGS HERE — physical facts that persist across turns and gate action
+═══════════════════════════════════════════════════════════════════════════
+- Injuries and wounds: a broken wrist, a gash above the eye, a sprained ankle, a missing finger, cracked ribs, a limp.
+- Exhaustion / stamina: bone-tired, winded, on the edge of collapse.
+- Intoxication, poison, disease, mind-altering states: drunk, dosed, feverish, paralysed, hallucinating.
+- Exposure: soaked to the bone, freezing, hypothermic, badly sunburnt.
+- Restraint / position: bound, chained, prone, pinned, hidden, blindfolded.
+- Senses: blinded, deafened.
+- Gear that physically gates what they can do: unarmed, down to a knife, armoured, holding a torch, carrying the wounded child, encumbered.
+
+═══════════════════════════════════════════════════════════════════════════
+WHAT DOES NOT BELONG HERE — other subsystems track these, or they are ephemeral
+═══════════════════════════════════════════════════════════════════════════
+- Relationships, personality, motive, disposition, who trusts whom — that is the character roster's job, not yours.
+- Plot, goals, plans, what is about to happen — plot points and agenda.
+- Mood or emotion, UNLESS it has a physical component. ("afraid" alone is not here; "shaking so hard she cannot keep her grip" is.)
+- Transient state that resets within a beat — a brief stumble, a passing remark, a momentary flinch.
+- Recap of what a character just did — the prose already said it; do not parrot it here.
+
+═══════════════════════════════════════════════════════════════════════════
+FORMAT — a plain markdown list, one line per character, PROTAGONIST FIRST
+═══════════════════════════════════════════════════════════════════════════
+Each line:
+- Name: the physical facts, separated by semicolons, terse and concrete.
+Keep it to ONE line per character. No prose paragraphs, no headers, no preamble, no explanation.
+
+Example:
+- Maren (protagonist): left wrist broken & splinted; soaked through; exhausted; unarmed.
+- Captain Voss: bleeding from a gash above the right eye; winded; cutlass drawn.
+- The hound: limping on its right foreleg.
+
+═══════════════════════════════════════════════════════════════════════════
+UPDATING RULES
+═══════════════════════════════════════════════════════════════════════════
+- Read the recent narrative against the current ledger. ADD any new physical fact the narrative established. REMOVE any condition the narrative has now resolved or healed (a wound tended, exhaustion slept off, restraints cut, a weapon recovered). CARRY FORWARD everything in between UNCHANGED — that carry-forward is the entire reason this ledger exists.
+- If a named character has left the scene, drop their line. If a new named character has entered the scene WITH a notable physical condition, add them.
+- The protagonist is ALWAYS present — keep their line even when the rest of the cast is empty.
+- Stay grounded in what the narrative actually showed. Do not invent injuries, and do not invent healing. When genuinely uncertain whether something resolved, KEEP it (a wrongly-dropped injury is worse than a wrongly-carried one).
+- If a previously-listed condition has improved but not vanished, update it (e.g. "exhausted" → "winded; recovering"), do not simply drop it.
+
+Output ONLY the updated ledger. No commentary, no wrapping prose. If there are genuinely no notable physical conditions for anyone, output a single line: "- (protagonist name): no notable conditions."`;
+
+export interface BuildConditionsOptions {
+  /** Adventure setting / world block — light grounding for genre/tone. */
+  settingDescription?: string;
+  /** Optional persistent world bible. */
+  worldBible?: string;
+}
+
+/**
+ * Build messages for the conditions pass. Modelled on the analysis pass: a
+ * tight system prompt + a user message assembled from the protagonist, the
+ * on-file named characters (if the living-world roster is available), the
+ * current ledger, and the most recent narrative. Returns the updated ledger
+ * text. Does NOT use the full shared history — physical state is grounded in
+ * recent events, so we keep the prompt small and cheap.
+ */
+export function buildConditionsMessages(
+  recentNarrative: string,
+  currentConditions: string,
+  protagonist?: string,
+  liveWorldState?: LiveWorldState,
+  options: BuildConditionsOptions = {},
+): LLMMessage[] {
+  const sections: string[] = [];
+
+  // Light setting grounding — genre/tone helps the model judge what counts
+  // as a physically-significant condition (a torch matters differently in a
+  // cave than on a city street). Trimmed; conditions are grounded in the
+  // recent narrative, not the setting bible.
+  const settingTrimmed = options.settingDescription?.trim();
+  if (settingTrimmed) {
+    sections.push(`[SETTING — for context only]\n${settingTrimmed}`);
+  }
+
+  const protagonistTrimmed = protagonist?.trim();
+  sections.push(
+    protagonistTrimmed
+      ? `[PROTAGONIST — who "the protagonist" refers to]\n${protagonistTrimmed}`
+      : '[PROTAGONIST — who "the protagonist" refers to]\n(no description on file — refer to them as "the protagonist")',
+  );
+
+  // Named characters on file, when the living-world roster is available. Gives
+  // the model the cast to track without it having to guess names.
+  const activeChars = Object.values(liveWorldState?.characters ?? {}).filter(
+    (c) => !c.archived,
+  );
+  if (activeChars.length > 0) {
+    const lines = activeChars.map(
+      (c) => `- ${c.name}: ${c.description?.trim() || "—"}`,
+    );
+    sections.push(
+      `[NAMED CHARACTERS CURRENTLY ON FILE — track any of these who are in the scene]\n${lines.join("\n")}`,
+    );
+  }
+
+  const prevTrimmed = currentConditions?.trim();
+  sections.push(
+    prevTrimmed
+      ? `[CURRENT LEDGER — update this]\n${prevTrimmed}`
+      : "[CURRENT LEDGER — none on file yet; start one.]",
+  );
+
+  sections.push(`[MOST RECENT NARRATIVE]\n${recentNarrative.trim()}`);
+
+  sections.push(
+    "Output the updated physical-state ledger now, following the format and rules in the system message. Protagonist first. Output ONLY the ledger — no preamble, no explanation.",
+  );
+
+  return [
+    { role: "system", content: CONDITIONS_SYSTEM_PROMPT },
+    { role: "user", content: sections.join("\n\n---\n\n") },
+  ];
+}
+
+/**
+ * Append a system message with the current physical-state ledger, if any.
+ * Injected into the narrative passes alongside the live world state so the
+ * model cannot quietly drop a character's injury, missing weapon, or
+ * exhaustion across turns.
+ */
+function appendConditions(
+  messages: LLMMessage[],
+  conditions: string | undefined,
+): void {
+  const trimmed = conditions?.trim();
+  if (!trimmed) return;
+  messages.push({
+    role: "system",
+    content: `[CHARACTER CONDITIONS — physical state as of this turn. This is AUTHORITATIVE and the narrative MUST respect it: a character cannot use a limb that is broken or missing, cannot produce an item they do not have, cannot run or fight if they are exhausted or their leg is injured, cannot see if they are blinded. Carry every entry forward unless the narrative explicitly shows it resolved.]\n\n${trimmed}`,
+  });
 }
 
 // --- Synthesis pass ---

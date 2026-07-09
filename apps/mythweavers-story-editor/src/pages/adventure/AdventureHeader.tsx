@@ -316,6 +316,40 @@ export const AdventureHeader: Component<{
             </div>
           </Show>
 
+          {/* Physical-state ledger — independent of the living-world subsystem;
+              shown whenever condition tracking is enabled. */}
+          <Show when={adventureStore.conditionTrackingEnabled}>
+            <div class={styles.storyPanelSection}>
+              <label class={styles.formLabel}>
+                🩹 Physical State
+                <Show when={adventureStore.isTrackingConditions}>
+                  <span style={{ 'margin-left': '8px', opacity: 0.6, 'font-size': '0.85em' }}>
+                    updating…
+                  </span>
+                </Show>
+              </label>
+              <div class={styles.directiveHint}>
+                A short ledger of who is hurt, exhausted, unarmed, bound, soaked,
+                and so on — for the protagonist and named characters in the scene.
+                Maintained by a background pass after each turn and injected into
+                every writer prompt as a reminder, so the model can't quietly
+                forget that a character can't use a broken arm or no longer has
+                their sword. You can edit it; your edits stick until the next pass
+                overwrites them.
+              </div>
+              <textarea
+                class={styles.directiveTextarea}
+                value={adventureStore.conditions}
+                onInput={(e) => {
+                  adventureStore.setConditions(e.currentTarget.value)
+                  engine.persist()
+                }}
+                placeholder="(empty — will be filled in after the first turn's conditions pass)"
+                rows={6}
+              />
+            </div>
+          </Show>
+
           {/* Directive section */}
           <div class={styles.storyPanelSection}>
             <label class={styles.formLabel}>Per-Turn Directive</label>

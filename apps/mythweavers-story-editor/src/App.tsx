@@ -881,7 +881,7 @@ const App: Component = () => {
       <Show when={authStore.isAuthenticated && !authStore.isOfflineMode && settingsStore.needsDecryption()}>
         <PasswordForEncryptionDialog
           mode="decrypt"
-          onClose={() => { /* needsDecryption will be false after successful decrypt, or user skipped */ }}
+          onClose={() => settingsStore.dismissDecryption()}
         />
       </Show>
 

@@ -981,6 +981,32 @@ export const PlayingScreen: Component = () => {
                   🔍
                 </Button>
               </Show>
+              <Show
+                when={
+                  adventureStore.turns.length > 0 &&
+                  adventureStore.conditionTrackingEnabled
+                }
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    engine
+                      .runConditionsPass()
+                      .catch((err) =>
+                        console.warn('[Conditions] manual pass error:', err),
+                      )
+                  }
+                  disabled={adventureStore.isTrackingConditions}
+                  title={
+                    adventureStore.isTrackingConditions
+                      ? 'Conditions pass already running'
+                      : 'Re-run the conditions pass to rebuild the physical-state ledger from recent turns'
+                  }
+                >
+                  🩹
+                </Button>
+              </Show>
               <Button
                 variant="primary"
                 onClick={engine.handleSubmit}

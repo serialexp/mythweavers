@@ -1,5 +1,5 @@
-import { Component, Show, createSignal } from 'solid-js'
 import { Alert, Button, FormField, Input, Modal, Spinner } from '@mythweavers/ui'
+import { Component, Show, createSignal } from 'solid-js'
 import { settingsStore } from '../stores/settingsStore'
 
 interface PasswordForEncryptionDialogProps {
@@ -13,8 +13,7 @@ export const PasswordForEncryptionDialog: Component<PasswordForEncryptionDialogP
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal('')
 
-  const title = () =>
-    props.mode === 'decrypt' ? 'Unlock API Keys' : 'Encrypt API Keys'
+  const title = () => (props.mode === 'decrypt' ? 'Unlock API Keys' : 'Encrypt API Keys')
 
   const description = () =>
     props.mode === 'decrypt'
@@ -39,8 +38,15 @@ export const PasswordForEncryptionDialog: Component<PasswordForEncryptionDialogP
 
       props.onClose()
     } catch (err) {
-      // AES-GCM throws on wrong password
-      setError('Incorrect password. Please try again.')
+      if (!settingsStore.isEncryptionAvailable()) {
+        // crypto.subtle is undefined on insecure origins — not a password problem
+        setError('Encryption is unavailable on this connection. Use HTTPS or localhost to sync encrypted keys.')
+      } else if (err instanceof DOMException && err.name === 'OperationError') {
+        // AES-GCM authentication failure — the actual wrong-password case
+        setError('Incorrect password. Please try again.')
+      } else {
+        setError(`Could not unlock keys: ${err instanceof Error ? err.message : String(err)}`)
+      }
     } finally {
       setLoading(false)
     }
