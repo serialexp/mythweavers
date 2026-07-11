@@ -285,6 +285,33 @@ RULES:
 - NPCs must act consistently with their established personalities, goals, and current motivations.`;
 
 /**
+ * Role-specific instruction for the autonomous "continue story" pass.
+ *
+ * Like the world step, there is no player action — but instead of holding the
+ * protagonist still while only the world reacts, the WHOLE scene advances on
+ * its own momentum: the protagonist, NPCs, and environment all move forward
+ * along their established trajectory. Used by the manual "Continue story"
+ * button when the story is already on track and the author wants to push it
+ * forward without typing an action.
+ */
+export const CONTINUE_STORY_INSTRUCTION = `YOUR ROLE THIS TURN: Continue the story.
+
+Write ONLY the story narrative — no metadata, no headings, no XML tags.
+
+SCOPE OF THIS TURN:
+- The whole scene advances on its own momentum. The protagonist, the NPCs present, and the environment all move forward according to their established trajectory, goals, and current situation.
+- Do NOT wait for or prompt the protagonist. Let them act on their own initiative, consistent with what they have been doing and what they want.
+- Continue directly from where the last turn left off. Do not recap or restate events that were just narrated.
+
+RULES:
+- POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
+- Show, don't tell. Vivid sensory details, dialogue, action.
+- 2-4 paragraphs.
+- Only include events the protagonist could plausibly observe. No unexplained knowledge of distant events.
+- Everything must be physically plausible within the established world.
+- Every character — the protagonist included — must act consistently with their established personality, goals, and current motivations.`;
+
+/**
  * Role-specific instruction for the optional director pass.
  *
  * The director runs BEFORE the writer (resolution or world-step) when the
@@ -329,6 +356,17 @@ A separate "writer" model will render your plan as prose. The player's most rece
 SCOPE OF THIS TURN (world-step):
 - Plan how on-screen NPCs act IN CHARACTER — pursuing their own goals, not just reacting.
 - MOVE THE SITUATION FORWARD. Each world-step should leave the protagonist's circumstances actually changed — a step closer to a consequence, a decision forced, a fact revealed, a stakes shift — not just re-dressed with fresh atmosphere. Lean slightly toward progress over ambiance, but don't lurch: one real development per turn is plenty.
+- Do NOT loop or stall. If a kind of beat has already played in this scene (another stranger looms in to threaten, the same menace gets restated), do something DIFFERENT with it — escalate, resolve, or move past it. Repeating the same beat with new faces is treading water, not pacing.
+
+${DIRECTOR_COMMON_RULES}`;
+
+export const DIRECTOR_CONTINUE_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the next beat of the story.
+
+A separate "writer" model will render your plan as prose. The player has not given an action. NOW the whole scene advances on its own momentum — the protagonist, NPCs, and environment all move forward along their established trajectory.
+
+SCOPE OF THIS TURN (continue):
+- Plan how the SCENE advances: the protagonist acts on their own initiative (consistent with their established goals), on-screen NPCs act IN CHARACTER pursuing their own goals, and the situation progresses.
+- MOVE THE SITUATION FORWARD. Each beat should leave the protagonist's circumstances actually changed — a step closer to a consequence, a decision forced, a fact revealed, a stakes shift — not just re-dressed with fresh atmosphere. Lean slightly toward progress over ambiance, but don't lurch: one real development per turn is plenty.
 - Do NOT loop or stall. If a kind of beat has already played in this scene (another stranger looms in to threaten, the same menace gets restated), do something DIFFERENT with it — escalate, resolve, or move past it. Repeating the same beat with new faces is treading water, not pacing.
 
 ${DIRECTOR_COMMON_RULES}`;
@@ -1011,7 +1049,7 @@ export function buildDirectorMessages(
   settingDescription: string,
   playerAction: string | null,
   steering: SteeringBucket | undefined,
-  kind: "resolution" | "world-step",
+  kind: "resolution" | "world-step" | "continue",
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
@@ -1033,7 +1071,9 @@ export function buildDirectorMessages(
   const instruction =
     kind === "world-step"
       ? DIRECTOR_WORLD_STEP_INSTRUCTION
-      : DIRECTOR_RESOLUTION_INSTRUCTION;
+      : kind === "continue"
+        ? DIRECTOR_CONTINUE_INSTRUCTION
+        : DIRECTOR_RESOLUTION_INSTRUCTION;
   // Steering only frames the protagonist's execution quality on the
   // resolution pass — world-step is neutral and gets no steering block.
   const steeringBlock =
@@ -1055,7 +1095,9 @@ export function buildDirectorMessages(
       content:
         kind === "world-step"
           ? "Plan the world step. The scene above just ended on a held beat. What concretely happens next, in plan form?"
-          : "Plan the opening turn. Establish the protagonist in the scene; produce the plan in the requested format.",
+          : kind === "continue"
+            ? "Plan the next beat. The scene above is on a held beat and no player action is coming — let the protagonist, NPCs, and world all advance along their established trajectory. What concretely happens next, in plan form?"
+            : "Plan the opening turn. Establish the protagonist in the scene; produce the plan in the requested format.",
     });
   }
 
@@ -1099,6 +1141,13 @@ export function buildWorldStepMessages(
   protagonistInput?: string,
   /** Live deuteragonist description from the store (always injected). */
   deuteragonistInput?: string,
+  /**
+   * Which autonomous pass this is. 'world-step' (default) holds the
+   * protagonist still and lets only the world/NPCs react; 'continue' advances
+   * the whole scene — protagonist included — on its own momentum. Picks the
+   * role instruction and closing user nudge.
+   */
+  mode: "world-step" | "continue" = "world-step",
 ): LLMMessage[] {
   const messages = buildSharedHistory(
     turns,
@@ -1132,7 +1181,7 @@ export function buildWorldStepMessages(
 
   messages.push({
     role: "system",
-    content: WORLD_STEP_INSTRUCTION,
+    content: mode === "continue" ? CONTINUE_STORY_INSTRUCTION : WORLD_STEP_INSTRUCTION,
   });
 
   // Director brief (if the two-model flow is enabled) lands AFTER the role
@@ -1149,7 +1198,9 @@ export function buildWorldStepMessages(
   messages.push({
     role: "user",
     content:
-      'Now let the world respond. NPCs act in character; the environment shifts only where it would naturally. Continue in second person, present tense — the protagonist remains "you", just as in the resolution narrative above.',
+      mode === "continue"
+        ? 'Now continue the story. Let the scene advance on its own momentum — the protagonist, the NPCs, and the world all move forward along their established trajectory. Do not wait for the protagonist to be prompted. Continue in second person, present tense — the protagonist remains "you".'
+        : 'Now let the world respond. NPCs act in character; the environment shifts only where it would naturally. Continue in second person, present tense — the protagonist remains "you", just as in the resolution narrative above.',
   });
 
   return messages;
@@ -1186,7 +1237,7 @@ export function buildRevisionMessages(
   originalNarrative: string,
   inconsistencies: string,
   steering: SteeringBucket | undefined,
-  kind: "resolution" | "world-step",
+  kind: "resolution" | "world-step" | "continue",
   turnDirective?: string,
   compactions?: Record<string, AdventureCompaction>,
   worldBible?: string,
@@ -1210,7 +1261,11 @@ export function buildRevisionMessages(
       ? `\n\n${steeringGuidance(steering)}`
       : "";
   const roleInstruction =
-    kind === "world-step" ? WORLD_STEP_INSTRUCTION : RESOLUTION_INSTRUCTION;
+    kind === "world-step"
+      ? WORLD_STEP_INSTRUCTION
+      : kind === "continue"
+        ? CONTINUE_STORY_INSTRUCTION
+        : RESOLUTION_INSTRUCTION;
   messages.push({
     role: "system",
     content: `${roleInstruction}\n\n${CORE_DIRECTIVE}${steeringBlock}`,

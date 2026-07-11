@@ -37,8 +37,12 @@ export interface AdventureTurn {
    *   `playerAction` is always null on these. Runs automatically when the
    *   story's `autoAdvanceWorld` setting is on, or on demand via the
    *   "Advance world" button.
+   * - 'continue': an autonomous beat fired by the "Continue story" button.
+   *   Like 'world-step' there is no player action, but the WHOLE scene
+   *   advances — protagonist, NPCs, and world — on its established
+   *   trajectory rather than holding the protagonist still.
    */
-  kind?: 'resolution' | 'world-step'
+  kind?: 'resolution' | 'world-step' | 'continue'
   /**
    * Director brief that drove this turn's prose, when the two-model flow
    * was enabled. Plain markdown — sections like SCENE STATE / BEATS /

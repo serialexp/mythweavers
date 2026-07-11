@@ -37,6 +37,7 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   'story:generate': 'writing',
   'story:generate+summary': 'writing',
   adventure: 'writing',
+  'adventure-continue': 'writing',
   'outline:expand': 'writing',
 
   // Analysis

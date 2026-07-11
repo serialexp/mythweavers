@@ -103,12 +103,12 @@ interface AdventureState {
    */
   pendingGateBrief: string | null
   /**
-   * Which narrative pass the pending brief is gating ('resolution' or
-   * 'world-step'). Drives the approval-panel label so the user knows
-   * which beat they're approving context for. Null when no brief is
-   * pending.
+   * Which narrative pass the pending brief is gating ('resolution',
+   * 'world-step', or 'continue'). Drives the approval-panel label so the
+   * user knows which beat they're approving context for. Null when no
+   * brief is pending.
    */
-  pendingGateKind: 'resolution' | 'world-step' | null
+  pendingGateKind: 'resolution' | 'world-step' | 'continue' | null
 
   // Generation state
   isGenerating: boolean
@@ -120,7 +120,7 @@ interface AdventureState {
    * Null when nothing is streaming or the stream is unrelated to a turn
    * (e.g. nonsense-check spinner).
    */
-  streamingKind: 'resolution' | 'world-step' | null
+  streamingKind: 'resolution' | 'world-step' | 'continue' | null
   /**
    * Steering bucket already rolled for the resolution pass currently
    * streaming. Rendered as the same chip that appears on the committed
@@ -533,7 +533,7 @@ export const adventureStore = {
   setPartySplit(v: boolean) {
     setState('partySplit', v)
   },
-  setPendingGateBrief(brief: string | null, kind: 'resolution' | 'world-step' | null) {
+  setPendingGateBrief(brief: string | null, kind: 'resolution' | 'world-step' | 'continue' | null) {
     batch(() => {
       setState('pendingGateBrief', brief)
       setState('pendingGateKind', kind)
@@ -546,7 +546,7 @@ export const adventureStore = {
   setStreamingContent(v: string) {
     setState('streamingContent', v)
   },
-  setStreamingKind(v: 'resolution' | 'world-step' | null) {
+  setStreamingKind(v: 'resolution' | 'world-step' | 'continue' | null) {
     setState('streamingKind', v)
   },
   setStreamingSteering(v: SteeringBucket | undefined) {

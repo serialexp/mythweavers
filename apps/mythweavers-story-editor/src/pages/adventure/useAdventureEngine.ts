@@ -39,6 +39,7 @@ export interface AdventureEngine {
   handleRetry: () => void
   handleRetryWorldStep: () => void
   handleAdvanceWorld: () => void
+  handleContinueStory: () => void
   handleRegenerate: () => void
   /** Manually re-run the analysis pass against the existing world state + last turns. */
   runAnalysisPass: () => Promise<void>
@@ -203,7 +204,7 @@ export function createAdventureEngine(
    */
   async function runDirector(
     playerAction: string | null,
-    kind: 'resolution' | 'world-step',
+    kind: 'resolution' | 'world-step' | 'continue',
     steering: SteeringBucket | undefined,
     storylineBrief: string | undefined,
   ): Promise<string | undefined> {
@@ -256,7 +257,7 @@ export function createAdventureEngine(
         }
       }
     } catch (err) {
-      // Re-throw aborts so the parent generate()/runWorldStep() catch
+      // Re-throw aborts so the parent generate()/runAutoTurn() catch
       // handles them like any other aborted call.
       if (err instanceof DOMException && err.name === 'AbortError') throw err
       const message = err instanceof Error ? err.message : 'Director call failed'
@@ -317,29 +318,34 @@ export function createAdventureEngine(
   }
 
   /**
-   * Run the world-step pass (pass 2). Assumes the resolution turn has
-   * already been finalized onto `adventureStore.turns`. Caller is responsible
-   * for managing `isGenerating` bracketing.
+   * Run an autonomous (no player action) narrative pass. Assumes the previous
+   * turn has already been finalized onto `adventureStore.turns`. Caller is
+   * responsible for managing `isGenerating` bracketing.
+   *
+   * - 'world-step': only the world/NPCs react; the protagonist holds still.
+   * - 'continue': the WHOLE scene advances — protagonist, NPCs, and world —
+   *   on its established trajectory.
    *
    * Steering is intentionally NOT applied here — it scopes only to the
    * quality of the protagonist's action in pass 1.
    */
-  async function runWorldStep() {
+  async function runAutoTurn(mode: 'world-step' | 'continue') {
+    const label = mode === 'continue' ? 'Continue story' : 'World step'
     adventureStore.setStreamingContent('')
-    adventureStore.setStreamingKind('world-step')
+    adventureStore.setStreamingKind(mode)
 
-    // Storyline gate — independently filtered for the world-step beat
-    // (no player action; the gate sees the just-finalized resolution
-    // narrative as the most recent turn in history). The brief here may
-    // be a different slice than the resolution brief — the world is
-    // reacting, not the protagonist.
-    const worldStepStorylineBrief = await runStorylineGate(null, 'world-step')
+    // Storyline gate — independently filtered for this beat (no player
+    // action; the gate sees the just-finalized turn as the most recent in
+    // history). The brief here may be a different slice than the resolution
+    // brief — the world is reacting / the scene is advancing, not the
+    // protagonist acting on fresh input.
+    const storylineBrief = await runStorylineGate(null, mode)
 
     // Optional director pass — grounded plan for the writer to render.
-    // No steering on world-step (the world is neutral). Failures are
+    // No steering on autonomous passes (the world is neutral). Failures are
     // non-fatal: writer just runs un-briefed.
-    const worldStepDirectorBrief = adventureStore.directorEnabled
-      ? await runDirector(null, 'world-step', undefined, worldStepStorylineBrief)
+    const directorBrief = adventureStore.directorEnabled
+      ? await runDirector(null, mode, undefined, storylineBrief)
       : undefined
 
     const messages = buildWorldStepMessages(
@@ -350,27 +356,28 @@ export function createAdventureEngine(
       adventureStore.worldBible,
       liveWorldStateForPrompt(),
       conditionsForPrompt(),
-      worldStepStorylineBrief,
-      worldStepDirectorBrief,
+      storylineBrief,
+      directorBrief,
       adventureStore.protagonistInput || undefined,
       adventureStore.deuteragonistInput || undefined,
+      mode,
     )
 
     const { narrative, streamErrors } = await streamPass(
       messages,
-      'adventure-world-step',
+      mode === 'continue' ? 'adventure-continue' : 'adventure-world-step',
     )
 
     if (streamErrors.length > 0 && !narrative) {
       adventureStore.setStreamingContent('')
-      adventureStore.setError(`World step: ${streamErrors.join('\n')}`)
+      adventureStore.setError(`${label}: ${streamErrors.join('\n')}`)
       return
     }
 
     if (!narrative) {
       adventureStore.setStreamingContent('')
       adventureStore.setError(
-        'World step returned an empty response. You can retry the world step or continue.',
+        `${label} returned an empty response. You can retry or continue.`,
       )
       return
     }
@@ -378,8 +385,8 @@ export function createAdventureEngine(
     adventureStore.finalizeTurn({
       playerAction: null,
       narrative,
-      kind: 'world-step',
-      ...(worldStepDirectorBrief ? { directorBrief: worldStepDirectorBrief } : {}),
+      kind: mode,
+      ...(directorBrief ? { directorBrief } : {}),
     })
     persist()
   }
@@ -629,11 +636,11 @@ export function createAdventureEngine(
       const shouldAdvance =
         playerAction !== null && adventureStore.autoAdvanceWorld
       if (shouldAdvance) {
-        // runWorldStep handles its own error surfacing; don't crash pass 1
+        // runAutoTurn handles its own error surfacing; don't crash pass 1
         // if pass 2 misbehaves.
         adventureStore.setIsGenerating(true)
         try {
-          await runWorldStep()
+          await runAutoTurn('world-step')
         } catch (worldErr: unknown) {
           if (worldErr instanceof DOMException && worldErr.name === 'AbortError') {
             const partial = adventureStore.streamingContent
@@ -738,18 +745,20 @@ export function createAdventureEngine(
   }
 
   /**
-   * Manually trigger pass 2 on the current last turn. Only valid when the
-   * last turn is a resolution with no following world-step and we're idle.
+   * Manually trigger an autonomous (no player action) pass on the current
+   * last turn. Available whenever at least one turn exists and we're idle —
+   * the button is always present so the author can stack beats (e.g. let the
+   * world move several times, or continue the story repeatedly) without first
+   * typing an action.
+   *
+   * - 'world-step': only the world/NPCs react; the protagonist holds.
+   * - 'continue': the whole scene — protagonist included — advances.
    */
-  async function handleAdvanceWorld() {
+  async function handleAutoTurn(mode: 'world-step' | 'continue') {
+    const label = mode === 'continue' ? 'Continue story' : 'World step'
     if (adventureStore.isGenerating) return
     const turns = adventureStore.turns
     if (turns.length === 0) return
-    const last = turns[turns.length - 1]
-    const lastKind = last.kind ?? 'resolution'
-    if (lastKind !== 'resolution') return
-    // Opening turn has no player action and is not a valid base.
-    if (last.playerAction === null) return
 
     adventureStore.setError(null)
     adventureStore.setIsGenerating(true)
@@ -757,7 +766,7 @@ export function createAdventureEngine(
     abortController = new AbortController()
 
     try {
-      await runWorldStep()
+      await runAutoTurn(mode)
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         const partial = adventureStore.streamingContent
@@ -766,17 +775,16 @@ export function createAdventureEngine(
           adventureStore.finalizeAbort({
             playerAction: null,
             narrative: wsNarrative,
-            kind: 'world-step',
+            kind: mode,
           })
           persist()
         } else {
           adventureStore.setStreamingContent('')
         }
       } else {
-        const message =
-          err instanceof Error ? err.message : 'World step failed'
-        adventureStore.setError(`World step: ${message}`)
-        console.error('World step error:', err)
+        const message = err instanceof Error ? err.message : `${label} failed`
+        adventureStore.setError(`${label}: ${message}`)
+        console.error(`${label} error:`, err)
       }
     } finally {
       adventureStore.setIsGenerating(false)
@@ -784,6 +792,16 @@ export function createAdventureEngine(
       adventureStore.setStreamingKind(null)
       abortController = null
     }
+  }
+
+  /** Let only the world/NPCs react to the latest turn (protagonist holds). */
+  async function handleAdvanceWorld() {
+    await handleAutoTurn('world-step')
+  }
+
+  /** Advance the whole scene — protagonist, NPCs, and world — on its trajectory. */
+  async function handleContinueStory() {
+    await handleAutoTurn('continue')
   }
 
   /**
@@ -1209,7 +1227,7 @@ export function createAdventureEngine(
    */
   async function runStorylineGate(
     playerAction: string | null,
-    kind: 'resolution' | 'world-step',
+    kind: 'resolution' | 'world-step' | 'continue',
   ): Promise<string | undefined> {
     // The storyline gate is a living-world pre-pass: it slices the synthesized/
     // authored storyline for the next beat. When living world is off there is no
@@ -1777,6 +1795,7 @@ export function createAdventureEngine(
     handleRetry,
     handleRetryWorldStep,
     handleAdvanceWorld,
+    handleContinueStory,
     handleRegenerate,
     runAnalysisPass,
     runSynthesisPass,

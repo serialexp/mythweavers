@@ -392,11 +392,16 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
 
   const isLastTurn = () => index === adventureStore.turns.length - 1
   const kind = () => turn().kind ?? 'resolution'
-  const isWorldStep = () => kind() === 'world-step'
+  // Autonomous (no player action) beats: 'world-step' (world/NPCs react) and
+  // 'continue' (the whole scene advances). Both render joined to the prior
+  // turn with a label chip.
+  const isAutoTurn = () => kind() === 'world-step' || kind() === 'continue'
+  const autoTurnLabel = () =>
+    kind() === 'continue' ? '— the story continues —' : '— the world moves —'
 
   return (
-    <div class={isWorldStep() ? styles.worldStepTurn : styles.turn}>
-      <Show when={isWorldStep()}>
+    <div class={isAutoTurn() ? styles.worldStepTurn : styles.turn}>
+      <Show when={isAutoTurn()}>
         <div
           class={
             adventureStore.autoAdvanceWorld
@@ -404,7 +409,7 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
               : styles.worldStepChip
           }
         >
-          — the world moves —
+          {autoTurnLabel()}
         </div>
       </Show>
 
@@ -518,16 +523,12 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
           </button>
         </Show>
 
-        {/* Manual "Advance world" — only on the latest turn, when it's a
-            resolution with a player action, and auto-advance is off. */}
+        {/* Manual autonomous passes — always available on the latest turn
+            when idle, regardless of the last turn's kind or the auto-advance
+            setting. Lets the author stack world beats or push the story
+            forward without typing an action. */}
         <Show
-          when={
-            !adventureStore.isGenerating &&
-            isLastTurn() &&
-            !isWorldStep() &&
-            !adventureStore.autoAdvanceWorld &&
-            turn().playerAction !== null
-          }
+          when={!adventureStore.isGenerating && isLastTurn()}
         >
           <Button
             variant="ghost"
@@ -536,6 +537,14 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
             title="Let NPCs and the world react before your next action"
           >
             ▸ Advance world
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => engine.handleContinueStory()}
+            title="Advance the whole scene — protagonist, NPCs, and world — along its current trajectory"
+          >
+            ▸ Continue story
           </Button>
         </Show>
       </div>
@@ -773,7 +782,7 @@ export const PlayingScreen: Component = () => {
           <Show when={adventureStore.pendingGateBrief}>
             <div class={styles.nonsenseWarning}>
               <div class={styles.nonsenseWarningHeader}>
-                🧵 Storyline brief — review before {adventureStore.pendingGateKind === 'world-step' ? 'world step' : 'this turn'}
+                🧵 Storyline brief — review before {adventureStore.pendingGateKind === 'world-step' ? 'world step' : adventureStore.pendingGateKind === 'continue' ? 'continuing the story' : 'this turn'}
               </div>
               <div
                 class={styles.nonsenseWarningContent}
@@ -832,15 +841,20 @@ export const PlayingScreen: Component = () => {
           {/* Streaming content for current generation */}
           <Show when={adventureStore.isGenerating}>
             {(() => {
-              const isWorldStepStreaming = () =>
-                adventureStore.streamingKind === 'world-step'
+              const isAutoTurnStreaming = () =>
+                adventureStore.streamingKind === 'world-step' ||
+                adventureStore.streamingKind === 'continue'
+              const autoTurnLabel = () =>
+                adventureStore.streamingKind === 'continue'
+                  ? '— the story continues —'
+                  : '— the world moves —'
               return (
                 <div
                   class={
-                    isWorldStepStreaming() ? styles.worldStepTurn : styles.turn
+                    isAutoTurnStreaming() ? styles.worldStepTurn : styles.turn
                   }
                 >
-                  <Show when={isWorldStepStreaming()}>
+                  <Show when={isAutoTurnStreaming()}>
                     <div
                       class={
                         adventureStore.autoAdvanceWorld
@@ -848,12 +862,12 @@ export const PlayingScreen: Component = () => {
                           : styles.worldStepChip
                       }
                     >
-                      — the world moves —
+                      {autoTurnLabel()}
                     </div>
                   </Show>
                   <Show
                     when={
-                      adventureStore.pendingAction && !isWorldStepStreaming()
+                      adventureStore.pendingAction && !isAutoTurnStreaming()
                     }
                   >
                     <div class={styles.playerAction}>
@@ -861,7 +875,7 @@ export const PlayingScreen: Component = () => {
                       {adventureStore.pendingAction}
                     </div>
                   </Show>
-                  <Show when={!isWorldStepStreaming()}>
+                  <Show when={!isAutoTurnStreaming()}>
                     <Show when={adventureStore.streamingSteering}>
                       {(s) => (
                         <div
