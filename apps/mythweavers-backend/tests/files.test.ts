@@ -140,6 +140,27 @@ describe('File Upload Endpoints', () => {
       expect(fileExists).toBe(true)
     })
 
+    test('does not expose local private uploads through a parallel static URL', async () => {
+      const form = new FormData()
+      form.append('file', createReadStream(testImagePath), {
+        filename: 'private-image.png',
+        contentType: 'image/png',
+      })
+      const upload = await app.inject({
+        method: 'POST',
+        url: '/my/files',
+        headers: { ...form.getHeaders() },
+        payload: form,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+      expect(upload.statusCode).toBe(201)
+
+      const protectedPath = upload.json().file.path as string
+      const bypassPath = protectedPath.replace(/^\/my\/files\//, '/files/')
+      const response = await app.inject({ method: 'GET', url: bypassPath })
+      expect(response.statusCode).toBe(404)
+    })
+
     test('should upload file with storyId', async () => {
       const form = new FormData()
       form.append('file', createReadStream(testImagePath), {

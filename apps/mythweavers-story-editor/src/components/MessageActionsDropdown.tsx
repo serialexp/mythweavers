@@ -1,16 +1,13 @@
-import { Button, Dropdown, DropdownDivider, DropdownItem, Spinner } from '@mythweavers/ui'
+import { Button, Dropdown, DropdownDivider, DropdownItem } from '@mythweavers/ui'
 import { Component, Show } from 'solid-js'
-import { PhCodeIcon, PhDotsThreeIcon, PhInfoIcon, PhListChecksIcon, PhPencilSimpleLineIcon, PhScissorsIcon } from 'solidjs-phosphor'
+import { PhCodeIcon, PhDotsThreeIcon, PhInfoIcon, PhPencilSimpleLineIcon, PhScissorsIcon } from 'solidjs-phosphor'
 
 interface MessageActionsDropdownProps {
-  onSummarize: () => void
   onToggleDebug: () => void
   onEditScript?: () => void
   onRewrite?: () => void
   onCut?: () => void
   onUncut?: () => void
-  isSummarizing?: boolean
-  hasSummary?: boolean
   hasScript?: boolean
   showDebug?: boolean
   disabled?: boolean
@@ -28,14 +25,6 @@ export const MessageActionsDropdown: Component<MessageActionsDropdownProps> = (p
         </Button>
       }
     >
-      <DropdownItem
-        onClick={props.onSummarize}
-        disabled={props.isSummarizing}
-        icon={props.isSummarizing ? <Spinner size="sm" /> : <PhListChecksIcon />}
-      >
-        {props.hasSummary ? 'Re-summarize' : 'Summarize'}
-      </DropdownItem>
-
       <Show when={props.onRewrite}>
         <DropdownItem onClick={props.onRewrite} icon={<PhPencilSimpleLineIcon />}>
           Rewrite

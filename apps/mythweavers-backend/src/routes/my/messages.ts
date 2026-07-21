@@ -1,6 +1,6 @@
-import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
-import type { JsonValue } from '@prisma/client/runtime/library'
 import { Prisma } from '@prisma/client'
+import type { JsonValue } from '@prisma/client/runtime/library'
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { promoteFileToPublic } from '../../lib/file-storage.js'
@@ -81,11 +81,7 @@ const messageWithBackgroundFile = {
  *
  * Returns null on success, or an error string suitable for a 400 response.
  */
-async function validateBackgroundFile(
-  fileId: string,
-  userId: number,
-  _storyId: string | null,
-): Promise<string | null> {
+async function validateBackgroundFile(fileId: string, userId: number, _storyId: string | null): Promise<string | null> {
   const file = await prisma.file.findUnique({
     where: { id: fileId },
     select: { id: true, ownerId: true, mimeType: true },
@@ -100,11 +96,7 @@ async function validateBackgroundFile(
  * Same ownership check as validateBackgroundFile, but enforces an audio
  * mime-type. Used when attaching an audio embed to an audio-type message.
  */
-async function validateAudioFile(
-  fileId: string,
-  userId: number,
-  _storyId: string | null,
-): Promise<string | null> {
+async function validateAudioFile(fileId: string, userId: number, _storyId: string | null): Promise<string | null> {
   const file = await prisma.file.findUnique({
     where: { id: fileId },
     select: { id: true, ownerId: true, mimeType: true },
@@ -116,7 +108,9 @@ async function validateAudioFile(
 }
 
 // Helper to convert options for Prisma input (handles null -> Prisma.JsonNull)
-function toJsonInput(value: BranchOption[] | null | undefined): Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined {
+function toJsonInput(
+  value: BranchOption[] | null | undefined,
+): Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined {
   if (value === null) {
     return Prisma.JsonNull
   }
@@ -147,11 +141,14 @@ const messageSchema = z.strictObject({
   instruction: z.string().nullable().meta({ example: 'Write a dramatic opening' }),
   script: z.string().nullable().meta({ example: 'console.log("hello")' }),
   deleted: z.boolean().meta({ example: false, description: 'Soft delete flag' }),
-  isQuery: z.boolean().meta({ example: false, description: 'True for meta/query messages not visible to content generation' }),
-  type: z
-    .string()
-    .nullable()
-    .meta({ example: 'branch', description: 'Message type: null for normal, branch for choices, event for events, background for reader background-image changes, audio for inline reader audio embeds' }),
+  isQuery: z
+    .boolean()
+    .meta({ example: false, description: 'True for meta/query messages not visible to content generation' }),
+  type: z.string().nullable().meta({
+    example: 'branch',
+    description:
+      'Message type: null for normal, branch for choices, event for events, background for reader background-image changes, audio for inline reader audio embeds',
+  }),
   options: z
     .array(branchOptionSchema)
     .nullable()
@@ -206,7 +203,8 @@ const createMessageBodySchema = z.strictObject({
     example: false,
   }),
   type: z.string().optional().meta({
-    description: 'Message type: null for normal, branch for choices, event for events, background for reader background-image changes',
+    description:
+      'Message type: null for normal, branch for choices, event for events, background for reader background-image changes',
     example: 'branch',
   }),
   options: z.array(branchOptionSchema).optional().meta({
@@ -615,6 +613,18 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // Only validate the background file when the patch actually sets/changes it
       // (request.body.backgroundFileId !== undefined). null is "clear", a string is "set".
       const storyId = message.scene.chapter.arc.book.story.id
+      if (request.body.nodeId !== undefined) {
+        const destination = await prisma.scene.findFirst({
+          where: {
+            id: request.body.nodeId,
+            chapter: { arc: { book: { storyId, story: { ownerId: userId } } } },
+          },
+          select: { id: true },
+        })
+        if (!destination) {
+          return reply.code(400).send({ error: 'Destination scene must belong to the same story' })
+        }
+      }
       const resultingType = request.body.type !== undefined ? request.body.type : message.type
       if (request.body.backgroundFileId !== undefined && request.body.backgroundFileId !== null) {
         if (resultingType !== 'background') {
@@ -743,15 +753,17 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           storyId: z.string().optional().meta({
             description: 'Story ID (also in path, included for compatibility)',
           }),
-          items: z.array(
-            z.strictObject({
-              messageId: z.string().meta({ description: 'Message ID to update' }),
-              nodeId: z.string().meta({ description: 'Target scene/node ID' }),
-              order: z.number().int().min(0).meta({ description: 'New sort order' }),
+          items: z
+            .array(
+              z.strictObject({
+                messageId: z.string().meta({ description: 'Message ID to update' }),
+                nodeId: z.string().meta({ description: 'Target scene/node ID' }),
+                order: z.number().int().min(0).meta({ description: 'New sort order' }),
+              }),
+            )
+            .meta({
+              description: 'Array of message updates',
             }),
-          ).meta({
-            description: 'Array of message updates',
-          }),
         }),
         response: {
           200: z.strictObject({
@@ -788,6 +800,30 @@ const messageRoutes: FastifyPluginAsyncZod = async (fastify) => {
           success: true as const,
           updatedAt: new Date().toISOString(),
         }
+      }
+
+      const messageIds = [...new Set(items.map((item) => item.messageId))]
+      const sceneIds = [...new Set(items.map((item) => item.nodeId))]
+      const [ownedMessages, ownedScenes] = await Promise.all([
+        prisma.message.findMany({
+          where: {
+            id: { in: messageIds },
+            scene: { chapter: { arc: { book: { storyId, story: { ownerId: userId } } } } },
+          },
+          select: { id: true },
+        }),
+        prisma.scene.findMany({
+          where: {
+            id: { in: sceneIds },
+            chapter: { arc: { book: { storyId, story: { ownerId: userId } } } },
+          },
+          select: { id: true },
+        }),
+      ])
+      if (ownedMessages.length !== messageIds.length || ownedScenes.length !== sceneIds.length) {
+        return reply.code(400).send({
+          error: 'Every message and destination scene must belong to the requested story',
+        })
       }
 
       // Update all messages in a transaction

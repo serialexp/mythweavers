@@ -49,6 +49,7 @@ This regenerates everything in `src/api-client/` but leaves `src/client/` untouc
 The client is configured to:
 - Use `http://localhost:3201` by default
 - Include credentials (cookies) in all requests for session auth
+- Throw typed `ApiRequestError` failures (including HTTP status) for non-2xx responses
 - Support runtime config via `window.RUNTIME_CONFIG.BACKEND_URL` (for Docker)
 - Support build-time config via `VITE_UNIFIED_API_URL` env var
 
@@ -57,7 +58,7 @@ The client is configured to:
 All 130+ endpoints are available as typed functions:
 
 - **Auth**: `postAuthRegister`, `postAuthLogin`, `postAuthLogout`, `getAuthSession`
-- **Stories**: `getMyStories`, `postMyStories`, `getMyStoriesById`, `patchMyStoriesById`, `deleteMyStoriesById`, `getMyStoriesByIdExport`
+- **Stories**: `getMyStories`, `postMyStories`, `getMyStoriesById`, `patchMyStoriesById`, `deleteMyStoriesById`, `getMyStoriesByIdLoadStory`
 - **Hierarchy**: Books, Arcs, Chapters, Scenes, Messages
 - **Content**: MessageRevisions, Paragraphs, ParagraphRevisions
 - **Characters**: `getMyStoriesByStoryIdCharacters`, `postMyStoriesByStoryIdCharacters`, etc.

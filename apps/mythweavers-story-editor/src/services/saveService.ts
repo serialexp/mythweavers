@@ -56,7 +56,6 @@ import {
   patchMyScenesBySceneIdBackground,
   getApiBaseUrl,
 } from '../client/config'
-import { VersionConflictError } from '../types/api'
 import {
   Character,
   ContextItem,
@@ -68,7 +67,6 @@ import {
   Node,
   StoryMap,
 } from '../types/core'
-import { apiClient } from '../utils/apiClient'
 
 // Convert base64 data URI to Blob without using fetch (CSP-compliant)
 function base64ToBlob(dataUri: string): Blob {
@@ -177,15 +175,6 @@ interface ContextDeleteOperation extends SaveOperationBase {
   type: 'context-delete'
   entityType: 'context'
   data?: undefined
-}
-
-interface ContextStatesOperation extends SaveOperationBase {
-  type: 'context-states'
-  entityType: 'context-states'
-  data: {
-    characterStates: Array<{ characterId: string; messageId: string; isActive: boolean }>
-    contextItemStates: Array<{ contextItemId: string; messageId: string; isActive: boolean }>
-  }
 }
 
 // Map operations
@@ -436,7 +425,6 @@ type SaveOperation =
   | ContextInsertOperation
   | ContextUpdateOperation
   | ContextDeleteOperation
-  | ContextStatesOperation
   | MapInsertOperation
   | MapUpdateOperation
   | MapDeleteOperation
@@ -564,9 +552,9 @@ export class SaveService {
   }
 
   // Trigger full save function (to be set by messagesStore)
-  private triggerFullSave: () => void = () => {}
+  private triggerFullSave: () => Promise<void> = async () => {}
 
-  setTriggerFullSave(fn: () => void) {
+  setTriggerFullSave(fn: () => Promise<void>) {
     this.triggerFullSave = fn
   }
 
@@ -576,8 +564,7 @@ export class SaveService {
     if (this.getStorageMode?.() === 'local') {
       // For local stories, any save triggers a full save
       // Local story detected, triggering full save
-      this.triggerFullSave()
-      return
+      return this.triggerFullSave()
     }
 
     // Don't queue anything during a full save
@@ -693,9 +680,6 @@ export class SaveService {
       } catch (error) {
         console.error(`Failed ${operation.type} for ${operation.entityType} ${operation.entityId}:`, error)
 
-        // Notify about the failed operation
-        this.onOperationFailed?.(operation, error as Error)
-
         // Check for authentication errors
         const errorMessage = error instanceof Error ? error.message : String(error)
         if (
@@ -705,24 +689,9 @@ export class SaveService {
           errorMessage.includes('Invalid session token')
         ) {
           console.error('[SaveService] Authentication error detected - user may need to log in again')
+          this.onOperationFailed?.(operation, error as Error)
           this.onError?.(new Error('Authentication failed. Please log in again to save your work.'))
           // Clear the queue to prevent further failures
-          this.state.queue = []
-          this.onQueueLengthChange?.(0)
-          break
-        }
-
-        // Handle version conflicts
-        if (
-          error instanceof VersionConflictError ||
-          (error instanceof Error && (error as any).code === 'VERSION_CONFLICT')
-        ) {
-          const conflictError = error as VersionConflictError
-          this.onConflict?.(
-            conflictError.serverUpdatedAt || (error as any).serverUpdatedAt,
-            conflictError.clientUpdatedAt || (error as any).clientUpdatedAt,
-          )
-          // Clear the queue on conflict
           this.state.queue = []
           this.onQueueLengthChange?.(0)
           break
@@ -732,8 +701,7 @@ export class SaveService {
         // Try multiple ways to get the status code since different clients format errors differently
         let statusCode = (error as any)?.response?.status || (error as any)?.status
 
-        // If status not found on error object, try parsing from error message
-        // Old apiClient format: "POST /path failed with status 404"
+        // If status is not present on the error object, try its message.
         if (!statusCode && errorMessage) {
           const match = errorMessage.match(/status (\d{3})/)
           if (match) {
@@ -743,10 +711,24 @@ export class SaveService {
 
         const isClientError = statusCode >= 400 && statusCode < 500
 
+        if (statusCode === 409) {
+          this.onOperationFailed?.(operation, error as Error)
+          const details = (error as any)?.details ?? error
+          if (details?.serverUpdatedAt && details?.clientUpdatedAt) {
+            this.onConflict?.(details.serverUpdatedAt, details.clientUpdatedAt)
+          } else {
+            this.onError?.(error instanceof Error ? error : new Error(errorMessage))
+          }
+          this.state.queue = []
+          this.onQueueLengthChange?.(0)
+          break
+        }
+
         if (isClientError) {
           console.warn(`[SaveService] Client error (${statusCode}) detected, not retrying`)
           // Don't retry client errors - they won't succeed on retry
-          // Just log and continue to next operation
+          this.onOperationFailed?.(operation, error as Error)
+          this.onError?.(error instanceof Error ? error : new Error(errorMessage))
         } else {
           // Retry logic for server errors (5xx) and network errors
           if (operation.retryCount === undefined) {
@@ -761,6 +743,7 @@ export class SaveService {
             this.state.queue.unshift(operation) // Put it back at the front
           } else {
             console.error(`[SaveService] Failed after 3 retries (status: ${statusCode || 'unknown'}), notifying user`)
+            this.onOperationFailed?.(operation, error as Error)
             this.onError?.(error as Error)
           }
         }
@@ -1045,10 +1028,7 @@ export class SaveService {
 
         // If map has imageData, upload it first
         if (operation.data.imageData) {
-          // Convert base64 to blob
-          const base64Data = operation.data.imageData.split(',')[1] || operation.data.imageData
-          const mimeType = operation.data.imageData.match(/data:([^;]+);/)?.[1] || 'image/png'
-          const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then((r) => r.blob())
+          const blob = base64ToBlob(operation.data.imageData)
 
           // Upload file using multipart/form-data
           const formData = new FormData()
@@ -1057,18 +1037,20 @@ export class SaveService {
             formData.append('storyId', storyId)
           }
 
-          const response = await fetch('http://localhost:3201/my/files', {
+          const response = await fetch(`${getApiBaseUrl()}/my/files`, {
             method: 'POST',
             credentials: 'include',
             body: formData,
           })
 
-          if (response.ok) {
-            const result = await response.json()
-            fileId = result.file?.id
-          } else {
-            console.error('Failed to upload map image:', await response.text())
+          if (!response.ok) {
+            const message = await response.text()
+            throw new Error(message || `Map image upload failed with status ${response.status}`)
           }
+
+          const result = await response.json()
+          fileId = result.file?.id
+          if (!fileId) throw new Error('Map image upload did not return a file ID')
         }
 
         // Create map with fileId
@@ -1146,6 +1128,8 @@ export class SaveService {
             body: {
               id: operation.data.id, // Pass client-generated ID
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary || undefined,
+              paragraphSummary: operation.data.paragraphSummary || undefined,
               summary: operation.data.summary || undefined,
               sortOrder: operation.data.order ?? 0,
             },
@@ -1156,6 +1140,8 @@ export class SaveService {
             body: {
               id: operation.data.id, // Pass client-generated ID
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary || undefined,
+              paragraphSummary: operation.data.paragraphSummary || undefined,
               summary: operation.data.summary || undefined,
               sortOrder: operation.data.order ?? 0,
             },
@@ -1166,6 +1152,8 @@ export class SaveService {
             body: {
               id: operation.data.id, // Pass client-generated ID
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary || undefined,
+              paragraphSummary: operation.data.paragraphSummary || undefined,
               summary: operation.data.summary || undefined,
               sortOrder: operation.data.order ?? 0,
               nodeType: operation.data.nodeType || 'story',
@@ -1179,7 +1167,10 @@ export class SaveService {
             body: {
               id: operation.data.id,
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary || undefined,
+              paragraphSummary: operation.data.paragraphSummary || undefined,
               summary: operation.data.summary || undefined,
+              summarySegments: operation.data.summarySegments || undefined,
               sortOrder: operation.data.order ?? 0,
             } as any,
           })
@@ -1193,6 +1184,8 @@ export class SaveService {
             path: { id: entityId },
             body: {
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary,
+              paragraphSummary: operation.data.paragraphSummary,
               summary: operation.data.summary,
               sortOrder: operation.data.order,
               coverArtFileId: operation.data.coverArtFileId,
@@ -1203,6 +1196,8 @@ export class SaveService {
             path: { id: entityId },
             body: {
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary,
+              paragraphSummary: operation.data.paragraphSummary,
               summary: operation.data.summary,
               sortOrder: operation.data.order,
             },
@@ -1212,6 +1207,8 @@ export class SaveService {
             path: { id: entityId },
             body: {
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary,
+              paragraphSummary: operation.data.paragraphSummary,
               summary: operation.data.summary,
               sortOrder: operation.data.order,
               nodeType: operation.data.nodeType,
@@ -1224,7 +1221,10 @@ export class SaveService {
             path: { id: entityId },
             body: {
               name: operation.data.title,
+              sentenceSummary: operation.data.sentenceSummary,
+              paragraphSummary: operation.data.paragraphSummary,
               summary: operation.data.summary,
+              summarySegments: operation.data.summarySegments,
               sortOrder: operation.data.order,
               includeInFull: operation.data.includeInFull,
               // Scene-specific fields for context/characters
@@ -1259,6 +1259,8 @@ export class SaveService {
             nodeId: node.id,
             nodeType: node.type as 'book' | 'arc' | 'chapter' | 'scene',
             name: node.title,
+            sentenceSummary: node.sentenceSummary,
+            paragraphSummary: node.paragraphSummary,
             summary: node.summary,
             sortOrder: node.order,
             nodeType_: node.nodeType,
@@ -1297,21 +1299,6 @@ export class SaveService {
         if (reorderResponse?.updatedAt) {
           this.updateLastKnownTimestamp(reorderResponse.updatedAt)
         }
-        break
-      }
-
-      case 'context-states': {
-        const contextStatesResponse = await apiClient
-          .fetch('/context-states/batch-update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              storyId,
-              ...operation.data,
-            }),
-          })
-          .then((res) => res.json())
-        this.updateLastKnownTimestamp(contextStatesResponse.updatedAt)
         break
       }
 
@@ -1366,37 +1353,15 @@ export class SaveService {
         break
 
       case 'fleet-movement-insert': {
-        const movementCreateResponse = await apiClient.createFleetMovement(
-          storyId,
-          operation.data.mapId,
-          operation.data.fleetId,
-          operation.data,
-        )
-        this.updateLastKnownTimestamp(movementCreateResponse.updatedAt)
-        break
+        throw new Error('Pawn movement persistence is not supported by the unified API')
       }
 
       case 'fleet-movement-update': {
-        const movementUpdateResponse = await apiClient.updateFleetMovement(
-          storyId,
-          operation.data.mapId,
-          operation.data.fleetId,
-          entityId,
-          operation.data,
-        )
-        this.updateLastKnownTimestamp(movementUpdateResponse.updatedAt)
-        break
+        throw new Error('Pawn movement persistence is not supported by the unified API')
       }
 
       case 'fleet-movement-delete': {
-        const movementDeleteResponse = await apiClient.deleteFleetMovement(
-          storyId,
-          operation.data.mapId,
-          operation.data.fleetId,
-          entityId,
-        )
-        this.updateLastKnownTimestamp(movementDeleteResponse.updatedAt)
-        break
+        throw new Error('Pawn movement persistence is not supported by the unified API')
       }
 
       case 'hyperlane-insert': {
@@ -1635,7 +1600,10 @@ export class SaveService {
   }
 
   // Save individual entities with debouncing
-  private debouncedSaves = new Map<string, NodeJS.Timeout>()
+  private debouncedSaves = new Map<
+    string,
+    { timeout: ReturnType<typeof setTimeout>; operation: Omit<SaveOperation, 'id' | 'timestamp'> }
+  >()
 
   private isOperation(operation: SaveOperation, action: 'insert' | 'update' | 'delete'): boolean {
     const expectedType = `${operation.entityType}-${action}` as SaveOperationType
@@ -1666,7 +1634,7 @@ export class SaveService {
     // Clear existing timeout
     const existing = this.debouncedSaves.get(key)
     if (existing) {
-      clearTimeout(existing)
+      clearTimeout(existing.timeout)
     }
 
     // Set new timeout
@@ -1675,7 +1643,20 @@ export class SaveService {
       this.queueSave(operation)
     }, delay)
 
-    this.debouncedSaves.set(key, timeout)
+    this.debouncedSaves.set(key, { timeout, operation })
+  }
+
+  /** Immediately enqueue every debounced write and wait for the queue to drain. */
+  async flushPendingSaves(): Promise<void> {
+    const pending = [...this.debouncedSaves.values()]
+    this.debouncedSaves.clear()
+    const queuedSaves: Promise<void>[] = []
+    for (const { timeout, operation } of pending) {
+      clearTimeout(timeout)
+      queuedSaves.push(this.queueSave(operation))
+    }
+    await Promise.all(queuedSaves)
+    await this.processingPromise
   }
 
   // Public save methods
@@ -1854,21 +1835,6 @@ export class SaveService {
       entityId: `${mapId}-${landmarkId}-${storyTime}-${field}`,
       storyId,
       data: { mapId, landmarkId, storyTime, field, value },
-    })
-  }
-
-  // Save context states (character and context item states)
-  saveContextStates(
-    storyId: string,
-    characterStates: Array<{ characterId: string; messageId: string; isActive: boolean }>,
-    contextItemStates: Array<{ contextItemId: string; messageId: string; isActive: boolean }>,
-  ) {
-    this.queueSave({
-      type: 'context-states',
-      entityType: 'context-states',
-      entityId: `context-states-${Date.now()}`,
-      storyId,
-      data: { characterStates, contextItemStates },
     })
   }
 
@@ -2203,47 +2169,10 @@ export class SaveService {
     })
   }
 
-  // Manual full story save
-  async saveFullStory(storyId: string, storyData: any): Promise<void> {
-    // Cancel all pending operations
-    this.cancelAllPendingSaves()
-
-    // Set flag to prevent new saves during full save
-    this.state.isFullSaveInProgress = true
-    this.onSaveStatusChange?.(true)
-
-    try {
-      const response = await apiClient.updateStory(storyId, {
-        ...storyData,
-        lastKnownUpdatedAt: this.state.lastKnownUpdatedAt,
-      })
-      this.updateLastKnownTimestamp(response.updatedAt)
-      // Full story save completed
-    } catch (error) {
-      // Handle version conflicts
-      if (
-        error instanceof VersionConflictError ||
-        (error instanceof Error && (error as any).code === 'VERSION_CONFLICT')
-      ) {
-        const conflictError = error as VersionConflictError
-        this.onConflict?.(
-          conflictError.serverUpdatedAt || (error as any).serverUpdatedAt,
-          conflictError.clientUpdatedAt || (error as any).clientUpdatedAt,
-        )
-      } else {
-        this.onError?.(error as Error)
-      }
-      throw error
-    } finally {
-      this.state.isFullSaveInProgress = false
-      this.onSaveStatusChange?.(false)
-    }
-  }
-
   // Cancel all pending saves
   cancelAllPendingSaves() {
     // Clear debounced saves
-    for (const timeout of this.debouncedSaves.values()) {
+    for (const { timeout } of this.debouncedSaves.values()) {
       clearTimeout(timeout)
     }
     this.debouncedSaves.clear()

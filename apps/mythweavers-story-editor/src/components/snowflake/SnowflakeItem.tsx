@@ -6,10 +6,12 @@ import { RefinementPreview } from './RefinementPreview'
 import * as styles from './Snowflake.css'
 import { SnowflakeInput } from './SnowflakeInput'
 import { SnowflakeItemActions } from './SnowflakeItemActions'
-import { childrenOf, determineRefinementLevel, summaryOf } from './actions/helpers'
+import { childrenOf, highestSummaryLevel } from './actions/helpers'
 
 interface SnowflakeItemProps {
   node: Node
+  /** Opens the scene-split modal for a scene node. Threaded down the recursion. */
+  onSplitScene?: (nodeId: string) => void
 }
 
 /** One node card in the outline tree; recurses into its children. */
@@ -17,7 +19,7 @@ export const SnowflakeItem: Component<SnowflakeItemProps> = (props) => {
   const children = () => childrenOf(props.node.id)
   const hasChildren = () => children().length > 0
   const expanded = () => nodeStore.isExpanded(props.node.id)
-  const level = () => determineRefinementLevel(summaryOf(props.node))
+  const level = () => highestSummaryLevel(props.node)
 
   return (
     <div class={styles.card[props.node.type]}>
@@ -43,13 +45,13 @@ export const SnowflakeItem: Component<SnowflakeItemProps> = (props) => {
           placeholder="Untitled"
         />
 
-        <Show when={summaryOf(props.node).trim().length > 0}>
+        <Show when={level()}>
           <span class={styles.levelBadge} title="Detail level (sentence / paragraph / page)">
             {`L${level()}`}
           </span>
         </Show>
 
-        <SnowflakeItemActions node={props.node} hasChildren={hasChildren()} />
+        <SnowflakeItemActions node={props.node} hasChildren={hasChildren()} onSplitScene={props.onSplitScene} />
       </div>
 
       <SnowflakeInput node={props.node} />
@@ -58,7 +60,7 @@ export const SnowflakeItem: Component<SnowflakeItemProps> = (props) => {
 
       <Show when={expanded() && hasChildren()}>
         <div class={styles.childrenContainer}>
-          <For each={children()}>{(child) => <SnowflakeItem node={child} />}</For>
+          <For each={children()}>{(child) => <SnowflakeItem node={child} onSplitScene={props.onSplitScene} />}</For>
         </div>
       </Show>
     </div>

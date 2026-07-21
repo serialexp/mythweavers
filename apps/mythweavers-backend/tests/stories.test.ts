@@ -724,7 +724,7 @@ describe('Story Endpoints', () => {
     })
   })
 
-  describe('GET /my/stories/:id/export', () => {
+  describe('GET /my/stories/:id/load-story', () => {
     test('should export story with all related data', async () => {
       // Create a story
       const storyResponse = await app.inject({
@@ -747,7 +747,7 @@ describe('Story Endpoints', () => {
       // Export the story
       const response = await app.inject({
         method: 'GET',
-        url: `/my/stories/${storyId}/export`,
+        url: `/my/stories/${storyId}/load-story`,
         cookies: { [sessionCookie.name]: sessionCookie.value },
       })
 
@@ -776,7 +776,7 @@ describe('Story Endpoints', () => {
     test('should require authentication', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: '/my/stories/some-id/export',
+        url: '/my/stories/some-id/load-story',
       })
 
       expect(response.statusCode).toBe(401)
@@ -785,11 +785,56 @@ describe('Story Endpoints', () => {
     test('should return 404 for non-existent story', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: '/my/stories/nonexistent/export',
+        url: '/my/stories/nonexistent/load-story',
         cookies: { [sessionCookie.name]: sessionCookie.value },
       })
 
       expect(response.statusCode).toBe(404)
+    })
+  })
+
+  describe('bulk node ownership boundaries', () => {
+    test('rejects foreign node IDs in bulk update and reorder requests', async () => {
+      const ownStory = await prisma.story.create({
+        data: { name: 'Own story', ownerId: userId },
+      })
+      const foreignUser = await prisma.user.create({
+        data: {
+          email: 'foreign@example.com',
+          username: 'foreignuser',
+          passwordHash: 'unused:unused',
+        },
+      })
+      const foreignStory = await prisma.story.create({
+        data: { name: 'Foreign story', ownerId: foreignUser.id },
+      })
+      const foreignBook = await prisma.book.create({
+        data: { name: 'Do not alter', storyId: foreignStory.id, sortOrder: 7 },
+      })
+
+      const updateResponse = await app.inject({
+        method: 'POST',
+        url: `/my/stories/${ownStory.id}/nodes/bulk-update`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: {
+          items: [{ nodeId: foreignBook.id, nodeType: 'book', name: 'Compromised' }],
+        },
+      })
+      expect(updateResponse.statusCode).toBe(400)
+
+      const reorderResponse = await app.inject({
+        method: 'POST',
+        url: `/my/stories/${ownStory.id}/nodes/reorder`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: {
+          items: [{ nodeId: foreignBook.id, nodeType: 'book', parentId: null, order: 0 }],
+        },
+      })
+      expect(reorderResponse.statusCode).toBe(400)
+
+      const unchanged = await prisma.book.findUniqueOrThrow({ where: { id: foreignBook.id } })
+      expect(unchanged.name).toBe('Do not alter')
+      expect(unchanged.sortOrder).toBe(7)
     })
   })
 })

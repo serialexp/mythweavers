@@ -28,14 +28,6 @@ interface UseStoryGenerationProps {
     maxTokens?: number,
     isRegeneration?: boolean,
   ) => Promise<void>
-  generateSummaries: (
-    messageId: string,
-    content: string,
-  ) => Promise<{
-    sentenceSummary: string
-    summary: string
-    paragraphSummary: string
-  }>
 }
 
 export const useStoryGeneration = (props: UseStoryGenerationProps) => {
@@ -592,28 +584,6 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     messagesStore.setIsLoading(false)
   }
 
-  const handleSummarizeMessage = async (messageId: string) => {
-    const message = messagesStore.messages.find((m) => m.id === messageId)
-    if (!message) return
-
-    messagesStore.setSummarizing(messageId, true)
-
-    try {
-      const { sentenceSummary, summary, paragraphSummary } = await props.generateSummaries(message.id, message.content)
-
-      messagesStore.updateMessage(messageId, {
-        sentenceSummary,
-        summary,
-        paragraphSummary,
-        isExpanded: true, // Keep showing full content after summaries are generated
-      })
-    } catch (error) {
-      console.error('Summarization failed:', error)
-    }
-
-    messagesStore.setSummarizing(messageId, false)
-  }
-
   const handleShowContextPreview = async () => {
     console.log('[useStoryGeneration] handleShowContextPreview started')
     const inputText = messagesStore.input.trim() || '[Empty input]'
@@ -748,7 +718,6 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
     regenerateLastMessage,
     handleRegenerateFromMessage,
     handleRegenerateQuery,
-    handleSummarizeMessage,
     handleShowContextPreview,
   }
 }

@@ -1,5 +1,5 @@
 // Bottom-up: summarize a node from its children's one-liners. Previews the
-// result; on accept overwrites the node's summary.
+// result; on accept writes the currently highest Snowflake level.
 
 import { errorStore } from '../../../stores/errorStore'
 import { nodeStore } from '../../../stores/nodeStore'
@@ -8,7 +8,7 @@ import { runSnowflakePrompt } from '../ai'
 import { LEVEL_DESCRIPTIONS } from '../constants'
 import { SNOWFLAKE_PARENT } from '../prompts'
 import { snowflakeStore } from '../store'
-import { childrenOf, determineRefinementLevel, summaryOf } from './helpers'
+import { childrenOf, highestSummaryLevel, summaryAtLevel, summaryFieldForLevel, summaryOf } from './helpers'
 
 const SUMMARIZE_OP = 'summarize'
 
@@ -22,7 +22,7 @@ export async function generateParentSummary(node: Node): Promise<void> {
   const loadingKey = `${node.id}:${SUMMARIZE_OP}`
   snowflakeStore.setLoading(loadingKey, true)
   try {
-    const level = determineRefinementLevel(summaryOf(node))
+    const level = highestSummaryLevel(node) ?? 1
     const childSummaries = children.map((c) => summaryOf(c)).join('\n')
     const instruction = [
       `<child_summaries>\n${childSummaries}\n</child_summaries>`,
@@ -41,11 +41,11 @@ export async function generateParentSummary(node: Node): Promise<void> {
     }
 
     snowflakeStore.setPreview(node.id, {
-      original: summaryOf(node),
+      original: summaryAtLevel(node, level),
       refined,
       level,
       onAccept: () => {
-        nodeStore.updateNode(node.id, { summary: refined })
+        nodeStore.updateNode(node.id, { [summaryFieldForLevel(level)]: refined })
         snowflakeStore.clearPreview(node.id)
       },
       onReject: () => snowflakeStore.clearPreview(node.id),

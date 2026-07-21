@@ -1,16 +1,8 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  mock,
-  test,
-} from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { promises as fs } from 'node:fs'
-import sharp from 'sharp'
+import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
+import sharp from 'sharp'
 
 import { getUploadDir } from '../src/lib/file-storage.js'
 import { prisma } from '../src/lib/prisma.js'
@@ -401,10 +393,38 @@ describe('POST /my/images/generate', () => {
 
     // User.balance decremented by the exact cost.
     const after = await prisma.user.findUnique({ where: { id: userId } })
-    expect(Number(after?.balance) - Number(before?.balance)).toBeCloseTo(
-      -0.01,
-      6,
-    )
+    expect(Number(after?.balance) - Number(before?.balance)).toBeCloseTo(-0.01, 6)
+  })
+
+  test('deduplicated generations do not leave a second storage object', async () => {
+    const userUploadDir = join(getUploadDir(), String(userId))
+    const countStoredFiles = async () => {
+      try {
+        const entries = await fs.readdir(userUploadDir, { recursive: true, withFileTypes: true })
+        return entries.filter((entry) => entry.isFile()).length
+      } catch {
+        return 0
+      }
+    }
+
+    const before = await countStoredFiles()
+    const first = await app.inject({
+      method: 'POST',
+      url: '/my/images/generate',
+      cookies: { [sessionCookie.name]: sessionCookie.value },
+      payload: validBody(),
+    })
+    const second = await app.inject({
+      method: 'POST',
+      url: '/my/images/generate',
+      cookies: { [sessionCookie.name]: sessionCookie.value },
+      payload: validBody(),
+    })
+
+    expect(first.statusCode).toBe(200)
+    expect(second.statusCode).toBe(200)
+    expect(second.json().fileId).toBe(first.json().fileId)
+    expect(await countStoredFiles()).toBe(before + 1)
   })
 
   test('returns 502 when upstream throws, logs an errored ImageUsageLog, no balance debit', async () => {

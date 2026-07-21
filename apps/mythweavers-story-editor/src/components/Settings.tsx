@@ -19,7 +19,7 @@ import { ModelSelector } from './ModelSelector'
 import { ProviderSelector, ApiKeys } from './ProviderModelSelector'
 import * as styles from './Settings.css'
 import { StoryTimePicker } from './StoryTimePicker'
-import { PhArrowSquareUpIcon, PhChatTextIcon, PhClockIcon, PhDownloadSimpleIcon, PhGearIcon, PhKeyIcon, PhLinkIcon, PhListBulletsIcon, PhPencilSimpleLineIcon, PhPlugIcon, PhStackIcon, PhTrashIcon } from 'solidjs-phosphor'
+import { PhArrowSquareUpIcon, PhChatTextIcon, PhClockIcon, PhDownloadSimpleIcon, PhGearIcon, PhKeyIcon, PhLinkIcon, PhPencilSimpleLineIcon, PhPlugIcon, PhStackIcon, PhTrashIcon } from 'solidjs-phosphor'
 
 interface SettingsSection {
   id: string
@@ -48,7 +48,6 @@ interface SettingsProps {
   availableModels: Model[]
   isLoadingModels: boolean
   onRefreshModels: () => void
-  onBulkSummarize: () => void
   onMigrateInstructions: () => void
   onRemoveUserMessages: () => void
   onCleanupThinkTags: () => void
@@ -329,26 +328,6 @@ export const Settings: Component<SettingsProps> = (props) => {
 
   const renderOperationsSection = () => (
     <div class={styles.section}>
-      <div class={styles.settingRow}>
-        <button
-          onClick={props.onBulkSummarize}
-          disabled={props.isLoading || !props.model || globalOperationStore.isOperationInProgress() || props.isGenerating}
-          class={styles.button}
-          title={
-            props.isGenerating
-              ? 'AI is currently generating content - please wait'
-              : globalOperationStore.isOperationInProgress()
-                ? 'Another operation is in progress'
-                : !props.model
-                  ? 'Select a model first'
-                  : "Generate summaries for all story messages that don't have one yet"
-          }
-        >
-          <PhListBulletsIcon /> Generate Missing Summaries
-        </button>
-      </div>
-
-
       <Show when={needsMigrationCount() > 0}>
         <div class={styles.settingRow}>
           <button

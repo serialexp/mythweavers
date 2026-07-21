@@ -1,0 +1,22 @@
+{
+  "name": "@mythweavers/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "mythweavers": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "cli": "tsx --env-file-if-exists=../../.env.local src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  }
+}

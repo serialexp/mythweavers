@@ -11,11 +11,6 @@ export interface Message {
   cacheReadTokens?: number // Tokens read from cache
   isQuery?: boolean
   paragraphs?: string[]
-  sentenceSummary?: string
-  summary?: string
-  paragraphSummary?: string
-  isExpanded?: boolean
-  isSummarizing?: boolean
   think?: string // AI's thinking/reasoning content
   showThink?: boolean // Whether to display the think content
   sceneAnalysis?: SceneAnalysis // Cached analysis of this story beat

@@ -1,4 +1,8 @@
 import { createHash } from 'node:crypto'
+import { createWriteStream } from 'node:fs'
+import { promises as fs } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { Prisma } from '@prisma/client'
 import archiver from 'archiver'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -6,12 +10,108 @@ import type { FastifyPluginAsyncZodOpenApi } from 'fastify-zod-openapi'
 import unzipper from 'unzipper'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
-import { getFileStream, saveBuffer } from '../../lib/file-storage.js'
+import { deleteFile, getFileStream, saveBuffer } from '../../lib/file-storage.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
 
 // Export manifest schema
 const EXPORT_VERSION = '1.0.0'
+const MAX_ZIP_ENTRIES = 2_000
+const MAX_ZIP_ENTRY_BYTES = 10 * 1024 * 1024
+const MAX_ZIP_EXPANDED_BYTES = 100 * 1024 * 1024
+const MAX_IMPORT_ENTITIES = 25_000
+const MAX_EXPORT_SOURCE_BYTES = 100 * 1024 * 1024
+
+function validateZipDirectory(directory: Awaited<ReturnType<typeof unzipper.Open.buffer>>): string | null {
+  if (directory.files.length > MAX_ZIP_ENTRIES) {
+    return `ZIP contains too many entries (maximum ${MAX_ZIP_ENTRIES})`
+  }
+
+  let expandedBytes = 0
+  for (const file of directory.files) {
+    const bytes = file.type === 'File' ? file.uncompressedSize : 0
+    if (bytes > MAX_ZIP_ENTRY_BYTES) {
+      return `ZIP entry ${file.path} is too large`
+    }
+    expandedBytes += bytes
+    if (expandedBytes > MAX_ZIP_EXPANDED_BYTES) {
+      return 'ZIP expands beyond the allowed total size'
+    }
+  }
+  return null
+}
+
+function countImportEntities(data: any): number {
+  let count = 1
+  const add = (items: unknown) => {
+    if (Array.isArray(items)) count += items.length
+  }
+
+  add(data.files)
+  add(data.characters)
+  add(data.contextItems)
+  add(data.calendars)
+  add(data.languages)
+  add(data.maps)
+  add(data.mediaAttachments)
+  add(data.plotPointStates)
+  add(data.tags)
+  add(data.books)
+
+  for (const character of data.characters ?? []) add(character.inventory)
+  for (const book of data.books ?? []) {
+    add(book.arcs)
+    for (const arc of book.arcs ?? []) {
+      add(arc.chapters)
+      for (const chapter of arc.chapters ?? []) {
+        add(chapter.publishingStatus)
+        add(chapter.scenes)
+        for (const scene of chapter.scenes ?? []) {
+          add(scene.messages)
+          for (const message of scene.messages ?? []) {
+            add(message.messageRevisions)
+            for (const revision of message.messageRevisions ?? []) {
+              add(revision.paragraphs)
+              for (const paragraph of revision.paragraphs ?? []) {
+                add(paragraph.paragraphRevisions)
+                for (const paragraphRevision of paragraph.paragraphRevisions ?? []) {
+                  add(paragraphRevision.paragraphComments)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  for (const map of data.maps ?? []) {
+    add(map.landmarks)
+    add(map.pawns)
+    add(map.paths)
+    for (const landmark of map.landmarks ?? []) add(landmark.states)
+    for (const pawn of map.pawns ?? []) add(pawn.movements)
+    for (const path of map.paths ?? []) add(path.segments)
+  }
+  for (const media of data.mediaAttachments ?? []) {
+    add(media.frames)
+    add(media.segments)
+    add(media.sceneLinks)
+  }
+  return count
+}
+
+function validateImportData(data: any): string | null {
+  if (!data || typeof data !== 'object' || !data.story || typeof data.story !== 'object') {
+    return 'Import does not contain a story object'
+  }
+  if (typeof data.story.name !== 'string' || data.story.name.length < 1 || data.story.name.length > 200) {
+    return 'Imported story name must be between 1 and 200 characters'
+  }
+  if (countImportEntities(data) > MAX_IMPORT_ENTITIES) {
+    return `Import contains too many entities (maximum ${MAX_IMPORT_ENTITIES})`
+  }
+  return null
+}
 
 // CYOA (Choose Your Own Adventure) format from artifact exports
 interface CyoaMessage {
@@ -45,9 +145,7 @@ function isCyoaFormat(data: any): data is CyoaFormat {
     data.messages.length > 0 &&
     data.messages.every(
       (m: any) =>
-        typeof m === 'object' &&
-        (m.role === 'user' || m.role === 'assistant') &&
-        typeof m.content === 'string',
+        typeof m === 'object' && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string',
     )
   )
 }
@@ -163,9 +261,7 @@ function convertCyoaToMythWeavers(cyoa: CyoaFormat): any {
   }
 
   // Build story name from pitch or default
-  const storyName = cyoa.pitch
-    ? cyoa.pitch.split('\n')[0].substring(0, 100)
-    : 'Imported CYOA Story'
+  const storyName = cyoa.pitch ? cyoa.pitch.split('\n')[0].substring(0, 100) : 'Imported CYOA Story'
 
   return {
     story: {
@@ -322,10 +418,7 @@ function remapId<T extends string | null | undefined>(
 }
 
 // Helper to remap JSON array of IDs
-function remapIdArray(
-  ids: unknown,
-  map: Map<string, string>,
-): string[] | undefined {
+function remapIdArray(ids: unknown, map: Map<string, string>): string[] | undefined {
   if (!Array.isArray(ids)) return undefined
   return ids.map((id) => map.get(id) ?? id).filter(Boolean)
 }
@@ -346,13 +439,14 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           200: z.any().meta({ description: 'ZIP file stream' }),
           401: errorSchema,
           404: errorSchema,
+          413: errorSchema,
           500: errorSchema,
         },
       },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const userId = (request as any).user!.id
-      const { storyId } = (request.params as any)
+      const { storyId } = request.params as any
 
       // Load story with ownership check
       const story = await prisma.story.findFirst({
@@ -368,48 +462,41 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
       }
 
       // Load all related data
-      const [
-        books,
-        characters,
-        contextItems,
-        calendars,
-        languages,
-        maps,
-        mediaAttachments,
-        plotPointStates,
-      ] = await Promise.all([
-        // Books with full hierarchy
-        prisma.book.findMany({
-          where: { storyId },
-          orderBy: { sortOrder: 'asc' },
-          include: {
-            coverArtFile: true,
-            spineArtFile: true,
-            arcs: {
-              orderBy: { sortOrder: 'asc' },
-              include: {
-                chapters: {
-                  orderBy: { sortOrder: 'asc' },
-                  include: {
-                    publishingStatus: true,
-                    scenes: {
-                      orderBy: { sortOrder: 'asc' },
-                      include: {
-                        mediaLinks: true,
-                        messages: {
-                          orderBy: { sortOrder: 'asc' },
-                          include: {
-                            plotPointStates: true,
-                            messageRevisions: {
-                              orderBy: { version: 'asc' },
-                              include: {
-                                paragraphs: {
-                                  orderBy: { sortOrder: 'asc' },
-                                  include: {
-                                    paragraphRevisions: {
-                                      orderBy: { version: 'asc' },
-                                      include: {
-                                        paragraphComments: true,
+      const [books, characters, contextItems, calendars, languages, maps, mediaAttachments, plotPointStates] =
+        await Promise.all([
+          // Books with full hierarchy
+          prisma.book.findMany({
+            where: { storyId },
+            orderBy: { sortOrder: 'asc' },
+            include: {
+              coverArtFile: true,
+              spineArtFile: true,
+              arcs: {
+                orderBy: { sortOrder: 'asc' },
+                include: {
+                  chapters: {
+                    orderBy: { sortOrder: 'asc' },
+                    include: {
+                      publishingStatus: true,
+                      scenes: {
+                        orderBy: { sortOrder: 'asc' },
+                        include: {
+                          mediaLinks: true,
+                          messages: {
+                            orderBy: { sortOrder: 'asc' },
+                            include: {
+                              plotPointStates: true,
+                              messageRevisions: {
+                                orderBy: { version: 'asc' },
+                                include: {
+                                  paragraphs: {
+                                    orderBy: { sortOrder: 'asc' },
+                                    include: {
+                                      paragraphRevisions: {
+                                        orderBy: { version: 'asc' },
+                                        include: {
+                                          paragraphComments: true,
+                                        },
                                       },
                                     },
                                   },
@@ -424,64 +511,63 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
                 },
               },
             },
-          },
-        }),
-        // Characters with inventory
-        prisma.character.findMany({
-          where: { storyId },
-          orderBy: { createdAt: 'asc' },
-          include: {
-            pictureFile: true,
-            inventory: true,
-          },
-        }),
-        // Context items
-        prisma.contextItem.findMany({
-          where: { storyId },
-          orderBy: { createdAt: 'asc' },
-        }),
-        // Calendars
-        prisma.calendar.findMany({
-          where: { storyId },
-          orderBy: { createdAt: 'asc' },
-        }),
-        // Languages
-        prisma.language.findMany({
-          where: { storyId },
-          orderBy: { createdAt: 'asc' },
-        }),
-        // Maps with all nested data
-        prisma.map.findMany({
-          where: { storyId },
-          orderBy: { createdAt: 'asc' },
-          include: {
-            landmarks: {
-              include: { states: true },
+          }),
+          // Characters with inventory
+          prisma.character.findMany({
+            where: { storyId },
+            orderBy: { createdAt: 'asc' },
+            include: {
+              pictureFile: true,
+              inventory: true,
             },
-            pawns: {
-              include: { movements: true },
+          }),
+          // Context items
+          prisma.contextItem.findMany({
+            where: { storyId },
+            orderBy: { createdAt: 'asc' },
+          }),
+          // Calendars
+          prisma.calendar.findMany({
+            where: { storyId },
+            orderBy: { createdAt: 'asc' },
+          }),
+          // Languages
+          prisma.language.findMany({
+            where: { storyId },
+            orderBy: { createdAt: 'asc' },
+          }),
+          // Maps with all nested data
+          prisma.map.findMany({
+            where: { storyId },
+            orderBy: { createdAt: 'asc' },
+            include: {
+              landmarks: {
+                include: { states: true },
+              },
+              pawns: {
+                include: { movements: true },
+              },
+              paths: {
+                include: { segments: true },
+              },
             },
-            paths: {
-              include: { segments: true },
+          }),
+          // Media attachments with all nested data
+          prisma.mediaAttachment.findMany({
+            where: { storyId },
+            orderBy: { createdAt: 'asc' },
+            include: {
+              frames: { orderBy: { frameNumber: 'asc' } },
+              segments: { orderBy: { segmentIndex: 'asc' } },
+              sceneLinks: true,
             },
-          },
-        }),
-        // Media attachments with all nested data
-        prisma.mediaAttachment.findMany({
-          where: { storyId },
-          orderBy: { createdAt: 'asc' },
-          include: {
-            frames: { orderBy: { frameNumber: 'asc' } },
-            segments: { orderBy: { segmentIndex: 'asc' } },
-            sceneLinks: true,
-          },
-        }),
-        // Story-level plot point states (not nested under messages)
-        prisma.plotPointState.findMany({
-          where: { storyId },
-          orderBy: { createdAt: 'asc' },
-        }),
-      ])
+          }),
+          // Story-level plot point states (not nested under messages)
+          prisma.plotPointState.findMany({
+            where: { storyId },
+            orderBy: { createdAt: 'asc' },
+          }),
+        ])
 
       // Collect all file references
       const fileIds = new Set<string>()
@@ -542,6 +628,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         books: books.map((book) => ({
           id: book.id,
           name: book.name,
+          sentenceSummary: book.sentenceSummary,
+          paragraphSummary: book.paragraphSummary,
           summary: book.summary,
           coverArtFileId: book.coverArtFileId,
           spineArtFileId: book.spineArtFileId,
@@ -553,6 +641,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           arcs: book.arcs.map((arc) => ({
             id: arc.id,
             name: arc.name,
+            sentenceSummary: arc.sentenceSummary,
+            paragraphSummary: arc.paragraphSummary,
             summary: arc.summary,
             sortOrder: arc.sortOrder,
             nodeType: arc.nodeType,
@@ -561,6 +651,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
             chapters: arc.chapters.map((chapter) => ({
               id: chapter.id,
               name: chapter.name,
+              sentenceSummary: chapter.sentenceSummary,
+              paragraphSummary: chapter.paragraphSummary,
               summary: chapter.summary,
               publishedOn: chapter.publishedOn?.toISOString() ?? null,
               publishedAt: chapter.publishedAt?.toISOString() ?? null,
@@ -578,6 +670,8 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
               scenes: chapter.scenes.map((scene) => ({
                 id: scene.id,
                 name: scene.name,
+                sentenceSummary: scene.sentenceSummary,
+                paragraphSummary: scene.paragraphSummary,
                 summary: scene.summary,
                 summarySegments: scene.summarySegments,
                 sortOrder: scene.sortOrder,
@@ -799,6 +893,15 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
       const storyJson = JSON.stringify(exportData)
       const checksum = createHash('sha256').update(storyJson).digest('hex')
 
+      const estimatedSourceBytes =
+        Buffer.byteLength(storyJson, 'utf8') +
+        files.reduce((total, file) => total + (file.bytes ?? MAX_ZIP_ENTRY_BYTES), 0)
+      if (estimatedSourceBytes > MAX_EXPORT_SOURCE_BYTES) {
+        return reply.status(413).send({
+          error: 'Story export exceeds the 100 MB source-size limit',
+        })
+      }
+
       // Create manifest
       const manifest: ExportManifest = {
         version: EXPORT_VERSION,
@@ -809,61 +912,52 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         checksum,
       }
 
-      // Pre-fetch all file contents into buffers
-      const fileBuffers: { id: string; buffer: Buffer; mimeType: string }[] = []
+      // Stream the archive and its files instead of holding every source file
+      // plus the completed ZIP in memory at the same time. A temporary-file
+      // spool also avoids coupling archive backpressure to the HTTP client.
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'story-export-'))
+      const zipPath = path.join(tempDir, 'story.zip')
+      const archive = archiver('zip', { zlib: { level: 9 } })
+      const zipOutput = createWriteStream(zipPath)
+      archive.pipe(zipOutput)
+      archive.on('warning', (error) => {
+        fastify.log.warn({ error }, 'Archive warning')
+      })
+
+      archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' })
+      archive.append(storyJson, { name: 'story.json' })
+
       for (const file of files) {
         try {
-          const { stream } = await getFileStream(
-            file.localPath,
-            file.r2Key,
-            file.visibility as 'public' | 'private',
-          )
-          // Collect stream into buffer
-          const chunks: Buffer[] = []
-          for await (const chunk of stream as AsyncIterable<Buffer>) {
-            chunks.push(chunk)
-          }
-          fileBuffers.push({
-            id: file.id,
-            buffer: Buffer.concat(chunks),
-            mimeType: file.mimeType,
+          const { stream } = await getFileStream(file.localPath, file.r2Key, file.visibility as 'public' | 'private')
+          const ext = getExtFromMimeType(file.mimeType)
+          archive.append(stream as import('node:stream').Readable, {
+            name: `files/${file.id}.${ext}`,
           })
         } catch (err) {
           fastify.log.warn({ fileId: file.id, error: err }, 'Failed to include file in export')
         }
       }
-
-      // Create ZIP archive and collect into buffer using a promise
-      const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
-        const archive = archiver('zip', { zlib: { level: 9 } })
-        const chunks: Buffer[] = []
-
-        archive.on('data', (chunk: Buffer) => chunks.push(chunk))
-        archive.on('end', () => resolve(Buffer.concat(chunks)))
-        archive.on('error', (err) => {
-          fastify.log.error({ error: err }, 'Archive error')
-          reject(err)
-        })
-
-        // Add manifest and story data
-        archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' })
-        archive.append(storyJson, { name: 'story.json' })
-
-        // Add pre-fetched file buffers
-        for (const { id, buffer, mimeType } of fileBuffers) {
-          const ext = getExtFromMimeType(mimeType)
-          archive.append(buffer, { name: `files/${id}.${ext}` })
-        }
-
-        archive.finalize()
-      })
-
       // Set response headers
       const slug = story.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
       const filename = `${slug}-${story.id}.zip`
+      try {
+        await new Promise<void>((resolve, reject) => {
+          archive.once('error', reject)
+          zipOutput.once('error', reject)
+          zipOutput.once('finish', resolve)
+          void archive.finalize()
+        })
+      } catch (error) {
+        await fs.rm(tempDir, { recursive: true, force: true })
+        throw error
+      }
+
+      const zipBuffer = await fs.readFile(zipPath)
+      await fs.rm(tempDir, { recursive: true, force: true })
       return reply
         .header('Content-Type', 'application/zip')
         .header('Content-Disposition', `attachment; filename="${filename}"`)
@@ -936,12 +1030,17 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
           exportData = jsonData
           originalStoryId = null
         }
-      } catch (jsonErr) {
+      } catch {
         // Not JSON, try ZIP
         try {
           directory = await unzipper.Open.buffer(fileBuffer)
-        } catch (zipErr) {
+        } catch {
           return reply.status(400).send({ error: 'Invalid file format: must be JSON or ZIP' })
+        }
+
+        const zipError = validateZipDirectory(directory)
+        if (zipError) {
+          return reply.status(400).send({ error: zipError })
         }
 
         // Find manifest and story files
@@ -957,7 +1056,7 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         let manifest: ExportManifest
         try {
           manifest = manifestSchema.parse(JSON.parse(manifestBuffer.toString('utf-8')))
-        } catch (err) {
+        } catch {
           return reply.status(400).send({ error: 'Invalid manifest format' })
         }
 
@@ -982,6 +1081,11 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         originalStoryId = manifest.storyId
       }
 
+      const importError = validateImportData(exportData)
+      if (importError) {
+        return reply.status(400).send({ error: importError })
+      }
+
       // Initialize ID maps
       const idMaps: IdMaps = {
         files: new Map(),
@@ -1004,666 +1108,667 @@ const exportStoryRoutes: FastifyPluginAsyncZodOpenApi = async (fastify) => {
         mediaAttachments: new Map(),
       }
 
+      const savedImportFiles: Array<{
+        localPath: string | null
+        r2Key: string | null
+        visibility: 'public' | 'private'
+      }> = []
+
       // Import in transaction (generous timeout for large stories)
-      const newStory = await prisma.$transaction(async (tx) => {
-        // 1. Import files first (only from ZIP, skip for JSON imports)
-        if (directory) {
-          for (const fileData of exportData.files || []) {
-            const zipFile = directory.files.find(
-              (f) => f.path.startsWith('files/') && f.path.includes(fileData.id),
-            )
-            if (zipFile) {
-              const fileBuffer = await zipFile.buffer()
-              const ext = getExtFromMimeType(fileData.mimeType)
-              const filename = `imported-${fileData.id}.${ext}`
+      const newStory = await prisma
+        .$transaction(
+          async (tx) => {
+            // 1. Import files first (only from ZIP, skip for JSON imports)
+            if (directory) {
+              for (const fileData of exportData.files || []) {
+                const zipFile = directory.files.find((f) => f.path.startsWith('files/') && f.path.includes(fileData.id))
+                if (zipFile) {
+                  const fileBuffer = await zipFile.buffer()
+                  const ext = getExtFromMimeType(fileData.mimeType)
+                  const filename = `imported-${fileData.id}.${ext}`
 
-              const metadata = await saveBuffer(
-                fileBuffer,
-                filename,
-                fileData.mimeType,
-                userId,
-                'private',
-              )
+                  const metadata = await saveBuffer(fileBuffer, filename, fileData.mimeType, userId, 'private')
+                  savedImportFiles.push(metadata)
 
-              const newFile = await tx.file.create({
-                data: {
-                  ownerId: userId,
-                  localPath: metadata.localPath,
-                  r2Key: metadata.r2Key,
-                  visibility: metadata.visibility,
-                  path: metadata.path,
-                  sha256: metadata.sha256,
-                  mimeType: metadata.mimeType,
-                  width: metadata.width,
-                  height: metadata.height,
-                  bytes: metadata.bytes,
-                },
-              })
-              idMaps.files.set(fileData.id, newFile.id)
-            }
-          }
-        }
-
-        // 2. Create story (with null for FK fields that need later fixup)
-        const storyData = exportData.story
-        const story = await tx.story.create({
-          data: {
-            name: storyData.name,
-            summary: storyData.summary,
-            ownerId: userId,
-            status: storyData.status,
-            type: storyData.type,
-            published: false, // Always start unpublished
-            wordsPerWeek: storyData.wordsPerWeek,
-            spellingLevel: storyData.spellingLevel,
-            chapters: storyData.chapters,
-            coverArtFileId: remapId(storyData.coverArtFileId, idMaps.files),
-            coverColor: storyData.coverColor,
-            coverTextColor: storyData.coverTextColor,
-            coverFontFamily: storyData.coverFontFamily,
-            defaultPerspective: storyData.defaultPerspective,
-            defaultTense: storyData.defaultTense,
-            genre: storyData.genre,
-            paragraphsPerTurn: storyData.paragraphsPerTurn,
-            format: storyData.format,
-            sortOrder: storyData.sortOrder,
-            pages: storyData.pages,
-            timelineStartTime: storyData.timelineStartTime,
-            timelineEndTime: storyData.timelineEndTime,
-            timelineGranularity: storyData.timelineGranularity,
-            // branchChoices omitted here — will be remapped and set after messages are created
-            selectedNodeId: null, // Will be remapped later
-            provider: storyData.provider,
-            model: storyData.model,
-            openaiEndpoint: storyData.openaiEndpoint || null,
-            globalScript: storyData.globalScript,
-            plotPointDefaults: storyData.plotPointDefaults,
-            // These will be set after creating related entities
-            defaultProtagonistId: null,
-            defaultCalendarId: null,
-            defaultLanguageId: null,
-          },
-        })
-
-        // Update files with storyId
-        for (const [, newFileId] of idMaps.files) {
-          await tx.file.update({
-            where: { id: newFileId },
-            data: { storyId: story.id },
-          })
-        }
-
-        // 3. Create characters (first pass - without laterVersionOfId)
-        for (const charData of exportData.characters || []) {
-          const newChar = await tx.character.create({
-            data: {
-              storyId: story.id,
-              pictureFileId: remapId(charData.pictureFileId, idMaps.files),
-              firstName: charData.firstName,
-              middleName: charData.middleName,
-              lastName: charData.lastName,
-              nickname: charData.nickname,
-              description: charData.description,
-              background: charData.background,
-              personality: charData.personality,
-              personalityQuirks: charData.personalityQuirks,
-              likes: charData.likes,
-              dislikes: charData.dislikes,
-              age: charData.age,
-              gender: charData.gender,
-              sexualOrientation: charData.sexualOrientation,
-              height: charData.height,
-              hairColor: charData.hairColor,
-              eyeColor: charData.eyeColor,
-              distinguishingFeatures: charData.distinguishingFeatures,
-              writingStyle: charData.writingStyle,
-              isMainCharacter: charData.isMainCharacter,
-              significantActions: charData.significantActions,
-              birthdate: charData.birthdate,
-              // laterVersionOfId will be set in second pass
-            },
-          })
-          idMaps.characters.set(charData.id, newChar.id)
-
-          // Create inventory items
-          for (const item of charData.inventory || []) {
-            await tx.item.create({
-              data: {
-                characterId: newChar.id,
-                name: item.name,
-                description: item.description,
-                amount: item.amount,
-              },
-            })
-          }
-        }
-
-        // Fixup character laterVersionOfId
-        for (const charData of exportData.characters || []) {
-          if (charData.laterVersionOfId) {
-            const newId = idMaps.characters.get(charData.id)
-            const newLaterVersionOfId = idMaps.characters.get(charData.laterVersionOfId)
-            if (newId && newLaterVersionOfId) {
-              await tx.character.update({
-                where: { id: newId },
-                data: { laterVersionOfId: newLaterVersionOfId },
-              })
-            }
-          }
-        }
-
-        // 4. Create context items
-        for (const ciData of exportData.contextItems || []) {
-          const newCi = await tx.contextItem.create({
-            data: {
-              storyId: story.id,
-              type: ciData.type,
-              name: ciData.name,
-              description: ciData.description,
-              isGlobal: ciData.isGlobal,
-            },
-          })
-          idMaps.contextItems.set(ciData.id, newCi.id)
-        }
-
-        // 5. Create calendars
-        let defaultCalendarId: string | null = null
-        for (const calData of exportData.calendars || []) {
-          const newCal = await tx.calendar.create({
-            data: {
-              storyId: story.id,
-              name: calData.name,
-              config: calData.config,
-            },
-          })
-          idMaps.calendars.set(calData.id, newCal.id)
-          if (calData.isDefault) {
-            defaultCalendarId = newCal.id
-          }
-        }
-
-        // 5b. Create languages
-        let defaultLanguageId: string | null = null
-        for (const langData of exportData.languages || []) {
-          const newLang = await tx.language.create({
-            data: {
-              storyId: story.id,
-              name: langData.name,
-              label: langData.label,
-            },
-          })
-          idMaps.languages.set(langData.id, newLang.id)
-          if (langData.isDefault) {
-            defaultLanguageId = newLang.id
-          }
-        }
-
-        // 6. Update story with defaultProtagonistId, defaultCalendarId, and defaultLanguageId
-        const newProtagonistId = remapId(storyData.defaultProtagonistId, idMaps.characters)
-        await tx.story.update({
-          where: { id: story.id },
-          data: {
-            defaultProtagonistId: newProtagonistId,
-            defaultCalendarId,
-            defaultLanguageId,
-          },
-        })
-
-        // 7. Create books and nested hierarchy
-        for (const bookData of exportData.books || []) {
-          const newBook = await tx.book.create({
-            data: {
-              storyId: story.id,
-              name: bookData.name,
-              summary: bookData.summary,
-              coverArtFileId: remapId(bookData.coverArtFileId, idMaps.files),
-              spineArtFileId: remapId(bookData.spineArtFileId, idMaps.files),
-              pages: bookData.pages,
-              sortOrder: bookData.sortOrder,
-              nodeType: bookData.nodeType,
-              deleted: bookData.deleted ?? false,
-              deletedAt: bookData.deletedAt ? new Date(bookData.deletedAt) : null,
-            },
-          })
-          idMaps.books.set(bookData.id, newBook.id)
-
-          for (const arcData of bookData.arcs || []) {
-            const newArc = await tx.arc.create({
-              data: {
-                bookId: newBook.id,
-                name: arcData.name,
-                summary: arcData.summary,
-                sortOrder: arcData.sortOrder,
-                nodeType: arcData.nodeType,
-                deleted: arcData.deleted ?? false,
-                deletedAt: arcData.deletedAt ? new Date(arcData.deletedAt) : null,
-              },
-            })
-            idMaps.arcs.set(arcData.id, newArc.id)
-
-            for (const chapterData of arcData.chapters || []) {
-              const newChapter = await tx.chapter.create({
-                data: {
-                  arcId: newArc.id,
-                  name: chapterData.name,
-                  summary: chapterData.summary,
-                  publishedOn: chapterData.publishedOn
-                    ? new Date(chapterData.publishedOn)
-                    : null,
-                  publishedAt: chapterData.publishedAt
-                    ? new Date(chapterData.publishedAt)
-                    : null,
-                  sortOrder: chapterData.sortOrder,
-                  nodeType: chapterData.nodeType,
-                  status: chapterData.status,
-                  wordCount: chapterData.wordCount ?? 0,
-                  deleted: chapterData.deleted ?? false,
-                  deletedAt: chapterData.deletedAt ? new Date(chapterData.deletedAt) : null,
-                  // Don't copy royalRoadId - would cause conflicts
-                },
-              })
-              idMaps.chapters.set(chapterData.id, newChapter.id)
-
-              // Create publishing status as DRAFT (don't copy platform IDs)
-              for (const ps of chapterData.publishingStatus || []) {
-                await tx.chapterPublishing.create({
-                  data: {
-                    chapterId: newChapter.id,
-                    platform: ps.platform,
-                    status: 'DRAFT', // Reset to draft
-                  },
-                })
-              }
-
-              for (const sceneData of chapterData.scenes || []) {
-                const newScene = await tx.scene.create({
-                  data: {
-                    chapterId: newChapter.id,
-                    name: sceneData.name,
-                    summary: sceneData.summary,
-                    sortOrder: sceneData.sortOrder,
-                    status: sceneData.status,
-                    includeInFull: sceneData.includeInFull,
-                    deleted: sceneData.deleted ?? false,
-                    deletedAt: sceneData.deletedAt ? new Date(sceneData.deletedAt) : null,
-                    perspective: sceneData.perspective,
-                    viewpointCharacterId: remapId(
-                      sceneData.viewpointCharacterId,
-                      idMaps.characters,
-                    ),
-                    activeCharacterIds: remapIdArray(
-                      sceneData.activeCharacterIds,
-                      idMaps.characters,
-                    ),
-                    activeContextItemIds: remapIdArray(
-                      sceneData.activeContextItemIds,
-                      idMaps.contextItems,
-                    ),
-                    goal: sceneData.goal,
-                    storyTime: sceneData.storyTime,
-                  },
-                })
-                idMaps.scenes.set(sceneData.id, newScene.id)
-
-                for (const messageData of sceneData.messages || []) {
-                  // Create message without currentMessageRevisionId first
-                  const newMessage = await tx.message.create({
+                  const newFile = await tx.file.create({
                     data: {
-                      sceneId: newScene.id,
-                      sortOrder: messageData.sortOrder,
-                      instruction: messageData.instruction,
-                      script: messageData.script,
-                      isQuery: messageData.isQuery ?? false,
-                      deleted: messageData.deleted ?? false,
-                      type: messageData.type,
-                      options: messageData.options,
+                      ownerId: userId,
+                      localPath: metadata.localPath,
+                      r2Key: metadata.r2Key,
+                      visibility: metadata.visibility,
+                      path: metadata.path,
+                      sha256: metadata.sha256,
+                      mimeType: metadata.mimeType,
+                      width: metadata.width,
+                      height: metadata.height,
+                      bytes: metadata.bytes,
                     },
                   })
-                  idMaps.messages.set(messageData.id, newMessage.id)
+                  idMaps.files.set(fileData.id, newFile.id)
+                }
+              }
+            }
 
-                  // Create plot point states for this message
-                  for (const pps of messageData.plotPointStates || []) {
-                    await tx.plotPointState.create({
+            // 2. Create story (with null for FK fields that need later fixup)
+            const storyData = exportData.story
+            const story = await tx.story.create({
+              data: {
+                name: storyData.name,
+                summary: storyData.summary,
+                ownerId: userId,
+                status: storyData.status,
+                type: storyData.type,
+                published: false, // Always start unpublished
+                wordsPerWeek: storyData.wordsPerWeek,
+                spellingLevel: storyData.spellingLevel,
+                chapters: storyData.chapters,
+                coverArtFileId: remapId(storyData.coverArtFileId, idMaps.files),
+                coverColor: storyData.coverColor,
+                coverTextColor: storyData.coverTextColor,
+                coverFontFamily: storyData.coverFontFamily,
+                defaultPerspective: storyData.defaultPerspective,
+                defaultTense: storyData.defaultTense,
+                genre: storyData.genre,
+                paragraphsPerTurn: storyData.paragraphsPerTurn,
+                format: storyData.format,
+                sortOrder: storyData.sortOrder,
+                pages: storyData.pages,
+                timelineStartTime: storyData.timelineStartTime,
+                timelineEndTime: storyData.timelineEndTime,
+                timelineGranularity: storyData.timelineGranularity,
+                // branchChoices omitted here — will be remapped and set after messages are created
+                selectedNodeId: null, // Will be remapped later
+                provider: storyData.provider,
+                model: storyData.model,
+                openaiEndpoint: storyData.openaiEndpoint || null,
+                globalScript: storyData.globalScript,
+                plotPointDefaults: storyData.plotPointDefaults,
+                // These will be set after creating related entities
+                defaultProtagonistId: null,
+                defaultCalendarId: null,
+                defaultLanguageId: null,
+              },
+            })
+
+            // Update files with storyId
+            for (const [, newFileId] of idMaps.files) {
+              await tx.file.update({
+                where: { id: newFileId },
+                data: { storyId: story.id },
+              })
+            }
+
+            // 3. Create characters (first pass - without laterVersionOfId)
+            for (const charData of exportData.characters || []) {
+              const newChar = await tx.character.create({
+                data: {
+                  storyId: story.id,
+                  pictureFileId: remapId(charData.pictureFileId, idMaps.files),
+                  firstName: charData.firstName,
+                  middleName: charData.middleName,
+                  lastName: charData.lastName,
+                  nickname: charData.nickname,
+                  description: charData.description,
+                  background: charData.background,
+                  personality: charData.personality,
+                  personalityQuirks: charData.personalityQuirks,
+                  likes: charData.likes,
+                  dislikes: charData.dislikes,
+                  age: charData.age,
+                  gender: charData.gender,
+                  sexualOrientation: charData.sexualOrientation,
+                  height: charData.height,
+                  hairColor: charData.hairColor,
+                  eyeColor: charData.eyeColor,
+                  distinguishingFeatures: charData.distinguishingFeatures,
+                  writingStyle: charData.writingStyle,
+                  isMainCharacter: charData.isMainCharacter,
+                  significantActions: charData.significantActions,
+                  birthdate: charData.birthdate,
+                  // laterVersionOfId will be set in second pass
+                },
+              })
+              idMaps.characters.set(charData.id, newChar.id)
+
+              // Create inventory items
+              for (const item of charData.inventory || []) {
+                await tx.item.create({
+                  data: {
+                    characterId: newChar.id,
+                    name: item.name,
+                    description: item.description,
+                    amount: item.amount,
+                  },
+                })
+              }
+            }
+
+            // Fixup character laterVersionOfId
+            for (const charData of exportData.characters || []) {
+              if (charData.laterVersionOfId) {
+                const newId = idMaps.characters.get(charData.id)
+                const newLaterVersionOfId = idMaps.characters.get(charData.laterVersionOfId)
+                if (newId && newLaterVersionOfId) {
+                  await tx.character.update({
+                    where: { id: newId },
+                    data: { laterVersionOfId: newLaterVersionOfId },
+                  })
+                }
+              }
+            }
+
+            // 4. Create context items
+            for (const ciData of exportData.contextItems || []) {
+              const newCi = await tx.contextItem.create({
+                data: {
+                  storyId: story.id,
+                  type: ciData.type,
+                  name: ciData.name,
+                  description: ciData.description,
+                  isGlobal: ciData.isGlobal,
+                },
+              })
+              idMaps.contextItems.set(ciData.id, newCi.id)
+            }
+
+            // 5. Create calendars
+            let defaultCalendarId: string | null = null
+            for (const calData of exportData.calendars || []) {
+              const newCal = await tx.calendar.create({
+                data: {
+                  storyId: story.id,
+                  name: calData.name,
+                  config: calData.config,
+                },
+              })
+              idMaps.calendars.set(calData.id, newCal.id)
+              if (calData.isDefault) {
+                defaultCalendarId = newCal.id
+              }
+            }
+
+            // 5b. Create languages
+            let defaultLanguageId: string | null = null
+            for (const langData of exportData.languages || []) {
+              const newLang = await tx.language.create({
+                data: {
+                  storyId: story.id,
+                  name: langData.name,
+                  label: langData.label,
+                },
+              })
+              idMaps.languages.set(langData.id, newLang.id)
+              if (langData.isDefault) {
+                defaultLanguageId = newLang.id
+              }
+            }
+
+            // 6. Update story with defaultProtagonistId, defaultCalendarId, and defaultLanguageId
+            const newProtagonistId = remapId(storyData.defaultProtagonistId, idMaps.characters)
+            await tx.story.update({
+              where: { id: story.id },
+              data: {
+                defaultProtagonistId: newProtagonistId,
+                defaultCalendarId,
+                defaultLanguageId,
+              },
+            })
+
+            // 7. Create books and nested hierarchy
+            for (const bookData of exportData.books || []) {
+              const newBook = await tx.book.create({
+                data: {
+                  storyId: story.id,
+                  name: bookData.name,
+                  sentenceSummary: bookData.sentenceSummary,
+                  paragraphSummary: bookData.paragraphSummary,
+                  summary: bookData.summary,
+                  coverArtFileId: remapId(bookData.coverArtFileId, idMaps.files),
+                  spineArtFileId: remapId(bookData.spineArtFileId, idMaps.files),
+                  pages: bookData.pages,
+                  sortOrder: bookData.sortOrder,
+                  nodeType: bookData.nodeType,
+                  deleted: bookData.deleted ?? false,
+                  deletedAt: bookData.deletedAt ? new Date(bookData.deletedAt) : null,
+                },
+              })
+              idMaps.books.set(bookData.id, newBook.id)
+
+              for (const arcData of bookData.arcs || []) {
+                const newArc = await tx.arc.create({
+                  data: {
+                    bookId: newBook.id,
+                    name: arcData.name,
+                    sentenceSummary: arcData.sentenceSummary,
+                    paragraphSummary: arcData.paragraphSummary,
+                    summary: arcData.summary,
+                    sortOrder: arcData.sortOrder,
+                    nodeType: arcData.nodeType,
+                    deleted: arcData.deleted ?? false,
+                    deletedAt: arcData.deletedAt ? new Date(arcData.deletedAt) : null,
+                  },
+                })
+                idMaps.arcs.set(arcData.id, newArc.id)
+
+                for (const chapterData of arcData.chapters || []) {
+                  const newChapter = await tx.chapter.create({
+                    data: {
+                      arcId: newArc.id,
+                      name: chapterData.name,
+                      sentenceSummary: chapterData.sentenceSummary,
+                      paragraphSummary: chapterData.paragraphSummary,
+                      summary: chapterData.summary,
+                      publishedOn: chapterData.publishedOn ? new Date(chapterData.publishedOn) : null,
+                      publishedAt: chapterData.publishedAt ? new Date(chapterData.publishedAt) : null,
+                      sortOrder: chapterData.sortOrder,
+                      nodeType: chapterData.nodeType,
+                      status: chapterData.status,
+                      wordCount: chapterData.wordCount ?? 0,
+                      deleted: chapterData.deleted ?? false,
+                      deletedAt: chapterData.deletedAt ? new Date(chapterData.deletedAt) : null,
+                      // Don't copy royalRoadId - would cause conflicts
+                    },
+                  })
+                  idMaps.chapters.set(chapterData.id, newChapter.id)
+
+                  // Create publishing status as DRAFT (don't copy platform IDs)
+                  for (const ps of chapterData.publishingStatus || []) {
+                    await tx.chapterPublishing.create({
                       data: {
-                        storyId: story.id,
-                        messageId: newMessage.id,
-                        key: pps.key,
-                        value: pps.value,
+                        chapterId: newChapter.id,
+                        platform: ps.platform,
+                        status: 'DRAFT', // Reset to draft
                       },
                     })
                   }
 
-                  let currentRevisionId: string | null = null
-                  for (const revData of messageData.messageRevisions || []) {
-                    const newRev = await tx.messageRevision.create({
+                  for (const sceneData of chapterData.scenes || []) {
+                    const newScene = await tx.scene.create({
                       data: {
-                        messageId: newMessage.id,
-                        version: revData.version,
-                        versionType: revData.versionType,
-                        model: revData.model,
-                        tokensPerSecond: revData.tokensPerSecond,
-                        totalTokens: revData.totalTokens,
-                        promptTokens: revData.promptTokens,
-                        cacheCreationTokens: revData.cacheCreationTokens,
-                        cacheReadTokens: revData.cacheReadTokens,
-                        think: revData.think,
-                        showThink: revData.showThink,
+                        chapterId: newChapter.id,
+                        name: sceneData.name,
+                        sentenceSummary: sceneData.sentenceSummary,
+                        paragraphSummary: sceneData.paragraphSummary,
+                        summary: sceneData.summary,
+                        sortOrder: sceneData.sortOrder,
+                        status: sceneData.status,
+                        includeInFull: sceneData.includeInFull,
+                        deleted: sceneData.deleted ?? false,
+                        deletedAt: sceneData.deletedAt ? new Date(sceneData.deletedAt) : null,
+                        perspective: sceneData.perspective,
+                        viewpointCharacterId: remapId(sceneData.viewpointCharacterId, idMaps.characters),
+                        activeCharacterIds: remapIdArray(sceneData.activeCharacterIds, idMaps.characters),
+                        activeContextItemIds: remapIdArray(sceneData.activeContextItemIds, idMaps.contextItems),
+                        goal: sceneData.goal,
+                        storyTime: sceneData.storyTime,
                       },
                     })
-                    idMaps.messageRevisions.set(revData.id, newRev.id)
+                    idMaps.scenes.set(sceneData.id, newScene.id)
 
-                    if (revData.id === messageData.currentMessageRevisionId) {
-                      currentRevisionId = newRev.id
-                    }
-
-                    for (const paraData of revData.paragraphs || []) {
-                      // Create paragraph without currentParagraphRevisionId first
-                      const newPara = await tx.paragraph.create({
+                    for (const messageData of sceneData.messages || []) {
+                      // Create message without currentMessageRevisionId first
+                      const newMessage = await tx.message.create({
                         data: {
-                          messageRevisionId: newRev.id,
-                          sortOrder: paraData.sortOrder,
+                          sceneId: newScene.id,
+                          sortOrder: messageData.sortOrder,
+                          instruction: messageData.instruction,
+                          script: messageData.script,
+                          isQuery: messageData.isQuery ?? false,
+                          deleted: messageData.deleted ?? false,
+                          type: messageData.type,
+                          options: messageData.options,
                         },
                       })
-                      idMaps.paragraphs.set(paraData.id, newPara.id)
+                      idMaps.messages.set(messageData.id, newMessage.id)
 
-                      let currentParaRevId: string | null = null
-                      for (const prData of paraData.paragraphRevisions || []) {
-                        const newPr = await tx.paragraphRevision.create({
+                      // Create plot point states for this message
+                      for (const pps of messageData.plotPointStates || []) {
+                        await tx.plotPointState.create({
                           data: {
-                            paragraphId: newPara.id,
-                            body: prData.body,
-                            contentSchema: prData.contentSchema,
-                            version: prData.version,
-                            state: prData.state,
-                            script: prData.script,
-                            plotPointActions: prData.plotPointActions,
-                            inventoryActions: prData.inventoryActions,
+                            storyId: story.id,
+                            messageId: newMessage.id,
+                            key: pps.key,
+                            value: pps.value,
                           },
                         })
-                        idMaps.paragraphRevisions.set(prData.id, newPr.id)
+                      }
 
-                        if (prData.id === paraData.currentParagraphRevisionId) {
-                          currentParaRevId = newPr.id
+                      let currentRevisionId: string | null = null
+                      for (const revData of messageData.messageRevisions || []) {
+                        const newRev = await tx.messageRevision.create({
+                          data: {
+                            messageId: newMessage.id,
+                            version: revData.version,
+                            versionType: revData.versionType,
+                            model: revData.model,
+                            tokensPerSecond: revData.tokensPerSecond,
+                            totalTokens: revData.totalTokens,
+                            promptTokens: revData.promptTokens,
+                            cacheCreationTokens: revData.cacheCreationTokens,
+                            cacheReadTokens: revData.cacheReadTokens,
+                            think: revData.think,
+                            showThink: revData.showThink,
+                          },
+                        })
+                        idMaps.messageRevisions.set(revData.id, newRev.id)
+
+                        if (revData.id === messageData.currentMessageRevisionId) {
+                          currentRevisionId = newRev.id
                         }
 
-                        // Create paragraph comments (without owner - they become anonymous)
-                        for (const pc of prData.paragraphComments || []) {
-                          await tx.paragraphComment.create({
+                        for (const paraData of revData.paragraphs || []) {
+                          // Create paragraph without currentParagraphRevisionId first
+                          const newPara = await tx.paragraph.create({
                             data: {
-                              paragraphRevisionId: newPr.id,
-                              ownerId: userId, // Assign to importing user
-                              body: pc.body,
-                              type: pc.type,
+                              messageRevisionId: newRev.id,
+                              sortOrder: paraData.sortOrder,
                             },
                           })
+                          idMaps.paragraphs.set(paraData.id, newPara.id)
+
+                          let currentParaRevId: string | null = null
+                          for (const prData of paraData.paragraphRevisions || []) {
+                            const newPr = await tx.paragraphRevision.create({
+                              data: {
+                                paragraphId: newPara.id,
+                                body: prData.body,
+                                contentSchema: prData.contentSchema,
+                                version: prData.version,
+                                state: prData.state,
+                                script: prData.script,
+                                plotPointActions: prData.plotPointActions,
+                                inventoryActions: prData.inventoryActions,
+                              },
+                            })
+                            idMaps.paragraphRevisions.set(prData.id, newPr.id)
+
+                            if (prData.id === paraData.currentParagraphRevisionId) {
+                              currentParaRevId = newPr.id
+                            }
+
+                            // Create paragraph comments (without owner - they become anonymous)
+                            for (const pc of prData.paragraphComments || []) {
+                              await tx.paragraphComment.create({
+                                data: {
+                                  paragraphRevisionId: newPr.id,
+                                  ownerId: userId, // Assign to importing user
+                                  body: pc.body,
+                                  type: pc.type,
+                                },
+                              })
+                            }
+                          }
+
+                          // Update paragraph with currentParagraphRevisionId
+                          if (currentParaRevId) {
+                            await tx.paragraph.update({
+                              where: { id: newPara.id },
+                              data: { currentParagraphRevisionId: currentParaRevId },
+                            })
+                          }
                         }
                       }
 
-                      // Update paragraph with currentParagraphRevisionId
-                      if (currentParaRevId) {
-                        await tx.paragraph.update({
-                          where: { id: newPara.id },
-                          data: { currentParagraphRevisionId: currentParaRevId },
+                      // Update message with currentMessageRevisionId
+                      if (currentRevisionId) {
+                        await tx.message.update({
+                          where: { id: newMessage.id },
+                          data: { currentMessageRevisionId: currentRevisionId },
                         })
                       }
                     }
-                  }
 
-                  // Update message with currentMessageRevisionId
-                  if (currentRevisionId) {
-                    await tx.message.update({
-                      where: { id: newMessage.id },
-                      data: { currentMessageRevisionId: currentRevisionId },
-                    })
-                  }
-                }
-
-                // After all messages are created for this scene, remap any
-                // summarySegments to point at the new message IDs. Segments
-                // whose endpoints can't be resolved are dropped (the matching
-                // message must have been deleted from the export source).
-                if (Array.isArray(sceneData.summarySegments) && sceneData.summarySegments.length > 0) {
-                  const remapped = sceneData.summarySegments
-                    .map((seg: { startMessageId: string; endMessageId: string; summary: string }) => {
-                      const start = idMaps.messages.get(seg.startMessageId)
-                      const end = idMaps.messages.get(seg.endMessageId)
-                      if (!start || !end) return null
-                      return { startMessageId: start, endMessageId: end, summary: seg.summary }
-                    })
-                    .filter(
-                      (
-                        seg: { startMessageId: string; endMessageId: string; summary: string } | null,
-                      ): seg is { startMessageId: string; endMessageId: string; summary: string } => seg !== null,
-                    )
-                  if (remapped.length > 0) {
-                    await tx.scene.update({
-                      where: { id: newScene.id },
-                      data: { summarySegments: remapped as Prisma.InputJsonValue },
-                    })
+                    // After all messages are created for this scene, remap any
+                    // summarySegments to point at the new message IDs. Segments
+                    // whose endpoints can't be resolved are dropped (the matching
+                    // message must have been deleted from the export source).
+                    if (Array.isArray(sceneData.summarySegments) && sceneData.summarySegments.length > 0) {
+                      const remapped = sceneData.summarySegments
+                        .map((seg: { startMessageId: string; endMessageId: string; summary: string }) => {
+                          const start = idMaps.messages.get(seg.startMessageId)
+                          const end = idMaps.messages.get(seg.endMessageId)
+                          if (!start || !end) return null
+                          return { startMessageId: start, endMessageId: end, summary: seg.summary }
+                        })
+                        .filter(
+                          (
+                            seg: { startMessageId: string; endMessageId: string; summary: string } | null,
+                          ): seg is { startMessageId: string; endMessageId: string; summary: string } => seg !== null,
+                        )
+                      if (remapped.length > 0) {
+                        await tx.scene.update({
+                          where: { id: newScene.id },
+                          data: { summarySegments: remapped as Prisma.InputJsonValue },
+                        })
+                      }
+                    }
                   }
                 }
               }
             }
-          }
-        }
 
-        // 8. Create maps and nested entities
-        for (const mapData of exportData.maps || []) {
-          const newMap = await tx.map.create({
-            data: {
-              storyId: story.id,
-              name: mapData.name,
-              fileId: mapData.fileId, // Map fileId is external URL, not internal file
-              borderColor: mapData.borderColor,
-              propertySchema: mapData.propertySchema,
-            },
-          })
-          idMaps.maps.set(mapData.id, newMap.id)
-
-          // Create landmarks
-          for (const lmData of mapData.landmarks || []) {
-            const newLm = await tx.landmark.create({
-              data: {
-                mapId: newMap.id,
-                x: lmData.x,
-                y: lmData.y,
-                name: lmData.name,
-                description: lmData.description,
-                type: lmData.type,
-                color: lmData.color,
-                size: lmData.size,
-                properties: lmData.properties,
-              },
-            })
-            idMaps.landmarks.set(lmData.id, newLm.id)
-
-            // Create landmark states
-            for (const state of lmData.states || []) {
-              await tx.landmarkState.create({
+            // 8. Create maps and nested entities
+            for (const mapData of exportData.maps || []) {
+              const newMap = await tx.map.create({
                 data: {
                   storyId: story.id,
-                  mapId: newMap.id,
-                  landmarkId: newLm.id,
-                  storyTime: state.storyTime,
-                  field: state.field,
-                  value: state.value,
+                  name: mapData.name,
+                  fileId: mapData.fileId, // Map fileId is external URL, not internal file
+                  borderColor: mapData.borderColor,
+                  propertySchema: mapData.propertySchema,
                 },
               })
+              idMaps.maps.set(mapData.id, newMap.id)
+
+              // Create landmarks
+              for (const lmData of mapData.landmarks || []) {
+                const newLm = await tx.landmark.create({
+                  data: {
+                    mapId: newMap.id,
+                    x: lmData.x,
+                    y: lmData.y,
+                    name: lmData.name,
+                    description: lmData.description,
+                    type: lmData.type,
+                    color: lmData.color,
+                    size: lmData.size,
+                    properties: lmData.properties,
+                  },
+                })
+                idMaps.landmarks.set(lmData.id, newLm.id)
+
+                // Create landmark states
+                for (const state of lmData.states || []) {
+                  await tx.landmarkState.create({
+                    data: {
+                      storyId: story.id,
+                      mapId: newMap.id,
+                      landmarkId: newLm.id,
+                      storyTime: state.storyTime,
+                      field: state.field,
+                      value: state.value,
+                    },
+                  })
+                }
+              }
+
+              // Create pawns
+              for (const pawnData of mapData.pawns || []) {
+                const newPawn = await tx.pawn.create({
+                  data: {
+                    mapId: newMap.id,
+                    name: pawnData.name,
+                    description: pawnData.description,
+                    designation: pawnData.designation,
+                    speed: pawnData.speed,
+                    defaultX: pawnData.defaultX,
+                    defaultY: pawnData.defaultY,
+                    color: pawnData.color,
+                    size: pawnData.size,
+                  },
+                })
+                idMaps.pawns.set(pawnData.id, newPawn.id)
+
+                // Create pawn movements
+                for (const movement of pawnData.movements || []) {
+                  await tx.pawnMovement.create({
+                    data: {
+                      storyId: story.id,
+                      mapId: newMap.id,
+                      pawnId: newPawn.id,
+                      startStoryTime: movement.startStoryTime,
+                      endStoryTime: movement.endStoryTime,
+                      startX: movement.startX,
+                      startY: movement.startY,
+                      endX: movement.endX,
+                      endY: movement.endY,
+                    },
+                  })
+                }
+              }
+
+              // Create paths
+              for (const pathData of mapData.paths || []) {
+                const newPath = await tx.path.create({
+                  data: {
+                    mapId: newMap.id,
+                    speedMultiplier: pathData.speedMultiplier,
+                  },
+                })
+                idMaps.paths.set(pathData.id, newPath.id)
+
+                // Create path segments
+                for (const seg of pathData.segments || []) {
+                  await tx.pathSegment.create({
+                    data: {
+                      pathId: newPath.id,
+                      mapId: newMap.id,
+                      order: seg.order,
+                      startX: seg.startX,
+                      startY: seg.startY,
+                      endX: seg.endX,
+                      endY: seg.endY,
+                      startLandmarkId: remapId(seg.startLandmarkId, idMaps.landmarks),
+                      endLandmarkId: remapId(seg.endLandmarkId, idMaps.landmarks),
+                    },
+                  })
+                }
+              }
             }
-          }
 
-          // Create pawns
-          for (const pawnData of mapData.pawns || []) {
-            const newPawn = await tx.pawn.create({
-              data: {
-                mapId: newMap.id,
-                name: pawnData.name,
-                description: pawnData.description,
-                designation: pawnData.designation,
-                speed: pawnData.speed,
-                defaultX: pawnData.defaultX,
-                defaultY: pawnData.defaultY,
-                color: pawnData.color,
-                size: pawnData.size,
-              },
-            })
-            idMaps.pawns.set(pawnData.id, newPawn.id)
-
-            // Create pawn movements
-            for (const movement of pawnData.movements || []) {
-              await tx.pawnMovement.create({
+            // 9. Create media attachments
+            for (const maData of exportData.mediaAttachments || []) {
+              const newMa = await tx.mediaAttachment.create({
                 data: {
                   storyId: story.id,
-                  mapId: newMap.id,
-                  pawnId: newPawn.id,
-                  startStoryTime: movement.startStoryTime,
-                  endStoryTime: movement.endStoryTime,
-                  startX: movement.startX,
-                  startY: movement.startY,
-                  endX: movement.endX,
-                  endY: movement.endY,
+                  name: maData.name,
+                  description: maData.description,
+                  mediaType: maData.mediaType,
+                  duration: maData.duration,
                 },
               })
+              idMaps.mediaAttachments.set(maData.id, newMa.id)
+
+              // Create frames
+              for (const frame of maData.frames || []) {
+                await tx.mediaFrame.create({
+                  data: {
+                    mediaAttachmentId: newMa.id,
+                    frameNumber: frame.frameNumber,
+                    timestamp: frame.timestamp,
+                    imageUrl: frame.imageUrl,
+                    description: frame.description,
+                  },
+                })
+              }
+
+              // Create segments
+              for (const seg of maData.segments || []) {
+                await tx.mediaSegment.create({
+                  data: {
+                    mediaAttachmentId: newMa.id,
+                    segmentIndex: seg.segmentIndex,
+                    startTime: seg.startTime,
+                    endTime: seg.endTime,
+                    text: seg.text,
+                    speaker: seg.speaker,
+                    videoUrl: seg.videoUrl,
+                  },
+                })
+              }
+
+              // Create scene links
+              for (const link of maData.sceneLinks || []) {
+                const newSceneId = idMaps.scenes.get(link.sceneId)
+                if (newSceneId) {
+                  await tx.mediaSceneLink.create({
+                    data: {
+                      mediaAttachmentId: newMa.id,
+                      sceneId: newSceneId,
+                      startTime: link.startTime,
+                      endTime: link.endTime,
+                      notes: link.notes,
+                    },
+                  })
+                }
+              }
             }
-          }
 
-          // Create paths
-          for (const pathData of mapData.paths || []) {
-            const newPath = await tx.path.create({
-              data: {
-                mapId: newMap.id,
-                speedMultiplier: pathData.speedMultiplier,
-              },
-            })
-            idMaps.paths.set(pathData.id, newPath.id)
-
-            // Create path segments
-            for (const seg of pathData.segments || []) {
-              await tx.pathSegment.create({
+            // 10. Create tags (find or create)
+            for (const tagName of exportData.tags || []) {
+              let tag = await tx.tag.findUnique({ where: { name: tagName } })
+              if (!tag) {
+                tag = await tx.tag.create({ data: { name: tagName } })
+              }
+              await tx.storyTag.create({
                 data: {
-                  pathId: newPath.id,
-                  mapId: newMap.id,
-                  order: seg.order,
-                  startX: seg.startX,
-                  startY: seg.startY,
-                  endX: seg.endX,
-                  endY: seg.endY,
-                  startLandmarkId: remapId(seg.startLandmarkId, idMaps.landmarks),
-                  endLandmarkId: remapId(seg.endLandmarkId, idMaps.landmarks),
+                  storyId: story.id,
+                  tagId: tag.id,
                 },
               })
             }
-          }
-        }
 
-        // 9. Create media attachments
-        for (const maData of exportData.mediaAttachments || []) {
-          const newMa = await tx.mediaAttachment.create({
-            data: {
-              storyId: story.id,
-              name: maData.name,
-              description: maData.description,
-              mediaType: maData.mediaType,
-              duration: maData.duration,
-            },
-          })
-          idMaps.mediaAttachments.set(maData.id, newMa.id)
+            // 11. Update story selectedNodeId and branchChoices if they were set
+            const storyUpdates: Record<string, any> = {}
 
-          // Create frames
-          for (const frame of maData.frames || []) {
-            await tx.mediaFrame.create({
-              data: {
-                mediaAttachmentId: newMa.id,
-                frameNumber: frame.frameNumber,
-                timestamp: frame.timestamp,
-                imageUrl: frame.imageUrl,
-                description: frame.description,
-              },
-            })
-          }
+            if (storyData.selectedNodeId) {
+              const newSelectedNodeId = idMaps.scenes.get(storyData.selectedNodeId)
+              if (newSelectedNodeId) {
+                storyUpdates.selectedNodeId = newSelectedNodeId
+              }
+            }
 
-          // Create segments
-          for (const seg of maData.segments || []) {
-            await tx.mediaSegment.create({
-              data: {
-                mediaAttachmentId: newMa.id,
-                segmentIndex: seg.segmentIndex,
-                startTime: seg.startTime,
-                endTime: seg.endTime,
-                text: seg.text,
-                speaker: seg.speaker,
-                videoUrl: seg.videoUrl,
-              },
-            })
-          }
+            if (storyData.branchChoices && typeof storyData.branchChoices === 'object') {
+              const remapped: Record<string, string> = {}
+              for (const [oldMessageId, selectedOptionId] of Object.entries(storyData.branchChoices)) {
+                const newMessageId = idMaps.messages.get(oldMessageId)
+                const newOptionId = idMaps.messages.get(selectedOptionId as string)
+                if (newMessageId && newOptionId) {
+                  remapped[newMessageId] = newOptionId
+                }
+              }
+              storyUpdates.branchChoices = remapped
+            }
 
-          // Create scene links
-          for (const link of maData.sceneLinks || []) {
-            const newSceneId = idMaps.scenes.get(link.sceneId)
-            if (newSceneId) {
-              await tx.mediaSceneLink.create({
-                data: {
-                  mediaAttachmentId: newMa.id,
-                  sceneId: newSceneId,
-                  startTime: link.startTime,
-                  endTime: link.endTime,
-                  notes: link.notes,
-                },
+            if (Object.keys(storyUpdates).length > 0) {
+              await tx.story.update({
+                where: { id: story.id },
+                data: storyUpdates,
               })
             }
-          }
-        }
 
-        // 10. Create tags (find or create)
-        for (const tagName of exportData.tags || []) {
-          let tag = await tx.tag.findUnique({ where: { name: tagName } })
-          if (!tag) {
-            tag = await tx.tag.create({ data: { name: tagName } })
-          }
-          await tx.storyTag.create({
-            data: {
-              storyId: story.id,
-              tagId: tag.id,
-            },
-          })
-        }
+            return story
+          },
+          { timeout: 120_000, maxWait: 30_000 },
+        )
+        .catch(async (error) => {
+          await Promise.allSettled(
+            savedImportFiles.map((file) => deleteFile(file.localPath, file.r2Key, file.visibility)),
+          )
+          throw error
+        })
 
-        // 11. Update story selectedNodeId and branchChoices if they were set
-        const storyUpdates: Record<string, any> = {}
-
-        if (storyData.selectedNodeId) {
-          const newSelectedNodeId = idMaps.scenes.get(storyData.selectedNodeId)
-          if (newSelectedNodeId) {
-            storyUpdates.selectedNodeId = newSelectedNodeId
-          }
-        }
-
-        if (storyData.branchChoices && typeof storyData.branchChoices === 'object') {
-          const remapped: Record<string, string> = {}
-          for (const [oldMessageId, selectedOptionId] of Object.entries(storyData.branchChoices)) {
-            const newMessageId = idMaps.messages.get(oldMessageId)
-            const newOptionId = idMaps.messages.get(selectedOptionId as string)
-            if (newMessageId && newOptionId) {
-              remapped[newMessageId] = newOptionId
-            }
-          }
-          storyUpdates.branchChoices = remapped
-        }
-
-        if (Object.keys(storyUpdates).length > 0) {
-          await tx.story.update({
-            where: { id: story.id },
-            data: storyUpdates,
-          })
-        }
-
-        return story
-      }, { timeout: 120_000, maxWait: 30_000 })
-
-      fastify.log.info(
-        { storyId: newStory.id, originalStoryId },
-        'Story imported successfully',
-      )
+      fastify.log.info({ storyId: newStory.id, originalStoryId }, 'Story imported successfully')
 
       return reply.status(201).send({
         success: true as const,

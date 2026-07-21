@@ -26,6 +26,78 @@ const tenseSchema = z.enum(['PAST', 'PRESENT']).meta({
   example: 'PAST',
 })
 
+type StoryNodeType = 'book' | 'arc' | 'chapter' | 'scene'
+type StoryNodeReference = { nodeId: string; nodeType: StoryNodeType }
+
+async function validateStoryNodeReferences(storyId: string, items: StoryNodeReference[]): Promise<boolean> {
+  const idsByType = {
+    book: items.filter((item) => item.nodeType === 'book').map((item) => item.nodeId),
+    arc: items.filter((item) => item.nodeType === 'arc').map((item) => item.nodeId),
+    chapter: items.filter((item) => item.nodeType === 'chapter').map((item) => item.nodeId),
+    scene: items.filter((item) => item.nodeType === 'scene').map((item) => item.nodeId),
+  }
+
+  const [books, arcs, chapters, scenes] = await Promise.all([
+    prisma.book.findMany({
+      where: { id: { in: idsByType.book }, storyId },
+      select: { id: true },
+    }),
+    prisma.arc.findMany({
+      where: { id: { in: idsByType.arc }, book: { storyId } },
+      select: { id: true },
+    }),
+    prisma.chapter.findMany({
+      where: { id: { in: idsByType.chapter }, arc: { book: { storyId } } },
+      select: { id: true },
+    }),
+    prisma.scene.findMany({
+      where: { id: { in: idsByType.scene }, chapter: { arc: { book: { storyId } } } },
+      select: { id: true },
+    }),
+  ])
+
+  return (
+    new Set(books.map((item) => item.id)).size === new Set(idsByType.book).size &&
+    new Set(arcs.map((item) => item.id)).size === new Set(idsByType.arc).size &&
+    new Set(chapters.map((item) => item.id)).size === new Set(idsByType.chapter).size &&
+    new Set(scenes.map((item) => item.id)).size === new Set(idsByType.scene).size
+  )
+}
+
+async function validateStoryNodeParents(
+  storyId: string,
+  items: Array<StoryNodeReference & { parentId: string | null }>,
+): Promise<boolean> {
+  if (items.some((item) => (item.nodeType === 'book' ? item.parentId !== null : item.parentId === null))) {
+    return false
+  }
+
+  const bookIds = items.filter((item) => item.nodeType === 'arc').map((item) => item.parentId as string)
+  const arcIds = items.filter((item) => item.nodeType === 'chapter').map((item) => item.parentId as string)
+  const chapterIds = items.filter((item) => item.nodeType === 'scene').map((item) => item.parentId as string)
+
+  const [books, arcs, chapters] = await Promise.all([
+    prisma.book.findMany({
+      where: { id: { in: bookIds }, storyId },
+      select: { id: true },
+    }),
+    prisma.arc.findMany({
+      where: { id: { in: arcIds }, book: { storyId } },
+      select: { id: true },
+    }),
+    prisma.chapter.findMany({
+      where: { id: { in: chapterIds }, arc: { book: { storyId } } },
+      select: { id: true },
+    }),
+  ])
+
+  return (
+    new Set(books.map((item) => item.id)).size === new Set(bookIds).size &&
+    new Set(arcs.map((item) => item.id)).size === new Set(arcIds).size &&
+    new Set(chapters.map((item) => item.id)).size === new Set(chapterIds).size
+  )
+}
+
 // Light schema for list endpoint - only fields needed for display
 const storyListItemSchema = z.strictObject({
   id: z.string().meta({
@@ -132,18 +204,25 @@ const storySchema = z.strictObject({
     description: 'Cover art URL path (from the associated file, if any)',
     example: '/files/1/2025/12/cover.jpg',
   }),
-  defaultBackgroundFileId: z.string().nullable().meta({
-    description:
-      'Story-level default background image file ID. Inherited downward by ' +
-      'books/arcs/chapters/scenes that do not set their own.',
-    example: 'clx1234567890',
-  }),
-  defaultBackgroundUrl: z.string().nullable().optional().meta({
-    description:
-      'Resolved URL of the story-level default background (from the joined ' +
-      'file, if loaded). Optional because not every endpoint hydrates it.',
-    example: '/files/1/2025/12/forest.jpg',
-  }),
+  defaultBackgroundFileId: z
+    .string()
+    .nullable()
+    .meta({
+      description:
+        'Story-level default background image file ID. Inherited downward by ' +
+        'books/arcs/chapters/scenes that do not set their own.',
+      example: 'clx1234567890',
+    }),
+  defaultBackgroundUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .meta({
+      description:
+        'Resolved URL of the story-level default background (from the joined ' +
+        'file, if loaded). Optional because not every endpoint hydrates it.',
+      example: '/files/1/2025/12/forest.jpg',
+    }),
   defaultPerspective: perspectiveSchema.nullable(),
   defaultTense: tenseSchema.nullable(),
   genre: z.string().nullable().meta({
@@ -175,7 +254,8 @@ const storySchema = z.strictObject({
     example: 'https://api.openai.com',
   }),
   aiOverrides: z.any().nullable().meta({
-    description: 'Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }',
+    description:
+      'Story-level AI settings overrides (JSON). Null fields inherit from global user preferences. Shape: { provider?, model?, maxTokens?, thinkingBudget?, contextSize?, categoryOverrides? }',
   }),
   coverColor: z.string().meta({
     description: 'Cover background color',
@@ -428,14 +508,16 @@ const deleteStoryResponseSchema = z.strictObject({
   success: z.literal(true),
 })
 
-// Export endpoint response schema - complete story with all nested data
-const exportStoryResponseSchema = z.strictObject({
+// Load-story endpoint response schema - complete story with all nested data (non-deleted only)
+const loadStoryResponseSchema = z.strictObject({
   story: storySchema,
   books: z.array(
     z.strictObject({
       id: z.string(),
       storyId: z.string(),
       name: z.string(),
+      sentenceSummary: z.string().nullable(),
+      paragraphSummary: z.string().nullable(),
       summary: z.string().nullable(),
       sortOrder: z.number(),
       coverArtFileId: z.string().nullable(),
@@ -452,6 +534,8 @@ const exportStoryResponseSchema = z.strictObject({
           id: z.string(),
           bookId: z.string(),
           name: z.string(),
+          sentenceSummary: z.string().nullable(),
+          paragraphSummary: z.string().nullable(),
           summary: z.string().nullable(),
           sortOrder: z.number(),
           defaultBackgroundFileId: z.string().nullable(),
@@ -465,6 +549,8 @@ const exportStoryResponseSchema = z.strictObject({
               id: z.string(),
               arcId: z.string(),
               name: z.string(),
+              sentenceSummary: z.string().nullable(),
+              paragraphSummary: z.string().nullable(),
               summary: z.string().nullable(),
               sortOrder: z.number(),
               defaultBackgroundFileId: z.string().nullable(),
@@ -483,6 +569,8 @@ const exportStoryResponseSchema = z.strictObject({
                   id: z.string(),
                   chapterId: z.string(),
                   name: z.string(),
+                  sentenceSummary: z.string().nullable(),
+                  paragraphSummary: z.string().nullable(),
                   summary: z.string().nullable(),
                   summarySegments: z
                     .array(
@@ -659,12 +747,8 @@ function formatStory(story: any) {
     coverArtUrl: coverArtFile?.path ?? null,
     defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     publishedAt: story.publishedAt ? story.publishedAt.toISOString() : null,
-    firstChapterReleasedAt: story.firstChapterReleasedAt
-      ? story.firstChapterReleasedAt.toISOString()
-      : null,
-    lastChapterReleasedAt: story.lastChapterReleasedAt
-      ? story.lastChapterReleasedAt.toISOString()
-      : null,
+    firstChapterReleasedAt: story.firstChapterReleasedAt ? story.firstChapterReleasedAt.toISOString() : null,
+    lastChapterReleasedAt: story.lastChapterReleasedAt ? story.lastChapterReleasedAt.toISOString() : null,
     createdAt: story.createdAt.toISOString(),
     updatedAt: story.updatedAt.toISOString(),
   }
@@ -995,18 +1079,18 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
   )
 
-  // GET /my/stories/:id/export - Export complete story with all nested data
+  // GET /my/stories/:id/load-story - Load complete story with all nested data for the editor
   fastify.get(
-    '/:id/export',
+    '/:id/load-story',
     {
       schema: {
         description:
-          'Export complete story with all nested data (books, arcs, chapters, scenes, messages, characters, etc.)',
+          'Load a complete story with all nested data for the editor (books, arcs, chapters, scenes, messages, characters, etc.). Soft-deleted nodes are excluded.',
         tags: ['my-stories'],
         security: [{ sessionAuth: [] }],
         params: storyIdParamSchema,
         response: {
-          200: exportStoryResponseSchema,
+          200: loadStoryResponseSchema,
           401: errorSchema,
           404: errorSchema,
           500: errorSchema,
@@ -1031,21 +1115,25 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           return reply.status(404).send({ error: 'Story not found' })
         }
 
-        // Load all books with nested hierarchy
+        // Load all books with nested hierarchy (exclude soft-deleted nodes at every level)
         const books = await prisma.book.findMany({
-          where: { storyId: id },
+          where: { storyId: id, deleted: false },
           orderBy: { sortOrder: 'asc' },
           include: {
             arcs: {
+              where: { deleted: false },
               orderBy: { sortOrder: 'asc' },
               include: {
                 chapters: {
+                  where: { deleted: false },
                   orderBy: { sortOrder: 'asc' },
                   include: {
                     scenes: {
+                      where: { deleted: false },
                       orderBy: { sortOrder: 'asc' },
                       include: {
                         messages: {
+                          where: { deleted: false },
                           orderBy: { sortOrder: 'asc' },
                           include: {
                             currentMessageRevision: {
@@ -1203,7 +1291,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
         fastify.log.info(
           { storyId: id, userId, bookCount: books.length, characterCount: characters.length },
-          'Story exported',
+          'Story loaded',
         )
 
         return {
@@ -1234,8 +1322,8 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           }),
         }
       } catch (error) {
-        fastify.log.error({ error }, 'Failed to export story')
-        return reply.status(500).send({ error: 'Failed to export story' })
+        fastify.log.error({ error }, 'Failed to load story')
+        return reply.status(500).send({ error: 'Failed to load story' })
       }
     },
   )
@@ -1359,10 +1447,11 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // Transform to response format
         const messages = deletedMessages.map((msg) => {
           // Combine paragraph bodies into content
-          const content = msg.currentMessageRevision?.paragraphs
-            .map((p) => p.currentParagraphRevision?.body ?? '')
-            .filter((body) => body.length > 0)
-            .join('\n\n') ?? ''
+          const content =
+            msg.currentMessageRevision?.paragraphs
+              .map((p) => p.currentParagraphRevision?.body ?? '')
+              .filter((body) => body.length > 0)
+              .join('\n\n') ?? ''
 
           return {
             id: msg.id,
@@ -1894,9 +1983,7 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // Restore book, its arcs, chapters, scenes, and messages
         const arcIds = book.arcs.map((a) => a.id)
         const chapterIds = book.arcs.flatMap((a) => a.chapters.map((c) => c.id))
-        const sceneIds = book.arcs.flatMap((a) =>
-          a.chapters.flatMap((c) => c.scenes.map((s) => s.id)),
-        )
+        const sceneIds = book.arcs.flatMap((a) => a.chapters.flatMap((c) => c.scenes.map((s) => s.id)))
         await prisma.$transaction([
           prisma.book.update({
             where: { id: bookId },
@@ -1995,6 +2082,14 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
       }
 
+      const [nodesAreOwned, parentsAreOwned] = await Promise.all([
+        validateStoryNodeReferences(storyId, items),
+        validateStoryNodeParents(storyId, items),
+      ])
+      if (!nodesAreOwned || !parentsAreOwned) {
+        return reply.code(400).send({ error: 'Every node and parent must belong to the requested story' })
+      }
+
       // Group items by type for batch updates
       const books = items.filter((i) => i.nodeType === 'book')
       const arcs = items.filter((i) => i.nodeType === 'arc')
@@ -2078,6 +2173,8 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 nodeType: z.enum(['book', 'arc', 'chapter', 'scene']).meta({ description: 'Type of node' }),
                 // Common fields
                 name: z.string().min(1).max(200).optional(),
+                sentenceSummary: z.string().nullable().optional(),
+                paragraphSummary: z.string().nullable().optional(),
                 summary: z.string().nullable().optional(),
                 sortOrder: z.number().int().optional(),
                 nodeType_: z.string().optional().meta({ description: 'Node display type (linear/branch)' }),
@@ -2132,6 +2229,10 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
       }
 
+      if (!(await validateStoryNodeReferences(storyId, items))) {
+        return reply.code(400).send({ error: 'Every node must belong to the requested story' })
+      }
+
       // Group items by type for batch updates
       const books = items.filter((i) => i.nodeType === 'book')
       const arcs = items.filter((i) => i.nodeType === 'arc')
@@ -2147,6 +2248,8 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             where: { id: item.nodeId },
             data: {
               ...(item.name !== undefined && { name: item.name }),
+              ...(item.sentenceSummary !== undefined && { sentenceSummary: item.sentenceSummary }),
+              ...(item.paragraphSummary !== undefined && { paragraphSummary: item.paragraphSummary }),
               ...(item.summary !== undefined && { summary: item.summary }),
               ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
               ...(item.nodeType_ !== undefined && { nodeType: item.nodeType_ }),
@@ -2159,6 +2262,8 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             where: { id: item.nodeId },
             data: {
               ...(item.name !== undefined && { name: item.name }),
+              ...(item.sentenceSummary !== undefined && { sentenceSummary: item.sentenceSummary }),
+              ...(item.paragraphSummary !== undefined && { paragraphSummary: item.paragraphSummary }),
               ...(item.summary !== undefined && { summary: item.summary }),
               ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
               ...(item.nodeType_ !== undefined && { nodeType: item.nodeType_ }),
@@ -2171,6 +2276,8 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
             where: { id: item.nodeId },
             data: {
               ...(item.name !== undefined && { name: item.name }),
+              ...(item.sentenceSummary !== undefined && { sentenceSummary: item.sentenceSummary }),
+              ...(item.paragraphSummary !== undefined && { paragraphSummary: item.paragraphSummary }),
               ...(item.summary !== undefined && { summary: item.summary }),
               ...(item.sortOrder !== undefined && { sortOrder: item.sortOrder }),
               ...(item.nodeType_ !== undefined && { nodeType: item.nodeType_ }),
@@ -2182,14 +2289,18 @@ const myStoriesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         ...scenes.map((item) => {
           const data: Record<string, unknown> = { updatedAt }
           if (item.name !== undefined) data.name = item.name
+          if (item.sentenceSummary !== undefined) data.sentenceSummary = item.sentenceSummary
+          if (item.paragraphSummary !== undefined) data.paragraphSummary = item.paragraphSummary
           if (item.summary !== undefined) data.summary = item.summary
           if (item.sortOrder !== undefined) data.sortOrder = item.sortOrder
           if (item.status !== undefined) data.status = item.status
           if (item.includeInFull !== undefined) data.includeInFull = item.includeInFull
           if (item.perspective !== undefined) data.perspective = item.perspective
           if (item.viewpointCharacterId !== undefined) data.viewpointCharacterId = item.viewpointCharacterId
-          if (item.activeCharacterIds !== undefined) data.activeCharacterIds = item.activeCharacterIds ?? Prisma.JsonNull
-          if (item.activeContextItemIds !== undefined) data.activeContextItemIds = item.activeContextItemIds ?? Prisma.JsonNull
+          if (item.activeCharacterIds !== undefined)
+            data.activeCharacterIds = item.activeCharacterIds ?? Prisma.JsonNull
+          if (item.activeContextItemIds !== undefined)
+            data.activeContextItemIds = item.activeContextItemIds ?? Prisma.JsonNull
           if (item.goal !== undefined) data.goal = item.goal
           if (item.storyTime !== undefined) data.storyTime = item.storyTime
           return prisma.scene.update({

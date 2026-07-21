@@ -48,38 +48,6 @@ export interface ContextGenerationOptions {
 }
 
 /**
- * Apply summarization based on position in context
- */
-function applySummarization(
-  message: Message,
-  position: number,
-  total: number,
-  isClaudeModel: boolean,
-  isCurrentChapter = false,
-): string {
-  // For Claude models, use full content only for current chapter
-  // Previous chapters should use summaries
-  if (isClaudeModel && isCurrentChapter) {
-    return message.content
-  }
-
-  const turnsFromEnd = total - position
-
-  // More than 14 turns from end: use sentence summary
-  const sentenceSummary = message.sentenceSummary ?? message.summary
-  if (turnsFromEnd > 14 && sentenceSummary) {
-    return sentenceSummary
-  }
-  // 8-14 turns from end: use paragraph summary
-  if (turnsFromEnd > 7 && message.paragraphSummary) {
-    return message.paragraphSummary
-  }
-  // Last 7 turns: use full content
-
-  return message.content
-}
-
-/**
  * Unified function for generating context messages for all use cases
  */
 export async function generateContextMessages(options: ContextGenerationOptions): Promise<ChatMessage[]> {
@@ -424,7 +392,7 @@ export async function generateContextMessages(options: ContextGenerationOptions)
       }
     } else {
       // Fallback: no nodes available, load all messages with summarization
-      console.log('[generateContextMessages] No nodes available, using all messages with summarization')
+      console.log('[generateContextMessages] No nodes available, using full message content')
 
       // Warn if there are many messages without node organization
       if (storyMessages.length > 50 && !options.forceMissingSummaries) {
@@ -437,7 +405,7 @@ export async function generateContextMessages(options: ContextGenerationOptions)
       }
 
       storyMessages.forEach((msg, index) => {
-        const content = applySummarization(msg, index + 1, storyMessages.length, isClaudeModel || false, false)
+        const content = msg.content
 
         if (content?.trim()) {
           // In CYOA mode, add user instruction as a separate message before the assistant response

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
+import archiver from 'archiver'
 import type { FastifyInstance } from 'fastify'
 import FormData from 'form-data'
 import sharp from 'sharp'
@@ -490,6 +491,35 @@ describe('Story Export/Import', () => {
       expect(response.statusCode).toBe(400)
     })
 
+    test('rejects ZIP entries whose expanded size exceeds the import limit', async () => {
+      const zip = archiver('zip', { zlib: { level: 9 } })
+      const chunks: Buffer[] = []
+      zip.on('data', (chunk: Buffer) => chunks.push(chunk))
+      const completed = new Promise<Buffer>((resolve, reject) => {
+        zip.once('end', () => resolve(Buffer.concat(chunks)))
+        zip.once('error', reject)
+      })
+      zip.append(Buffer.alloc(10 * 1024 * 1024 + 1, 65), { name: 'story.json' })
+      zip.append('{}', { name: 'manifest.json' })
+      void zip.finalize()
+
+      const form = new FormData()
+      form.append('file', await completed, {
+        filename: 'expanded-too-large.zip',
+        contentType: 'application/zip',
+      })
+      const response = await app.inject({
+        method: 'POST',
+        url: '/my/stories/import-zip',
+        headers: { ...form.getHeaders() },
+        payload: form,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+      })
+
+      expect(response.statusCode).toBe(400)
+      expect(response.json().error).toContain('too large')
+    })
+
     test('should return 400 for no file', async () => {
       const form = new FormData()
 
@@ -973,9 +1003,7 @@ describe('Story Export/Import', () => {
 
     test('should generate story name from pitch if no name provided', async () => {
       const cyoaData = {
-        messages: [
-          { role: 'assistant', content: 'Start of the adventure.' },
-        ],
+        messages: [{ role: 'assistant', content: 'Start of the adventure.' }],
         pitch:
           'This is a very long pitch that describes the entire story premise and should be truncated when used as a name',
         savedAt: new Date().toISOString(),
@@ -1004,9 +1032,7 @@ describe('Story Export/Import', () => {
 
     test('should use default name when no pitch provided', async () => {
       const cyoaData = {
-        messages: [
-          { role: 'assistant', content: 'Nameless adventure begins.' },
-        ],
+        messages: [{ role: 'assistant', content: 'Nameless adventure begins.' }],
         savedAt: new Date().toISOString(),
       }
 

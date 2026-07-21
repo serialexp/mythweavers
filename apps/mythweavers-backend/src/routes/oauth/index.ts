@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
+import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
-import { getUserFromSession } from '../../lib/auth.js'
 
 // Constants
 const DEVICE_CODE_EXPIRY_MINUTES = 15
@@ -89,13 +89,7 @@ const tokenResponseSchema = z.strictObject({
 })
 
 const tokenErrorSchema = z.strictObject({
-  error: z.enum([
-    'authorization_pending',
-    'slow_down',
-    'expired_token',
-    'access_denied',
-    'invalid_request',
-  ]).meta({
+  error: z.enum(['authorization_pending', 'slow_down', 'expired_token', 'access_denied', 'invalid_request']).meta({
     description: 'OAuth error code',
     example: 'authorization_pending',
   }),
@@ -137,7 +131,7 @@ const oauthRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
+    async (_request, reply) => {
       try {
         // Generate codes
         const deviceCode = randomBytes(32).toString('hex')
@@ -166,8 +160,8 @@ const oauthRoutes: FastifyPluginAsyncZod = async (fastify) => {
         })
 
         // Build verification URI
-        const baseUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 3201}`
-        const verificationUri = `${baseUrl}/device`
+        const editorUrl = process.env.EDITOR_URL || 'http://localhost:3203'
+        const verificationUri = `${editorUrl}/device`
 
         return {
           device_code: deviceCode,
@@ -269,6 +263,7 @@ const oauthRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.post(
     '/approve',
     {
+      preHandler: requireAuth,
       schema: {
         description: 'Approve a device code (requires authentication)',
         tags: ['oauth'],
@@ -284,11 +279,7 @@ const oauthRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       try {
-        // Require authentication
-        const user = await getUserFromSession(request)
-        if (!user) {
-          return reply.status(401).send({ error: 'Authentication required' })
-        }
+        const user = request.user!
 
         const { user_code } = request.body
 

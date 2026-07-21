@@ -94,7 +94,7 @@ API_URL=http://localhost:3001
 DATABASE_URL=postgresql://user:password@localhost:5432/writer_unified
 
 # CORS
-CORS_ORIGIN=*
+CORS_ORIGIN=http://localhost:3203,http://localhost:3202
 
 # Migration Sources
 WRITER2_DATABASE_URL=mysql://user:password@localhost:3306/writer2

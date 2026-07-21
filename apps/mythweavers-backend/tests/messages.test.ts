@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import type { FastifyInstance } from 'fastify'
+import { prisma } from '../src/lib/prisma.js'
 import { buildApp, cleanDatabase } from './helpers.js'
 
 describe('Message Endpoints', () => {
@@ -491,6 +492,67 @@ describe('Message Endpoints', () => {
       expect(body.revisions[1].model).toBe('model-v2')
       expect(body.revisions[2].version).toBe(1)
       expect(body.revisions[2].model).toBeNull()
+    })
+  })
+
+  describe('message move ownership boundaries', () => {
+    test('rejects foreign destination scenes and foreign message IDs', async () => {
+      const ownMessageResponse = await app.inject({
+        method: 'POST',
+        url: `/my/scenes/${sceneId}/messages`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: {},
+      })
+      const ownMessageId = ownMessageResponse.json().message.id
+
+      const foreignUser = await prisma.user.create({
+        data: {
+          email: 'foreign@example.com',
+          username: 'foreignuser',
+          passwordHash: 'unused:unused',
+        },
+      })
+      const foreignStory = await prisma.story.create({
+        data: { name: 'Foreign story', ownerId: foreignUser.id },
+      })
+      const foreignBook = await prisma.book.create({
+        data: { name: 'Book', storyId: foreignStory.id, sortOrder: 0 },
+      })
+      const foreignArc = await prisma.arc.create({
+        data: { name: 'Arc', bookId: foreignBook.id, sortOrder: 0 },
+      })
+      const foreignChapter = await prisma.chapter.create({
+        data: { name: 'Chapter', arcId: foreignArc.id, sortOrder: 0 },
+      })
+      const foreignScene = await prisma.scene.create({
+        data: { name: 'Scene', chapterId: foreignChapter.id, sortOrder: 0 },
+      })
+      const foreignMessage = await prisma.message.create({
+        data: { sceneId: foreignScene.id, sortOrder: 0 },
+      })
+
+      const patchResponse = await app.inject({
+        method: 'PATCH',
+        url: `/my/messages/${ownMessageId}`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: { nodeId: foreignScene.id },
+      })
+      expect(patchResponse.statusCode).toBe(400)
+
+      const reorderResponse = await app.inject({
+        method: 'POST',
+        url: `/my/stories/${storyId}/messages/reorder`,
+        cookies: { [sessionCookie.name]: sessionCookie.value },
+        payload: {
+          items: [{ messageId: foreignMessage.id, nodeId: sceneId, order: 0 }],
+        },
+      })
+      expect(reorderResponse.statusCode).toBe(400)
+
+      expect((await prisma.message.findUniqueOrThrow({ where: { id: ownMessageId } })).sceneId).toBe(sceneId)
+      expect((await prisma.message.findUniqueOrThrow({ where: { id: foreignMessage.id } })).sceneId).toBe(
+        foreignScene.id,
+      )
     })
   })
 })

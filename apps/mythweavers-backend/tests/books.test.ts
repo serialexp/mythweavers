@@ -57,6 +57,8 @@ describe('Book Endpoints', () => {
         },
         payload: {
           name: 'Book One: The Beginning',
+          sentenceSummary: 'A hero begins a dangerous journey.',
+          paragraphSummary: 'A hero leaves home, finds allies, and begins a dangerous journey.',
           summary: 'The journey begins...',
           nodeType: 'story',
         },
@@ -68,6 +70,8 @@ describe('Book Endpoints', () => {
       expect(body.book).toMatchObject({
         id: expect.any(String),
         name: 'Book One: The Beginning',
+        sentenceSummary: 'A hero begins a dangerous journey.',
+        paragraphSummary: 'A hero leaves home, finds allies, and begins a dangerous journey.',
         summary: 'The journey begins...',
         storyId,
         sortOrder: 0,

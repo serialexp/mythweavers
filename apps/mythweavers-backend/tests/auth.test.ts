@@ -285,6 +285,47 @@ describe('Auth Endpoints', () => {
         expect(after!.expiresAt.getTime()).toBe(originalExpiry)
       }
     })
+
+    test('authenticated API routes do not change the chosen session expiry', async () => {
+      const loginResponse = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: {
+          username: 'testuser',
+          password: 'password123',
+          rememberMe: true,
+        },
+      })
+      const token = loginResponse.cookies[0].value
+      const { prisma } = await import('../src/lib/prisma.js')
+      const before = await prisma.session.findUniqueOrThrow({ where: { token } })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/my/stories',
+        cookies: { sessionToken: token },
+      })
+      expect(response.statusCode).toBe(200)
+
+      const after = await prisma.session.findUniqueOrThrow({ where: { token } })
+      expect(after.expiresAt.getTime()).toBe(before.expiresAt.getTime())
+    })
+
+    test('cookie-authenticated API routes reject untrusted origins', async () => {
+      const loginResponse = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: { username: 'testuser', password: 'password123' },
+      })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/my/stories',
+        headers: { origin: 'https://attacker.example' },
+        cookies: { sessionToken: loginResponse.cookies[0].value },
+      })
+      expect(response.statusCode).toBe(403)
+    })
   })
 
   describe('GET /auth/session', () => {

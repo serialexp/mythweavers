@@ -290,7 +290,7 @@ describe('Messages Batch API', () => {
     // Now fetch the story via the export endpoint to verify instructions persisted
     const exportResponse = await app.inject({
       method: 'GET',
-      url: `/my/stories/${storyId}/export`,
+      url: `/my/stories/${storyId}/load-story`,
       cookies: { sessionToken },
     })
 

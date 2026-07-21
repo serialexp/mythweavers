@@ -1,14 +1,14 @@
 import { batch, createMemo } from 'solid-js'
 import { createStore } from 'solid-js/store'
+import { getMyStoriesByIdLoadStory } from '../client/config'
 import { saveService } from '../services/saveService'
-import { VersionConflictError } from '../types/api'
-import { Message } from '../types/core'
-import { SavedStory } from '../types/store'
-import { apiClient } from '../utils/apiClient'
+import type { Message } from '../types/core'
+import type { SavedStory } from '../types/store'
 import { generateMessageId } from '../utils/id'
 import { calculateActivePath } from '../utils/nodeTraversal'
 import { createSavePayload } from '../utils/savePayload'
 import { storage } from '../utils/storage'
+import { messagesFromStoryExport } from '../utils/storyExport'
 import { storyManager } from '../utils/storyManager'
 import { getStoryStats } from '../utils/storyUtils'
 import { currentStoryStore } from './currentStoryStore'
@@ -40,6 +40,46 @@ const [messagesState, setMessagesState] = createStore({
 
 // Data loading is handled by reloadDataForStory
 
+let localSavePromise: Promise<void> | null = null
+let localSaveRequested = false
+
+const saveLocalStory = (): Promise<void> => {
+  localSaveRequested = true
+
+  if (localSavePromise) return localSavePromise
+
+  localSavePromise = (async () => {
+    setMessagesState('isSaving', true)
+    setMessagesState('lastSaveError', null)
+
+    try {
+      while (localSaveRequested) {
+        localSaveRequested = false
+        const storyData = createSavePayload()
+        const didSave = await storyManager.updateLocalStory(currentStoryStore.id, {
+          ...storyData,
+          id: currentStoryStore.id,
+          savedAt: new Date(),
+          storageMode: 'local',
+        } satisfies SavedStory)
+
+        if (!didSave) throw new Error('Could not write the story to local storage')
+        currentStoryStore.updateAutoSaveTime()
+      }
+    } catch (error) {
+      console.error('Failed to auto-save story:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      setMessagesState('lastSaveError', errorMessage)
+      errorStore.addError(`Save failed: ${errorMessage}`)
+    } finally {
+      localSavePromise = null
+      setMessagesState('isSaving', false)
+    }
+  })()
+
+  return localSavePromise
+}
+
 // Full save function that saves the entire story (for local storage or manual saves)
 const saveFullStory = async () => {
   // Don't save if no story is initialized
@@ -48,67 +88,30 @@ const saveFullStory = async () => {
     return
   }
 
-  // Don't save if we're already saving or loading
-  if (messagesState.isSaving || messagesState.isLoading) return
-
-  // Don't save empty stories
-  if (messagesState.messages.length === 0) return
+  // Don't save while a story is loading.
+  if (messagesState.isLoading) return
 
   // Don't save if storage mode is not set (during initialization)
   if (!currentStoryStore.storageMode) return
+
+  // Local writes are serialized and coalesced. If another change arrives while
+  // IndexedDB is being written, the loop takes a fresh snapshot and writes it
+  // before resolving.
+  if (currentStoryStore.storageMode === 'local') return saveLocalStory()
+
+  // Server saves are managed by saveService's queue.
+  if (messagesState.isSaving) return
 
   setMessagesState('isSaving', true)
   setMessagesState('lastSaveError', null)
 
   try {
-    // Create consistent save payload
-    const storyData = createSavePayload()
-
     // Saving chapters
 
-    if (currentStoryStore.storageMode === 'server') {
-      // Save to server
-      // Always update existing server story
-      // Server stories are loaded with their server ID as the story ID
-      try {
-        // Save maps first (including any pending landmark changes)
-        await mapsStore.saveAllMaps()
-
-        const response = await apiClient.updateStory(currentStoryStore.id, {
-          ...storyData,
-          lastKnownUpdatedAt: currentStoryStore.lastKnownUpdatedAt,
-        })
-        // Update the last known updatedAt timestamp
-        currentStoryStore.setLastKnownUpdatedAt(response.updatedAt)
-      } catch (error) {
-        // Check for version conflict error (both VersionConflictError instance and error with VERSION_CONFLICT code)
-        if (
-          error instanceof VersionConflictError ||
-          (error instanceof Error && (error as any).code === 'VERSION_CONFLICT')
-        ) {
-          // Show conflict dialog
-          const conflictError = error as VersionConflictError
-          setMessagesState('conflictInfo', {
-            serverUpdatedAt: conflictError.serverUpdatedAt || (error as any).serverUpdatedAt,
-            clientUpdatedAt: conflictError.clientUpdatedAt || (error as any).clientUpdatedAt,
-          })
-          setMessagesState('showConflictDialog', true)
-          throw error // Re-throw to prevent marking as saved
-        }
-        throw error
-      }
-      // Story auto-saved to server
-    } else {
-      // Save to local storage
-      // Update the existing local story
-      await storyManager.updateLocalStory(currentStoryStore.id, {
-        ...storyData,
-        id: currentStoryStore.id,
-        savedAt: new Date(),
-        storageMode: 'local',
-      } satisfies SavedStory)
-      // Story auto-saved to local storage
-    }
+    // Server stories are normalized and persist incrementally through
+    // saveService. A manual save flushes every debounced/queued operation.
+    await mapsStore.saveAllMaps()
+    await saveService.flushPendingSaves()
 
     currentStoryStore.updateAutoSaveTime()
   } catch (error) {
@@ -367,11 +370,7 @@ const reloadDataForStory = async (storyId: string) => {
       // Filter out compacted messages - they're no longer needed
       const messages = story.messages
         .filter((msg) => !msg.isCompacted)
-        .map((msg) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
-          isSummarizing: false,
-        }))
+        .map((msg) => ({ ...msg, timestamp: new Date(msg.timestamp) }))
 
       // Log if we filtered any compacted messages
       const compactedCount = story.messages.filter((msg) => msg.isCompacted).length
@@ -1030,9 +1029,6 @@ export const messagesStore = {
     if (message.role === 'assistant' && !message.isQuery) {
       setMessagesState('messages', (msg) => msg.id === messageId, {
         content: '',
-        sentenceSummary: undefined,
-        summary: undefined,
-        paragraphSummary: undefined,
         paragraphs: undefined,
         tokensPerSecond: undefined,
         totalTokens: undefined,
@@ -1074,11 +1070,6 @@ export const messagesStore = {
       !messagesState.isLoading
     )
   },
-
-  setSummarizing: (messageId: string, isSummarizing: boolean) =>
-    setMessagesState('messages', (msg) => msg.id === messageId, {
-      isSummarizing,
-    }),
 
   setAnalyzing: (messageId: string, isAnalyzing: boolean) =>
     setMessagesState('messages', (msg) => msg.id === messageId, {
@@ -1351,18 +1342,8 @@ export const messagesStore = {
     setMessagesState('showConflictDialog', false)
 
     try {
-      // Create consistent save payload with force flag
-      const storyData = {
-        ...createSavePayload(),
-        force: true, // Force the save
-      }
-
       if (currentStoryStore.storageMode === 'server') {
-        // Force update existing story
-        const response = await apiClient.updateStory(currentStoryStore.id, storyData)
-        // Update the last known updatedAt timestamp
-        currentStoryStore.setLastKnownUpdatedAt(response.updatedAt)
-        // Story force-saved to server
+        await saveService.flushPendingSaves()
       }
 
       currentStoryStore.updateAutoSaveTime()
@@ -1652,9 +1633,9 @@ export const messagesStore = {
     // For server stories, reload from server
     if (currentStoryStore.storageMode === 'server') {
       try {
-        const story = await apiClient.getStory(storyId)
-        if (story) {
-          messagesStore.setMessages(story.messages)
+        const result = await getMyStoriesByIdLoadStory({ path: { id: storyId } })
+        if (result.data) {
+          messagesStore.setMessages(messagesFromStoryExport(result.data))
         }
       } catch (error) {
         console.error('Failed to refresh messages from server:', error)

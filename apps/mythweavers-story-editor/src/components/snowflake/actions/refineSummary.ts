@@ -1,7 +1,5 @@
-// Refine a node's one-liner to a target detail level (L1 sentence / L2
-// paragraph / L3 page). Produces a preview the user accepts or rejects; on
-// accept the node's summary is overwritten in place (no version history in the
-// single-summary model).
+// Refine a node to a target detail level (L1 sentence / L2 paragraph / L3
+// canonical summary). Each result is stored independently.
 
 import { errorStore } from '../../../stores/errorStore'
 import { nodeStore } from '../../../stores/nodeStore'
@@ -10,7 +8,7 @@ import { runSnowflakePrompt } from '../ai'
 import type { RefinementLevel } from '../constants'
 import { refinePromptForType } from '../prompts'
 import { snowflakeStore } from '../store'
-import { parentOf, siblingIndex, siblingsOf, summaryOf } from './helpers'
+import { parentOf, siblingIndex, siblingsOf, summaryAtLevel, summaryFieldForLevel, summaryOf } from './helpers'
 
 const REFINE_OP = 'refine'
 
@@ -65,13 +63,13 @@ export async function refineSummary(node: Node, targetLevel: RefinementLevel): P
       return
     }
 
-    const original = summaryOf(node)
+    const original = summaryAtLevel(node, targetLevel)
     snowflakeStore.setPreview(node.id, {
       original,
       refined,
       level: targetLevel,
       onAccept: () => {
-        nodeStore.updateNode(node.id, { summary: refined })
+        nodeStore.updateNode(node.id, { [summaryFieldForLevel(targetLevel)]: refined })
         snowflakeStore.clearPreview(node.id)
       },
       onReject: () => snowflakeStore.clearPreview(node.id),

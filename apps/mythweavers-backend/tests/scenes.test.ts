@@ -278,6 +278,8 @@ describe('Scene Endpoints', () => {
         cookies: { [sessionCookie.name]: sessionCookie.value },
         payload: {
           name: 'Updated Name',
+          sentenceSummary: 'The hero enters the ruins.',
+          paragraphSummary: 'The hero enters the ruins and discovers signs of a recent struggle.',
           summary: 'Updated summary',
           goal: 'Updated goal',
           perspective: 'FIRST',
@@ -291,6 +293,8 @@ describe('Scene Endpoints', () => {
       const body = response.json()
       expect(body.success).toBe(true)
       expect(body.scene.name).toBe('Updated Name')
+      expect(body.scene.sentenceSummary).toBe('The hero enters the ruins.')
+      expect(body.scene.paragraphSummary).toBe('The hero enters the ruins and discovers signs of a recent struggle.')
       expect(body.scene.summary).toBe('Updated summary')
       expect(body.scene.goal).toBe('Updated goal')
       expect(body.scene.perspective).toBe('FIRST')

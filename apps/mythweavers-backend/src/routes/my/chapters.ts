@@ -24,6 +24,8 @@ const chapterSchema = z.strictObject({
     description: 'Chapter summary/description',
     example: 'The hero awakens to a new world...',
   }),
+  sentenceSummary: z.string().nullable().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().nullable().meta({ description: 'Paragraph-length Snowflake summary' }),
   arcId: z.string().meta({
     description: 'Parent arc ID',
     example: 'clx9876543210',
@@ -100,6 +102,8 @@ const createChapterBodySchema = z.strictObject({
     description: 'Chapter summary/description',
     example: 'The hero awakens to a new world...',
   }),
+  sentenceSummary: z.string().optional().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().optional().meta({ description: 'Paragraph-length Snowflake summary' }),
   nodeType: nodeTypeSchema.optional(),
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within arc (defaults to end)',
@@ -121,6 +125,8 @@ const updateChapterBodySchema = z.strictObject({
     description: 'Chapter summary/description',
     example: 'The hero awakens to a new world...',
   }),
+  sentenceSummary: z.string().nullable().optional().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().nullable().optional().meta({ description: 'Paragraph-length Snowflake summary' }),
   nodeType: nodeTypeSchema.optional(),
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within arc',
@@ -218,7 +224,7 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
       try {
         const userId = request.user!.id
         const { arcId } = request.params
-        const { id, name, summary, nodeType, sortOrder } = request.body
+        const { id, name, sentenceSummary, paragraphSummary, summary, nodeType, sortOrder } = request.body
 
         // Verify arc exists and user owns the parent story
         const arc = await prisma.arc.findFirst({
@@ -251,6 +257,8 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
           data: {
             ...(id && { id }), // Use client-provided ID if present
             name,
+            sentenceSummary: sentenceSummary || null,
+            paragraphSummary: paragraphSummary || null,
             summary: summary || null,
             arcId,
             sortOrder: finalSortOrder,

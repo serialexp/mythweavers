@@ -24,12 +24,6 @@ export const isStoryReadyForGeneration = (): boolean => {
     return false
   }
 
-  // Check if any messages are currently being summarized
-  const isSummarizing = messagesStore.messages.some((msg) => msg.isSummarizing)
-  if (isSummarizing) {
-    return false
-  }
-
   // Check if any messages are currently being analyzed
   const isAnalyzing = messagesStore.messages.some((msg) => msg.isAnalyzing)
   if (isAnalyzing) {

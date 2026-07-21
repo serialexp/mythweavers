@@ -1,21 +1,49 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
-import { z } from 'zod'
 import type Stripe from 'stripe'
-import { stripe } from '../../lib/stripe.js'
+import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
+import { stripe } from '../../lib/stripe.js'
 
 const errorSchema = z.object({ error: z.string() })
+
+export async function creditStripeTopUp(input: {
+  paymentIntentId: string
+  userId: number
+  amount: number
+}): Promise<boolean> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: input.userId },
+        data: { balance: { increment: input.amount } },
+      })
+
+      await tx.balanceLedger.create({
+        data: {
+          userId: input.userId,
+          amount: input.amount,
+          balanceAfter: updated.balance,
+          type: 'TOPUP',
+          description: `Stripe top-up: $${input.amount.toFixed(2)} (${input.paymentIntentId})`,
+          externalId: input.paymentIntentId,
+        },
+      })
+    })
+    return true
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+      return false
+    }
+    throw error
+  }
+}
 
 const stripeWebhookRoutes: FastifyPluginAsyncZod = async (fastify) => {
   // Override the JSON parser for this plugin scope only — Stripe needs the raw body
   // for signature verification. This does NOT affect any other routes.
-  fastify.addContentTypeParser(
-    'application/json',
-    { parseAs: 'buffer' },
-    (_req, body, done) => {
-      done(null, body)
-    },
-  )
+  fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => {
+    done(null, body)
+  })
 
   fastify.post(
     '/stripe',
@@ -48,11 +76,7 @@ const stripeWebhookRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       let event: Stripe.Event
       try {
-        event = await stripe.webhooks.constructEventAsync(
-          request.body as Buffer,
-          sig,
-          webhookSecret,
-        )
+        event = await stripe.webhooks.constructEventAsync(request.body as Buffer, sig, webhookSecret)
       } catch (err) {
         fastify.log.warn({ err }, '[stripe-webhook] Signature verification failed')
         return reply.status(400).send({ error: 'Webhook signature verification failed' })
@@ -61,44 +85,37 @@ const stripeWebhookRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object as Stripe.PaymentIntent
         const userId = Number(paymentIntent.metadata?.userId)
-        const amount = Number(paymentIntent.metadata?.amount)
+        const amountInCents = paymentIntent.amount_received
+        const amount = amountInCents / 100
 
-        if (!userId || !amount || amount <= 0) {
-          fastify.log.warn({ metadata: paymentIntent.metadata }, '[stripe-webhook] Invalid payment intent metadata')
-          return reply.status(400).send({ error: 'Invalid payment intent metadata' })
+        if (
+          !Number.isInteger(userId) ||
+          userId <= 0 ||
+          !Number.isInteger(amountInCents) ||
+          amountInCents <= 0 ||
+          paymentIntent.currency.toLowerCase() !== 'usd'
+        ) {
+          fastify.log.warn(
+            {
+              paymentIntentId: paymentIntent.id,
+              userId: paymentIntent.metadata?.userId,
+              amountReceived: paymentIntent.amount_received,
+              currency: paymentIntent.currency,
+            },
+            '[stripe-webhook] Invalid payment intent data',
+          )
+          return reply.status(400).send({ error: 'Invalid payment intent data' })
         }
 
-        // Idempotency: check if we already processed this payment intent
-        const existingEntry = await prisma.balanceLedger.findFirst({
-          where: {
-            userId,
-            type: 'TOPUP',
-            description: { contains: paymentIntent.id },
-          },
+        const credited = await creditStripeTopUp({
+          paymentIntentId: paymentIntent.id,
+          userId,
+          amount,
         })
-
-        if (!existingEntry) {
-          await prisma.$transaction(async (tx) => {
-            const updated = await tx.user.update({
-              where: { id: userId },
-              data: { balance: { increment: amount } },
-            })
-
-            await tx.balanceLedger.create({
-              data: {
-                userId,
-                amount,
-                balanceAfter: updated.balance,
-                type: 'TOPUP',
-                description: `Stripe top-up: $${amount.toFixed(2)} (${paymentIntent.id})`,
-              },
-            })
-          })
-
-          fastify.log.info(
-            { userId, amount, paymentIntentId: paymentIntent.id },
-            '[stripe-webhook] Balance credited',
-          )
+        if (credited) {
+          fastify.log.info({ userId, amount, paymentIntentId: paymentIntent.id }, '[stripe-webhook] Balance credited')
+        } else {
+          fastify.log.info({ paymentIntentId: paymentIntent.id }, '[stripe-webhook] PaymentIntent already credited')
         }
       }
 

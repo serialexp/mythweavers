@@ -33,12 +33,7 @@ export interface Message {
   tokenUsage?: TokenUsage
   isQuery?: boolean
   paragraphs?: Paragraph[]
-  sentenceSummary?: string
-  summary?: string
-  paragraphSummary?: string
-  isExpanded?: boolean
   isInstructionExpanded?: boolean // Whether instruction is expanded (for truncated instructions)
-  isSummarizing?: boolean
   think?: string // AI's thinking/reasoning content
   showThink?: boolean // Whether to display the think content
   sceneAnalysis?: SceneAnalysis // Cached analysis of this story beat
@@ -158,6 +153,11 @@ export interface Node {
   type: NodeType
   nodeType?: NodeContentType // API field: indicates if content is story, non-story, or context
   title: string
+  /** One-sentence Snowflake outline level (L1). */
+  sentenceSummary?: string | null
+  /** Paragraph-length Snowflake outline level (L2). */
+  paragraphSummary?: string | null
+  /** Canonical, most complete summary (L3 and all non-Snowflake consumers). */
   summary?: string
   /**
    * Per-branch-segment summaries. When set, this is the authoritative summary

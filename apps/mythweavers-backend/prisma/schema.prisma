@@ -334,6 +334,8 @@ model StoryReadStatus {
 model Book {
   id                      String    @id @default(cuid())
   name                    String    @default("")
+  sentenceSummary         String?   @db.Text
+  paragraphSummary        String?   @db.Text
   summary                 String?   @db.Text
   storyId                 String
   story                   Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
@@ -361,6 +363,8 @@ model Book {
 model Arc {
   id                      String    @id @default(cuid())
   name                    String    @default("")
+  sentenceSummary         String?   @db.Text
+  paragraphSummary        String?   @db.Text
   summary                 String?   @db.Text
   bookId                  String
   book                    Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
@@ -381,11 +385,13 @@ model Arc {
 }
 
 model Chapter {
-  id          String    @id @default(cuid())
-  name        String    @default("")
-  summary     String?   @db.Text
-  arcId       String
-  arc         Arc       @relation(fields: [arcId], references: [id], onDelete: Cascade)
+  id               String  @id @default(cuid())
+  name             String  @default("")
+  sentenceSummary  String? @db.Text
+  paragraphSummary String? @db.Text
+  summary          String? @db.Text
+  arcId            String
+  arc              Arc     @relation(fields: [arcId], references: [id], onDelete: Cascade)
   /// @deprecated Use `publishedAt` instead. Kept during migration period; will be dropped once all callers are cut over.
   publishedOn DateTime?
   /// When this chapter became (or will become) publicly visible on the reading frontend.
@@ -422,9 +428,11 @@ model Chapter {
 }
 
 model Scene {
-  id        String  @id @default(cuid())
-  name      String  @default("")
-  summary   String? @db.Text
+  id               String  @id @default(cuid())
+  name             String  @default("")
+  sentenceSummary  String? @db.Text
+  paragraphSummary String? @db.Text
+  summary          String? @db.Text
   /// Per-segment summaries for branching scenes. Array of
   /// `{ startMessageId, endMessageId, summary }`. A segment is a maximal run of
   /// messages bounded by branch boundaries (a branch message ends a segment;
@@ -1125,6 +1133,8 @@ model BalanceLedger {
 
   type        LedgerEntryType
   description String // e.g. "LLM usage: claude-sonnet-4", "Admin credit: top-up"
+  /// Idempotency key supplied by an external billing system (for example a Stripe PaymentIntent ID).
+  externalId String? @unique
 
   /// If this debit was caused by an LLM call, link to the detailed usage log
   llmUsageLogId String?      @unique

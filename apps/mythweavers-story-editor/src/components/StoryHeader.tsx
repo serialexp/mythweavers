@@ -6,7 +6,6 @@ import { authStore } from '../stores/authStore'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
-import { episodeViewerStore } from '../stores/episodeViewerStore'
 import { headerStore } from '../stores/headerStore'
 import { llmActivityStore } from '../stores/llmActivityStore'
 import { mapsStore } from '../stores/mapsStore'
@@ -23,7 +22,6 @@ import { CalendarManagement } from './CalendarManagement'
 import { LanguageManagement } from './LanguageManagement'
 import { Characters, type CharactersRef } from './Characters'
 import { ContextItems, type ContextItemsRef } from './ContextItems'
-import { EpisodeViewer } from './EpisodeViewer'
 import { HeaderButton } from './HeaderButton'
 import { LlmActivityPanel } from './LlmActivityPanel'
 import { Maps } from './Maps'
@@ -35,7 +33,7 @@ import { StoryStats } from './StoryStats'
 import { QuickLlmDialog } from './QuickLlmDialog'
 import { quickLlmStore } from '../stores/quickLlmStore'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
-import { PhArrowsOutCardinalIcon, PhBookIcon, PhBookOpenIcon, PhCalendarBlankIcon, PhCaretDownIcon, PhCaretUpIcon, PhChatDotsIcon, PhCodeIcon, PhCpuIcon, PhDotsThreeIcon, PhFilmSlateIcon, PhGearIcon, PhGlobeIcon, PhMagnifyingGlassIcon, PhMapTrifoldIcon, PhMoonIcon, PhPlusIcon, PhSignOutIcon, PhSunIcon, PhTranslateIcon, PhTreeStructureIcon, PhUsersIcon } from 'solidjs-phosphor'
+import { PhArrowsOutCardinalIcon, PhBookIcon, PhBookOpenIcon, PhCalendarBlankIcon, PhCaretDownIcon, PhCaretUpIcon, PhChatDotsIcon, PhCodeIcon, PhCpuIcon, PhDotsThreeIcon, PhGearIcon, PhGlobeIcon, PhMagnifyingGlassIcon, PhMapTrifoldIcon, PhMoonIcon, PhPlusIcon, PhSignOutIcon, PhSunIcon, PhTranslateIcon, PhTreeStructureIcon, PhUsersIcon } from 'solidjs-phosphor'
 
 interface StoryHeaderProps {
   onLoadStory: (
@@ -44,7 +42,6 @@ interface StoryHeaderProps {
     input: string,
     storySetting: string,
   ) => void
-  onBulkSummarize: () => void
   onMigrateInstructions: () => void
   onRemoveUserMessages: () => void
   onCleanupThinkTags: () => void
@@ -313,9 +310,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                   Search
                 </DropdownItem>
               </Show>
-              <DropdownItem icon={<PhFilmSlateIcon />} onClick={() => episodeViewerStore.toggle()}>
-                Episode Viewer
-              </DropdownItem>
               <Show when={currentStoryStore.id}>
                 <DropdownItem
                   icon={<PhTreeStructureIcon />}
@@ -389,7 +383,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
           availableModels={modelsStore.availableModels}
           isLoadingModels={modelsStore.isLoadingModels}
           onRefreshModels={() => modelsStore.fetchModels()}
-          onBulkSummarize={props.onBulkSummarize}
           onMigrateInstructions={props.onMigrateInstructions}
           onRemoveUserMessages={props.onRemoveUserMessages}
           onCleanupThinkTags={props.onCleanupThinkTags}
@@ -498,11 +491,6 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
       >
         <QuickLlmDialog />
       </OverlayPanel>
-
-      {/* Only show modal version when not in docked mode */}
-      <Show when={!episodeViewerStore.isDocked}>
-        <EpisodeViewer isOpen={episodeViewerStore.isOpen} onClose={() => episodeViewerStore.hide()} mode="modal" />
-      </Show>
 
       {/* Travel Time Calculator */}
       <TravelTimeCalculator

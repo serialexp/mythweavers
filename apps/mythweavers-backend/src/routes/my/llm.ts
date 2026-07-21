@@ -1,26 +1,22 @@
+import {
+  AnthropicClient,
+  CloudflareClient,
+  type LLMMessage,
+  type LLMStreamEvent,
+  OpenAICompatibleClient,
+} from '@mythweavers/llm'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { type TokenUsage, calculateCost } from '../../lib/billing.js'
-import {
-  type UpstreamConfig,
-  getPublicModels,
-  resolveUpstream,
-} from '../../lib/llm-config.js'
+import { type UpstreamConfig, getPublicModels, resolveUpstream } from '../../lib/llm-config.js'
 import { prisma } from '../../lib/prisma.js'
-import {
-  AnthropicClient,
-  CloudflareClient,
-  OpenAICompatibleClient,
-  type LLMStreamEvent,
-  type LLMMessage,
-} from '@mythweavers/llm'
 
 // --- Zod schemas ---
 
 const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
-  content: z.string(),
+  content: z.string().max(200_000),
   cache_control: z
     .object({
       type: z.literal('ephemeral'),
@@ -48,13 +44,13 @@ const toolChoiceSchema = z.union([
 
 const generateBodySchema = z.object({
   model: z.string().meta({ description: 'Model name from the server allowed list' }),
-  messages: z.array(messageSchema).min(1),
+  messages: z.array(messageSchema).min(1).max(100),
   temperature: z.number().min(0).max(2).optional(),
-  max_tokens: z.number().int().positive().optional(),
-  thinking_budget: z.number().int().positive().optional(),
-  tools: z.array(toolDefinitionSchema).optional().meta({
+  max_tokens: z.number().int().positive().max(32_768).default(4096),
+  thinking_budget: z.number().int().positive().max(32_768).optional(),
+  tools: z.array(toolDefinitionSchema).max(64).optional().meta({
     description:
-      "Optional tool definitions the model may invoke. Currently only honored on OpenAI-compatible upstreams; other providers will reject the request.",
+      'Optional tool definitions the model may invoke. Currently only honored on OpenAI-compatible upstreams; other providers will reject the request.',
   }),
   tool_choice: toolChoiceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -143,6 +139,34 @@ function createClient(config: UpstreamConfig) {
   }
 }
 
+export async function reserveLlmCredit(userId: number, model: string, amount: number): Promise<{ id: string } | null> {
+  return prisma.$transaction(async (tx) => {
+    const result = await tx.user.updateMany({
+      where: {
+        id: userId,
+        balance: { gte: amount },
+      },
+      data: { balance: { decrement: amount } },
+    })
+    if (result.count !== 1) return null
+
+    const reservedUser = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { balance: true },
+    })
+    return tx.balanceLedger.create({
+      data: {
+        userId,
+        amount: -amount,
+        balanceAfter: reservedUser.balance,
+        type: 'LLM_USAGE',
+        description: `LLM reservation: ${model}`,
+      },
+      select: { id: true },
+    })
+  })
+}
+
 // --- Route plugin ---
 
 const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -178,8 +202,7 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       preHandler: requireAuth,
       schema: {
-        description:
-          'Proxy an LLM generation request through the server. Streams normalized SSE events.',
+        description: 'Proxy an LLM generation request through the server. Streams normalized SSE events.',
         tags: ['llm'],
         body: generateBodySchema,
         response: {
@@ -201,9 +224,28 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
         })
       }
 
-      // Balance check — soft guard (balance can go slightly negative from concurrent calls)
+      // Reserve the worst-case cost atomically before contacting the upstream.
+      // UTF-8 bytes are a deliberately conservative token upper bound for
+      // admission; unused credit is refunded during final settlement.
       const user = request.user!
-      if (user.balance.toNumber() <= 0) {
+      const inputTokenUpperBound = request.body.messages.reduce(
+        (total, message) => total + Buffer.byteLength(message.content, 'utf8'),
+        0,
+      )
+      const outputTokenUpperBound = request.body.max_tokens + (request.body.thinking_budget ?? 0)
+      const reservationCost = calculateCost(
+        {
+          promptTokens: inputTokenUpperBound,
+          completionTokens: outputTokenUpperBound,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 0,
+        },
+        upstream.pricing,
+      )
+
+      const reservation = await reserveLlmCredit(user.id, upstream.model, reservationCost)
+
+      if (!reservation) {
         return reply.status(403).send({ error: 'Insufficient balance' })
       }
 
@@ -246,8 +288,10 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // Use assignment (not +=) — providers send totals, not deltas
         if (usage.usage.prompt_tokens != null) tokenUsage.promptTokens = usage.usage.prompt_tokens
         if (usage.usage.completion_tokens != null) tokenUsage.completionTokens = usage.usage.completion_tokens
-        if (usage.usage.cache_creation_input_tokens != null) tokenUsage.cacheCreationTokens = usage.usage.cache_creation_input_tokens
-        if (usage.usage.cache_read_input_tokens != null) tokenUsage.cacheReadTokens = usage.usage.cache_read_input_tokens
+        if (usage.usage.cache_creation_input_tokens != null)
+          tokenUsage.cacheCreationTokens = usage.usage.cache_creation_input_tokens
+        if (usage.usage.cache_read_input_tokens != null)
+          tokenUsage.cacheReadTokens = usage.usage.cache_read_input_tokens
       }
 
       try {
@@ -285,12 +329,15 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
           }
         }
 
-        fastify.log.info({
-          model: upstream.model,
-          totalMs: Date.now() - t0,
-          ttfbMs: firstChunkAt ? firstChunkAt - t0 : null,
-          chunks: chunkCount,
-        }, '[llm-proxy] stream complete')
+        fastify.log.info(
+          {
+            model: upstream.model,
+            totalMs: Date.now() - t0,
+            ttfbMs: firstChunkAt ? firstChunkAt - t0 : null,
+            chunks: chunkCount,
+          },
+          '[llm-proxy] stream complete',
+        )
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
           streamAborted = true
@@ -307,57 +354,77 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
           }
         }
       } finally {
-        try { raw.end() } catch { /* already ended */ }
+        try {
+          raw.end()
+        } catch {
+          /* already ended */
+        }
 
-        // Billing: calculate cost and record usage + ledger entry
-        if (tokenUsage.promptTokens > 0 || tokenUsage.completionTokens > 0) {
-          const cost = calculateCost(tokenUsage, upstream.pricing)
-          if (cost > 0) {
-            try {
-              await prisma.$transaction(async (tx) => {
-                // 1. Create detailed usage log
-                const usageLog = await tx.llmUsageLog.create({
-                  data: {
-                    userId: user.id,
-                    modelId: upstream.model,
-                    providerName: upstream.provider,
-                    promptTokens: tokenUsage.promptTokens,
-                    completionTokens: tokenUsage.completionTokens,
-                    cacheCreationTokens: tokenUsage.cacheCreationTokens,
-                    cacheReadTokens: tokenUsage.cacheReadTokens,
-                    priceInput: upstream.pricing.input,
-                    priceOutput: upstream.pricing.output,
-                    priceCacheRead: upstream.pricing.cacheRead,
-                    priceCacheWrite: upstream.pricing.cacheWrite,
-                    cost,
-                    durationMs: Date.now() - streamStart,
-                    aborted: streamAborted,
-                  },
-                })
+        // Billing settlement: replace the conservative reservation with the
+        // actual charge and refund everything unused. A crash before this
+        // point leaves the maximum charge reserved rather than giving away an
+        // unrecorded upstream request; it can be reconciled from the ledger.
+        const hasUsage = tokenUsage.promptTokens > 0 || tokenUsage.completionTokens > 0
+        const calculatedCost = hasUsage ? calculateCost(tokenUsage, upstream.pricing) : 0
+        const actualCost = Math.min(calculatedCost, reservationCost)
+        if (calculatedCost > reservationCost) {
+          fastify.log.error(
+            { userId: user.id, calculatedCost, reservationCost, model: upstream.model },
+            '[billing] Actual LLM cost exceeded its reservation',
+          )
+        }
 
-                // 2. Deduct balance
-                const updated = await tx.user.update({
-                  where: { id: user.id },
-                  data: { balance: { decrement: cost } },
-                })
+        try {
+          await prisma.$transaction(async (tx) => {
+            const refund = reservationCost - actualCost
+            const settledUser =
+              refund > 0
+                ? await tx.user.update({
+                    where: { id: user.id },
+                    data: { balance: { increment: refund } },
+                    select: { balance: true },
+                  })
+                : await tx.user.findUniqueOrThrow({
+                    where: { id: user.id },
+                    select: { balance: true },
+                  })
 
-                // 3. Record ledger entry
-                await tx.balanceLedger.create({
-                  data: {
-                    userId: user.id,
-                    amount: -cost,
-                    balanceAfter: updated.balance,
-                    type: 'LLM_USAGE',
-                    description: `LLM usage: ${upstream.model}`,
-                    llmUsageLogId: usageLog.id,
-                  },
-                })
-              })
-            } catch (err) {
-              console.error('[billing] Failed to record usage:', err)
-              // Don't fail the request — the stream already completed
+            if (!hasUsage || actualCost <= 0) {
+              await tx.balanceLedger.delete({ where: { id: reservation.id } })
+              return
             }
-          }
+
+            const usageLog = await tx.llmUsageLog.create({
+              data: {
+                userId: user.id,
+                modelId: upstream.model,
+                providerName: upstream.provider,
+                promptTokens: tokenUsage.promptTokens,
+                completionTokens: tokenUsage.completionTokens,
+                cacheCreationTokens: tokenUsage.cacheCreationTokens,
+                cacheReadTokens: tokenUsage.cacheReadTokens,
+                priceInput: upstream.pricing.input,
+                priceOutput: upstream.pricing.output,
+                priceCacheRead: upstream.pricing.cacheRead,
+                priceCacheWrite: upstream.pricing.cacheWrite,
+                cost: actualCost,
+                durationMs: Date.now() - streamStart,
+                aborted: streamAborted,
+              },
+            })
+
+            await tx.balanceLedger.update({
+              where: { id: reservation.id },
+              data: {
+                amount: -actualCost,
+                balanceAfter: settledUser.balance,
+                description: `LLM usage: ${upstream.model}`,
+                llmUsageLogId: usageLog.id,
+              },
+            })
+          })
+        } catch (err) {
+          fastify.log.error({ err, reservationId: reservation.id }, '[billing] Failed to settle LLM usage')
         }
       }
     },

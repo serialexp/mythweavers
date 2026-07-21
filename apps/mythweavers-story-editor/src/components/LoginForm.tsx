@@ -2,7 +2,6 @@ import { Alert, Button, Card, CardBody, FormField, Input } from '@mythweavers/ui
 import { Component, Show, createSignal } from 'solid-js'
 import { postAuthLogin, postAuthRegister } from '../client/config'
 import { getApiBaseUrl } from '../client/config'
-import { ForgotPassword } from './ForgotPassword'
 import * as styles from './LoginForm.css'
 
 interface LoginFormProps {
@@ -11,7 +10,6 @@ interface LoginFormProps {
 
 export const LoginForm: Component<LoginFormProps> = (props) => {
   const [isRegistering, setIsRegistering] = createSignal(false)
-  const [showForgotPassword, setShowForgotPassword] = createSignal(false)
   const [email, setEmail] = createSignal('')
   const [username, setUsername] = createSignal('')
   const [password, setPassword] = createSignal('')
@@ -284,20 +282,6 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
               {isLoading() ? 'Please wait...' : isRegistering() ? 'Register' : 'Login'}
             </Button>
 
-            <Show when={!isRegistering()}>
-              <div style={{ 'text-align': 'center', 'margin-top': '1rem' }}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowForgotPassword(true)}
-                  disabled={isLoading()}
-                >
-                  Forgot Password?
-                </Button>
-              </div>
-            </Show>
-
             <div class={styles.switchModeText}>
               {isRegistering() ? 'Already have an account?' : "Don't have an account?"}
               <Button type="button" variant="ghost" size="sm" onClick={switchMode} disabled={isLoading()}>
@@ -420,13 +404,6 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           </form>
         </CardBody>
       </Card>
-
-      <Show when={showForgotPassword()}>
-        <ForgotPassword
-          onClose={() => setShowForgotPassword(false)}
-          onBackToLogin={() => setShowForgotPassword(false)}
-        />
-      </Show>
     </div>
   )
 }

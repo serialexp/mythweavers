@@ -31,6 +31,23 @@ export const toolbar = style({
   },
 })
 
+export const toolbarLeft = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['3'],
+  flexWrap: 'wrap',
+  minWidth: 0,
+})
+
+export const levelControl = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 0,
+  borderRadius: tokens.radius.sm,
+  border: `1px solid ${tokens.color.border.default}`,
+  overflow: 'hidden',
+})
+
 export const toolbarTitle = style({
   fontSize: tokens.font.size.lg,
   fontWeight: tokens.font.weight.semibold,
@@ -250,6 +267,40 @@ const buttonBase = style({
 })
 
 export const actionButton = buttonBase
+
+// ---- Detail-level segmented control (toolbar) ----
+
+export const levelButton = style([
+  buttonBase,
+  {
+    borderRadius: 0,
+    borderWidth: 0,
+    padding: `${tokens.space['1']} ${tokens.space['2.5']}`,
+    background: 'transparent',
+    fontWeight: tokens.font.weight.semibold,
+    selectors: {
+      '&:hover:not(:disabled)': {
+        background: tokens.color.surface.hover,
+        color: tokens.color.text.primary,
+        borderColor: 'transparent',
+      },
+    },
+  },
+])
+
+export const levelButtonActive = style([
+  levelButton,
+  {
+    background: tokens.color.accent.primary,
+    color: tokens.color.text.inverse,
+    selectors: {
+      '&:hover:not(:disabled)': {
+        background: tokens.color.accent.primaryHover,
+        color: tokens.color.text.inverse,
+      },
+    },
+  },
+])
 
 export const dangerButton = style([
   buttonBase,

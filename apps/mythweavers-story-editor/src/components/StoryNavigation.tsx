@@ -1318,8 +1318,8 @@ export const StoryNavigation: Component<StoryNavigationProps> = (props) => {
     if (!confirm('This will create a new story from this book. Continue?')) return
 
     try {
-      const { getMyStoriesByIdExport, getApiBaseUrl } = await import('../client/config')
-      const result = await getMyStoriesByIdExport({ path: { id: currentStoryStore.id } })
+      const { getMyStoriesByIdLoadStory, getApiBaseUrl } = await import('../client/config')
+      const result = await getMyStoriesByIdLoadStory({ path: { id: currentStoryStore.id } })
       const exportData = result.data
 
       if (!exportData) {

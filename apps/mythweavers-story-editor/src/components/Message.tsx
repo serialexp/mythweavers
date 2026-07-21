@@ -1,5 +1,5 @@
 import { Button } from '@mythweavers/ui'
-import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
+import { Component, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import * as styles from './Message.css'
 import { useOllama } from '../hooks/useOllama'
 import { useStoryGeneration } from '../hooks/useStoryGeneration'
@@ -9,7 +9,6 @@ import { nodeStore } from '../stores/nodeStore'
 import { singleRewriteDialogStore } from '../stores/singleRewriteDialogStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
 import { uiStore } from '../stores/uiStore'
-import type { SummaryViewMode } from '../stores/uiStore'
 import { viewModeStore } from '../stores/viewModeStore'
 import { Message as MessageType } from '../types/core'
 import { processPastedText } from '../utils/textProcessing'
@@ -30,18 +29,13 @@ const cn = (...classes: (string | false | undefined | null)[]) => classes.filter
 
 interface MessageProps {
   message: MessageType
-  storyTurnNumber: number
-  totalStoryTurns: number
   isGenerating: boolean
 }
 
 export const Message: Component<MessageProps> = (props) => {
   // Get hooks for generation functions
-  const { generateResponse, generateSummaries } = useOllama()
-  const { handleRegenerateFromMessage, handleRegenerateQuery, handleSummarizeMessage } = useStoryGeneration({
-    generateResponse,
-    generateSummaries,
-  })
+  const { generateResponse } = useOllama()
+  const { handleRegenerateFromMessage, handleRegenerateQuery } = useStoryGeneration({ generateResponse })
   const [isEditingInstruction, setIsEditingInstruction] = createSignal(false)
 
   // Determine if this message should use the always-on editor (story content)
@@ -202,132 +196,6 @@ export const Message: Component<MessageProps> = (props) => {
       tokenUsage,
     }
   })
-
-  const shouldShowSummary = () => {
-    const hasAnySummary = !!(props.message.sentenceSummary || props.message.summary || props.message.paragraphSummary)
-    return hasAnySummary && props.message.role === 'assistant' && !props.message.isQuery
-  }
-
-  const isExpanded = () => props.message.isExpanded ?? false
-
-  type SummaryChoice = 'sentence' | 'paragraph' | 'full' | 'content'
-  type SummaryLevel = Exclude<SummaryChoice, 'content'>
-
-  const summaryView = createMemo(() => uiStore.summaryView)
-
-  const summarySelection = createMemo(() => {
-    const preference = summaryView()
-    const available: Record<SummaryChoice, string | undefined> = {
-      sentence: props.message.sentenceSummary,
-      paragraph: props.message.paragraphSummary,
-      full: props.message.summary,
-      content: props.message.content,
-    }
-
-    const pickFromOrder = (order: SummaryChoice[]) => {
-      for (const key of order) {
-        const value = available[key]
-        if (value && value.trim().length > 0) {
-          return { key, text: value }
-        }
-      }
-      return { key: 'content' as SummaryChoice, text: available.content || '' }
-    }
-
-    if (preference === 'sentence') {
-      return pickFromOrder(['sentence', 'paragraph', 'full', 'content'])
-    }
-
-    if (preference === 'paragraph') {
-      return pickFromOrder(['paragraph', 'full', 'sentence', 'content'])
-    }
-
-    if (preference === 'full') {
-      return pickFromOrder(['full', 'paragraph', 'sentence', 'content'])
-    }
-
-    if (viewModeStore.isScriptMode() && !isExpanded()) {
-      return pickFromOrder(['paragraph', 'full', 'sentence', 'content'])
-    }
-
-    if (props.storyTurnNumber <= props.totalStoryTurns - 14) {
-      return pickFromOrder(['sentence', 'paragraph', 'full', 'content'])
-    }
-
-    if (props.storyTurnNumber <= props.totalStoryTurns - 7) {
-      return pickFromOrder(['paragraph', 'full', 'sentence', 'content'])
-    }
-
-    return pickFromOrder(['full', 'paragraph', 'sentence', 'content'])
-  })
-
-  const summaryText = createMemo(() => {
-    const selection = summarySelection()
-    const text = selection.text || ''
-
-    if (!text) return ''
-
-    if (viewModeStore.isScriptMode() && !isExpanded()) {
-      const sentences = text.match(/[^.!?]+[.!?]+/g) || []
-      const firstTwo = sentences.slice(0, 2).join(' ')
-      return firstTwo || text
-    }
-
-    return text
-  })
-
-  const activeSummaryTab = createMemo<SummaryViewMode | SummaryLevel | null>(() => {
-    const view = summaryView()
-    if (view === 'auto') {
-      return 'auto'
-    }
-    const key = summarySelection().key
-    if (key === 'content') return null
-    return key
-  })
-
-  const summaryTitle = createMemo(() => {
-    const key = summarySelection().key
-    switch (key) {
-      case 'sentence':
-        return 'Summary · One sentence'
-      case 'paragraph':
-        return 'Summary · One paragraph'
-      case 'full':
-        return 'Summary'
-      default:
-        return 'Summary'
-    }
-  })
-
-  const summaryTabs: { key: SummaryViewMode; label: string; description: string }[] = [
-    { key: 'auto', label: 'Auto', description: 'Use context-based summary selection' },
-    { key: 'sentence', label: 'Sentence', description: 'Show the one-sentence recap' },
-    { key: 'full', label: 'Normal', description: 'Show the multi-sentence summary' },
-    { key: 'paragraph', label: 'Paragraph', description: 'Show the one-paragraph summary' },
-  ]
-
-  const summaryAvailability = createMemo<Record<SummaryLevel, boolean>>(() => ({
-    sentence: !!props.message.sentenceSummary?.trim(),
-    paragraph: !!props.message.paragraphSummary?.trim(),
-    full: !!props.message.summary?.trim(),
-  }))
-
-  const toggleExpanded = () => {
-    messagesStore.updateMessage(props.message.id, { isExpanded: !isExpanded() })
-  }
-
-  const getCompressionRatio = () => {
-    if (!shouldShowSummary() || !props.message.content) return null
-
-    const summaryLength = summaryText().length
-    const originalLength = props.message.content.length
-
-    if (originalLength === 0) return null
-
-    const ratio = (summaryLength / originalLength) * 100
-    return Math.round(ratio)
-  }
 
   const toggleThink = () => {
     messagesStore.updateMessage(props.message.id, { showThink: !props.message.showThink })
@@ -588,7 +456,6 @@ export const Message: Component<MessageProps> = (props) => {
       styles.message,
       isInstruction ? styles.messageInstruction : styles.messageAssistant,
       !isInstruction && props.message.isQuery && styles.messageQuery,
-      !isInstruction && props.message.isSummarizing && styles.messageSummarizing,
       !isInstruction && props.message.isAnalyzing && styles.messageAnalyzing,
       !isInstruction && props.message.type === 'event' && styles.messageEvent,
       !isInstruction && uiStore.isCut(props.message.id) && styles.messageCut,
@@ -793,60 +660,7 @@ export const Message: Component<MessageProps> = (props) => {
                 />
               </div>
             </Show>
-            {/* Collapsed: show summary */}
-            <Show when={shouldShowSummary() && !isExpanded()}>
-              <div class={styles.summary}>
-                <div class={styles.summaryHeader}>
-                  <div class={styles.summaryTitle}>{summaryTitle()}</div>
-                  <div class={styles.summaryTabs}>
-                    <For each={summaryTabs}>
-                      {(tab) => {
-                        const isAvailable = () => tab.key === 'auto' || summaryAvailability()[tab.key as SummaryLevel]
-                        const isActive = () => activeSummaryTab() === tab.key
-                        return (
-                          <button
-                            class={cn(styles.summaryTab, isActive() && styles.summaryTabActive)}
-                            disabled={!isAvailable()}
-                            onClick={() => uiStore.setSummaryView(tab.key)}
-                            title={tab.description}
-                          >
-                            {tab.label}
-                          </button>
-                        )
-                      }}
-                    </For>
-                  </div>
-                </div>
-                <div class={styles.summaryContent}>{summaryText()}</div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                class={styles.summaryToggle}
-                onClick={toggleExpanded}
-                title="Show full content"
-              >
-                <PhCaretDownIcon /> Show full content
-              </Button>
-            </Show>
-            {/* Expanded: show editor instead of plain text - always show editor */}
-            <Show when={!shouldShowSummary() || isExpanded()}>
-              <SceneEditorWrapper
-                messageId={props.message.id}
-                editable={!props.isGenerating}
-              />
-              <Show when={shouldShowSummary() && isExpanded()}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class={styles.summaryToggle}
-                  onClick={toggleExpanded}
-                  title="Show summary"
-                >
-                  <PhCaretUpIcon /> Show summary
-                </Button>
-              </Show>
-            </Show>
+            <SceneEditorWrapper messageId={props.message.id} editable={!props.isGenerating} />
             {/* Think section for story content */}
             <Show when={props.message.think}>
               <Show when={!props.message.showThink}>
@@ -1031,9 +845,6 @@ export const Message: Component<MessageProps> = (props) => {
                 )
               })()}
             </Show>
-            <Show when={getCompressionRatio() !== null}>
-              <span class={styles.tokenInfo}>{getCompressionRatio()}% size</span>
-            </Show>
           </div>
           <div class={styles.actionButtons}>
             <Show when={canRegenerateFromHere()}>
@@ -1079,17 +890,12 @@ export const Message: Component<MessageProps> = (props) => {
               </Show>
               <Show when={!props.message.isQuery && props.message.type !== 'event'}>
                 <MessageActionsDropdown
-                  onSummarize={() => handleSummarizeMessage(props.message.id)}
                   onToggleDebug={() => setShowAnalysisDebug(!showAnalysisDebug())}
                   onEditScript={props.message.script ? undefined : () => setShowScriptModal(true)}
                   onRewrite={() => singleRewriteDialogStore.show(props.message.id)}
                   onCut={handleCut}
                   onUncut={handleUncut}
                   isCut={uiStore.isCut(props.message.id)}
-                  isSummarizing={props.message.isSummarizing}
-                  hasSummary={Boolean(
-                    props.message.sentenceSummary || props.message.summary || props.message.paragraphSummary,
-                  )}
                   hasScript={!!props.message.script}
                   showDebug={showAnalysisDebug()}
                 />
@@ -1101,7 +907,6 @@ export const Message: Component<MessageProps> = (props) => {
                   isCut={uiStore.isCut(props.message.id)}
                   onToggleDebug={() => setShowAnalysisDebug(!showAnalysisDebug())}
                   showDebug={showAnalysisDebug()}
-                  onSummarize={() => {}}
                 />
               </Show>
             </Show>

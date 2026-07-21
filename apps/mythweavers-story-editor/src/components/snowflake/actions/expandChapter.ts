@@ -70,7 +70,7 @@ export async function expandChapter(chapter: Node): Promise<void> {
     const existing = childrenOf(chapter.id).filter((n) => n.type === 'scene').length
     scenes.forEach((summary, i) => {
       const scene = nodeStore.addNode(chapter.id, 'scene', deriveTitle(summary, fallbackTitle('scene', existing + i)))
-      nodeStore.updateNode(scene.id, { summary })
+      nodeStore.updateNode(scene.id, { sentenceSummary: summary })
     })
   } catch (error) {
     console.error('[snowflake] expandChapter failed:', error)

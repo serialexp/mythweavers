@@ -1,28 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../utils/apiClient', () => ({
-  apiClient: {
-    createNode: vi.fn(),
-    updateNode: vi.fn(),
-    deleteNode: vi.fn(),
-    updateNodesBulk: vi.fn(),
-    insertMessage: vi.fn(),
-    updateMessage: vi.fn(),
-    deleteMessage: vi.fn(),
-    reorderMessages: vi.fn(),
-    updateCharacter: vi.fn(),
-    deleteCharacter: vi.fn(),
-    updateContextItem: vi.fn(),
-    deleteContextItem: vi.fn(),
-    createMap: vi.fn(),
-    updateMap: vi.fn(),
-    deleteMap: vi.fn(),
-    setLandmarkState: vi.fn(),
-    updateStorySettings: vi.fn(),
-    fetch: vi.fn(),
-  },
-}))
-
 vi.mock('../stores/currentStoryStore', () => ({
   currentStoryStore: {
     storageMode: 'server',
@@ -165,5 +142,83 @@ describe('SaveService queue merge behaviour', () => {
     const queue = getQueue()
     expect(queue).toHaveLength(1)
     expect(queue[0].type).toBe('node-delete')
+  })
+})
+
+describe('SaveService failure reporting', () => {
+  it('reports a non-retryable HTTP error to the UI', async () => {
+    const service = new SaveService()
+    const onError = vi.fn()
+    const onOperationFailed = vi.fn()
+    service.setCallbacks({ onError, onOperationFailed, getStorageMode: () => 'server' })
+    const error = Object.assign(new Error('Validation failed'), { status: 422 })
+    vi.spyOn(service as any, 'executeSaveOperation').mockRejectedValue(error)
+
+    await service.queueSave({
+      type: 'node-update',
+      entityType: 'node',
+      entityId: 'node-1',
+      storyId: 'story-1',
+      data: { id: 'node-1', type: 'scene', title: 'Scene' },
+    })
+
+    expect(onError).toHaveBeenCalledWith(error)
+    expect(onOperationFailed).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not roll back an optimistic update when a retry succeeds', async () => {
+    const service = new SaveService()
+    const onError = vi.fn()
+    const onOperationFailed = vi.fn()
+    service.setCallbacks({ onError, onOperationFailed, getStorageMode: () => 'server' })
+    const error = Object.assign(new Error('Service unavailable'), { status: 503 })
+    const execute = vi
+      .spyOn(service as any, 'executeSaveOperation')
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(undefined)
+
+    await service.queueSave({
+      type: 'landmark-insert',
+      entityType: 'landmark',
+      entityId: 'landmark-1',
+      storyId: 'story-1',
+      data: { id: 'landmark-1', mapId: 'map-1', x: 1, y: 2, name: 'Port', type: 'city' },
+    })
+
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(onOperationFailed).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('waits for a local full-story save to complete', async () => {
+    const service = new SaveService()
+    service.setCallbacks({ getStorageMode: () => 'local' })
+    let finishSave!: () => void
+    const fullSave = new Promise<void>((resolve) => {
+      finishSave = resolve
+    })
+    const triggerFullSave = vi.fn(() => fullSave)
+    service.setTriggerFullSave(triggerFullSave)
+
+    let didResolve = false
+    const queued = service
+      .queueSave({
+        type: 'node-update',
+        entityType: 'node',
+        entityId: 'node-1',
+        storyId: 'story-1',
+        data: { title: 'Updated title' },
+      })
+      .then(() => {
+        didResolve = true
+      })
+
+    await Promise.resolve()
+    expect(triggerFullSave).toHaveBeenCalledTimes(1)
+    expect(didResolve).toBe(false)
+
+    finishSave()
+    await queued
+    expect(didResolve).toBe(true)
   })
 })

@@ -1,5 +1,11 @@
 # AI image generation for backgrounds — handoff (2026-05-01)
 
+> 2026-07-19 backend-audit follow-up: `BalanceLedger.externalId String? @unique`
+> was added for transactionally idempotent Stripe top-ups. The next interactive
+> Prisma migration must include this additive column/unique constraint. Do not
+> hand-write the migration; run
+> `pnpm --filter @mythweavers/backend prisma:migrate --name add_balance_ledger_external_id`.
+
 Adding the ability for authors to generate background images from text prompts,
 plugging into the existing background pipeline (`defaultBackgroundFileId` on
 Story / Book / Arc / Chapter / Scene).
@@ -230,4 +236,3 @@ This is implemented in `apps/mythweavers-story-editor/src/utils/summarySegments.
 - **Pre-existing test infra issue:** `contextGeneration.test.ts` fails to
   load with `Cannot read properties of undefined (reading 'registerGraph')`
   from solid-js dev store. Pre-existing, not introduced by this work.
-

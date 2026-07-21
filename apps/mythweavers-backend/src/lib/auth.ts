@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { authConfig } from './config.js'
+import { isAllowedOrigin } from './cors.js'
 import { prisma } from './prisma.js'
 
 /**
@@ -36,12 +36,14 @@ async function getUserFromAccessToken(request: FastifyRequest) {
   }
 
   // Update lastUsed timestamp (fire and forget, don't block request)
-  prisma.accessToken.update({
-    where: { id: accessToken.id },
-    data: { lastUsed: new Date() },
-  }).catch(() => {
-    // Ignore errors updating lastUsed
-  })
+  prisma.accessToken
+    .update({
+      where: { id: accessToken.id },
+      data: { lastUsed: new Date() },
+    })
+    .catch(() => {
+      // Ignore errors updating lastUsed
+    })
 
   return accessToken.user
 }
@@ -79,13 +81,6 @@ export async function getUserFromSession(request: FastifyRequest) {
     return null
   }
 
-  // Refresh session expiry
-  const newExpiresAt = new Date(Date.now() + authConfig.sessionDuration)
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { expiresAt: newExpiresAt },
-  })
-
   return session.user
 }
 
@@ -94,6 +89,8 @@ export async function getUserFromSession(request: FastifyRequest) {
  * Throws 401 error if not authenticated
  */
 export async function requireAuth(request: FastifyRequest, _reply: FastifyReply) {
+  requireTrustedCookieOrigin(request)
+
   const user = await getUserFromSession(request)
 
   if (!user) {
@@ -105,6 +102,15 @@ export async function requireAuth(request: FastifyRequest, _reply: FastifyReply)
 
   // Attach user to request for use in route handlers
   request.user = user
+}
+
+export function requireTrustedCookieOrigin(request: FastifyRequest): void {
+  const usesCookieAuth = !request.headers.authorization?.startsWith('Bearer ') && Boolean(request.cookies.sessionToken)
+  if (usesCookieAuth && !isAllowedOrigin(request.headers.origin)) {
+    const error = new Error('Request origin is not allowed') as Error & { statusCode?: number }
+    error.statusCode = 403
+    throw error
+  }
 }
 
 /**

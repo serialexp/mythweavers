@@ -1,5 +1,4 @@
 import { For, Show, createMemo } from 'solid-js'
-import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
 import { InsertControls } from './InsertControls'
@@ -72,8 +71,6 @@ export function ScriptModeView(props: ScriptModeViewProps) {
             <div class={viewStyles.messageWrapper}>
               <Message
                 message={message}
-                storyTurnNumber={messagesStore.getStoryTurnNumbers().get(message.id) || 0}
-                totalStoryTurns={messagesStore.getTotalStoryTurns()}
                 isGenerating={props.isGenerating}
               />
             </div>

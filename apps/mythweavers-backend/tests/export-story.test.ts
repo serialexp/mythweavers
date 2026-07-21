@@ -8,9 +8,9 @@ import { getUploadDir } from '../src/lib/file-storage.js'
 import { buildApp, cleanDatabase } from './helpers.js'
 
 /**
- * Tests for GET /my/stories/:id/export — the JSON export endpoint the
- * writer uses to back up a story. Historically this endpoint breaks
- * silently whenever a new column is added to any of the exported models
+ * Tests for GET /my/stories/:id/load-story — the JSON endpoint the
+ * editor uses to load a complete story. Historically this endpoint breaks
+ * silently whenever a new column is added to any of the loaded models
  * because the strict Zod response schema rejects the response and the
  * user only finds out when they hit the page. This test exercises the
  * full surface so schema drift fails CI.
@@ -68,7 +68,7 @@ async function uploadFile(
   return { id: res.json().file.id, path: res.json().file.path }
 }
 
-describe('GET /my/stories/:id/export (JSON)', () => {
+describe('GET /my/stories/:id/load-story (JSON)', () => {
   beforeEach(async () => {
     await cleanDatabase()
   })
@@ -197,7 +197,7 @@ describe('GET /my/stories/:id/export (JSON)', () => {
     // --- Run the export ---
     const res = await app.inject({
       method: 'GET',
-      url: `/my/stories/${storyId}/export`,
+      url: `/my/stories/${storyId}/load-story`,
       cookies: { [cookie.name]: cookie.value },
     })
 
@@ -271,9 +271,135 @@ describe('GET /my/stories/:id/export (JSON)', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/my/stories/${storyId}/export`,
+      url: `/my/stories/${storyId}/load-story`,
       cookies: { [strangerCookie.name]: strangerCookie.value },
     })
     expect(res.statusCode).toBe(404)
+  })
+
+  test('excludes soft-deleted scenes and messages from the loaded story', async () => {
+    // Regression: deleting a scene in the editor disappeared from the UI but
+    // reappeared on reload because the load-story endpoint returned tombstones.
+    const register = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: {
+        email: 'load-deleted@example.com',
+        username: 'loaddeleted',
+        password: 'password123',
+      },
+    })
+    const cookie = register.cookies[0]
+
+    const storyId = (
+      await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        cookies: { [cookie.name]: cookie.value },
+        payload: { name: 'Soft Delete Regression' },
+      })
+    ).json().story.id
+
+    // Build a chapter with two scenes, each with a message.
+    const bookId = (
+      await app.inject({
+        method: 'POST',
+        url: `/my/stories/${storyId}/books`,
+        cookies: { [cookie.name]: cookie.value },
+        payload: { name: 'Book 1' },
+      })
+    ).json().book.id
+
+    const arcId = (
+      await app.inject({
+        method: 'POST',
+        url: `/my/books/${bookId}/arcs`,
+        cookies: { [cookie.name]: cookie.value },
+        payload: { name: 'Arc 1' },
+      })
+    ).json().arc.id
+
+    const chapterId = (
+      await app.inject({
+        method: 'POST',
+        url: `/my/arcs/${arcId}/chapters`,
+        cookies: { [cookie.name]: cookie.value },
+        payload: { name: 'Chapter 1' },
+      })
+    ).json().chapter.id
+
+    const keepSceneId = (
+      await app.inject({
+        method: 'POST',
+        url: `/my/chapters/${chapterId}/scenes`,
+        cookies: { [cookie.name]: cookie.value },
+        payload: { name: 'Kept Scene' },
+      })
+    ).json().scene.id
+
+    const deletedSceneId = (
+      await app.inject({
+        method: 'POST',
+        url: `/my/chapters/${chapterId}/scenes`,
+        cookies: { [cookie.name]: cookie.value },
+        payload: { name: 'Doomed Scene' },
+      })
+    ).json().scene.id
+
+    // A message in each scene, plus a second message we'll delete on its own.
+    await app.inject({
+      method: 'POST',
+      url: `/my/scenes/${keepSceneId}/messages`,
+      cookies: { [cookie.name]: cookie.value },
+      payload: { instruction: 'keep this turn' },
+    })
+    await app.inject({
+      method: 'POST',
+      url: `/my/scenes/${deletedSceneId}/messages`,
+      cookies: { [cookie.name]: cookie.value },
+      payload: { instruction: 'goes away with the scene' },
+    })
+    const deletedMessageId = (
+      await app.inject({
+        method: 'POST',
+        url: `/my/scenes/${keepSceneId}/messages`,
+        cookies: { [cookie.name]: cookie.value },
+        payload: { instruction: 'delete this turn only' },
+      })
+    ).json().message.id
+
+    // Soft-delete one scene (cascades to its messages) and one standalone message.
+    const deleteSceneRes = await app.inject({
+      method: 'DELETE',
+      url: `/my/scenes/${deletedSceneId}`,
+      cookies: { [cookie.name]: cookie.value },
+    })
+    expect(deleteSceneRes.statusCode).toBe(200)
+
+    const deleteMessageRes = await app.inject({
+      method: 'DELETE',
+      url: `/my/messages/${deletedMessageId}`,
+      cookies: { [cookie.name]: cookie.value },
+    })
+    expect(deleteMessageRes.statusCode).toBe(200)
+
+    // Load the story — deleted nodes must be absent.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/my/stories/${storyId}/load-story`,
+      cookies: { [cookie.name]: cookie.value },
+    })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+
+    const scenes = body.books[0].arcs[0].chapters[0].scenes
+    const sceneIds = scenes.map((s: { id: string }) => s.id)
+    expect(sceneIds).toContain(keepSceneId)
+    expect(sceneIds).not.toContain(deletedSceneId)
+    expect(scenes).toHaveLength(1)
+
+    // The standalone deleted message must not appear among the kept scene's turns.
+    const messageIds = scenes[0].messages.map((m: { id: string }) => m.id)
+    expect(messageIds).not.toContain(deletedMessageId)
   })
 })

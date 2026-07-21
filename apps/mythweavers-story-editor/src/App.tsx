@@ -7,7 +7,6 @@ import { Spinner } from '@mythweavers/ui'
 import { ConflictResolutionDialog } from './components/ConflictResolutionDialog'
 import { ContextPreviewModal } from './components/ContextPreviewModal'
 import { CopyTokenModal } from './components/CopyTokenModal'
-import { EpisodeViewer } from './components/EpisodeViewer'
 import { ErrorNotifications } from './components/ErrorNotifications'
 import { GlobalStatusIndicator } from './components/GlobalStatusIndicator'
 import { LoginForm } from './components/LoginForm'
@@ -17,7 +16,6 @@ import { MessageRewriterDialog } from './components/MessageRewriterDialog'
 import { MassRewriteDialog } from './components/MassRewriteDialog'
 import { SingleRewriteDialog } from './components/SingleRewriteDialog'
 import { PendingEntitiesModal } from './components/PendingEntitiesModal'
-import { ResetPassword } from './components/ResetPassword'
 import { SearchModal } from './components/SearchModal'
 import { ServerStatusIndicator } from './components/ServerStatusIndicator'
 import { StorageFullModal } from './components/StorageFullModal'
@@ -36,8 +34,6 @@ import { languageStore } from './stores/languageStore'
 import { charactersStore } from './stores/charactersStore'
 import { contextItemsStore } from './stores/contextItemsStore'
 import { currentStoryStore } from './stores/currentStoryStore'
-import { episodeViewerStore } from './stores/episodeViewerStore'
-import { globalOperationStore } from './stores/globalOperationStore'
 import { headerStore } from './stores/headerStore'
 import { mapsStore } from './stores/mapsStore'
 import { messagesStore } from './stores/messagesStore'
@@ -55,7 +51,34 @@ import { importClaudeChat, importClaudeChatWithBranches } from './utils/claudeCh
 import { PasswordForEncryptionDialog } from './components/PasswordForEncryptionDialog'
 import { AdventurePage } from './pages/AdventurePage'
 import UsagePage from './pages/UsagePage'
+import DeviceAuthorizationPage from './pages/DeviceAuthorizationPage'
+import { saveService } from './services/saveService'
 import { storyManager } from './utils/storyManager'
+
+type StoryLoadResult =
+  | { type: 'loaded' }
+  | { type: 'not-found' }
+  | { type: 'error'; message: string; details?: unknown; status?: number }
+
+function getStoryLoadError(error: unknown, status?: number): Omit<Extract<StoryLoadResult, { type: 'error' }>, 'type'> {
+  const errorData = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
+  const message =
+    typeof errorData?.error === 'string'
+      ? errorData.error
+      : error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : status
+            ? `Request failed with status ${status}`
+            : 'Unable to reach the server'
+
+  return {
+    message,
+    details: errorData?.debug,
+    status,
+  }
+}
 
 // Component to redirect to login
 const RedirectToLogin: Component = () => {
@@ -67,7 +90,7 @@ const RedirectToLogin: Component = () => {
 }
 
 const App: Component = () => {
-  const { generateResponse, generateSummaries, abortGeneration, isGenerating, checkIfOllamaIsBusy } = useOllama()
+  const { generateResponse, abortGeneration, isGenerating, checkIfOllamaIsBusy } = useOllama()
 
   const [showContextPreview, setShowContextPreview] = createSignal(false)
   const [contextPreviewData, setContextPreviewData] = createSignal<{
@@ -95,11 +118,9 @@ const App: Component = () => {
     handleAutoOrManualSubmit,
     handleSubmit,
     regenerateLastMessage,
-    handleSummarizeMessage,
     handleShowContextPreview,
   } = useStoryGeneration({
     generateResponse,
-    generateSummaries,
   })
 
   // Initialize cache management
@@ -159,13 +180,25 @@ const App: Component = () => {
       setIsMobile(window.innerWidth <= 768)
     }
 
+    const flushPendingSaves = () => {
+      void saveService.flushPendingSaves()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushPendingSaves()
+    }
+
     window.addEventListener('focus', handleFocus)
     window.addEventListener('resize', handleResize)
+    window.addEventListener('pagehide', flushPendingSaves)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     onCleanup(() => {
       cleanup()
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('pagehide', flushPendingSaves)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     })
   })
 
@@ -315,6 +348,8 @@ const App: Component = () => {
           parentId: null,
           type: 'book',
           title: book.name,
+          sentenceSummary: book.sentenceSummary,
+          paragraphSummary: book.paragraphSummary,
           summary: book.summary,
           order: book.sortOrder ?? bookIndex,
           coverArtFileId: book.coverArtFileId ?? null,
@@ -335,6 +370,8 @@ const App: Component = () => {
             parentId: book.id,
             type: 'arc',
             title: arc.name,
+            sentenceSummary: arc.sentenceSummary,
+            paragraphSummary: arc.paragraphSummary,
             summary: arc.summary,
             order: arc.sortOrder ?? arcIndex,
             defaultBackgroundFileId: arc.defaultBackgroundFileId ?? null,
@@ -353,6 +390,8 @@ const App: Component = () => {
               parentId: arc.id,
               type: 'chapter',
               title: chapter.name,
+              sentenceSummary: chapter.sentenceSummary,
+              paragraphSummary: chapter.paragraphSummary,
               summary: chapter.summary,
               order: chapter.sortOrder ?? chapterIndex,
               nodeType: chapter.nodeType || 'story',
@@ -378,7 +417,10 @@ const App: Component = () => {
                 parentId: chapter.id,
                 type: 'scene',
                 title: scene.name || `Scene ${sceneIndex + 1}`,
+                sentenceSummary: scene.sentenceSummary,
+                paragraphSummary: scene.paragraphSummary,
                 summary: scene.summary,
+                summarySegments: scene.summarySegments,
                 order: scene.sortOrder ?? sceneIndex,
                 // Scene-specific fields
                 goal: scene.goal,
@@ -505,21 +547,39 @@ const App: Component = () => {
     plotPointsStore.clear()
   }
 
+  /**
+   * During route cleanup we normally clear the loaded story so navigating
+   * away (e.g. back to the story list) does not leave stale data in the
+   * global stores. The exception is flipping between the editor
+   * (`/story/:id`) and the outline view (`/story/:id/snowflake`): these are
+   * sibling routes over the *same* node tree, so the data is already in the
+   * stores and clearing it would only force an unnecessary full re-fetch.
+   * Returns true when the in-progress navigation truly leaves the current
+   * story and the stores should be cleared.
+   */
+  const shouldResetStoryOnLeave = (storyId: string): boolean => {
+    if (!storyId) return true
+    const dest = window.location.pathname
+    const prefix = `/story/${storyId}`
+    // Exact editor route, or any sub-route (`/story/:id/snowflake`, …).
+    return dest !== prefix && !dest.startsWith(`${prefix}/`)
+  }
+
   // Load story by ID (used by story route)
-  const loadStoryById = async (storyId: string): Promise<boolean> => {
+  const loadStoryById = async (storyId: string): Promise<StoryLoadResult> => {
     // Loading story by ID
 
     // Check if this is an old ID format (timestamp-based)
     // Matches patterns like: 1754232850821-w2kv7u3vl or 1754232438376-pm7i6zrj2
     if (/^\d{13}-\w+$/.test(storyId)) {
       // Detected old story ID format
-      return false
+      return { type: 'not-found' }
     }
 
     // Try server first (server stories take priority)
     try {
-      const { getMyStoriesByIdExport } = await import('./client/config')
-      const result = await getMyStoriesByIdExport({ path: { id: storyId } })
+      const { getMyStoriesByIdLoadStory } = await import('./client/config')
+      const result = await getMyStoriesByIdLoadStory({ path: { id: storyId } })
       const exportData = result.data
       console.log('[loadStoryById] Received exported story data:', {
         hasStory: !!exportData?.story,
@@ -541,34 +601,33 @@ const App: Component = () => {
 
         // Load the exported story data
         await loadServerStoryData(exportData, storyId)
-        return true
+        return { type: 'loaded' }
       }
-      console.log('[loadStoryById] Export succeeded but no story in response data:', exportData)
+
+      if (result.error) {
+        const status = result.response?.status
+        if (status !== 404) {
+          const loadError = getStoryLoadError(result.error, status)
+          console.error('[loadStoryById] Error loading story:', { status, ...loadError })
+          return { type: 'error', ...loadError }
+        }
+      } else {
+        const status = result.response?.status
+        const loadError = getStoryLoadError('The server returned an invalid story response', status)
+        console.error('[loadStoryById] Export succeeded but no story in response data:', exportData)
+        return { type: 'error', ...loadError }
+      }
+
+      console.log('[loadStoryById] Story was not found on the server; checking local storage')
     } catch (error: any) {
       console.log('[loadStoryById] Export endpoint failed:', error)
-
-      // Check if this is a server error (500) vs not found (404)
       const status = error?.response?.status || error?.status
-      if (status && status >= 500) {
-        // Server error - show error message but don't redirect
-        const errorMessage = error?.response?.data?.error || error?.data?.error || 'Server error occurred'
-        const errorDetails = error?.response?.data?.debug || error?.data?.debug
-
-        console.error('[loadStoryById] Server error loading story:', {
-          status,
-          message: errorMessage,
-          details: errorDetails,
-        })
-
-        // Set error state instead of "not found"
-        // TODO: setStoryLoadError is defined in StoryPage, not accessible here
-        // This code path should display the error differently
-        console.error('[loadStoryById] Cannot set story load error - signal not in scope')
-        return false
+      if (status !== 404) {
+        const errorData = error?.response?.data || error?.data || error
+        const loadError = getStoryLoadError(errorData, status)
+        console.error('[loadStoryById] Error loading story:', { status, ...loadError })
+        return { type: 'error', ...loadError }
       }
-
-      // 404 or other client errors - try local storage
-      // Story not found on server, checking local storage
     }
 
     // If not on server, try local storage
@@ -628,10 +687,10 @@ const App: Component = () => {
       if (story.branchChoices) {
         currentStoryStore.setBranchChoices(story.branchChoices)
       }
-      return true
+      return { type: 'loaded' }
     }
 
-    return false // Story not found
+    return { type: 'not-found' }
   }
 
   // Run story migration on startup
@@ -724,23 +783,6 @@ const App: Component = () => {
       alert(`Failed to generate context preview: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
     console.log('[App] handleShowContextPreviewModal completed')
-  }
-
-  const handleBulkSummarize = async () => {
-    if (!confirm('This will generate summaries for all messages. Continue?')) return
-
-    const messages = messagesStore.messages.filter((m) => m.role === 'assistant' && !m.isQuery && !m.summary)
-    globalOperationStore.startOperation('bulk-summarize', messages.length, 'Generating summaries...')
-
-    try {
-      for (let i = 0; i < messages.length; i++) {
-        const message = messages[i]
-        globalOperationStore.updateProgress(i + 1, `Summarizing message ${i + 1} of ${messages.length}`)
-        await handleSummarizeMessage(message.id)
-      }
-    } finally {
-      globalOperationStore.completeOperation()
-    }
   }
 
   const handleMigrateInstructions = () => {
@@ -895,6 +937,7 @@ const App: Component = () => {
         </div>
       </Show>
 
+      <Route path="/device" component={DeviceAuthorizationPage} />
       <Route
         path="/login"
         component={() => {
@@ -913,22 +956,6 @@ const App: Component = () => {
                 }
                 console.log('[App] Navigating to /stories')
                 navigate('/stories', { replace: true })
-              }}
-            />
-          )
-        }}
-      />
-
-      <Route
-        path="/reset-password"
-        component={() => {
-          const navigate = useNavigate()
-          return (
-            <ResetPassword
-              onClose={() => navigate('/login')}
-              onSuccess={() => {
-                // Navigate to login
-                navigate('/login', { replace: true })
               }}
             />
           )
@@ -971,12 +998,17 @@ const App: Component = () => {
         component={() => {
           const params = useParams()
           const navigate = useNavigate()
-          const [loadingStory, setLoadingStory] = createSignal(true)
+          // Start in the "loaded" state when the story is already in the
+          // stores (e.g. flipping back from the outline view) so the view
+          // swaps instantly with no loading flash or re-fetch.
+          const [loadingStory, setLoadingStory] = createSignal(
+            !untrack(() => currentStoryStore.isInitialized && currentStoryStore.id === params.id),
+          )
           const [storyNotFound, setStoryNotFound] = createSignal(false)
           const [storyLoadError, setStoryLoadError] = createSignal<{
             message: string
-            details?: any
-            status: number
+            details?: unknown
+            status?: number
           } | null>(null)
 
           // Clear the active story (and related stores) when leaving the
@@ -988,8 +1020,16 @@ const App: Component = () => {
           // signal changes), so this onCleanup only fires on a true unmount
           // — switching between two stories is still handled by
           // loadStoryById -> resetStoryState.
+          //
+          // Exception: flipping between the editor and the outline view
+          // (`/story/:id` <-> `/story/:id/snowflake`) also unmounts this
+          // route, but the two views share the same loaded story. Skip the
+          // reset in that case so we don't discard the data and trigger a
+          // full server re-fetch.
           onCleanup(() => {
-            void resetStoryState()
+            if (shouldResetStoryOnLeave(currentStoryStore.id)) {
+              void resetStoryState()
+            }
           })
 
           createEffect(() => {
@@ -1014,14 +1054,13 @@ const App: Component = () => {
             setStoryLoadError(null)
 
             void loadStoryById(storyId)
-              .then((loaded) => {
+              .then((result) => {
                 if (disposed) return
-                if (!loaded) {
-                  // Only set "not found" if we don't already have a server error
-                  if (!storyLoadError()) {
-                    setStoryNotFound(true)
-                    setTimeout(() => navigate('/stories'), 2000)
-                  }
+                if (result.type === 'error') {
+                  setStoryLoadError(result)
+                } else if (result.type === 'not-found') {
+                  setStoryNotFound(true)
+                  setTimeout(() => navigate('/stories'), 2000)
                 }
               })
               .finally(() => {
@@ -1058,7 +1097,9 @@ const App: Component = () => {
                         <Show when={storyLoadError()}>
                           {(error) => (
                             <div class={styles.errorContainer}>
-                              <div class={styles.errorTitle}>Server Error ({error().status})</div>
+                              <div class={styles.errorTitle}>
+                                Unable to Load Story{error().status ? ` (${error().status})` : ''}
+                              </div>
                               <div class={styles.errorText}>{error().message}</div>
                               <Show when={error().details}>
                                 <details class={styles.errorDetails}>
@@ -1092,7 +1133,6 @@ const App: Component = () => {
 
                         <StoryHeader
                           onLoadStory={handleLoadStory}
-                          onBulkSummarize={handleBulkSummarize}
                           onMigrateInstructions={handleMigrateInstructions}
                           onRemoveUserMessages={handleRemoveUserMessages}
                           onCleanupThinkTags={handleCleanupThinkTags}
@@ -1142,12 +1182,6 @@ const App: Component = () => {
                             />
                           </main>
 
-                          {/* Right sidebar: Docked Episode Viewer on wide screens */}
-                          <Show when={episodeViewerStore.isDocked && episodeViewerStore.isOpen}>
-                            <div class={styles.desktopEpisodeViewer}>
-                              <EpisodeViewer isOpen={true} onClose={() => episodeViewerStore.hide()} mode="docked" />
-                            </div>
-                          </Show>
                         </div>
 
                         <ContextPreviewModal
@@ -1256,13 +1290,26 @@ const App: Component = () => {
         component={() => {
           const params = useParams()
           const navigate = useNavigate()
-          const [loadingStory, setLoadingStory] = createSignal(true)
+          // Skip the loading state when the story is already loaded (e.g.
+          // flipping over from the editor) — same data, just a view swap.
+          const [loadingStory, setLoadingStory] = createSignal(
+            !untrack(() => currentStoryStore.isInitialized && currentStoryStore.id === params.id),
+          )
           const [storyNotFound, setStoryNotFound] = createSignal(false)
+          const [storyLoadError, setStoryLoadError] = createSignal<{
+            message: string
+            details?: unknown
+            status?: number
+          } | null>(null)
 
           // Mirror the /story/:id route: reset on true unmount, load on entry
-          // (skipping if the story is already in the stores).
+          // (skipping if the story is already in the stores). The reset is
+          // skipped when flipping to the sibling editor route so the loaded
+          // story survives the view switch (see shouldResetStoryOnLeave).
           onCleanup(() => {
-            void resetStoryState()
+            if (shouldResetStoryOnLeave(currentStoryStore.id)) {
+              void resetStoryState()
+            }
           })
 
           createEffect(() => {
@@ -1282,11 +1329,14 @@ const App: Component = () => {
 
             setLoadingStory(true)
             setStoryNotFound(false)
+            setStoryLoadError(null)
 
             void loadStoryById(storyId)
-              .then((loaded) => {
+              .then((result) => {
                 if (disposed) return
-                if (!loaded) {
+                if (result.type === 'error') {
+                  setStoryLoadError(result)
+                } else if (result.type === 'not-found') {
                   setStoryNotFound(true)
                   setTimeout(() => navigate('/stories'), 2000)
                 }
@@ -1317,10 +1367,31 @@ const App: Component = () => {
                   }
                 >
                   <Show
-                    when={!storyNotFound()}
+                    when={!storyLoadError() && !storyNotFound()}
                     fallback={
                       <div class={styles.loadingContainer}>
-                        <div class={styles.errorText}>Story not found. Redirecting to stories page...</div>
+                        <Show when={storyLoadError()}>
+                          {(error) => (
+                            <div class={styles.errorContainer}>
+                              <div class={styles.errorTitle}>
+                                Unable to Load Story{error().status ? ` (${error().status})` : ''}
+                              </div>
+                              <div class={styles.errorText}>{error().message}</div>
+                              <Show when={error().details}>
+                                <details class={styles.errorDetails}>
+                                  <summary>Technical Details</summary>
+                                  <pre>{JSON.stringify(error().details, null, 2)}</pre>
+                                </details>
+                              </Show>
+                              <button class={styles.retryButton} onClick={() => window.location.reload()}>
+                                Retry
+                              </button>
+                            </div>
+                          )}
+                        </Show>
+                        <Show when={storyNotFound()}>
+                          <div class={styles.errorText}>Story not found. Redirecting to stories page...</div>
+                        </Show>
                       </div>
                     }
                   >
@@ -1338,7 +1409,6 @@ const App: Component = () => {
 
                         <StoryHeader
                           onLoadStory={handleLoadStory}
-                          onBulkSummarize={handleBulkSummarize}
                           onMigrateInstructions={handleMigrateInstructions}
                           onRemoveUserMessages={handleRemoveUserMessages}
                           onCleanupThinkTags={handleCleanupThinkTags}

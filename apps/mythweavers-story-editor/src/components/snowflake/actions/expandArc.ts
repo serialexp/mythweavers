@@ -63,7 +63,7 @@ export async function expandArc(arc: Node, chapterCount: number): Promise<void> 
     const existing = childrenOf(arc.id).filter((n) => n.type === 'chapter').length
     chapters.forEach((summary, i) => {
       const chapter = nodeStore.addNode(arc.id, 'chapter', deriveTitle(summary, fallbackTitle('chapter', existing + i)))
-      nodeStore.updateNode(chapter.id, { summary })
+      nodeStore.updateNode(chapter.id, { sentenceSummary: summary })
     })
   } catch (error) {
     console.error('[snowflake] expandArc failed:', error)

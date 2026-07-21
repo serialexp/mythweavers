@@ -4,24 +4,14 @@ import { Message } from '../types/core'
 export const getStoryStats = (
   messages: Message[],
   charsPerToken: number,
-  model?: string,
-  provider?: 'ollama' | 'openrouter' | 'anthropic',
+  _model?: string,
+  _provider?: 'ollama' | 'openrouter' | 'anthropic',
 ) => {
   const storyMessages = messages.filter((msg) => !msg.isQuery)
-
-  // Check if we're using a Claude model or Anthropic provider
-  const isClaudeModel = model?.toLowerCase().includes('claude')
-  const isAnthropicProvider = provider === 'anthropic'
-  const alwaysUseFullContent = isClaudeModel || isAnthropicProvider
 
   console.log('getStoryStats debug:', {
     totalMessages: messages.length,
     storyMessages: storyMessages.length,
-    model,
-    provider,
-    isClaudeModel,
-    isAnthropicProvider,
-    alwaysUseFullContent,
     charsPerToken,
   })
 
@@ -29,46 +19,13 @@ export const getStoryStats = (
   const storyText = storyMessages.map((msg) => msg.content).join(' ')
   const wordCount = storyText.trim() ? storyText.trim().split(/\s+/).length : 0
 
-  // For token estimation, use the same logic as context calculation
-  let summaryCount = 0
-  let paragraphCount = 0
-  let fullCount = 0
-
-  const contextText = storyMessages
-    .map((msg, index) => {
-      const storyTurnNumber = index + 1
-      const totalStoryTurns = storyMessages.length
-
-      if (alwaysUseFullContent) {
-        // For Anthropic/Claude models, always use full content
-        fullCount++
-        return msg.content
-      }
-      // Use different summary levels based on turn position
-      const sentenceSummary = msg.sentenceSummary || msg.summary
-      if (storyTurnNumber <= totalStoryTurns - 14 && sentenceSummary) {
-        // More than 14 turns from end: use sentence summary
-        summaryCount++
-        return sentenceSummary
-      }
-      if (storyTurnNumber <= totalStoryTurns - 7 && msg.paragraphSummary) {
-        // 8-14 turns from end: use paragraph summary
-        paragraphCount++
-        return msg.paragraphSummary
-      }
-      // Last 7 turns: use full content
-      fullCount++
-      return msg.content
-    })
-    .join('\n\n')
+  const contextText = storyMessages.map((msg) => msg.content).join('\n\n')
 
   const charCount = contextText.length
   const estimatedTokens = Math.ceil(charCount / charsPerToken)
 
   console.log('getStoryStats content breakdown:', {
-    summaryCount,
-    paragraphCount,
-    fullCount,
+    fullCount: storyMessages.length,
     fullTextCharCount: storyText.length,
     contextTextCharCount: charCount,
     estimatedTokens,
@@ -81,43 +38,15 @@ export const getMessagesInContext = (
   messages: Message[],
   contextSize: number,
   charsPerToken: number,
-  model?: string,
-  provider?: 'ollama' | 'openrouter' | 'anthropic',
+  _model?: string,
+  _provider?: 'ollama' | 'openrouter' | 'anthropic',
 ) => {
   const messagesInContext = new Set<string>()
 
   // Only consider assistant messages (actual story content) like we do in generation
   const storyMessages = messages.filter((msg) => !msg.isQuery && msg.role === 'assistant')
 
-  // Check if we're using a Claude model or Anthropic provider (which always uses full content)
-  const isClaudeModel = model?.toLowerCase().includes('claude')
-  const isAnthropicProvider = provider === 'anthropic'
-  const alwaysUseFullContent = isClaudeModel || isAnthropicProvider
-
-  // Calculate actual content size using the same logic as generation
-  const storyContext = storyMessages
-    .map((msg, index) => {
-      const storyTurnNumber = index + 1
-      const totalStoryTurns = storyMessages.length
-
-      if (alwaysUseFullContent) {
-        // For Anthropic/Claude models, always use full content
-        return msg.content
-      }
-      // Use different summary levels based on turn position
-      const sentenceSummary = msg.sentenceSummary || msg.summary
-      if (storyTurnNumber <= totalStoryTurns - 14 && sentenceSummary) {
-        // More than 14 turns from end: use sentence summary
-        return sentenceSummary
-      }
-      if (storyTurnNumber <= totalStoryTurns - 7 && msg.paragraphSummary) {
-        // 8-14 turns from end: use paragraph summary
-        return msg.paragraphSummary
-      }
-      // Last 7 turns: use full content
-      return msg.content
-    })
-    .join('\n\n')
+  const storyContext = storyMessages.map((msg) => msg.content).join('\n\n')
 
   const contextTokens = Math.ceil(storyContext.length / charsPerToken)
 
@@ -129,27 +58,7 @@ export const getMessagesInContext = (
     let totalTokens = 0
     for (let i = storyMessages.length - 1; i >= 0; i--) {
       const msg = storyMessages[i]
-      const storyTurnNumber = i + 1
-      const totalStoryTurns = storyMessages.length
-
-      // Use different summary levels based on turn position
-      let content: string
-      if (alwaysUseFullContent) {
-        // For Anthropic/Claude models, always use full content
-        content = msg.content
-      } else {
-        const sentenceSummary = msg.sentenceSummary || msg.summary
-        if (storyTurnNumber <= totalStoryTurns - 14 && sentenceSummary) {
-          // More than 14 turns from end: use sentence summary
-          content = sentenceSummary
-        } else if (storyTurnNumber <= totalStoryTurns - 7 && msg.paragraphSummary) {
-          // 8-14 turns from end: use paragraph summary
-          content = msg.paragraphSummary
-        } else {
-          // Last 7 turns: use full content
-          content = msg.content
-        }
-      }
+      const content = msg.content
 
       const messageTokens = Math.ceil(content.length / charsPerToken)
 
@@ -345,26 +254,7 @@ export const getStoryPromptWithHistory = (
   // Only use assistant messages (actual story content)
   const storyMessages = messages.filter((msg) => !msg.isQuery && msg.role === 'assistant')
 
-  // Build context with summaries for older turns
-  const storyContext = storyMessages
-    .map((msg, index) => {
-      const storyTurnNumber = index + 1
-      const totalStoryTurns = storyMessages.length
-
-      // Use different summary levels based on turn position
-      const sentenceSummary = msg.sentenceSummary || msg.summary
-      if (storyTurnNumber <= totalStoryTurns - 14 && sentenceSummary) {
-        // More than 14 turns from end: use sentence summary
-        return sentenceSummary
-      }
-      if (storyTurnNumber <= totalStoryTurns - 7 && msg.paragraphSummary) {
-        // 8-14 turns from end: use paragraph summary
-        return msg.paragraphSummary
-      }
-      // Last 7 turns: use full content
-      return msg.content
-    })
-    .join('\n\n')
+  const storyContext = storyMessages.map((msg) => msg.content).join('\n\n')
 
   const contextSection = characterContext ? `${characterContext}` : ''
   const isNewStory = storyMessages.length === 0
@@ -474,26 +364,7 @@ export const getQueryPrompt = (inputText: string, messages: Message[]) => {
   // Only use assistant messages (actual story content)
   const storyMessages = messages.filter((msg) => !msg.isQuery && msg.role === 'assistant')
 
-  // Build context with summaries for older turns
-  const storyContext = storyMessages
-    .map((msg, index) => {
-      const storyTurnNumber = index + 1
-      const totalStoryTurns = storyMessages.length
-
-      // Use different summary levels based on turn position
-      const sentenceSummary = msg.sentenceSummary || msg.summary
-      if (storyTurnNumber <= totalStoryTurns - 14 && sentenceSummary) {
-        // More than 14 turns from end: use sentence summary
-        return sentenceSummary
-      }
-      if (storyTurnNumber <= totalStoryTurns - 7 && msg.paragraphSummary) {
-        // 8-14 turns from end: use paragraph summary
-        return msg.paragraphSummary
-      }
-      // Last 7 turns: use full content
-      return msg.content
-    })
-    .join('\n\n')
+  const storyContext = storyMessages.map((msg) => msg.content).join('\n\n')
 
   return `You are a helpful assistant answering questions about a story in progress. Here is the story so far:
 
@@ -502,60 +373,4 @@ ${storyContext}
 User question: ${inputText}
 
 Please provide a clear, concise answer about the story, its characters, plot, or any other aspect the user is asking about. Do not continue the story itself.`
-}
-
-export const getSummarizationPrompt = (content: string, characterContext?: string): string => {
-  // Calculate dynamic sentence count based on content length
-  const wordCount = content.trim().split(/\s+/).length
-  let sentenceCount: number
-
-  if (wordCount <= 200) {
-    sentenceCount = 2
-  } else if (wordCount <= 500) {
-    sentenceCount = 3
-  } else if (wordCount <= 1000) {
-    sentenceCount = 4
-  } else if (wordCount <= 2000) {
-    sentenceCount = 5
-  } else {
-    sentenceCount = 6
-  }
-
-  const sentenceText = sentenceCount === 1 ? 'sentence' : 'sentences'
-
-  // Check if there's a protagonist mentioned in the character context
-  const hasProtagonist = characterContext?.includes('(protagonist)')
-  const protagonistNote = hasProtagonist ? " Pay special attention to the protagonist's actions and development." : ''
-
-  return `Summarize the story section provided above in exactly ${sentenceCount} ${sentenceText}. Focus on the most important plot points, character developments, or key events.${protagonistNote} Be concise and capture the essence of what happens. Use character names directly without introducing or describing who they are. Do NOT include any preamble, introduction, or meta-commentary. Output ONLY the summary itself.`
-}
-
-export const getSentenceSummarizationPrompt = (_content: string, characterContext?: string): string => {
-  const hasProtagonist = characterContext?.includes('(protagonist)')
-  const protagonistNote = hasProtagonist ? ' Highlight the protagonist’s role if relevant.' : ''
-  return `Summarize the story section provided above in exactly one sentence. Capture the most important event or character development using character names directly.${protagonistNote} Do NOT include any preamble, introduction, or meta-commentary. Output ONLY the single sentence summary.`
-}
-
-export const getParagraphSummarizationPrompt = (content: string, characterContext?: string): string => {
-  // Calculate dynamic paragraph count based on content length
-  const wordCount = content.trim().split(/\s+/).length
-  let paragraphCount: number
-
-  if (wordCount <= 300) {
-    paragraphCount = 1
-  } else if (wordCount <= 800) {
-    paragraphCount = 2
-  } else if (wordCount <= 1500) {
-    paragraphCount = 3
-  } else {
-    paragraphCount = 4
-  }
-
-  const paragraphText = paragraphCount === 1 ? 'paragraph' : 'paragraphs'
-
-  // Check if there's a protagonist mentioned in the character context
-  const hasProtagonist = characterContext?.includes('(protagonist)')
-  const protagonistNote = hasProtagonist ? " Give special emphasis to the protagonist's journey and experiences." : ''
-
-  return `Summarize the story section provided above in exactly ${paragraphCount} ${paragraphText}. Focus on what happens - the events, actions, and plot developments. Include key dialogue and character actions, but avoid descriptive language, metaphors, or embellishments.${protagonistNote} Write in a straightforward, factual style that captures the sequence of events. Use character names directly. Do NOT include any preamble, introduction, or meta-commentary. Output ONLY the summary itself.`
 }

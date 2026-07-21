@@ -2,10 +2,10 @@ import { randomBytes, scrypt } from 'node:crypto'
 import { promisify } from 'node:util'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
-import { requireAuth } from '../../lib/auth.js'
+import { requireAuth, requireTrustedCookieOrigin } from '../../lib/auth.js'
 import { authConfig, getCookieOptions } from '../../lib/config.js'
 import { prisma } from '../../lib/prisma.js'
-import { preferencesSchema, type UserPreferences } from '../my/preferences.js'
+import { type UserPreferences, preferencesSchema } from '../my/preferences.js'
 
 const scryptAsync = promisify(scrypt)
 
@@ -68,7 +68,7 @@ const logoutResponseSchema = z.strictObject({
 
 const changePasswordBodySchema = z.strictObject({
   currentPassword: z.string().min(1).meta({
-    description: 'The user\'s current password (required to authorise the change).',
+    description: "The user's current password (required to authorise the change).",
     example: 'old-secure-password',
   }),
   newPassword: z.string().min(8).meta({
@@ -214,9 +214,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // there's no need to remember which length the user picked. After
         // expiresAt elapses, the user logs in again.
         const sessionToken = randomBytes(32).toString('hex')
-        const durationMs = rememberMe
-          ? authConfig.extendedSessionDuration
-          : authConfig.sessionDuration
+        const durationMs = rememberMe ? authConfig.extendedSessionDuration : authConfig.sessionDuration
         const expiresAt = new Date(Date.now() + durationMs)
 
         await prisma.session.create({
@@ -231,10 +229,7 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
         // and DB-side session expire together.
         reply.setCookie('sessionToken', sessionToken, getCookieOptions(durationMs))
 
-        fastify.log.info(
-          { userId: user.id, username: user.username, rememberMe: !!rememberMe },
-          'User logged in',
-        )
+        fastify.log.info({ userId: user.id, username: user.username, rememberMe: !!rememberMe }, 'User logged in')
 
         return {
           success: true as const,
@@ -255,11 +250,13 @@ const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.post(
     '/logout',
     {
+      preHandler: async (request) => requireTrustedCookieOrigin(request),
       schema: {
         description: 'Logout and invalidate current session',
         tags: ['auth'],
         response: {
           200: logoutResponseSchema,
+          403: errorSchema,
           500: errorSchema,
         },
       },

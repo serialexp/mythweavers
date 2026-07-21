@@ -74,17 +74,14 @@ describe('generateContextMessages', () => {
       })
     })
 
-    it('should apply summarization for non-Claude models', async () => {
+    it('uses full message content in the legacy path', async () => {
       const messages: Message[] = []
 
-      // Create 20 messages to test summarization
       for (let i = 1; i <= 20; i++) {
         messages.push(
           createMessage({
             id: `msg-${i}`,
             content: `Message ${i} content`,
-            summary: `Message ${i} summary`,
-            paragraphSummary: `Message ${i} paragraph summary`,
           }),
         )
       }
@@ -98,22 +95,15 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      // With 20 messages total:
-      // turnsFromEnd = 20 - position
-      // Messages 1-5: turnsFromEnd = 19-15, all > 14, use sentence summaries
-      expect(result[1].content).toBe('Message 1 summary')
-      expect(result[5].content).toBe('Message 5 summary')
-
-      // Messages 6-12: turnsFromEnd = 14-8, all > 7 but <= 14, use paragraph summaries
-      expect(result[6].content).toBe('Message 6 paragraph summary')
-      expect(result[12].content).toBe('Message 12 paragraph summary')
-
-      // Messages 13-20: turnsFromEnd = 7-0, all <= 7, use full content
+      expect(result[1].content).toBe('Message 1 content')
+      expect(result[5].content).toBe('Message 5 content')
+      expect(result[6].content).toBe('Message 6 content')
+      expect(result[12].content).toBe('Message 12 content')
       expect(result[13].content).toBe('Message 13 content')
       expect(result[20].content).toBe('Message 20 content')
     })
 
-    it('applies tiered summarization in the legacy path for Claude too, with cache control on recent turns', async () => {
+    it('uses full content for Claude and adds cache control to recent turns', async () => {
       const messages: Message[] = []
 
       for (let i = 1; i <= 20; i++) {
@@ -121,8 +111,6 @@ describe('generateContextMessages', () => {
           createMessage({
             id: `msg-${i}`,
             content: `Message ${i} content`,
-            summary: `Message ${i} summary`,
-            paragraphSummary: `Message ${i} paragraph summary`,
           }),
         )
       }
@@ -136,12 +124,10 @@ describe('generateContextMessages', () => {
 
       const result = await generateContextMessages(options)
 
-      // Same tiers as the non-Claude path: sentence summaries, then paragraph
-      // summaries, then full content for the most recent turns.
-      expect(result[1].content).toBe('Message 1 summary')
-      expect(result[5].content).toBe('Message 5 summary')
-      expect(result[6].content).toBe('Message 6 paragraph summary')
-      expect(result[12].content).toBe('Message 12 paragraph summary')
+      expect(result[1].content).toBe('Message 1 content')
+      expect(result[5].content).toBe('Message 5 content')
+      expect(result[6].content).toBe('Message 6 content')
+      expect(result[12].content).toBe('Message 12 content')
       expect(result[13].content).toBe('Message 13 content')
       expect(result[20].content).toBe('Message 20 content')
 
@@ -155,12 +141,10 @@ describe('generateContextMessages', () => {
           id: 'msg-1',
           content: 'Compacted content',
           isCompacted: true,
-          summary: 'Should not use this',
         }),
         createMessage({
           id: 'msg-2',
           content: 'Regular content',
-          summary: 'Regular summary',
         }),
       ]
 

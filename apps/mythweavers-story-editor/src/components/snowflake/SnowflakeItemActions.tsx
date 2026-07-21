@@ -5,6 +5,7 @@ import {
   PhDotsThreeIcon,
   PhPencilSimpleIcon,
   PhPlusCircleIcon,
+  PhScissorsIcon,
   PhTrashIcon,
   PhTreeStructureIcon,
 } from 'solidjs-phosphor'
@@ -38,6 +39,7 @@ function childTypeOf(type: NodeType): NodeType | null {
 interface SnowflakeItemActionsProps {
   node: Node
   hasChildren: boolean
+  onSplitScene?: (nodeId: string) => void
 }
 
 export const SnowflakeItemActions: Component<SnowflakeItemActionsProps> = (props) => {
@@ -131,6 +133,11 @@ export const SnowflakeItemActions: Component<SnowflakeItemActionsProps> = (props
         >
           {`Insert ${props.node.type} before`}
         </DropdownItem>
+        <Show when={props.node.type === 'scene'}>
+          <DropdownItem icon={<PhScissorsIcon />} onClick={() => props.onSplitScene?.(props.node.id)}>
+            Split into Chapters/Scenes
+          </DropdownItem>
+        </Show>
         <DropdownDivider />
         <DropdownItem
           icon={<PhTrashIcon />}

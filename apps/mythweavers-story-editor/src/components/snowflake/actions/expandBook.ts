@@ -67,7 +67,7 @@ export async function expandBook(book: Node): Promise<void> {
     const existing = childrenOf(book.id).filter((n) => n.type === 'arc').length
     arcs.forEach((arcSummary, i) => {
       const arc = nodeStore.addNode(book.id, 'arc', deriveTitle(arcSummary, fallbackTitle('arc', existing + i)))
-      nodeStore.updateNode(arc.id, { summary: arcSummary })
+      nodeStore.updateNode(arc.id, { sentenceSummary: arcSummary })
     })
   } catch (error) {
     console.error('[snowflake] expandBook failed:', error)

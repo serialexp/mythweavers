@@ -24,6 +24,14 @@ const bookSchema = z.strictObject({
     description: 'Book summary/description',
     example: 'The journey begins...',
   }),
+  sentenceSummary: z.string().nullable().meta({
+    description: 'One-sentence Snowflake summary',
+    example: 'A reluctant hero begins a dangerous journey.',
+  }),
+  paragraphSummary: z.string().nullable().meta({
+    description: 'Paragraph-length Snowflake summary',
+    example: 'A reluctant hero leaves home and gathers allies for a dangerous journey.',
+  }),
   storyId: z.string().meta({
     description: 'Parent story ID',
     example: 'clx9876543210',
@@ -93,6 +101,8 @@ const createBookBodySchema = z.strictObject({
     description: 'Book summary/description',
     example: 'The journey begins...',
   }),
+  sentenceSummary: z.string().optional().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().optional().meta({ description: 'Paragraph-length Snowflake summary' }),
   nodeType: nodeTypeSchema.optional(),
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within story (defaults to end)',
@@ -110,6 +120,8 @@ const updateBookBodySchema = z.strictObject({
     description: 'Book summary/description',
     example: 'The journey begins...',
   }),
+  sentenceSummary: z.string().nullable().optional().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().nullable().optional().meta({ description: 'Paragraph-length Snowflake summary' }),
   nodeType: nodeTypeSchema.optional(),
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within story',
@@ -202,7 +214,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
       try {
         const userId = request.user!.id
         const { storyId } = request.params
-        const { id, name, summary, nodeType, sortOrder } = request.body
+        const { id, name, sentenceSummary, paragraphSummary, summary, nodeType, sortOrder } = request.body
 
         // Verify story exists and is owned by user
         const story = await prisma.story.findFirst({
@@ -231,6 +243,8 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
           data: {
             ...(id && { id }), // Use client-provided ID if present
             name,
+            sentenceSummary: sentenceSummary || null,
+            paragraphSummary: paragraphSummary || null,
             summary: summary || null,
             storyId,
             sortOrder: finalSortOrder,

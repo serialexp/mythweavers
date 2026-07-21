@@ -13,10 +13,11 @@ export const triggerButton = style({
   width: '100%',
   background: 'transparent',
   border: 'none',
-  padding: tokens.space['2'],
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
   cursor: 'pointer',
   color: tokens.color.text.primary,
-  borderRadius: tokens.radius.default,
+  fontSize: tokens.font.size.sm,
+  textAlign: 'left',
   transition: `background ${tokens.duration.fast} ${tokens.easing.default}`,
 
   ':hover': {

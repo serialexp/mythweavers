@@ -31,7 +31,6 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
       id: string
       type: 'message'
       content: string
-      summary?: string
       sceneId: string
       originalIndex: number
     }>
@@ -183,7 +182,6 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
       id: string
       type: 'message'
       content: string
-      summary?: string
       sceneId: string
       originalIndex: number
     }> = []
@@ -194,7 +192,6 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
         id: msg.id,
         type: 'message',
         content: msg.content,
-        summary: msg.summary,
         sceneId: msg.sceneId || '',
         originalIndex: msg.order,
       })
@@ -442,16 +439,10 @@ export function ReorderModeView(_props: ReorderModeViewProps) {
                   // Show full content when expanded (NOT inside messagePreview)
                   <div class={styles.fullContent}>{item.content}</div>
                 ) : (
-                  // Show summary when collapsed (inside messagePreview for clamping)
+                  // Show a short content preview when collapsed.
                   <div class={styles.messagePreview}>
-                    {item.summary ? (
-                      <div class={styles.summaryText}>{item.summary}</div>
-                    ) : (
-                      <>
-                        {item.content.slice(0, 200)}
-                        {item.content.length > 200 && '...'}
-                      </>
-                    )}
+                    {item.content.slice(0, 200)}
+                    {item.content.length > 200 && '...'}
                   </div>
                 )}
               </div>

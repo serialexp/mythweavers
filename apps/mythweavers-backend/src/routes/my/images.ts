@@ -14,7 +14,8 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
-import { saveBuffer } from '../../lib/file-storage.js'
+import { deleteFile, saveBuffer } from '../../lib/file-storage.js'
+import { createImageClient } from '../../lib/image-clients.js'
 import {
   estimateCost,
   estimateOurCost,
@@ -23,7 +24,6 @@ import {
   resolveImageUpstream,
   tilesFor,
 } from '../../lib/image-config.js'
-import { createImageClient } from '../../lib/image-clients.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
 
@@ -65,14 +65,10 @@ const generateBodySchema = z.strictObject({
     description: 'Image model ID from the public catalog (GET /my/images/models)',
     example: '@cf/black-forest-labs/flux-1-schnell',
   }),
-  prompt: z
-    .string()
-    .min(1, 'Prompt is required')
-    .max(2000, 'Prompt is too long')
-    .meta({
-      description: 'Text prompt for the image model',
-      example: 'A misty fantasy forest at dusk, painterly style',
-    }),
+  prompt: z.string().min(1, 'Prompt is required').max(2000, 'Prompt is too long').meta({
+    description: 'Text prompt for the image model',
+    example: 'A misty fantasy forest at dusk, painterly style',
+  }),
   width: z
     .number()
     .int()
@@ -106,8 +102,7 @@ const generateResponseSchema = z.strictObject({
   height: z.number().int().nullable(),
   mimeType: z.string(),
   costDebited: z.string().meta({
-    description:
-      'Cost charged to the user as a Decimal-string (matches BalanceLedger.amount serialization).',
+    description: 'Cost charged to the user as a Decimal-string (matches BalanceLedger.amount serialization).',
   }),
 })
 
@@ -226,9 +221,7 @@ const myImagesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // 2. Resolve upstream config.
       const upstream = await resolveImageUpstream(body.model)
       if (!upstream) {
-        return reply
-          .status(400)
-          .send({ error: `Image model "${body.model}" is not available` })
+        return reply.status(400).send({ error: `Image model "${body.model}" is not available` })
       }
 
       // 3. Clamp parameters to model capability.
@@ -244,13 +237,8 @@ const myImagesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         estimatedPrice = estimateCost(upstream, width, height, steps)
       } catch (err) {
         // Misconfigured model — treat as 500.
-        fastify.log.error(
-          { err, model: body.model },
-          'Image model pricing misconfigured',
-        )
-        return reply
-          .status(500)
-          .send({ error: 'Image model is misconfigured (pricing)' })
+        fastify.log.error({ err, model: body.model }, 'Image model pricing misconfigured')
+        return reply.status(500).send({ error: 'Image model is misconfigured (pricing)' })
       }
 
       const user = await prisma.user.findUnique({
@@ -361,8 +349,7 @@ const myImagesRoutes: FastifyPluginAsyncZod = async (fastify) => {
               errored: true,
             },
           })
-          const message =
-            err instanceof Error ? err.message : 'Image generation failed'
+          const message = err instanceof Error ? err.message : 'Image generation failed'
           return reply.status(502).send({ error: message })
         }
 
@@ -371,13 +358,7 @@ const myImagesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const filename = `generated-${Date.now()}.${extFromMime(result.mimeType)}`
 
         // Save bytes outside the DB tx (filesystem/R2 I/O shouldn't hold a tx open).
-        const fileMetadata = await saveBuffer(
-          buffer,
-          filename,
-          result.mimeType,
-          userId,
-          'private',
-        )
+        const fileMetadata = await saveBuffer(buffer, filename, result.mimeType, userId, 'private')
 
         // Compute final cost based on actual width/height the model produced
         // (it may have clamped). Falls back to the estimate if the client
@@ -387,94 +368,117 @@ const myImagesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const finalCost = estimateCost(upstream, finalWidth, finalHeight, steps)
         const ourCost = estimateOurCost(upstream, finalWidth, finalHeight, steps)
 
-        const { fileId, filePath } = await prisma.$transaction(async (tx) => {
-          // Dedup: if the user already has a File with this sha256, reuse it.
-          const existing = await tx.file.findFirst({
-            where: { ownerId: userId, sha256: fileMetadata.sha256 },
-          })
-          let fileRow = existing
-          if (!fileRow) {
-            fileRow = await tx.file.create({
+        let storageObjectAdopted = false
+        try {
+          const { fileId, filePath, fileCreated } = await prisma.$transaction(async (tx) => {
+            // Dedup: if the user already has a File with this sha256, reuse it.
+            const existing = await tx.file.findFirst({
+              where: { ownerId: userId, sha256: fileMetadata.sha256 },
+            })
+            let fileRow = existing
+            let fileCreated = false
+            if (!fileRow) {
+              fileRow = await tx.file.create({
+                data: {
+                  ownerId: userId,
+                  storyId: body.storyId,
+                  localPath: fileMetadata.localPath,
+                  r2Key: fileMetadata.r2Key,
+                  visibility: fileMetadata.visibility,
+                  path: fileMetadata.path,
+                  sha256: fileMetadata.sha256,
+                  mimeType: fileMetadata.mimeType,
+                  width: fileMetadata.width,
+                  height: fileMetadata.height,
+                  bytes: fileMetadata.bytes,
+                },
+              })
+              fileCreated = true
+            }
+
+            const usageLog = await tx.imageUsageLog.create({
               data: {
-                ownerId: userId,
-                storyId: body.storyId,
-                localPath: fileMetadata.localPath,
-                r2Key: fileMetadata.r2Key,
-                visibility: fileMetadata.visibility,
-                path: fileMetadata.path,
-                sha256: fileMetadata.sha256,
-                mimeType: fileMetadata.mimeType,
-                width: fileMetadata.width,
-                height: fileMetadata.height,
-                bytes: fileMetadata.bytes,
+                userId,
+                modelId: upstream.model,
+                providerName: upstream.provider,
+                imageModelId: upstream.imageModelId,
+                fileId: fileRow.id,
+                prompt: body.prompt,
+                width: finalWidth,
+                height: finalHeight,
+                steps,
+                tilesUsed: tilesFor(finalWidth, finalHeight),
+                megapixels: megapixelsFor(finalWidth, finalHeight),
+                pricingMode: upstream.pricingMode,
+                priceFlat: upstream.pricing.priceFlat,
+                priceFirstMP: upstream.pricing.priceFirstMP,
+                priceSubsequentMP: upstream.pricing.priceSubsequentMP,
+                pricePerTile: upstream.pricing.pricePerTile,
+                pricePerTileStep: upstream.pricing.pricePerTileStep,
+                cost: finalCost,
+                durationMs: Date.now() - startedAt,
               },
             })
+
+            const updated = await tx.user.update({
+              where: { id: userId },
+              data: { balance: { decrement: finalCost } },
+            })
+
+            await tx.balanceLedger.create({
+              data: {
+                userId,
+                amount: -finalCost,
+                balanceAfter: updated.balance,
+                type: 'IMAGE_USAGE',
+                description: `Image gen: ${upstream.model}`,
+                imageUsageLogId: usageLog.id,
+              },
+            })
+
+            return { fileId: fileRow.id, filePath: fileRow.path, fileCreated }
+          })
+          storageObjectAdopted = fileCreated
+
+          if (!fileCreated) {
+            try {
+              await deleteFile(fileMetadata.localPath, fileMetadata.r2Key, fileMetadata.visibility)
+            } catch (cleanupError) {
+              fastify.log.error({ cleanupError }, 'Failed to remove deduplicated generated image')
+            }
           }
 
-          const usageLog = await tx.imageUsageLog.create({
-            data: {
+          fastify.log.info(
+            {
               userId,
-              modelId: upstream.model,
-              providerName: upstream.provider,
-              imageModelId: upstream.imageModelId,
-              fileId: fileRow.id,
-              prompt: body.prompt,
-              width: finalWidth,
-              height: finalHeight,
-              steps,
-              tilesUsed: tilesFor(finalWidth, finalHeight),
-              megapixels: megapixelsFor(finalWidth, finalHeight),
-              pricingMode: upstream.pricingMode,
-              priceFlat: upstream.pricing.priceFlat,
-              priceFirstMP: upstream.pricing.priceFirstMP,
-              priceSubsequentMP: upstream.pricing.priceSubsequentMP,
-              pricePerTile: upstream.pricing.pricePerTile,
-              pricePerTileStep: upstream.pricing.pricePerTileStep,
+              model: upstream.model,
+              provider: upstream.provider,
               cost: finalCost,
+              ourCost,
               durationMs: Date.now() - startedAt,
+              fileId,
             },
-          })
+            'Image generated',
+          )
 
-          const updated = await tx.user.update({
-            where: { id: userId },
-            data: { balance: { decrement: finalCost } },
-          })
-
-          await tx.balanceLedger.create({
-            data: {
-              userId,
-              amount: -finalCost,
-              balanceAfter: updated.balance,
-              type: 'IMAGE_USAGE',
-              description: `Image gen: ${upstream.model}`,
-              imageUsageLogId: usageLog.id,
-            },
-          })
-
-          return { fileId: fileRow.id, filePath: fileRow.path }
-        })
-
-        fastify.log.info(
-          {
-            userId,
-            model: upstream.model,
-            provider: upstream.provider,
-            cost: finalCost,
-            ourCost,
-            durationMs: Date.now() - startedAt,
+          return {
+            success: true as const,
             fileId,
-          },
-          'Image generated',
-        )
-
-        return {
-          success: true as const,
-          fileId,
-          path: filePath,
-          width: fileMetadata.width,
-          height: fileMetadata.height,
-          mimeType: fileMetadata.mimeType,
-          costDebited: finalCost.toFixed(6),
+            path: filePath,
+            width: fileMetadata.width,
+            height: fileMetadata.height,
+            mimeType: fileMetadata.mimeType,
+            costDebited: finalCost.toFixed(6),
+          }
+        } catch (error) {
+          if (!storageObjectAdopted) {
+            try {
+              await deleteFile(fileMetadata.localPath, fileMetadata.r2Key, fileMetadata.visibility)
+            } catch (cleanupError) {
+              fastify.log.error({ cleanupError }, 'Failed to clean up untracked generated image')
+            }
+          }
+          throw error
         }
       } finally {
         request.raw.removeListener('close', onClose)

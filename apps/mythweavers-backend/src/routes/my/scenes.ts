@@ -44,6 +44,8 @@ const sceneSchema = z.strictObject({
     description: 'Scene summary/description',
     example: 'The hero wakes up in a strange place...',
   }),
+  sentenceSummary: z.string().nullable().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().nullable().meta({ description: 'Paragraph-length Snowflake summary' }),
   summarySegments: z.array(summarySegmentSchema).nullable().meta({
     description:
       'Per-segment summaries for branching scenes. Null when the scene has ' +
@@ -139,6 +141,8 @@ const createSceneBodySchema = z.strictObject({
     description: 'Scene summary/description',
     example: 'The hero wakes up in a strange place...',
   }),
+  sentenceSummary: z.string().optional().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().optional().meta({ description: 'Paragraph-length Snowflake summary' }),
   summarySegments: z.array(summarySegmentSchema).optional().meta({
     description: 'Per-segment summaries for branching scenes',
   }),
@@ -196,6 +200,8 @@ const updateSceneBodySchema = z.strictObject({
     description: 'Scene summary/description',
     example: 'The hero wakes up in a strange place...',
   }),
+  sentenceSummary: z.string().nullable().optional().meta({ description: 'One-sentence Snowflake summary' }),
+  paragraphSummary: z.string().nullable().optional().meta({ description: 'Paragraph-length Snowflake summary' }),
   summarySegments: z.array(summarySegmentSchema).nullable().optional().meta({
     description:
       'Per-segment summaries for branching scenes. Send `null` to clear.',
@@ -328,6 +334,8 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const {
           id,
           name,
+          sentenceSummary,
+          paragraphSummary,
           summary,
           summarySegments,
           sortOrder,
@@ -373,6 +381,8 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           data: {
             id, // Use client-provided ID if given
             name,
+            sentenceSummary: sentenceSummary || null,
+            paragraphSummary: paragraphSummary || null,
             summary: summary || null,
             summarySegments: (summarySegments ?? null) as Prisma.InputJsonValue,
             chapterId,

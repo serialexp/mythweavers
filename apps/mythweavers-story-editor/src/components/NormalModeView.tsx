@@ -1,5 +1,4 @@
 import { For, Show, createMemo } from 'solid-js'
-import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { uiStore } from '../stores/uiStore'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
@@ -65,8 +64,6 @@ export function NormalModeView(props: NormalModeViewProps) {
             <div class={viewStyles.messageWrapper}>
               <Message
                 message={message}
-                storyTurnNumber={messagesStore.getStoryTurnNumbers().get(message.id) || 0}
-                totalStoryTurns={messagesStore.getTotalStoryTurns()}
                 isGenerating={props.isGenerating}
               />
             </div>

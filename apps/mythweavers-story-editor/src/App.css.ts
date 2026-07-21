@@ -27,14 +27,6 @@ export const desktopNavigation = style({
   overflow: 'hidden',
 })
 
-export const desktopEpisodeViewer = style({
-  width: '400px',
-  flexShrink: 0,
-  height: '100%',
-  background: tokens.color.bg.raised,
-  overflow: 'hidden',
-})
-
 export const chatContainer = style({
   flex: 1,
   display: 'flex',

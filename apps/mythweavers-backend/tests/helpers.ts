@@ -1,7 +1,9 @@
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
+import formbody from '@fastify/formbody'
 import multipart from '@fastify/multipart'
 import swagger from '@fastify/swagger'
+import websocket from '@fastify/websocket'
 import scalar from '@scalar/fastify-api-reference'
 import Fastify from 'fastify'
 import {
@@ -10,51 +12,9 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-zod-openapi'
+import { isAllowedOrigin } from '../src/lib/cors.js'
 import { prisma } from '../src/lib/prisma.js'
-import authRoutes from '../src/routes/auth/index.js'
-import calendarPresetsRoutes from '../src/routes/calendars/presets.js'
-import myArcsRoutes from '../src/routes/my/arcs.js'
-import myBooksRoutes from '../src/routes/my/books.js'
-import myCalendarsRoutes from '../src/routes/my/calendars.js'
-import myChaptersRoutes from '../src/routes/my/chapters.js'
-import myCharactersRoutes from '../src/routes/my/characters.js'
-import myContextItemsRoutes from '../src/routes/my/context-items.js'
-import myFilesRoutes from '../src/routes/my/files.js'
-import myImagesRoutes from '../src/routes/my/images.js'
-import myInventoryRoutes from '../src/routes/my/inventory.js'
-import myLandmarkStatesRoutes from '../src/routes/my/landmark-states.js'
-import myLandmarksRoutes from '../src/routes/my/landmarks.js'
-import myMapsRoutes from '../src/routes/my/maps.js'
-import myMessageRevisionsRoutes from '../src/routes/my/message-revisions.js'
-import myMessagesBatchRoutes from '../src/routes/my/messages-batch.js'
-import myMessagesRoutes from '../src/routes/my/messages.js'
-import myParagraphRevisionsRoutes from '../src/routes/my/paragraph-revisions.js'
-import myParagraphsRoutes from '../src/routes/my/paragraphs.js'
-import myPathSegmentsRoutes from '../src/routes/my/path-segments.js'
-import myPathsRoutes from '../src/routes/my/paths.js'
-import myPawnsRoutes from '../src/routes/my/pawns.js'
-import myPlotPointStatesRoutes from '../src/routes/my/plot-point-states.js'
-import myBackgroundRoutes from '../src/routes/my/background.js'
-import myPublishingRoutes from '../src/routes/my/publishing.js'
-import myRoyalRoadRoutes from '../src/routes/my/royal-road.js'
-import myScenesRoutes from '../src/routes/my/scenes.js'
-import myStoriesRoutes from '../src/routes/my/stories.js'
-import myLanguagesRoutes from '../src/routes/my/languages.js'
-import myStoryCalendarRoutes from '../src/routes/my/story-calendar.js'
-import myStoryLanguageRoutes from '../src/routes/my/story-language.js'
-import myStoryTagsRoutes from '../src/routes/my/story-tags.js'
-import myExportStoryRoutes from '../src/routes/my/export-story.js'
-import myBalanceRoutes from '../src/routes/my/balance.js'
-import myPreferencesRoutes from '../src/routes/my/preferences.js'
-import myUsageRoutes from '../src/routes/my/usage.js'
-import myLlmRoutes from '../src/routes/my/llm.js'
-import myBookshelfRoutes from '../src/routes/my/bookshelf.js'
-import myReadingStatusRoutes from '../src/routes/my/reading-status.js'
-import adminLlmRoutes from '../src/routes/admin/llm.js'
-import adminUsersRoutes from '../src/routes/admin/users.js'
-import publicStoriesRoutes from '../src/routes/stories/public.js'
-import publicAuthorsRoutes from '../src/routes/authors/public.js'
-import publicTagRoutes from '../src/routes/tags/public.js'
+import { registerApplicationRoutes } from '../src/register-routes.js'
 
 let cachedApp: Awaited<ReturnType<typeof buildAppInternal>> | null = null
 
@@ -83,7 +43,7 @@ async function buildAppInternal() {
 
   // Register plugins
   await app.register(cors, {
-    origin: '*',
+    origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
     credentials: true,
   })
 
@@ -92,11 +52,15 @@ async function buildAppInternal() {
     parseOptions: {},
   })
 
+  await app.register(formbody)
+
   await app.register(multipart, {
     limits: {
       fileSize: 10 * 1024 * 1024, // 10MB
     },
   })
+
+  await app.register(websocket)
 
   // Register fastify-zod-openapi plugin
   await app.register(fastifyZodOpenApiPlugin)
@@ -137,51 +101,7 @@ async function buildAppInternal() {
     })
   })
 
-  // Register routes
-  await app.register(authRoutes, { prefix: '/auth' })
-  await app.register(myStoriesRoutes, { prefix: '/my/stories' })
-  await app.register(myBooksRoutes, { prefix: '/my' })
-  await app.register(myArcsRoutes, { prefix: '/my' })
-  await app.register(myChaptersRoutes, { prefix: '/my' })
-  await app.register(myScenesRoutes, { prefix: '/my' })
-  await app.register(myCharactersRoutes, { prefix: '/my' })
-  await app.register(myContextItemsRoutes, { prefix: '/my' })
-  await app.register(myMessagesRoutes, { prefix: '/my' })
-  await app.register(myMessagesBatchRoutes, { prefix: '/my' })
-  await app.register(myMessageRevisionsRoutes, { prefix: '/my' })
-  await app.register(myParagraphsRoutes, { prefix: '/my' })
-  await app.register(myParagraphRevisionsRoutes, { prefix: '/my' })
-  await app.register(myFilesRoutes, { prefix: '/my' })
-  await app.register(myImagesRoutes, { prefix: '/my' })
-  await app.register(myInventoryRoutes, { prefix: '/my' })
-  await app.register(myStoryTagsRoutes, { prefix: '/my' })
-  await app.register(myCalendarsRoutes, { prefix: '/my' })
-  await app.register(myStoryCalendarRoutes, { prefix: '/my' })
-  await app.register(myLanguagesRoutes, { prefix: '/my' })
-  await app.register(myStoryLanguageRoutes, { prefix: '/my' })
-  await app.register(myMapsRoutes, { prefix: '/my' })
-  await app.register(myLandmarksRoutes, { prefix: '/my' })
-  await app.register(myLandmarkStatesRoutes, { prefix: '/my' })
-  await app.register(myPawnsRoutes, { prefix: '/my' })
-  await app.register(myPathsRoutes, { prefix: '/my' })
-  await app.register(myPathSegmentsRoutes, { prefix: '/my' })
-  await app.register(myPlotPointStatesRoutes, { prefix: '/my' })
-  await app.register(myPublishingRoutes, { prefix: '/my' })
-  await app.register(myBackgroundRoutes, { prefix: '/my' })
-  await app.register(myRoyalRoadRoutes, { prefix: '/my' })
-  await app.register(myExportStoryRoutes, { prefix: '/my' })
-  await app.register(myBalanceRoutes, { prefix: '/my' })
-  await app.register(myPreferencesRoutes, { prefix: '/my' })
-  await app.register(myUsageRoutes, { prefix: '/my' })
-  await app.register(myLlmRoutes, { prefix: '/my' })
-  await app.register(myBookshelfRoutes, { prefix: '/my' })
-  await app.register(myReadingStatusRoutes, { prefix: '/my' })
-  await app.register(adminLlmRoutes, { prefix: '/admin' })
-  await app.register(adminUsersRoutes, { prefix: '/admin' })
-  await app.register(publicStoriesRoutes, { prefix: '/stories' })
-  await app.register(publicAuthorsRoutes, { prefix: '/authors' })
-  await app.register(publicTagRoutes, { prefix: '' })
-  await app.register(calendarPresetsRoutes, { prefix: '/calendars' })
+  await registerApplicationRoutes(app)
 
   return app
 }

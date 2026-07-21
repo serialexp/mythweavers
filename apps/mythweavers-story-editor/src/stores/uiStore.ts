@@ -1,7 +1,5 @@
 import { createStore } from 'solid-js/store'
 
-export type SummaryViewMode = 'auto' | 'sentence' | 'paragraph' | 'full'
-
 interface UIState {
   cutMessageIds: Set<string>
   targetingMode: {
@@ -9,7 +7,6 @@ interface UIState {
     branchMessageId: string | null // The branch message being edited
     optionId: string | null // The option being targeted
   }
-  summaryView: SummaryViewMode
 }
 
 const [uiState, setUIState] = createStore<UIState>({
@@ -19,7 +16,6 @@ const [uiState, setUIState] = createStore<UIState>({
     branchMessageId: null,
     optionId: null,
   },
-  summaryView: 'auto',
 })
 
 export const uiStore = {
@@ -104,11 +100,4 @@ export const uiStore = {
     return uiState.targetingMode.active
   },
 
-  get summaryView() {
-    return uiState.summaryView
-  },
-
-  setSummaryView(mode: SummaryViewMode) {
-    setUIState('summaryView', mode)
-  },
 }

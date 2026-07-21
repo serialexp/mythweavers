@@ -41,11 +41,11 @@ export async function generateBooks(storyConcept: string, bookCount: number): Pr
         'book',
         deriveTitle(book.summary, fallbackTitle('book', existingBookCount + bookIdx)),
       )
-      nodeStore.updateNode(bookNode.id, { summary: book.summary })
+      nodeStore.updateNode(bookNode.id, { sentenceSummary: book.summary })
 
       book.arcs.forEach((arcSummary, arcIdx) => {
         const arcNode = nodeStore.addNode(bookNode.id, 'arc', deriveTitle(arcSummary, fallbackTitle('arc', arcIdx)))
-        nodeStore.updateNode(arcNode.id, { summary: arcSummary })
+        nodeStore.updateNode(arcNode.id, { sentenceSummary: arcSummary })
       })
     })
   } catch (error) {
