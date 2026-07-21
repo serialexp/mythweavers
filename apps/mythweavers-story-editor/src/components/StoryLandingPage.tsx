@@ -19,27 +19,34 @@ import {
 } from '@mythweavers/ui'
 import { useNavigate } from '@solidjs/router'
 import { Component, Show, createMemo, createSignal, onMount } from 'solid-js'
+import { PhGearIcon, PhUserCircleIcon } from 'solidjs-phosphor'
+import {
+  getApiBaseUrl,
+  getCalendarsPresets,
+  getMyAdventures,
+  postMyStories,
+  postMyStoriesByStoryIdCalendars,
+} from '../client/config'
 import { authStore } from '../stores/authStore'
-import { getApiBaseUrl, getCalendarsPresets, getMyAdventures, postMyStories, postMyStoriesByStoryIdCalendars } from '../client/config'
 import { charactersStore } from '../stores/charactersStore'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { mapsStore } from '../stores/mapsStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
-import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
+import type { ApiStoryMetadata } from '../types/api'
+import type { Message } from '../types/core'
 import type { BranchConversionResult } from '../utils/claudeChatImport'
 import { importClaudeChat, importClaudeChatWithBranches } from '../utils/claudeChatImporter'
+import { createServerStoryFromSnapshot } from '../utils/serverStoryClone'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
 import { StoryMetadata, storyManager } from '../utils/storyManager'
-import type { Message } from '../types/core'
-import { AdventureList } from './AdventureList'
 import { AISettingsPanel } from './AISettingsPanel'
+import { AdventureList } from './AdventureList'
 import { ClaudeChatImportModal } from './ClaudeChatImportModal'
 import { NewStoryForm } from './NewStoryForm'
-import { StoryList, StoryListItem } from './StoryList'
 import * as styles from './StoryLandingPage.css'
-import { PhGearIcon, PhUserCircleIcon } from 'solidjs-phosphor'
+import { StoryList, StoryListItem } from './StoryList'
 
 interface StoryLandingPageProps {
   onSelectStory: (storyId: string) => void
@@ -62,6 +69,11 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
   const [showAISettings, setShowAISettings] = createSignal(false)
   const [importingMythWeavers, setImportingMythWeavers] = createSignal(false)
   const [adventureCount, setAdventureCount] = createSignal<number | null>(null)
+  const [serverPage, setServerPage] = createSignal(1)
+  const [serverTotalPages, setServerTotalPages] = createSignal(1)
+  const [loadingMore, setLoadingMore] = createSignal(false)
+
+  const hasMoreServerStories = () => serverAvailable() && serverPage() < serverTotalPages()
 
   // Combined stories list
   const combinedStories = createMemo((): StoryListItem[] => {
@@ -112,6 +124,57 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     )
   })
 
+  // Compute local fingerprints for server stories that also have a local
+  // version, merging them into the existing fingerprint map.
+  const mergeLocalFingerprints = async (stories: ApiStoryMetadata[]) => {
+    if (stories.length === 0) return
+    const newFingerprints = new Map(localFingerprints())
+    for (const serverStory of stories) {
+      if (serverStory.fingerprint) {
+        // Check if we have a local version
+        const localStory = await storyManager.loadStory(serverStory.id)
+        if (localStory) {
+          newFingerprints.set(serverStory.id, generateStoryFingerprint(localStory.messages))
+        }
+      }
+    }
+    setLocalFingerprints(newFingerprints)
+  }
+
+  // Load the first page of server stories, resetting pagination state.
+  const loadFirstServerPage = async () => {
+    const { stories, pagination } = await storyManager.getServerStories({ page: 1 })
+    setServerStories(stories)
+    setServerPage(pagination?.page ?? 1)
+    setServerTotalPages(pagination?.totalPages ?? 1)
+    await mergeLocalFingerprints(stories)
+  }
+
+  const loadMoreServerStories = async () => {
+    if (loadingMore()) return
+    setLoadingMore(true)
+    try {
+      const { stories, pagination } = await storyManager.getServerStories({ page: serverPage() + 1 })
+      // Dedupe by id: stories created/updated between page requests can shift
+      // page boundaries and surface the same story twice.
+      setServerStories((prev) => {
+        const seen = new Set(prev.map((s) => s.id))
+        return [...prev, ...stories.filter((s) => !seen.has(s.id))]
+      })
+      if (pagination) {
+        setServerPage(pagination.page)
+        setServerTotalPages(pagination.totalPages)
+      } else {
+        setServerPage((p) => p + 1)
+      }
+      await mergeLocalFingerprints(stories)
+    } catch (error) {
+      console.error('Failed to load more server stories:', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   const loadStories = async () => {
     setLoading(true)
 
@@ -133,36 +196,14 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     if (available) {
       try {
         console.log('[LandingPage] Loading server stories...')
-        const serverStoriesList = await storyManager.getServerStories()
-        console.log('[LandingPage] Server stories loaded:', serverStoriesList)
-        setServerStories(serverStoriesList)
-
-        // Compute local fingerprints for server stories that have local versions
-        const newFingerprints = new Map<string, string>()
-        for (const serverStory of serverStoriesList) {
-          if (serverStory.fingerprint) {
-            // Check if we have a local version
-            const localStory = await storyManager.loadStory(serverStory.id)
-            if (localStory) {
-              console.log('[LandingPage] Local story loaded:', localStory)
-              console.log(
-                `[LandingPage] Local story ${serverStory.name} has ${localStory.messages?.length || 0} messages`,
-              )
-              console.log('[LandingPage] First message:', localStory.messages?.[0])
-              const localFingerprint = generateStoryFingerprint(localStory.messages)
-              console.log(
-                `[LandingPage] Story ${serverStory.name}: server=${serverStory.fingerprint.substring(0, 6)}, local=${localFingerprint}`,
-              )
-              newFingerprints.set(serverStory.id, localFingerprint)
-            } else {
-              console.log(`[LandingPage] No local version found for ${serverStory.name}`)
-            }
-          }
-        }
-        setLocalFingerprints(newFingerprints)
+        await loadFirstServerPage()
       } catch (error) {
         console.error('Failed to load server stories:', error)
       }
+    } else {
+      setServerStories([])
+      setServerPage(1)
+      setServerTotalPages(1)
     }
 
     setLoading(false)
@@ -229,8 +270,8 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
           }
         }
 
-        // Don't manually load the story - let the route handler load it properly via export endpoint
-        // Just navigate to it and the /story/:id route will call loadStoryById which uses getMyStoriesByIdExport
+        // Don't manually load the story - let the route handler load it properly via load-story endpoint
+        // Just navigate to it and the /story/:id route will call loadStoryById which uses getMyStoriesByIdLoadStory
         props.onSelectStory(newStory.id)
         return
       } catch (error) {
@@ -331,24 +372,15 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
     try {
       const data = await storyManager.loadStory(storyId)
       if (data) {
-        await apiClient.createStory({
-          name: data.name,
-          messages: data.messages || [],
-          characters: data.characters || [],
-          contextItems: data.contextItems || [],
-          input: data.input || '',
-          storySetting: data.storySetting || '',
-          person: data.person || 'third',
-          tense: data.tense || 'past',
-          globalScript: data.globalScript,
-        })
+        await createServerStoryFromSnapshot(data)
 
-        // Update local story to mark it as server-synced
-        await storyManager.updateStoryMetadata(storyId, { storageMode: 'server' })
+        // Upload is a conversion to a server-backed story. The server assigns
+        // a new ID, so retaining the old local index entry as `server` would
+        // leave a route that can never resolve on the backend.
+        await storyManager.deleteStory(storyId)
 
-        // Reload stories
-        const serverStoriesList = await apiClient.getStories()
-        setServerStories(serverStoriesList)
+        // Reload stories (reset server pagination to the first page)
+        await loadFirstServerPage()
         const localStoriesList = await storyManager.getSavedStories()
         setLocalStories(localStoriesList)
       }
@@ -386,11 +418,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         const formData = new FormData()
         formData.append('file', file)
 
-        const baseUrl = (import.meta.env.VITE_UNIFIED_API_URL ||
-                        (typeof window !== 'undefined' && (window as any).RUNTIME_CONFIG?.BACKEND_URL) ||
-                        'http://localhost:3201')
-
-        const response = await fetch(`${baseUrl}/my/stories/import-zip`, {
+        const response = await fetch(`${getApiBaseUrl()}/my/stories/import-zip`, {
           method: 'POST',
           body: formData,
           credentials: 'include',
@@ -582,6 +610,13 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
                     serverAvailable={serverAvailable()}
                     onRename={loadStories}
                   />
+                  <Show when={hasMoreServerStories()}>
+                    <div style={{ display: 'flex', 'justify-content': 'center', 'margin-top': '1rem' }}>
+                      <Button variant="secondary" onClick={loadMoreServerStories} disabled={loadingMore()}>
+                        {loadingMore() ? 'Loading...' : 'Load more stories'}
+                      </Button>
+                    </div>
+                  </Show>
                 </Show>
               </Show>
             </CardBody>

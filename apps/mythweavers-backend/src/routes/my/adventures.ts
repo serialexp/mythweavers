@@ -59,6 +59,24 @@ const errorSchema = z.object({
   error: z.string().meta({ example: 'Not found' }),
 })
 
+const listAdventuresQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1).meta({
+    description: 'Page number',
+    example: 1,
+  }),
+  pageSize: z.coerce.number().int().positive().max(100).default(50).meta({
+    description: 'Items per page (max 100)',
+    example: 50,
+  }),
+})
+
+const paginationSchema = z.object({
+  page: z.number().int().meta({ example: 1 }),
+  pageSize: z.number().int().meta({ example: 50 }),
+  total: z.number().int().meta({ example: 42 }),
+  totalPages: z.number().int().meta({ example: 1 }),
+})
+
 const adventuresRoutes: FastifyPluginAsyncZod = async (fastify) => {
   // GET /my/adventures - List user's adventures
   fastify.get(
@@ -68,9 +86,11 @@ const adventuresRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         description: 'List all adventures for the authenticated user',
         tags: ['adventures'],
+        querystring: listAdventuresQuerySchema,
         response: {
           200: z.object({
             adventures: z.array(adventureListItemSchema),
+            pagination: paginationSchema,
           }),
           401: errorSchema,
           500: errorSchema,
@@ -78,16 +98,28 @@ const adventuresRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request) => {
-      const adventures = await prisma.adventure.findMany({
-        where: { userId: request.user!.id },
-        select: {
-          id: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { updatedAt: 'desc' },
-      })
+      const userId = request.user!.id
+      const { page, pageSize } = request.query
+
+      const skip = (page - 1) * pageSize
+
+      const [adventures, total] = await Promise.all([
+        prisma.adventure.findMany({
+          where: { userId },
+          select: {
+            id: true,
+            name: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: pageSize,
+          skip,
+        }),
+        prisma.adventure.count({ where: { userId } }),
+      ])
+
+      const totalPages = Math.ceil(total / pageSize)
 
       return {
         adventures: adventures.map((a) => ({
@@ -95,6 +127,7 @@ const adventuresRoutes: FastifyPluginAsyncZod = async (fastify) => {
           createdAt: a.createdAt.toISOString(),
           updatedAt: a.updatedAt.toISOString(),
         })),
+        pagination: { page, pageSize, total, totalPages },
       }
     },
   )

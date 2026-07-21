@@ -1,9 +1,10 @@
 import { deleteMyStoriesById, getHealth, getMyStories, patchMyStoriesById } from '../client/config'
+import type { ApiStoryMetadata } from '../types/api'
 import { Character, Message } from '../types/core'
 import { SavedStory, StoryMetadata } from '../types/store'
-import { ApiStoryMetadata, apiClient } from './apiClient'
 import { getErrorMessage, getErrorName, getErrorStack, isError } from './errorHandling'
 import { generateMessageId } from './id'
+import { createServerStoryFromSnapshot } from './serverStoryClone'
 import { storage } from './storage'
 
 // Re-export for backward compatibility
@@ -45,10 +46,7 @@ export const storyManager = {
       id,
       name,
       savedAt: new Date(),
-      messages: messages.map((msg) => ({
-        ...msg,
-        isSummarizing: false, // Don't save temporary state
-      })),
+      messages,
       characters,
       input,
       storySetting,
@@ -224,20 +222,7 @@ export const storyManager = {
       const story = await storyManager.loadStory(id)
       if (!story) return null
 
-      const contextItems = story.contextItems || []
-
-      // Create new story on server
-      const apiStory = await apiClient.createStory({
-        name: story.name,
-        messages: story.messages,
-        characters: story.characters,
-        contextItems,
-        input: story.input,
-        storySetting: story.storySetting,
-        person: story.person,
-        tense: story.tense,
-        globalScript: story.globalScript,
-      })
+      const apiStory = await createServerStoryFromSnapshot(story)
 
       // Update local story with sync timestamp
       // Note: We no longer sync local to server
@@ -251,64 +236,19 @@ export const storyManager = {
     }
   },
 
-  syncFromServer: async (serverId: string): Promise<string | null> => {
+  getServerStories: async (
+    options: { page?: number; pageSize?: number } = {},
+  ): Promise<{
+    stories: ApiStoryMetadata[]
+    pagination: { page: number; pageSize: number; total: number; totalPages: number } | null
+  }> => {
     try {
-      const apiStory = await apiClient.getStory(serverId)
-
-      // Create local story from server data
-      const localId = generateMessageId()
-      const storyData: SavedStory = {
-        id: localId,
-        name: apiStory.name,
-        savedAt: new Date(apiStory.savedAt),
-        messages: apiStory.messages.map((msg) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
-        })),
-        characters: apiStory.characters,
-        contextItems: apiStory.contextItems,
-        input: apiStory.input,
-        storySetting: apiStory.storySetting,
-        person: apiStory.person || 'third',
-        tense: apiStory.tense || 'present',
-        globalScript: apiStory.globalScript,
-        // serverId removed - server stories use server ID as primary ID,
-        syncedAt: new Date(),
-        storageMode: 'server',
-      }
-
-      // Save to storage
-      await storage.set(`${STORY_PREFIX}${localId}`, storyData)
-
-      // Update index
-      const index = await storyManager.getSavedStories()
-      const metadata: StoryMetadata = {
-        id: localId,
-        name: apiStory.name,
-        savedAt: new Date(apiStory.savedAt),
-        messageCount: apiStory.messages.length,
-        characterCount: apiStory.characters.length,
-        storySetting: apiStory.storySetting,
-        storageMode: 'server',
-      }
-
-      index.push(metadata)
-      await storage.set(STORY_INDEX_KEY, index)
-
-      return localId
-    } catch (error) {
-      console.error('Failed to sync story from server:', error)
-      return null
-    }
-  },
-
-  getServerStories: async (): Promise<ApiStoryMetadata[]> => {
-    try {
-      const result = await getMyStories()
-      if (!result.data) return []
+      const { page = 1, pageSize = 50 } = options
+      const result = await getMyStories({ query: { page, pageSize } })
+      if (!result.data) return { stories: [], pagination: null }
 
       // Convert unified backend format to expected format
-      return result.data.stories.map((story) => ({
+      const stories = result.data.stories.map((story) => ({
         id: story.id,
         name: story.name,
         savedAt: story.updatedAt,
@@ -320,9 +260,11 @@ export const storyManager = {
         coverArtUrl: (story as { coverArtUrl?: string | null }).coverArtUrl ?? null,
         fingerprint: undefined,
       }))
+
+      return { stories, pagination: result.data.pagination }
     } catch (error) {
       console.error('Failed to fetch server stories:', error)
-      return []
+      return { stories: [], pagination: null }
     }
   },
 

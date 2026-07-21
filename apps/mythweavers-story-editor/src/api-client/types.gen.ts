@@ -215,7 +215,7 @@ export type GetAuthSessionResponses = {
                 id: string;
                 name: string;
                 endpoint: string;
-                apiKey: string;
+                apiKey?: string;
             }>;
             categoryOverrides?: {
                 [key: string]: {
@@ -232,7 +232,7 @@ export type GetAuthSessionResponses = {
                 id: string;
                 name: string;
                 endpoint: string;
-                apiKey: string;
+                apiKey?: string;
             }> | {
                 [key: string]: {
                     provider: string;
@@ -507,7 +507,16 @@ export type PostDeviceResponses = {
 export type GetMyAdventuresData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Page number
+         */
+        page?: number;
+        /**
+         * Items per page (max 100)
+         */
+        pageSize?: number;
+    };
     url: '/my/adventures';
 };
 
@@ -539,6 +548,24 @@ export type GetMyAdventuresResponses = {
             createdAt: string;
             updatedAt: string;
         }>;
+        pagination: {
+            /**
+             * Current page number
+             */
+            page: number;
+            /**
+             * Items per page
+             */
+            pageSize: number;
+            /**
+             * Total number of items
+             */
+            total: number;
+            /**
+             * Total number of pages
+             */
+            totalPages: number;
+        };
     };
 };
 
@@ -1934,7 +1961,7 @@ export type PatchMyStoriesByIdResponses = {
 
 export type PatchMyStoriesByIdResponse = PatchMyStoriesByIdResponses[keyof PatchMyStoriesByIdResponses];
 
-export type GetMyStoriesByIdExportData = {
+export type GetMyStoriesByIdLoadStoryData = {
     body?: never;
     path: {
         /**
@@ -1943,10 +1970,10 @@ export type GetMyStoriesByIdExportData = {
         id: string;
     };
     query?: never;
-    url: '/my/stories/{id}/export';
+    url: '/my/stories/{id}/load-story';
 };
 
-export type GetMyStoriesByIdExportErrors = {
+export type GetMyStoriesByIdLoadStoryErrors = {
     /**
      * Default Response
      */
@@ -1988,9 +2015,9 @@ export type GetMyStoriesByIdExportErrors = {
     };
 };
 
-export type GetMyStoriesByIdExportError = GetMyStoriesByIdExportErrors[keyof GetMyStoriesByIdExportErrors];
+export type GetMyStoriesByIdLoadStoryError = GetMyStoriesByIdLoadStoryErrors[keyof GetMyStoriesByIdLoadStoryErrors];
 
-export type GetMyStoriesByIdExportResponses = {
+export type GetMyStoriesByIdLoadStoryResponses = {
     /**
      * Default Response
      */
@@ -2184,6 +2211,8 @@ export type GetMyStoriesByIdExportResponses = {
             id: string;
             storyId: string;
             name: string;
+            sentenceSummary: string | null;
+            paragraphSummary: string | null;
             summary: string | null;
             sortOrder: number;
             coverArtFileId: string | null;
@@ -2199,6 +2228,8 @@ export type GetMyStoriesByIdExportResponses = {
                 id: string;
                 bookId: string;
                 name: string;
+                sentenceSummary: string | null;
+                paragraphSummary: string | null;
                 summary: string | null;
                 sortOrder: number;
                 defaultBackgroundFileId: string | null;
@@ -2211,6 +2242,8 @@ export type GetMyStoriesByIdExportResponses = {
                     id: string;
                     arcId: string;
                     name: string;
+                    sentenceSummary: string | null;
+                    paragraphSummary: string | null;
                     summary: string | null;
                     sortOrder: number;
                     defaultBackgroundFileId: string | null;
@@ -2228,6 +2261,8 @@ export type GetMyStoriesByIdExportResponses = {
                         id: string;
                         chapterId: string;
                         name: string;
+                        sentenceSummary: string | null;
+                        paragraphSummary: string | null;
                         summary: string | null;
                         summarySegments: Array<{
                             startMessageId: string;
@@ -2429,7 +2464,7 @@ export type GetMyStoriesByIdExportResponses = {
     };
 };
 
-export type GetMyStoriesByIdExportResponse = GetMyStoriesByIdExportResponses[keyof GetMyStoriesByIdExportResponses];
+export type GetMyStoriesByIdLoadStoryResponse = GetMyStoriesByIdLoadStoryResponses[keyof GetMyStoriesByIdLoadStoryResponses];
 
 export type GetMyStoriesByIdDeletedMessagesData = {
     body?: never;
@@ -3072,6 +3107,8 @@ export type PostMyStoriesByStoryIdNodesBulkUpdateData = {
              */
             nodeType: 'book' | 'arc' | 'chapter' | 'scene';
             name?: string;
+            sentenceSummary?: string | null;
+            paragraphSummary?: string | null;
             summary?: string | null;
             sortOrder?: number;
             /**
@@ -3229,6 +3266,14 @@ export type GetMyStoriesByStoryIdBooksResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Parent story ID
              */
             storyId: string;
@@ -3300,6 +3345,14 @@ export type PostMyStoriesByStoryIdBooksData = {
          * Book summary/description
          */
         summary?: string;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string;
         /**
          * Node type (story content, non-story, or context)
          */
@@ -3395,6 +3448,14 @@ export type PostMyStoriesByStoryIdBooksResponses = {
              * Book summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Parent story ID
              */
@@ -3600,6 +3661,14 @@ export type GetMyBooksByIdResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Parent story ID
              */
             storyId: string;
@@ -3667,6 +3736,14 @@ export type PatchMyBooksByIdData = {
          * Book summary/description
          */
         summary?: string | null;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string | null;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string | null;
         /**
          * Node type (story content, non-story, or context)
          */
@@ -3770,6 +3847,14 @@ export type PatchMyBooksByIdResponses = {
              * Book summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Parent story ID
              */
@@ -3903,6 +3988,14 @@ export type GetMyBooksByBookIdArcsResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Parent book ID
              */
             bookId: string;
@@ -3958,6 +4051,14 @@ export type PostMyBooksByBookIdArcsData = {
          * Arc summary/description
          */
         summary?: string;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string;
         /**
          * Node type (story content, non-story, or context)
          */
@@ -4053,6 +4154,14 @@ export type PostMyBooksByBookIdArcsResponses = {
              * Arc summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Parent book ID
              */
@@ -4242,6 +4351,14 @@ export type GetMyArcsByIdResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Parent book ID
              */
             bookId: string;
@@ -4293,6 +4410,14 @@ export type PatchMyArcsByIdData = {
          * Arc summary/description
          */
         summary?: string | null;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string | null;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string | null;
         /**
          * Node type (story content, non-story, or context)
          */
@@ -4388,6 +4513,14 @@ export type PatchMyArcsByIdResponses = {
              * Arc summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Parent book ID
              */
@@ -4505,6 +4638,14 @@ export type GetMyArcsByArcIdChaptersResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Parent arc ID
              */
             arcId: string;
@@ -4580,6 +4721,14 @@ export type PostMyArcsByArcIdChaptersData = {
          * Chapter summary/description
          */
         summary?: string;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string;
         /**
          * Node type (story content, non-story, or context)
          */
@@ -4679,6 +4828,14 @@ export type PostMyArcsByArcIdChaptersResponses = {
              * Chapter summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Parent arc ID
              */
@@ -4888,6 +5045,14 @@ export type GetMyChaptersByIdResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Parent arc ID
              */
             arcId: string;
@@ -4959,6 +5124,14 @@ export type PatchMyChaptersByIdData = {
          * Chapter summary/description
          */
         summary?: string | null;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string | null;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string | null;
         /**
          * Node type (story content, non-story, or context)
          */
@@ -5066,6 +5239,14 @@ export type PatchMyChaptersByIdResponses = {
              * Chapter summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Parent arc ID
              */
@@ -5203,6 +5384,14 @@ export type GetMyChaptersByChapterIdScenesResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
              */
             summarySegments: Array<{
@@ -5303,6 +5492,14 @@ export type PostMyChaptersByChapterIdScenesData = {
          * Scene summary/description
          */
         summary?: string;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string;
         /**
          * Per-segment summaries for branching scenes
          */
@@ -5443,6 +5640,14 @@ export type PostMyChaptersByChapterIdScenesResponses = {
              * Scene summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
              */
@@ -5677,6 +5882,14 @@ export type GetMyScenesByIdResponses = {
              */
             summary: string | null;
             /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
+            /**
              * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
              */
             summarySegments: Array<{
@@ -5773,6 +5986,14 @@ export type PatchMyScenesByIdData = {
          * Scene summary/description
          */
         summary?: string | null;
+        /**
+         * One-sentence Snowflake summary
+         */
+        sentenceSummary?: string | null;
+        /**
+         * Paragraph-length Snowflake summary
+         */
+        paragraphSummary?: string | null;
         /**
          * Per-segment summaries for branching scenes. Send `null` to clear.
          */
@@ -5913,6 +6134,14 @@ export type PatchMyScenesByIdResponses = {
              * Scene summary/description
              */
             summary: string | null;
+            /**
+             * One-sentence Snowflake summary
+             */
+            sentenceSummary: string | null;
+            /**
+             * Paragraph-length Snowflake summary
+             */
+            paragraphSummary: string | null;
             /**
              * Per-segment summaries for branching scenes. Null when the scene has no segmented summary; readers fall back to `summary`.
              */
@@ -18143,7 +18372,7 @@ export type GetMyPreferencesResponses = {
                 id: string;
                 name: string;
                 endpoint: string;
-                apiKey: string;
+                apiKey?: string;
             }>;
             categoryOverrides?: {
                 [key: string]: {
@@ -18160,7 +18389,7 @@ export type GetMyPreferencesResponses = {
                 id: string;
                 name: string;
                 endpoint: string;
-                apiKey: string;
+                apiKey?: string;
             }> | {
                 [key: string]: {
                     provider: string;
@@ -18193,7 +18422,7 @@ export type PutMyPreferencesData = {
             id: string;
             name: string;
             endpoint: string;
-            apiKey: string;
+            apiKey?: string;
         }>;
         categoryOverrides?: {
             [key: string]: {
@@ -18210,7 +18439,7 @@ export type PutMyPreferencesData = {
             id: string;
             name: string;
             endpoint: string;
-            apiKey: string;
+            apiKey?: string;
         }> | {
             [key: string]: {
                 provider: string;
@@ -18258,7 +18487,7 @@ export type PutMyPreferencesResponses = {
                 id: string;
                 name: string;
                 endpoint: string;
-                apiKey: string;
+                apiKey?: string;
             }>;
             categoryOverrides?: {
                 [key: string]: {
@@ -18275,7 +18504,7 @@ export type PutMyPreferencesResponses = {
                 id: string;
                 name: string;
                 endpoint: string;
-                apiKey: string;
+                apiKey?: string;
             }> | {
                 [key: string]: {
                     provider: string;

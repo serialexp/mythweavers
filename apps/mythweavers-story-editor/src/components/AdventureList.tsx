@@ -1,4 +1,4 @@
-import { Component, For, Show, createEffect, createResource, createSignal } from 'solid-js'
+import { Component, For, Show, createEffect, createSignal, onMount } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { ActionRow, Button, IconButton, Input, Modal, Spinner, Text } from '@mythweavers/ui'
 import { deleteMyAdventuresById, getMyAdventures, postMyAdventures, putMyAdventuresById } from '../client/config'
@@ -73,18 +73,67 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
   const [showNewAdventure, setShowNewAdventure] = createSignal(false)
   const [editingId, setEditingId] = createSignal<string | null>(null)
   const [editingName, setEditingName] = createSignal('')
+  const [adventures, setAdventures] = createSignal<Array<{
+    id: string
+    name: string
+    createdAt: string
+    updatedAt: string
+  }>>([])
+  const [loading, setLoading] = createSignal(true)
+  const [adventurePage, setAdventurePage] = createSignal(1)
+  const [adventureTotalPages, setAdventureTotalPages] = createSignal(1)
+  const [loadingMore, setLoadingMore] = createSignal(false)
 
-  const fetchAdventures = async () => {
-    const { data } = await getMyAdventures()
-    return data?.adventures ?? []
+  const hasMoreAdventures = () => adventurePage() < adventureTotalPages()
+
+  const fetchAdventures = async (page: number) => {
+    const { data } = await getMyAdventures({ query: { page, pageSize: 50 } })
+    if (!data) return { adventures: [], pagination: null }
+    return { adventures: data.adventures, pagination: data.pagination }
   }
 
-  const [adventures, { refetch }] = createResource(fetchAdventures)
+  const loadFirstAdventurePage = async () => {
+    setLoading(true)
+    const { adventures: list, pagination } = await fetchAdventures(1)
+    setAdventures(list)
+    setAdventurePage(pagination?.page ?? 1)
+    setAdventureTotalPages(pagination?.totalPages ?? 1)
+    setLoading(false)
+  }
+
+  const loadMoreAdventures = async () => {
+    if (loadingMore()) return
+    setLoadingMore(true)
+    try {
+      const nextPage = adventurePage() + 1
+      const { adventures: list, pagination } = await fetchAdventures(nextPage)
+      // Dedupe by id in case of page-boundary shifts
+      setAdventures((prev) => {
+        const seen = new Set(prev.map((a) => a.id))
+        return [...prev, ...list.filter((a) => !seen.has(a.id))]
+      })
+      if (pagination) {
+        setAdventurePage(pagination.page)
+        setAdventureTotalPages(pagination.totalPages)
+      } else {
+        setAdventurePage((p) => p + 1)
+      }
+    } catch (err) {
+      console.error('Failed to load more adventures:', err)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  // Load on mount
+  onMount(() => {
+    loadFirstAdventurePage()
+  })
 
   // Report count to parent
   createEffect(() => {
     const list = adventures()
-    if (list && props.onCountChange) {
+    if (props.onCountChange) {
       props.onCountChange(list.length)
     }
   })
@@ -114,7 +163,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
         path: { id },
         body: { name: newName },
       })
-      refetch()
+      loadFirstAdventurePage()
     } catch (err) {
       console.error('Failed to rename adventure:', err)
     } finally {
@@ -133,7 +182,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
     setDeletingId(id)
     try {
       await deleteMyAdventuresById({ path: { id } })
-      refetch()
+      loadFirstAdventurePage()
     } catch (err) {
       console.error('Failed to delete adventure:', err)
     } finally {
@@ -199,13 +248,13 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
         </Button>
       </div>
 
-      <Show when={!adventures.loading} fallback={
+      <Show when={!loading()} fallback={
         <div style={{ display: 'flex', 'justify-content': 'center', padding: '2rem' }}>
           <Spinner size="sm" />
         </div>
       }>
         <Show
-          when={adventures() && adventures()!.length > 0}
+          when={adventures().length > 0}
           fallback={
             <div class={styles.emptyState}>
               <Text size="lg" color="secondary">
@@ -278,6 +327,13 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
               )}
             </For>
           </div>
+          <Show when={hasMoreAdventures()}>
+            <div class={styles.loadMoreRow}>
+              <Button variant="secondary" onClick={loadMoreAdventures} disabled={loadingMore()}>
+                {loadingMore() ? 'Loading...' : 'Load more adventures'}
+              </Button>
+            </div>
+          </Show>
         </Show>
       </Show>
 

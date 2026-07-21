@@ -434,19 +434,55 @@ export class OpenAICompatibleClient implements LLMClient {
       }
     }
 
-    const response = await fetch(
-      this.buildUrl("/chat/completions"),
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          ...extra,
-        },
-        body: JSON.stringify(requestBody),
-        signal: options.signal,
-      },
+    // --- Upstream request with timeout ---
+    // Some proxies can hang before the first byte or drop mid-stream.
+    // Abort after 30s of no data so the error surfaces as an SSE event
+    // instead of a silent empty response or a hanging connection.
+    const upstreamTimeoutMs = 30_000
+    const upstreamAbort = new AbortController()
+    const upstreamTimer = setTimeout(
+      () => upstreamAbort.abort(new DOMException('Upstream request timed out', 'TimeoutError')),
+      upstreamTimeoutMs,
     )
+    // Forward the caller's abort signal so user cancellation works normally.
+    const callerSignal = options.signal
+    if (callerSignal) {
+      callerSignal.addEventListener(
+        'abort',
+        () => upstreamAbort.abort(callerSignal.reason),
+        { once: true },
+      )
+    }
+
+    let response: Response
+    try {
+      response = await fetch(
+        this.buildUrl("/chat/completions"),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            ...extra,
+          },
+          body: JSON.stringify(requestBody),
+          signal: upstreamAbort.signal,
+        },
+      )
+    } catch (err: unknown) {
+      clearTimeout(upstreamTimer)
+      const name = (err as Error).name
+      if (name === 'TimeoutError' || name === 'AbortError') {
+        yield {
+          type: 'error',
+          error: (err as Error).message || 'Upstream request timed out or was cancelled',
+        }
+        yield { type: 'done' }
+        return
+      }
+      throw err
+    }
+    clearTimeout(upstreamTimer)
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -465,15 +501,13 @@ export class OpenAICompatibleClient implements LLMClient {
     }
 
     const toolCallsByIndex = new Map<number, ToolCallAccumulator>()
-    let sawDone = false
+    let hadSseContent = false
     for await (const raw of parseSSEStream(response.body)) {
+      hadSseContent = true
       for (const event of parseStreamChunk(raw, toolCallsByIndex)) {
         // Hold off on emitting `done` until after tool calls are flushed,
         // so consumers see all tool_call events first.
-        if (event.type === "done") {
-          sawDone = true
-          continue
-        }
+        if (event.type === "done") continue
         yield event
       }
     }
@@ -481,13 +515,25 @@ export class OpenAICompatibleClient implements LLMClient {
     // Flush any accumulated tool calls before signaling done.
     for (const event of flushToolCalls(toolCallsByIndex)) {
       yield event
+      hadSseContent = true
+    }
+
+    // If the HTTP response was 200 but the body contained no parseable SSE
+    // data, the upstream likely returned a non-streaming error page (e.g. a
+    // reverse-proxy timeout page wrapped in 200).  Emit a meaningful error
+    // instead of a silent empty response.
+    if (!hadSseContent) {
+      yield {
+        type: "error",
+        error:
+          "The upstream returned an empty or non-SSE response — " +
+          "the request may have timed out or the proxy dropped the connection.",
+      }
     }
 
     // Guarantee done — covers both the case where finish_reason was sent
     // (we suppressed that done above so tool calls flush first) and the
-    // case where the stream ended without one. `sawDone` is read so the
-    // linter doesn't flag the captured-but-unused branch.
-    void sawDone
+    // case where the stream ended without one.
     yield { type: "done" }
   }
 }

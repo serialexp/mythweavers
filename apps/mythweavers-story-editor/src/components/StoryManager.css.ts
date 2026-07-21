@@ -114,3 +114,9 @@ export const noStories = style({
   color: tokens.color.text.muted,
   fontSize: tokens.font.size.sm,
 })
+
+export const loadMoreRow = style({
+  display: 'flex',
+  justifyContent: 'center',
+  marginTop: tokens.space['3'],
+})

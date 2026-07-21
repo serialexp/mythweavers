@@ -15,3 +15,9 @@ export const emptyState = style({
 export const newButton = style({
   marginBottom: tokens.space['3'],
 })
+
+export const loadMoreRow = style({
+  display: 'flex',
+  justifyContent: 'center',
+  marginTop: tokens.space['3'],
+})

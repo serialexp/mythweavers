@@ -5,7 +5,6 @@ import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import formbody from '@fastify/formbody'
 import multipart from '@fastify/multipart'
-import fastifyStatic from '@fastify/static'
 import swagger from '@fastify/swagger'
 import websocket from '@fastify/websocket'
 import scalar from '@scalar/fastify-api-reference'
@@ -20,63 +19,13 @@ import { z } from 'zod'
 
 // Get version from package.json
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const packageJson = JSON.parse(
-  readFileSync(path.join(__dirname, '../package.json'), 'utf-8'),
-)
+const packageJson = JSON.parse(readFileSync(path.join(__dirname, '../package.json'), 'utf-8'))
 const VERSION = packageJson.version
-import authRoutes from './routes/auth/index.js'
-import calendarPresetsRoutes from './routes/calendars/presets.js'
-import devicePageRoutes from './routes/device/index.js'
-import oauthRoutes from './routes/oauth/index.js'
-import myAdventuresRoutes from './routes/my/adventures.js'
-import myArcsRoutes from './routes/my/arcs.js'
-import myBooksRoutes from './routes/my/books.js'
-import myCalendarsRoutes from './routes/my/calendars.js'
-import myChaptersRoutes from './routes/my/chapters.js'
-import myCharactersRoutes from './routes/my/characters.js'
-import myContextItemsRoutes from './routes/my/context-items.js'
-import myFilesRoutes from './routes/my/files.js'
-import myImagesRoutes from './routes/my/images.js'
-import myInventoryRoutes from './routes/my/inventory.js'
-import myLandmarkStatesRoutes from './routes/my/landmark-states.js'
-import myLandmarksRoutes from './routes/my/landmarks.js'
-import myMapsRoutes from './routes/my/maps.js'
-import myMessageRevisionsRoutes from './routes/my/message-revisions.js'
-import myMessagesBatchRoutes from './routes/my/messages-batch.js'
-import myMessagesRoutes from './routes/my/messages.js'
-import myParagraphRevisionsRoutes from './routes/my/paragraph-revisions.js'
-import myParagraphsRoutes from './routes/my/paragraphs.js'
-import myPathSegmentsRoutes from './routes/my/path-segments.js'
-import myPathsRoutes from './routes/my/paths.js'
-import myPawnsRoutes from './routes/my/pawns.js'
-import myPlotPointStatesRoutes from './routes/my/plot-point-states.js'
-import myBackgroundRoutes from './routes/my/background.js'
-import myPublishingRoutes from './routes/my/publishing.js'
-import myRoyalRoadRoutes from './routes/my/royal-road.js'
-import myScenesRoutes from './routes/my/scenes.js'
-import myStoriesRoutes from './routes/my/stories.js'
-import myLanguagesRoutes from './routes/my/languages.js'
-import myStoryCalendarRoutes from './routes/my/story-calendar.js'
-import myStoryLanguageRoutes from './routes/my/story-language.js'
-import myStoryTagsRoutes from './routes/my/story-tags.js'
-import myExportPdfRoutes from './routes/my/export-pdf.js'
-import myExportStoryRoutes from './routes/my/export-story.js'
-import myBalanceRoutes from './routes/my/balance.js'
-import myPreferencesRoutes from './routes/my/preferences.js'
-import myUsageRoutes from './routes/my/usage.js'
-import myLlmRoutes from './routes/my/llm.js'
-import myBookshelfRoutes from './routes/my/bookshelf.js'
-import myReadingStatusRoutes from './routes/my/reading-status.js'
-import stripeWebhookRoutes from './routes/webhooks/stripe.js'
-import wsRoutes from './routes/ws.js'
-import { prisma } from './lib/prisma.js'
+import { isAllowedOrigin } from './lib/cors.js'
 import { startCostSyncScheduler, stopCostSyncScheduler } from './lib/cost-sync-scheduler.js'
+import { prisma } from './lib/prisma.js'
+import { registerApplicationRoutes } from './register-routes.js'
 import { startWorker as startRoyalRoadWorker, stopWorker as stopRoyalRoadWorker } from './workers/royal-road.js'
-import adminLlmRoutes from './routes/admin/llm.js'
-import adminUsersRoutes from './routes/admin/users.js'
-import publicStoriesRoutes from './routes/stories/public.js'
-import publicTagRoutes from './routes/tags/public.js'
-import publicAuthorsRoutes from './routes/authors/public.js'
 
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT) : 3201
 const HOST = process.env.HOST || '0.0.0.0'
@@ -110,12 +59,11 @@ function sanitizeHeaders(headers: Record<string, unknown>) {
   return sanitized
 }
 
-// CORS setup - allow all localhost ports for development
-// Note: Can't use '*' with credentials, so we use a function that accepts all origins
+// Credentialed CORS must use an explicit allowlist. Requests without an
+// Origin header (CLI/server-to-server) remain valid.
 await server.register(cors, {
-  origin: (_origin, cb) => {
-    // Allow all origins in development (for different localhost ports)
-    cb(null, true)
+  origin: (origin, cb) => {
+    cb(null, isAllowedOrigin(origin))
   },
   credentials: true,
   exposedHeaders: ['Content-Disposition'],
@@ -127,7 +75,7 @@ await server.register(cookie, {
   parseOptions: {},
 })
 
-// Form body support (for device authorization page)
+// Form body support
 await server.register(formbody)
 
 // Multipart support (for file uploads)
@@ -139,15 +87,6 @@ await server.register(multipart, {
 
 // WebSocket support (for real-time sync)
 await server.register(websocket)
-
-// Static file serving for uploaded files
-// TODO: In production, use Cloudflare R2 or S3-compatible storage instead
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
-await server.register(fastifyStatic, {
-  root: UPLOAD_DIR,
-  prefix: '/files/',
-  decorateReply: false, // Don't add sendFile method to avoid conflicts
-})
 
 // Register fastify-zod-openapi plugin
 await server.register(fastifyZodOpenApiPlugin)
@@ -290,60 +229,12 @@ server.get(
   },
 )
 
-// Register routes
-await server.register(authRoutes, { prefix: '/auth' })
-await server.register(oauthRoutes, { prefix: '/oauth' })
-await server.register(devicePageRoutes, { prefix: '/device' })
-await server.register(myAdventuresRoutes, { prefix: '/my' })
-await server.register(myStoriesRoutes, { prefix: '/my/stories' })
-await server.register(myBooksRoutes, { prefix: '/my' })
-await server.register(myArcsRoutes, { prefix: '/my' })
-await server.register(myChaptersRoutes, { prefix: '/my' })
-await server.register(myScenesRoutes, { prefix: '/my' })
-await server.register(myCharactersRoutes, { prefix: '/my' })
-await server.register(myContextItemsRoutes, { prefix: '/my' })
-await server.register(myMessagesRoutes, { prefix: '/my' })
-await server.register(myMessagesBatchRoutes, { prefix: '/my' })
-await server.register(myMessageRevisionsRoutes, { prefix: '/my' })
-await server.register(myParagraphsRoutes, { prefix: '/my' })
-await server.register(myParagraphRevisionsRoutes, { prefix: '/my' })
-await server.register(myFilesRoutes, { prefix: '/my' })
-await server.register(myImagesRoutes, { prefix: '/my' })
-await server.register(myInventoryRoutes, { prefix: '/my' })
-await server.register(myStoryTagsRoutes, { prefix: '/my' })
-await server.register(myCalendarsRoutes, { prefix: '/my' })
-await server.register(myStoryCalendarRoutes, { prefix: '/my' })
-await server.register(myLanguagesRoutes, { prefix: '/my' })
-await server.register(myStoryLanguageRoutes, { prefix: '/my' })
-await server.register(myMapsRoutes, { prefix: '/my' })
-await server.register(myLandmarksRoutes, { prefix: '/my' })
-await server.register(myLandmarkStatesRoutes, { prefix: '/my' })
-await server.register(myPawnsRoutes, { prefix: '/my' })
-await server.register(myPathsRoutes, { prefix: '/my' })
-await server.register(myPathSegmentsRoutes, { prefix: '/my' })
-await server.register(myPlotPointStatesRoutes, { prefix: '/my' })
-await server.register(myPublishingRoutes, { prefix: '/my' })
-await server.register(myBackgroundRoutes, { prefix: '/my' })
-await server.register(myRoyalRoadRoutes, { prefix: '/my' })
-await server.register(myExportPdfRoutes, { prefix: '/my' })
-await server.register(myExportStoryRoutes, { prefix: '/my' })
-await server.register(myBalanceRoutes, { prefix: '/my' })
-await server.register(myPreferencesRoutes, { prefix: '/my' })
-await server.register(myUsageRoutes, { prefix: '/my' })
-await server.register(myLlmRoutes, { prefix: '/my' })
-await server.register(myBookshelfRoutes, { prefix: '/my' })
-await server.register(myReadingStatusRoutes, { prefix: '/my' })
-await server.register(stripeWebhookRoutes, { prefix: '/webhooks' })
-await server.register(wsRoutes)
-await server.register(adminLlmRoutes, { prefix: '/admin' })
-await server.register(adminUsersRoutes, { prefix: '/admin' })
-await server.register(publicStoriesRoutes, { prefix: '/stories' })
-await server.register(publicAuthorsRoutes, { prefix: '/authors' })
-await server.register(publicTagRoutes, { prefix: '' })
-await server.register(calendarPresetsRoutes, { prefix: '/calendars' })
+await registerApplicationRoutes(server)
 
 // Bootstrap admin accounts from env var (comma-separated emails)
-const adminEmails = process.env.ADMIN_EMAILS?.split(',').map((e) => e.trim()).filter(Boolean)
+const adminEmails = process.env.ADMIN_EMAILS?.split(',')
+  .map((e) => e.trim())
+  .filter(Boolean)
 if (adminEmails?.length) {
   const result = await prisma.user.updateMany({
     where: { email: { in: adminEmails }, role: { not: 'admin' } },
@@ -371,13 +262,35 @@ try {
 }
 
 // Graceful shutdown
+const SHUTDOWN_TIMEOUT_MS = 5000
 const signals = ['SIGINT', 'SIGTERM']
+let shuttingDown = false
 signals.forEach((signal) => {
   process.on(signal, async () => {
+    if (shuttingDown) return
+    shuttingDown = true
     server.log.info(`Received ${signal}, closing server...`)
     stopCostSyncScheduler()
     stopRoyalRoadWorker()
+
+    // Backstop: server.close() can stall indefinitely on connections whose
+    // peer never finishes closing (suspended laptop, killed browser), so
+    // force-exit if graceful shutdown doesn't complete in time.
+    const forceExitTimer = setTimeout(() => {
+      server.log.warn('Graceful shutdown timed out, forcing exit')
+      process.exit(0)
+    }, SHUTDOWN_TIMEOUT_MS)
+    forceExitTimer.unref()
+
+    // Close WebSocket connections up front: their close handshake depends on
+    // the peer responding, which can keep server.close() pending forever.
+    // terminate() destroys the underlying socket immediately.
+    for (const client of server.websocketServer.clients) {
+      client.terminate()
+    }
+
     await server.close()
+    clearTimeout(forceExitTimer)
     process.exit(0)
   })
 })

@@ -2,13 +2,14 @@ import { Button, Modal } from '@mythweavers/ui'
 import { useNavigate } from '@solidjs/router'
 import { Component, Show, createEffect, createMemo, createSignal } from 'solid-js'
 import { unwrap } from 'solid-js/store'
+import { deleteMyStoriesById, getMyStoriesByStoryIdPdf } from '../client/config'
 import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
 import { storyManagerStore } from '../stores/storyManagerStore'
-import { getMyStoriesByStoryIdPdf } from '../client/config'
-import { ApiStoryMetadata, apiClient } from '../utils/apiClient'
+import type { ApiStoryMetadata } from '../types/api'
 import { createSavePayload } from '../utils/savePayload'
+import { createServerStoryFromSnapshot } from '../utils/serverStoryClone'
 import { generateStoryFingerprint } from '../utils/storyFingerprint'
 import { StoryMetadata, storyManager } from '../utils/storyManager'
 import { StoryList, StoryListItem } from './StoryList'
@@ -26,6 +27,11 @@ export const StoryManager: Component = () => {
   } | null>(null)
   const [serverAvailable, setServerAvailable] = createSignal(false)
   const [localFingerprints, setLocalFingerprints] = createSignal<Map<string, string>>(new Map())
+  const [serverPage, setServerPage] = createSignal(1)
+  const [serverTotalPages, setServerTotalPages] = createSignal(1)
+  const [loadingMore, setLoadingMore] = createSignal(false)
+
+  const hasMoreServerStories = () => serverAvailable() && serverPage() < serverTotalPages()
   // Combined stories list for StoryList component
   const combinedStories = createMemo((): StoryListItem[] => {
     const fingerprints = localFingerprints()
@@ -109,34 +115,65 @@ export const StoryManager: Component = () => {
     }
   })
 
+  // Compute local fingerprints for server stories that also have a local
+  // version, starting from the given map.
+  const computeLocalFingerprints = async (
+    stories: ApiStoryMetadata[],
+    base: Map<string, string>,
+  ): Promise<Map<string, string>> => {
+    const fingerprints = new Map(base)
+    for (const serverStory of stories) {
+      if (serverStory.fingerprint) {
+        // Check if we have a local version
+        const localStory = await storyManager.loadStory(serverStory.id)
+        if (localStory) {
+          fingerprints.set(serverStory.id, generateStoryFingerprint(localStory.messages))
+        }
+      }
+    }
+    return fingerprints
+  }
+
   const loadServerStories = async () => {
     console.log('[StoryManager] loadServerStories called!')
     try {
-      const stories = await storyManager.getServerStories()
+      const { stories, pagination } = await storyManager.getServerStories({ page: 1 })
       console.log('[StoryManager] Loaded server stories:', stories)
 
       // First, set the server stories so they show up with fingerprints
       setServerStories(stories)
+      setServerPage(pagination?.page ?? 1)
+      setServerTotalPages(pagination?.totalPages ?? 1)
 
       // Then compute local fingerprints for server stories that have local versions
-      const newFingerprints = new Map<string, string>()
-      for (const serverStory of stories) {
-        if (serverStory.fingerprint) {
-          console.log(`[StoryManager] Server story ${serverStory.id} has fingerprint: ${serverStory.fingerprint}`)
-          // Check if we have a local version
-          const localStory = await storyManager.loadStory(serverStory.id)
-          if (localStory) {
-            const localFingerprint = generateStoryFingerprint(localStory.messages)
-            console.log(`[StoryManager] Local story ${serverStory.id} has fingerprint: ${localFingerprint}`)
-            console.log(`[StoryManager] Fingerprints match: ${localFingerprint === serverStory.fingerprint}`)
-            newFingerprints.set(serverStory.id, localFingerprint)
-          }
-        }
-      }
-      // Update the local fingerprints signal - this will trigger a re-computation of combinedStories
-      setLocalFingerprints(newFingerprints)
+      setLocalFingerprints(await computeLocalFingerprints(stories, new Map()))
     } catch (error) {
       console.error('Failed to load server stories:', error)
+    }
+  }
+
+  const loadMoreServerStories = async () => {
+    if (loadingMore()) return
+    setLoadingMore(true)
+    try {
+      const { stories, pagination } = await storyManager.getServerStories({ page: serverPage() + 1 })
+      // Dedupe by id: stories created/updated between page requests can shift
+      // page boundaries and surface the same story twice.
+      setServerStories((prev) => {
+        const seen = new Set(prev.map((s) => s.id))
+        return [...prev, ...stories.filter((s) => !seen.has(s.id))]
+      })
+      if (pagination) {
+        setServerPage(pagination.page)
+        setServerTotalPages(pagination.totalPages)
+      } else {
+        setServerPage((p) => p + 1)
+      }
+      setLocalFingerprints(await computeLocalFingerprints(stories, localFingerprints()))
+    } catch (error) {
+      console.error('Failed to load more server stories:', error)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -147,7 +184,7 @@ export const StoryManager: Component = () => {
     if (saveAsMode() === 'server' && serverAvailable()) {
       try {
         // Save to server
-        const response = await apiClient.createStory(createSavePayload({ name }))
+        const response = await createServerStoryFromSnapshot(createSavePayload({ name }))
 
         // Update current story to the new server story
         currentStoryStore.loadStory(response.id, name, 'server')
@@ -217,7 +254,7 @@ export const StoryManager: Component = () => {
     } else if (type === 'server') {
       if (confirm('Are you sure you want to delete this server story? This action cannot be undone.')) {
         try {
-          await apiClient.deleteStory(storyId)
+          await deleteMyStoriesById({ path: { id: storyId } })
           // Refresh the server stories list
           await loadServerStories()
         } catch (error) {
@@ -359,15 +396,24 @@ export const StoryManager: Component = () => {
           <Show
             when={combinedStories().length === 0}
             fallback={
-              <StoryList
-                stories={combinedStories()}
-                onLoadStory={handleLoadStoryWrapper}
-                onDeleteStory={handleDeleteStoryWrapper}
-                onExportPdf={handleExportPdf}
-                onRename={refreshStories}
-                editingEnabled={true}
-                serverAvailable={serverAvailable()}
-              />
+              <>
+                <StoryList
+                  stories={combinedStories()}
+                  onLoadStory={handleLoadStoryWrapper}
+                  onDeleteStory={handleDeleteStoryWrapper}
+                  onExportPdf={handleExportPdf}
+                  onRename={refreshStories}
+                  editingEnabled={true}
+                  serverAvailable={serverAvailable()}
+                />
+                <Show when={hasMoreServerStories()}>
+                  <div class={styles.loadMoreRow}>
+                    <Button variant="secondary" onClick={loadMoreServerStories} disabled={loadingMore()}>
+                      {loadingMore() ? 'Loading...' : 'Load more stories'}
+                    </Button>
+                  </div>
+                </Show>
+              </>
             }
           >
             <div class={styles.noStories}>No stories yet</div>
