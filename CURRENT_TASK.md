@@ -1,3 +1,49 @@
+# LLM prompt-cache prefix fingerprinting — handoff (2026-07-22)
+
+**Why:** debugging why the built-in `/my/llm/generate` proxy shows no provider
+prompt-cache hits. We now fingerprint each request's prompt prefix so we can
+later correlate which requests shared a prefix (and how much of it) — without
+storing any message content.
+
+**What landed (all in `apps/mythweavers-backend`):**
+- `src/lib/prefix-hash.ts` (new) — `computePrefixHashes(messages)` returns
+  `{ hashes: string[], breakpoints: number[] }`: cumulative per-message
+  SHA-256 (first 16 bytes hex) chaining role+content, plus the indices that
+  carried a `cache_control` breakpoint. Also `sharedPrefixLength(a, b)` for
+  offline analysis. Cumulative ⇒ two requests share their first `k` messages
+  iff their hash lists agree at `0..k-1`; longest match = shared-prefix length.
+- `prisma/schema.prisma` — added `prefixHashes Json?` to `LlmUsageLog`.
+  **MIGRATION NOT YET APPLIED.**
+- `src/routes/my/llm.ts` — computes `prefixHashes` up front; settlement now
+  creates an `LlmUsageLog` row for **every** request (including failed /
+  zero-cost / aborted), storing `prefixHashes`. Billing is unchanged: the
+  ledger row is still linked only when there's an actual charge; on no-charge
+  the reservation ledger row is deleted (full refund) but the usage log is
+  kept for debugging.
+- `tests/prefix-hash.test.ts` (new) — 9 pure-function tests (cumulative
+  property, cache-miss semantics, role sensitivity, NUL-separator collision,
+  breakpoint indices). Pass. `prisma generate` run; `tsc --noEmit` ✓.
+
+**What Bart needs to do:**
+1. Apply the migration interactively (additive column — safe). Note this will
+   also sweep up the other pending additive changes already listed below
+   (`BalanceLedger.externalId`, `Scene.summarySegments`); all additive.
+   ```
+   cd apps/mythweavers-backend
+   pnpm prisma migrate dev --name add_llm_usage_prefix_hashes
+   ```
+2. After migrating, run `pnpm --filter @mythweavers/backend test` to confirm
+   the full suite (the prefix-hash unit tests already pass without the DB).
+
+**Note on the caching investigation itself:** the `gpt-5_6-sol` / `-terra`
+OpenAI-dashboard usage does NOT flow through this backend (local DB has zero
+such rows and no OpenAI provider). That traffic is the front-end calling
+OpenAI directly. This fingerprinting only captures requests that go through
+`/my/llm/generate` (the `server` provider). To debug the direct browser→OpenAI
+path, the front-end `OpenAICompatibleClient` would need equivalent logging.
+
+---
+
 # AI image generation for backgrounds — handoff (2026-05-01)
 
 > 2026-07-19 backend-audit follow-up: `BalanceLedger.externalId String? @unique`

@@ -1185,6 +1185,12 @@ model LlmUsageLog {
   durationMs Int? // Stream duration
   aborted    Boolean @default(false) // Client disconnected mid-stream
 
+  /// Cache-prefix debug fingerprint: cumulative per-message prompt hashes plus
+  /// the breakpoint indices, shape { hashes: string[], breakpoints: number[] }.
+  /// Lets us correlate which requests shared a prompt prefix (and how much) for
+  /// prompt-cache debugging, without storing any message content.
+  prefixHashes Json?
+
   createdAt DateTime @default(now())
 
   // Reverse relation to ledger

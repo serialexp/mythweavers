@@ -5,11 +5,13 @@ import {
   type LLMStreamEvent,
   OpenAICompatibleClient,
 } from '@mythweavers/llm'
+import type { Prisma } from '@prisma/client'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { type TokenUsage, calculateCost } from '../../lib/billing.js'
 import { type UpstreamConfig, getPublicModels, resolveUpstream } from '../../lib/llm-config.js'
+import { computePrefixHashes } from '../../lib/prefix-hash.js'
 import { prisma } from '../../lib/prisma.js'
 
 // --- Zod schemas ---
@@ -220,6 +222,11 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
     async (request, reply) => {
       const { model } = request.body
 
+      // Cache-prefix debug fingerprint: cumulative per-message hashes plus
+      // breakpoint indices. Computed up front so it's recorded even when the
+      // request later fails. No message content is retained — only hashes.
+      const prefixHashes = computePrefixHashes(request.body.messages)
+
       // Resolve which upstream provider to use
       const upstream = await resolveUpstream(model)
       if (!upstream) {
@@ -394,11 +401,10 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
                     select: { balance: true },
                   })
 
-            if (!hasUsage || actualCost <= 0) {
-              await tx.balanceLedger.delete({ where: { id: reservation.id } })
-              return
-            }
-
+            // Record every request — including failed / zero-usage ones — so we
+            // retain its prefix-hash fingerprint for cache debugging. Cost is
+            // whatever actually settled (0 for failures); the ledger link below
+            // is only created when there's a real charge.
             const usageLog = await tx.llmUsageLog.create({
               data: {
                 userId: user.id,
@@ -415,8 +421,16 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 cost: actualCost,
                 durationMs: Date.now() - streamStart,
                 aborted: streamAborted,
+                prefixHashes: prefixHashes as unknown as Prisma.InputJsonValue,
               },
             })
+
+            if (!hasUsage || actualCost <= 0) {
+              // Nothing to charge (full refund already applied above): drop the
+              // reservation ledger row, but keep the usage log for debugging.
+              await tx.balanceLedger.delete({ where: { id: reservation.id } })
+              return
+            }
 
             await tx.balanceLedger.update({
               where: { id: reservation.id },

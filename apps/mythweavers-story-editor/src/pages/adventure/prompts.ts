@@ -216,6 +216,57 @@ export const CORE_DIRECTIVE = `The player's input describes their INTENT, not ex
 
 The player's action is the starting point of each turn. Resolve it first and honestly, then let the world react to it in the same narrative — do not wait for another turn to show consequences.`;
 
+// --- Adaptive response length ---
+
+/** A paragraph range, e.g. { min: 2, max: 4 }. */
+export interface ParagraphRange {
+  min: number;
+  max: number;
+}
+
+const DEFAULT_PARAGRAPH_RANGE: ParagraphRange = { min: 2, max: 4 };
+
+/**
+ * Rough sentence count of a player action. Splits on sentence terminators
+ * and newlines; quoted dialogue counts too (each quoted line is its own
+ * beat the writer has to render). Deliberately approximate — it only
+ * steers the response-length guidance, so overcounting an abbreviation
+ * just nudges the range up slightly.
+ */
+function countSentences(text: string): number {
+  const count = text
+    .split(/[.!?…]+(?=[\s"“”'’)\]]|$)|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.replace(/["'“”‘’)\]]/g, "").length > 0).length;
+  return Math.max(count, 1);
+}
+
+/**
+ * Pick the paragraph range for a turn's narrative from the length of the
+ * player action driving it. A terse one-line action ("I open the door.")
+ * fits the default 2-4 paragraphs; a multi-sentence instruction packs
+ * several beats, and squeezing those into 2-4 paragraphs makes the model
+ * compress a full scene into a cramped summary — so the budget grows with
+ * the action (~1 extra sentence ≈ 1 extra paragraph, capped at 8-10).
+ */
+export function paragraphRangeForAction(
+  playerAction: string | null | undefined,
+): ParagraphRange {
+  if (!playerAction) return DEFAULT_PARAGRAPH_RANGE;
+  const sentences = countSentences(playerAction);
+  if (sentences <= 3) return DEFAULT_PARAGRAPH_RANGE;
+  const min = Math.min(sentences - 1, 8);
+  return { min, max: min + 2 };
+}
+
+/** The most recent real player action in the turn history, if any. */
+function lastPlayerAction(turns: AdventureTurn[]): string | null {
+  for (let i = turns.length - 1; i >= 0; i--) {
+    if (turns[i].playerAction) return turns[i].playerAction;
+  }
+  return null;
+}
+
 /**
  * Role-specific instruction for pass 1 (resolution).
  *
@@ -223,8 +274,13 @@ The player's action is the starting point of each turn. Resolve it first and hon
  * reactively but do NOT pursue their own agenda here — that's pass 2's job.
  * Ends in a beat where the world waits, so the player can optionally stop
  * the scene there (when auto-advance is off).
+ *
+ * The paragraph budget scales with the player action's length — see
+ * `paragraphRangeForAction`.
  */
-export const RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Resolve the player's action.
+export const RESOLUTION_INSTRUCTION = (
+  paragraphs: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+) => `YOUR ROLE THIS TURN: Resolve the player's action.
 
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
 
@@ -234,7 +290,7 @@ SCOPE OF THIS TURN:
 RULES:
 - POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
-- 2-4 paragraphs.
+- ${paragraphs.min}-${paragraphs.max} paragraphs.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
 - NPCs react consistently with their established personalities and current motivations.`;
@@ -268,7 +324,9 @@ Output ONLY the sentence. No labels, no formatting, no meta-commentary.`;
  * and the environment move on their own agenda and the scene is set up for
  * the next player input.
  */
-export const WORLD_STEP_INSTRUCTION = `YOUR ROLE THIS TURN: Let the world move.
+export const WORLD_STEP_INSTRUCTION = (
+  paragraphs: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+) => `YOUR ROLE THIS TURN: Let the world move.
 
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
 
@@ -279,7 +337,7 @@ SCOPE OF THIS TURN:
 RULES:
 - POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
-- 2-4 paragraphs.
+- ${paragraphs.min}-${paragraphs.max} paragraphs.
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
 - NPCs must act consistently with their established personalities, goals, and current motivations.`;
@@ -294,7 +352,9 @@ RULES:
  * button when the story is already on track and the author wants to push it
  * forward without typing an action.
  */
-export const CONTINUE_STORY_INSTRUCTION = `YOUR ROLE THIS TURN: Continue the story.
+export const CONTINUE_STORY_INSTRUCTION = (
+  paragraphs: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+) => `YOUR ROLE THIS TURN: Continue the story.
 
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
 
@@ -306,7 +366,7 @@ SCOPE OF THIS TURN:
 RULES:
 - POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
-- 2-4 paragraphs.
+- ${paragraphs.min}-${paragraphs.max} paragraphs.
 - Only include events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
 - Every character — the protagonist included — must act consistently with their established personality, goals, and current motivations.`;
@@ -323,7 +383,16 @@ RULES:
  * Output is markdown text — NOT prose. The writer's prompt requires it
  * to follow these beats exactly.
  */
-const DIRECTOR_COMMON_RULES = `OUTPUT FORMAT — you MUST follow this exactly:
+/**
+ * Shared rules for all director passes. The beat budget scales with the
+ * player action's length (see `paragraphRangeForAction`) so the plan stays
+ * in sync with the paragraph budget the writer is given — a long action
+ * planned as 2–4 beats but written as 4–6 paragraphs would force the
+ * writer to pad, and the reverse would compress the scene.
+ */
+const DIRECTOR_COMMON_RULES = (
+  beats: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+) => `OUTPUT FORMAT — you MUST follow this exactly:
 BEATS:
 1. <beat>
 2. <beat>
@@ -336,20 +405,24 @@ HARD RULES:
   GOOD: "He tells her she remembers nothing." / "He makes clear she's safe but not free to leave yet." / "He refuses to say who tied her up."
   BAD:  "He rubs his eyes with thumb and forefinger, pulls a dented flask from his coat, and mutters 'You don't remember a damn thing, do you?'"
 - Do NOT script the prose: no quoted or paraphrased dialogue lines, no specific gestures (rubbing eyes, scraping a chair, shoving hands in pockets), no choreographed movement or distances, no sensory description. If you catch yourself writing the sentence the character would say or the move they'd make, stop — state what it ACCOMPLISHES instead.
-- 2–4 beats. Each beat is one short sentence: an actor and the gist of their action or message.
+- ${beats.min}–${beats.max} beats. Each beat is one short sentence: an actor and the gist of their action or message.
 - When an on-screen NPC acts or reacts, that IS a beat — name the NPC and the gist of what they do, grounded in their established disposition + motive. Do not break reactions out into a separate list.
 - The beats are the whole plan: the writer renders them faithfully and will not invent new beats or fix wonky ones. Make them coherent, in-character, and self-sufficient.`;
 
-export const DIRECTOR_RESOLUTION_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the resolution of the player's action.
+export const DIRECTOR_RESOLUTION_INSTRUCTION = (
+  beats: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+) => `YOUR ROLE THIS TURN: Direct the resolution of the player's action.
 
 A separate "writer" model will render your plan as prose. Your job is to decide WHAT HAPPENS — concretely, grounded in the established world, characters, and storyline — so the writer can focus entirely on HOW to write it.
 
 SCOPE OF THIS TURN (resolution):
 - Plan the direct, immediate consequences of the player action.
 
-${DIRECTOR_COMMON_RULES}`;
+${DIRECTOR_COMMON_RULES(beats)}`;
 
-export const DIRECTOR_WORLD_STEP_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the world step.
+export const DIRECTOR_WORLD_STEP_INSTRUCTION = (
+  beats: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+) => `YOUR ROLE THIS TURN: Direct the world step.
 
 A separate "writer" model will render your plan as prose. The player's most recent action has already been resolved (see the narrative above). The scene is on a held beat. NOW NPCs and the environment move on their own.
 
@@ -358,9 +431,11 @@ SCOPE OF THIS TURN (world-step):
 - MOVE THE SITUATION FORWARD. Each world-step should leave the protagonist's circumstances actually changed — a step closer to a consequence, a decision forced, a fact revealed, a stakes shift — not just re-dressed with fresh atmosphere. Lean slightly toward progress over ambiance, but don't lurch: one real development per turn is plenty.
 - Do NOT loop or stall. If a kind of beat has already played in this scene (another stranger looms in to threaten, the same menace gets restated), do something DIFFERENT with it — escalate, resolve, or move past it. Repeating the same beat with new faces is treading water, not pacing.
 
-${DIRECTOR_COMMON_RULES}`;
+${DIRECTOR_COMMON_RULES(beats)}`;
 
-export const DIRECTOR_CONTINUE_INSTRUCTION = `YOUR ROLE THIS TURN: Direct the next beat of the story.
+export const DIRECTOR_CONTINUE_INSTRUCTION = (
+  beats: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+) => `YOUR ROLE THIS TURN: Direct the next beat of the story.
 
 A separate "writer" model will render your plan as prose. The player has not given an action. NOW the whole scene advances on its own momentum — the protagonist, NPCs, and environment all move forward along their established trajectory.
 
@@ -369,7 +444,7 @@ SCOPE OF THIS TURN (continue):
 - MOVE THE SITUATION FORWARD. Each beat should leave the protagonist's circumstances actually changed — a step closer to a consequence, a decision forced, a fact revealed, a stakes shift — not just re-dressed with fresh atmosphere. Lean slightly toward progress over ambiance, but don't lurch: one real development per turn is plenty.
 - Do NOT loop or stall. If a kind of beat has already played in this scene (another stranger looms in to threaten, the same menace gets restated), do something DIFFERENT with it — escalate, resolve, or move past it. Repeating the same beat with new faces is treading water, not pacing.
 
-${DIRECTOR_COMMON_RULES}`;
+${DIRECTOR_COMMON_RULES(beats)}`;
 
 export const NONSENSE_CHECK_INSTRUCTION = `YOUR ROLE: Check ONLY the text above for things that don't make sense.
 
@@ -955,6 +1030,7 @@ export function buildResolutionMessages(
   // history — the steering text changes every turn, so it must not be inside the
   // cached prefix.
   const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : "";
+  const paragraphRange = paragraphRangeForAction(playerAction);
   const protagName = extractName(protagonistInput, "the protagonist");
   const deutName = extractName(deuteragonistInput, "the deuteragonist");
   const partySplitBlock = partySplit
@@ -963,7 +1039,7 @@ export function buildResolutionMessages(
 Generate BOTH scenes in a single response. Wrap each in its own XML tag:
 
 <protagonist>
-[Narrative of what ${protagName} experiences — second person, present tense, addressing ${protagName} as "you". 2-4 paragraphs.]
+[Narrative of what ${protagName} experiences — second person, present tense, addressing ${protagName} as "you". ${paragraphRange.min}-${paragraphRange.max} paragraphs.]
 </protagonist>
 
 <deuteragonist>
@@ -974,7 +1050,7 @@ Each section must be a complete, self-contained narrative. Do NOT add any text o
     : "";
   messages.push({
     role: "system",
-    content: `${RESOLUTION_INSTRUCTION}\n\n${CORE_DIRECTIVE}${steeringBlock}${partySplitBlock}`,
+    content: `${RESOLUTION_INSTRUCTION(paragraphRange)}\n\n${CORE_DIRECTIVE}${steeringBlock}${partySplitBlock}`,
   });
 
   // Director brief (if the two-model flow is enabled) lands AFTER the role
@@ -1068,12 +1144,17 @@ export function buildDirectorMessages(
   appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
 
+  // Beat budget mirrors the writer's paragraph budget: the current action
+  // for a resolution, the most recent real action otherwise.
+  const beatRange = paragraphRangeForAction(
+    kind === "resolution" ? playerAction : lastPlayerAction(turns),
+  );
   const instruction =
     kind === "world-step"
-      ? DIRECTOR_WORLD_STEP_INSTRUCTION
+      ? DIRECTOR_WORLD_STEP_INSTRUCTION(beatRange)
       : kind === "continue"
-        ? DIRECTOR_CONTINUE_INSTRUCTION
-        : DIRECTOR_RESOLUTION_INSTRUCTION;
+        ? DIRECTOR_CONTINUE_INSTRUCTION(beatRange)
+        : DIRECTOR_RESOLUTION_INSTRUCTION(beatRange);
   // Steering only frames the protagonist's execution quality on the
   // resolution pass — world-step is neutral and gets no steering block.
   const steeringBlock =
@@ -1179,9 +1260,12 @@ export function buildWorldStepMessages(
   appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
 
+  // No fresh player action in this pass — scale the narrative budget off
+  // the most recent real action, since the world is responding to it.
+  const paragraphRange = paragraphRangeForAction(lastPlayerAction(turns));
   messages.push({
     role: "system",
-    content: mode === "continue" ? CONTINUE_STORY_INSTRUCTION : WORLD_STEP_INSTRUCTION,
+    content: mode === "continue" ? CONTINUE_STORY_INSTRUCTION(paragraphRange) : WORLD_STEP_INSTRUCTION(paragraphRange),
   });
 
   // Director brief (if the two-model flow is enabled) lands AFTER the role
@@ -1260,12 +1344,15 @@ export function buildRevisionMessages(
     kind === "resolution" && steering
       ? `\n\n${steeringGuidance(steering)}`
       : "";
+  const paragraphRange = paragraphRangeForAction(
+    kind === "resolution" ? playerAction : lastPlayerAction(turns),
+  );
   const roleInstruction =
     kind === "world-step"
-      ? WORLD_STEP_INSTRUCTION
+      ? WORLD_STEP_INSTRUCTION(paragraphRange)
       : kind === "continue"
-        ? CONTINUE_STORY_INSTRUCTION
-        : RESOLUTION_INSTRUCTION;
+        ? CONTINUE_STORY_INSTRUCTION(paragraphRange)
+        : RESOLUTION_INSTRUCTION(paragraphRange);
   messages.push({
     role: "system",
     content: `${roleInstruction}\n\n${CORE_DIRECTIVE}${steeringBlock}`,
