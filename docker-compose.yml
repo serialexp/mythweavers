@@ -65,7 +65,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET is required}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      # Comma-separated allowed origins. Empty falls back to the built-in
+      # defaults. Never use "*": credentialed CORS forbids it and the
+      # backend refuses to start.
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
       # Optional: Cloudflare R2 storage (falls back to local uploads/ if not set)
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
