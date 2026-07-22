@@ -259,14 +259,6 @@ export function paragraphRangeForAction(
   return { min, max: min + 2 };
 }
 
-/** The most recent real player action in the turn history, if any. */
-function lastPlayerAction(turns: AdventureTurn[]): string | null {
-  for (let i = turns.length - 1; i >= 0; i--) {
-    if (turns[i].playerAction) return turns[i].playerAction;
-  }
-  return null;
-}
-
 /**
  * Role-specific instruction for pass 1 (resolution).
  *
@@ -1144,10 +1136,10 @@ export function buildDirectorMessages(
   appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
 
-  // Beat budget mirrors the writer's paragraph budget: the current action
-  // for a resolution, the most recent real action otherwise.
+  // Beat budget mirrors the writer's paragraph budget. Only the resolution
+  // pass scales — world-step/continue have no player action to scale off.
   const beatRange = paragraphRangeForAction(
-    kind === "resolution" ? playerAction : lastPlayerAction(turns),
+    kind === "resolution" ? playerAction : null,
   );
   const instruction =
     kind === "world-step"
@@ -1260,12 +1252,12 @@ export function buildWorldStepMessages(
   appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
 
-  // No fresh player action in this pass — scale the narrative budget off
-  // the most recent real action, since the world is responding to it.
-  const paragraphRange = paragraphRangeForAction(lastPlayerAction(turns));
+  // No player action drives this pass, so the narrative budget stays at
+  // the default — the world moves at its own pace regardless of how long
+  // the player's last instruction was.
   messages.push({
     role: "system",
-    content: mode === "continue" ? CONTINUE_STORY_INSTRUCTION(paragraphRange) : WORLD_STEP_INSTRUCTION(paragraphRange),
+    content: mode === "continue" ? CONTINUE_STORY_INSTRUCTION() : WORLD_STEP_INSTRUCTION(),
   });
 
   // Director brief (if the two-model flow is enabled) lands AFTER the role
@@ -1344,8 +1336,10 @@ export function buildRevisionMessages(
     kind === "resolution" && steering
       ? `\n\n${steeringGuidance(steering)}`
       : "";
+  // Only resolution revisions scale off the player action; world-step and
+  // continue keep the default budget.
   const paragraphRange = paragraphRangeForAction(
-    kind === "resolution" ? playerAction : lastPlayerAction(turns),
+    kind === "resolution" ? playerAction : null,
   );
   const roleInstruction =
     kind === "world-step"
