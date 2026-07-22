@@ -44,7 +44,7 @@ const toolChoiceSchema = z.union([
 
 const generateBodySchema = z.object({
   model: z.string().meta({ description: 'Model name from the server allowed list' }),
-  messages: z.array(messageSchema).min(1).max(100),
+  messages: z.array(messageSchema).min(1),
   temperature: z.number().min(0).max(2).optional(),
   max_tokens: z.number().int().positive().max(32_768).default(4096),
   thinking_budget: z.number().int().positive().max(32_768).optional(),
