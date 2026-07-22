@@ -1,3 +1,52 @@
+# OpenAI explicit prompt-cache breakpoints — handoff (2026-07-23)
+
+**Root cause (proven empirically against gpt-5.6-sol):** OpenAI *implicit* prompt
+caching only auto-places a breakpoint on the **last** message. So a prompt whose
+tail changes every turn (adventure: stable history + fresh live-state/action)
+never caches its stable prefix — replacing the last message drops cache to 0,
+even with a byte-identical 5.6k-token system prefix. `prompt_cache_key` alone
+does NOT fix it. An **explicit** breakpoint at the end of the stable prefix does
+(verified: cold write 5674 tok, then 5674 cache_read on subsequent replace-tail
+calls).
+
+**Fix (all in `packages/llm/src/clients/openai-compatible.ts`):** translate the
+`cache_control` markers we already set for Anthropic into OpenAI's breakpoint
+syntax. Self-activating — no caller changes. Gated so nothing else changes:
+- Only when `isOpenAIEndpoint` (api.openai.com) AND `supportsCacheBreakpoints`
+  (gpt-5.6+; older models 400 on these fields) AND a message carries
+  `cache_control`. Otherwise cache_control is still stripped (current behavior),
+  so OpenRouter/deepseek/moonshot/older-OpenAI are untouched.
+- A `cache_control` message renders as a `text` block with
+  `prompt_cache_breakpoint: { mode: "explicit" }`.
+- `prompt_cache_options: { mode: "explicit" }` so only the stable prefix is
+  written (avoids paying the 1.25× cache-write on the volatile tail each turn).
+- `prompt_cache_key`: caller's if provided, else derived (browser-safe FNV-1a)
+  from the prefix so same-prefix requests route together (gpt-5.6+ requires a
+  key for reliable matching).
+- Usage parsing now also reads `prompt_tokens_details.cache_write_tokens` →
+  `cache_creation_input_tokens`, so writes are surfaced/billed.
+- `packages/llm` typecheck ✓. Validated end-to-end through the real
+  `OpenAICompatibleClient` with `cache_control` markers.
+
+**Why it now fixes adventure automatically:** `prompts.ts` already emits
+`cache_control` at the stable boundaries (system+world-bible, last verbatim
+turn). Both delivery paths carry those markers to the client — the frontend
+direct path (`streamPass` → factory → `OpenAICompatibleClient`) and the backend
+proxy (`/my/llm/generate` forwards `cache_control`). As long as the provider
+endpoint is `api.openai.com` and the model is `gpt-5.6-*`, caching now engages.
+
+**What Bart still needs to do (config, not code):**
+- On the gpt-5.6 admin models, set `priceCacheWrite = 1.25 × priceInput` and
+  `priceCacheRead` to OpenAI's discounted read rate, so the now-surfaced
+  cache-write/read token counts bill correctly.
+- (Optional) pass a per-adventure `prompt_cache_key` from `streamPass` for
+  tighter routing; the derived key already covers the common case.
+
+**Note:** `prompt_cache_options.ttl` defaults to `30m` on gpt-5.6 (only value),
+so retention needs no config.
+
+---
+
 # LLM prompt-cache prefix fingerprinting — handoff (2026-07-22)
 
 **Why:** debugging why the built-in `/my/llm/generate` proxy shows no provider

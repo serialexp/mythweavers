@@ -2,6 +2,7 @@ import type {
   LLMClient,
   LLMClientConfig,
   LLMGenerateOptions,
+  LLMMessage,
   LLMModel,
   LLMStreamEvent,
   ModelPricing,
@@ -131,6 +132,55 @@ function isOpenAIEndpoint(baseUrl: string): boolean {
 }
 
 /**
+ * Whether an OpenAI model supports explicit prompt-cache breakpoints
+ * (`prompt_cache_options` / `prompt_cache_breakpoint`). These were introduced
+ * with the GPT-5.6 family; earlier OpenAI models return `400` when these fields
+ * are present, so we only emit them for gpt-5.6 and any later family (gpt-6, …).
+ *
+ * Why breakpoints matter: OpenAI's *implicit* caching only auto-places a
+ * breakpoint on the LAST message, so a prompt whose tail changes every turn
+ * (a live conversation) never caches its stable prefix. An explicit breakpoint
+ * at the end of the stable content lets that prefix be cached and reused even
+ * as the tail changes — verified empirically against gpt-5.6.
+ */
+function supportsCacheBreakpoints(model: string): boolean {
+  const m = /^gpt-(\d+)(?:\.(\d+))?/.exec(model.toLowerCase())
+  if (!m) return false
+  const major = Number(m[1])
+  const minor = m[2] ? Number(m[2]) : 0
+  return major > 5 || (major === 5 && minor >= 6)
+}
+
+/**
+ * Small, fast, browser-safe non-crypto hash (FNV-1a, 32-bit → hex). Used only
+ * to derive a `prompt_cache_key` for routing; there is no security requirement,
+ * and key collisions only affect cache-routing distribution, not correctness.
+ */
+function fnv1aHex(s: string): string {
+  let h = 0x811c9dc5 >>> 0
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(16).padStart(8, "0")
+}
+
+/**
+ * Derive a stable `prompt_cache_key` from the cached prefix — the message
+ * content up to and including the first breakpoint. Requests sharing that
+ * stable prefix hash to the same key and therefore route to the same cache,
+ * which GPT-5.6+ requires for reliable explicit-breakpoint matching.
+ */
+function derivePromptCacheKey(messages: LLMMessage[]): string {
+  let acc = ""
+  for (const m of messages) {
+    acc += `${m.role}\n${m.content}\n`
+    if (m.cache_control) break
+  }
+  return `mw-${fnv1aHex(acc)}`
+}
+
+/**
  * Apply `thinking_budget` to an OpenAI-compatible request body, translating
  * to the parameter shape the upstream provider expects.
  *
@@ -218,6 +268,9 @@ function parseStreamChunk(
   //   - DeepSeek:                     usage.prompt_cache_hit_tokens
   //   - OpenRouter → Anthropic:       usage.cache_read_input_tokens
   //                                   usage.cache_creation_input_tokens
+  // Cache WRITES are reported by OpenAI (gpt-5.6+) in
+  // usage.prompt_tokens_details.cache_write_tokens; Anthropic-shaped upstreams
+  // use usage.cache_creation_input_tokens. Both map to our cacheCreation field.
   if (parsed.usage) {
     const u = parsed.usage
     const cacheRead =
@@ -225,7 +278,9 @@ function parseStreamChunk(
       u.cached_tokens ??
       u.prompt_cache_hit_tokens ??
       u.cache_read_input_tokens
-    const cacheWrite = u.cache_creation_input_tokens
+    const cacheWrite =
+      u.prompt_tokens_details?.cache_write_tokens ??
+      u.cache_creation_input_tokens
     events.push({
       type: "usage",
       usage: {
@@ -400,10 +455,35 @@ export class OpenAICompatibleClient implements LLMClient {
       ? resolve(this.config.extraHeaders)
       : {}
 
-    const formattedMessages = options.messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }))
+    // Explicit prompt-cache breakpoints: only on genuine OpenAI, only on models
+    // that support them (gpt-5.6+), and only when the caller actually marked
+    // breakpoints via `cache_control` (the same markers we set for Anthropic).
+    // Otherwise we keep flattening to plain string content (cache_control is
+    // dropped) so nothing changes for other providers / older models.
+    const onOpenAI = isOpenAIEndpoint(this.getBaseUrl())
+    const useBreakpoints =
+      onOpenAI &&
+      supportsCacheBreakpoints(options.model) &&
+      options.messages.some((m) => m.cache_control)
+
+    const formattedMessages = options.messages.map((msg) => {
+      if (useBreakpoints && msg.cache_control) {
+        // Chat Completions supports the breakpoint marker on a `text` block.
+        // The marker caches this block and everything rendered before it;
+        // content after it can change without invalidating the cached prefix.
+        return {
+          role: msg.role,
+          content: [
+            {
+              type: "text",
+              text: msg.content,
+              prompt_cache_breakpoint: { mode: "explicit" },
+            },
+          ],
+        }
+      }
+      return { role: msg.role, content: msg.content }
+    })
 
     const requestBody: Record<string, unknown> = {
       model: options.model,
@@ -425,11 +505,25 @@ export class OpenAICompatibleClient implements LLMClient {
     // whatever OpenAI-compatible upstream we're talking to.
     applyThinkingBudget(requestBody, options, this.getBaseUrl())
 
-    // OpenAI prompt caching: a stable routing key steers same-prefix traffic
-    // to the same cache, which OpenAI recommends for reliable prefix matching
-    // (especially on shared API keys). Genuine OpenAI endpoints only.
-    if (options.prompt_cache_key && isOpenAIEndpoint(this.getBaseUrl())) {
-      requestBody.prompt_cache_key = options.prompt_cache_key
+    // OpenAI prompt caching. A stable routing key steers same-prefix traffic to
+    // the same cache; gpt-5.6+ *requires* one for reliable explicit-breakpoint
+    // matching. Prefer the caller's key; otherwise derive a stable one from the
+    // cached prefix so same-prefix requests still route together. Genuine
+    // OpenAI endpoints only (other providers may reject the field).
+    if (onOpenAI) {
+      if (options.prompt_cache_key) {
+        requestBody.prompt_cache_key = options.prompt_cache_key
+      } else if (useBreakpoints) {
+        requestBody.prompt_cache_key = derivePromptCacheKey(options.messages)
+      }
+    }
+
+    // Explicit mode: only the breakpoints we marked are written to cache — so we
+    // pay the (1.25×) cache-write on the stable prefix, not on the volatile tail
+    // every turn. Without this, implicit mode would also breakpoint the last
+    // message each request.
+    if (useBreakpoints) {
+      requestBody.prompt_cache_options = { mode: "explicit" }
     }
 
     // Tools — passed through in OpenAI's `function` shape. Empty/undefined
