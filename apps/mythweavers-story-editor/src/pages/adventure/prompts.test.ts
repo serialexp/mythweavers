@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildConditionsMessages,
+  buildSharedHistory,
   CONDITIONS_SYSTEM_PROMPT,
   paragraphRangeForAction,
 } from './prompts'
-import type { CharacterCard } from '../../hooks/useAdventurePersistence'
+import type { AdventureTurn, CharacterCard } from '../../hooks/useAdventurePersistence'
 
 const protag = 'Maren, a young field medic with steady hands.'
 
@@ -133,5 +134,42 @@ describe('paragraphRangeForAction', () => {
 
   it('counts a sentence fragment with no terminator as one sentence', () => {
     expect(paragraphRangeForAction('I open the door')).toEqual({ min: 2, max: 4 })
+  })
+})
+
+describe('buildSharedHistory cache breakpoints', () => {
+  const turn = (i: number): AdventureTurn => ({
+    playerAction: i === 0 ? null : `Player action ${i}`,
+    narrative: `Narrative for turn ${i}`,
+  })
+
+  // Assistant messages that carry a cache breakpoint. The primary assistant
+  // narrative for a turn is the message we mark (see addTurnToMessages).
+  const markedAssistants = (turns: AdventureTurn[]) => {
+    const messages = buildSharedHistory(turns)
+    return messages.filter((m) => m.role === 'assistant' && m.cache_control)
+  }
+
+  it('always marks the system/world-bible block', () => {
+    const messages = buildSharedHistory([turn(0), turn(1), turn(2)])
+    expect(messages[0].role).toBe('system')
+    expect(messages[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' })
+  })
+
+  it('marks a breakpoint on the last TWO turns, not just the last one', () => {
+    // OpenAI explicit caching only reads at a breakpoint re-declared this turn
+    // that a previous turn wrote. A single last-turn breakpoint moves every
+    // turn and is never re-read; the second (lagging) breakpoint is what makes
+    // turn-to-turn reads possible.
+    const marked = markedAssistants([turn(0), turn(1), turn(2), turn(3)])
+    expect(marked).toHaveLength(2)
+    expect(marked[0].content).toContain('turn 2')
+    expect(marked[1].content).toContain('turn 3')
+  })
+
+  it('marks the single turn when only one exists', () => {
+    const marked = markedAssistants([turn(0)])
+    expect(marked).toHaveLength(1)
+    expect(marked[0].content).toContain('turn 0')
   })
 })

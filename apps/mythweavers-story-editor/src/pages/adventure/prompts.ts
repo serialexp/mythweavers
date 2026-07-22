@@ -834,10 +834,22 @@ export function buildSharedHistory(
     addTurnToMessages(messages, turns, i, false, settingDescription, forDeuteragonist);
   }
 
-  // Recent turns: always verbatim
+  // Recent turns: always verbatim. Mark a cache breakpoint on the last TWO
+  // turns, not just the last one.
+  //
+  // OpenAI explicit prompt caching only *reads* at a breakpoint boundary that
+  // is re-declared in the current request AND was written by an earlier one.
+  // A breakpoint on only the last turn moves forward every turn, so that
+  // boundary is never re-declared and never read — you pay a cache write each
+  // turn and get zero reads. Marking the last two turns keeps a breakpoint
+  // that lags one turn: the boundary the previous turn wrote (its last turn,
+  // now our second-to-last) is re-declared here and therefore read, while the
+  // new last turn is written for the next turn to read. Anthropic is
+  // unaffected — it already reads the longest cached prefix, and the extra
+  // breakpoint stays within its 4-breakpoint limit.
   for (let i = recentStart; i < turns.length; i++) {
-    const isLastTurn = i === turns.length - 1;
-    addTurnToMessages(messages, turns, i, isLastTurn, settingDescription, forDeuteragonist);
+    const withinLastTwo = i >= turns.length - 2;
+    addTurnToMessages(messages, turns, i, withinLastTwo, settingDescription, forDeuteragonist);
   }
 
   return messages;
