@@ -17,6 +17,10 @@ function normalizeOrigin(value: string): string | null {
   }
 }
 
+function withDefaultScheme(value: string): string {
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`
+}
+
 export function getAllowedOrigins(): ReadonlySet<string> {
   const configured = process.env.CORS_ORIGIN?.split(',')
     .map((origin) => origin.trim())
@@ -30,7 +34,7 @@ export function getAllowedOrigins(): ReadonlySet<string> {
     ? configured
     : [...DEFAULT_ALLOWED_ORIGINS, ...(process.env.EDITOR_URL ? [process.env.EDITOR_URL] : [])]
 
-  return new Set(candidates.map(normalizeOrigin).filter((origin): origin is string => origin !== null))
+  return new Set(candidates.map(withDefaultScheme).map(normalizeOrigin).filter((origin): origin is string => origin !== null))
 }
 
 export function isAllowedOrigin(origin: string | undefined): boolean {
