@@ -71,6 +71,7 @@ export class ServerLLMClient implements LLMClient {
       ...(options.tools && options.tools.length > 0
         ? { tools: options.tools, tool_choice: options.tool_choice ?? 'auto' }
         : {}),
+      ...(options.prompt_cache_key ? { prompt_cache_key: options.prompt_cache_key } : {}),
       ...(options.metadata ? { metadata: options.metadata } : {}),
     }
 

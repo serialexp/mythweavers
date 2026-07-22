@@ -117,6 +117,20 @@ function isMoonshotEndpoint(baseUrl: string): boolean {
 }
 
 /**
+ * Whether the upstream is genuine OpenAI (api.openai.com). OpenAI-specific
+ * request fields like `prompt_cache_key` must only be sent there — other
+ * OpenAI-compatible providers (OpenRouter, Moonshot, vLLM, proxies, ...)
+ * may reject unknown fields.
+ */
+function isOpenAIEndpoint(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname.toLowerCase() === "api.openai.com"
+  } catch {
+    return baseUrl.replace(/\/+$/, "") === DEFAULT_ENDPOINT
+  }
+}
+
+/**
  * Apply `thinking_budget` to an OpenAI-compatible request body, translating
  * to the parameter shape the upstream provider expects.
  *
@@ -410,6 +424,13 @@ export class OpenAICompatibleClient implements LLMClient {
     // Translate Anthropic-style thinking_budget into the right shape for
     // whatever OpenAI-compatible upstream we're talking to.
     applyThinkingBudget(requestBody, options, this.getBaseUrl())
+
+    // OpenAI prompt caching: a stable routing key steers same-prefix traffic
+    // to the same cache, which OpenAI recommends for reliable prefix matching
+    // (especially on shared API keys). Genuine OpenAI endpoints only.
+    if (options.prompt_cache_key && isOpenAIEndpoint(this.getBaseUrl())) {
+      requestBody.prompt_cache_key = options.prompt_cache_key
+    }
 
     // Tools — passed through in OpenAI's `function` shape. Empty/undefined
     // tools means the field is omitted entirely (some providers reject an

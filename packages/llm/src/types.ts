@@ -115,6 +115,17 @@ export interface LLMGenerateOptions {
   tools?: ToolDefinition[]
   /** Constrain how aggressively the model picks tools. Default `"auto"`. */
   tool_choice?: ToolChoice
+  /**
+   * OpenAI prompt-caching routing key (`prompt_cache_key`). Requests that
+   * share a key are routed to the same cache, which OpenAI recommends for
+   * reliable prefix matching — important on shared/multi-tenant API keys
+   * where unrelated traffic would otherwise evict or miss the cache.
+   *
+   * Only ever sent to genuine OpenAI endpoints (api.openai.com); other
+   * OpenAI-compatible providers may reject unknown fields, so clients gate
+   * it themselves. Ignored by non-OpenAI clients.
+   */
+  prompt_cache_key?: string
   /** Provider-specific options (e.g. Ollama num_ctx, repeat_penalty). */
   providerOptions?: Record<string, unknown>
   metadata?: Record<string, unknown>

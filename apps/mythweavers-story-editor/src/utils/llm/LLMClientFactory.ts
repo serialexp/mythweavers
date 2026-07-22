@@ -10,6 +10,7 @@ import {
   normalizeTokenUsage,
 } from '@mythweavers/llm'
 import { llmActivityStore } from '../../stores/llmActivityStore'
+import { currentStoryStore } from '../../stores/currentStoryStore'
 import { settingsStore } from '../../stores/settingsStore'
 import type { LLMProvider } from '../../types/llm'
 import { generateMessageId } from '../id'
@@ -20,6 +21,17 @@ interface LlmMetadata {
 }
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+/**
+ * Default OpenAI prompt-caching routing key: stable per story so all
+ * same-story requests (which share long prompt prefixes) are routed to the
+ * same cache. Only ever reaches genuine OpenAI endpoints — see
+ * OpenAICompatibleClient. Returns undefined when no story is loaded.
+ */
+const defaultPromptCacheKey = (): string | undefined => {
+  const storyId = currentStoryStore.id
+  return storyId ? `story-${storyId}` : undefined
+}
 
 /**
  * Merge two TokenUsage snapshots.
@@ -68,7 +80,12 @@ class LoggedLLMClient implements LLMClient {
     let error: Error | undefined
     const streamErrors: string[] = []
 
-    const delegate = this.inner.generate(options)
+    // Inject the default per-story prompt cache key unless the caller
+    // supplied one explicitly.
+    const cacheKey = options.prompt_cache_key ?? defaultPromptCacheKey()
+    const effectiveOptions = cacheKey ? { ...options, prompt_cache_key: cacheKey } : options
+
+    const delegate = this.inner.generate(effectiveOptions)
 
     try {
       for await (const event of delegate) {

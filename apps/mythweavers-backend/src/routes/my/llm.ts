@@ -53,6 +53,10 @@ const generateBodySchema = z.object({
       'Optional tool definitions the model may invoke. Currently only honored on OpenAI-compatible upstreams; other providers will reject the request.',
   }),
   tool_choice: toolChoiceSchema.optional(),
+  prompt_cache_key: z.string().min(1).max(256).optional().meta({
+    description:
+      'OpenAI prompt-caching routing key. Requests sharing a key are routed to the same cache for better prefix-cache hit rates. Only forwarded to genuine OpenAI upstreams.',
+  }),
   metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
@@ -316,6 +320,7 @@ const llmRoutes: FastifyPluginAsyncZod = async (fastify) => {
           thinking_budget: request.body.thinking_budget,
           ...(request.body.tools ? { tools: request.body.tools } : {}),
           ...(request.body.tool_choice ? { tool_choice: request.body.tool_choice } : {}),
+          ...(request.body.prompt_cache_key ? { prompt_cache_key: request.body.prompt_cache_key } : {}),
           signal: abortController.signal,
         })) {
           if (event.type === 'chunk' && !firstChunkAt) {
