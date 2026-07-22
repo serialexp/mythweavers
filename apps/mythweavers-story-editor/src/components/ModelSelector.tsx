@@ -1,8 +1,9 @@
 import { Button, Modal } from '@mythweavers/ui'
-import { Component, For, Show, createSignal } from 'solid-js'
-import { Model } from '../types/core'
-import * as styles from './ModelSelector.css'
+import { Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { PhArrowsClockwiseIcon } from 'solidjs-phosphor'
+import { Model } from '../types/core'
+import { sortModelsByPrice } from '../utils/modelSorting'
+import * as styles from './ModelSelector.css'
 
 interface ModelSelectorProps {
   model: string
@@ -14,6 +15,10 @@ interface ModelSelectorProps {
 
 export const ModelSelector: Component<ModelSelectorProps> = (props) => {
   const [showModal, setShowModal] = createSignal(false)
+
+  // Cheapest first, merging each model's input-price and cached-input-price
+  // ranks so cache-friendly models (e.g. DeepSeek) still rank well.
+  const sortedModels = createMemo(() => sortModelsByPrice(props.availableModels))
 
   const formatPrice = (price: number) => {
     return price.toFixed(2)
@@ -67,7 +72,7 @@ export const ModelSelector: Component<ModelSelectorProps> = (props) => {
                 <div class={styles.colContext}>Context</div>
               </div>
               <div class={styles.tableBody}>
-                <For each={props.availableModels}>
+                <For each={sortedModels()}>
                   {(model) => (
                     <div
                       class={`${styles.tableRow} ${props.model === model.name ? styles.tableRowSelected : ''}`}
