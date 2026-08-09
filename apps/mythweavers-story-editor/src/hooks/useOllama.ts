@@ -7,7 +7,7 @@ import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
 import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
-import type { Character } from '../types/core'
+import type { Character, NodeSummaryLevels } from '../types/core'
 import type { LLMMessage, TokenUsage } from '@mythweavers/llm'
 import { normalizeTokenUsage } from '@mythweavers/llm'
 import { generateAnalysis } from '../utils/analysisClient'
@@ -499,11 +499,32 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
 
   const CHUNK_SIZE = 10
 
+  // Pull the JSON object out of a model response that may be fenced, prefixed
+  // with commentary, or both. Returns null when nothing parseable is found so
+  // the caller can fall back to treating the response as plain text.
+  const parseJsonObject = (text: string): Record<string, unknown> | null => {
+    const withoutFences = text.replace(/```(?:json)?/gi, '').trim()
+    const start = withoutFences.indexOf('{')
+    const end = withoutFences.lastIndexOf('}')
+    if (start === -1 || end === -1 || end <= start) return null
+
+    try {
+      const parsed = JSON.parse(withoutFences.slice(start, end + 1))
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null
+    } catch {
+      return null
+    }
+  }
+
+  const asTrimmedString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
+
   const generateNodeSummary = async ({
     nodeId,
     messageContents,
     viewpointCharacterId,
-  }: GenerateNodeSummaryParams): Promise<string> => {
+  }: GenerateNodeSummaryParams): Promise<NodeSummaryLevels> => {
     const resolved = resolveModel('summary:node')
     const client = LLMClientFactory.getClient(resolved.provider)
 
@@ -553,18 +574,28 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
       )
 
       // Generate a summary for each chunk
-      const chunkSummaries: string[] = []
+      const chunkSummaries: NodeSummaryLevels[] = []
 
       for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
         const chunk = chunks[chunkIndex]
         const chunkContent = chunk.join('\n\n')
 
-        const prompt = `Create a summary of the following content from a story in 3-4 paragraphs. The summary should capture the key events, character developments, and plot points.${protagonistName ? ` Focus on ${protagonistName}'s role and experiences as the protagonist.` : ''}${viewpointName ? ` Note that this chapter is written from ${viewpointName}'s perspective.` : ''} Be objective and comprehensive. Do NOT include any preamble, introduction, or meta-commentary. Output ONLY the summary itself:
+        const focusNote = `${protagonistName ? ` Focus on ${protagonistName}'s role and experiences as the protagonist.` : ''}${viewpointName ? ` Note that this chapter is written from ${viewpointName}'s perspective.` : ''}`
+
+        const prompt = `Summarize the following content from a story at three levels of detail. Capture the key events, character developments, and plot points.${focusNote} Be objective and comprehensive.
 
 ${chunkContent}
 
 ---
-Now write the summary of the above content in 3-4 paragraphs. Remember: capture key events, character developments, and plot points. Be concise and objective. Output ONLY the summary text itself - no headers, no preamble, no meta-commentary. Start directly with the summary content.`
+Now summarize the above content at three levels of detail:
+- "detailed": 3-4 paragraphs covering key events, character developments, and plot points.
+- "paragraph": a single paragraph condensing the same material.
+- "sentence": a single sentence capturing the essential thrust of what happens.
+
+Each level must stand on its own and describe the same content — the shorter levels are not continuations of the longer ones. Be concise and objective, with no preamble or meta-commentary.
+
+Respond with ONLY a JSON object in exactly this shape, with no surrounding text or code fences:
+{"detailed": "...", "paragraph": "...", "sentence": "..."}`
 
         const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
 
@@ -580,20 +611,51 @@ Now write the summary of the above content in 3-4 paragraphs. Remember: capture 
           metadata: { callType: 'summary:node' },
         })
 
-        let chunkSummary = ''
+        let chunkResponse = ''
         for await (const event of response) {
           if (event.type === 'chunk') {
-            chunkSummary += event.text
+            chunkResponse += event.text
           }
         }
 
-        chunkSummaries.push(chunkSummary.trim())
+        const parsed = parseJsonObject(chunkResponse)
+        const detailed = asTrimmedString(parsed?.detailed)
+
+        if (!parsed || !detailed) {
+          // The model ignored the JSON instruction (small local models do this
+          // regularly). Keep the raw text as the detailed level rather than
+          // losing the whole summary, and leave the shorter levels empty so
+          // they aren't overwritten with junk.
+          console.warn(
+            `[generateNodeSummary] Chunk ${chunkIndex + 1}/${chunks.length} did not return parseable JSON; falling back to raw text`,
+          )
+          chunkSummaries.push({ detailed: chunkResponse.trim(), paragraph: '', sentence: '' })
+        } else {
+          chunkSummaries.push({
+            detailed,
+            paragraph: asTrimmedString(parsed.paragraph),
+            sentence: asTrimmedString(parsed.sentence),
+          })
+        }
+
         console.log(`[generateNodeSummary] Generated summary for chunk ${chunkIndex + 1}/${chunks.length}`)
       }
 
-      // Combine all chunk summaries
-      const finalSummary = chunkSummaries.join('\n\n')
-      return finalSummary
+      // Combine all chunk summaries. A scene that fits in one chunk — the
+      // common case — gets exactly the three lengths the model produced. A
+      // multi-chunk scene necessarily gets one entry per chunk at every level,
+      // since each call only ever sees its own slice of the scene.
+      const joinLevel = (pick: (levels: NodeSummaryLevels) => string) =>
+        chunkSummaries
+          .map(pick)
+          .filter((text) => text.length > 0)
+          .join('\n\n')
+
+      return {
+        detailed: joinLevel((levels) => levels.detailed),
+        paragraph: joinLevel((levels) => levels.paragraph),
+        sentence: joinLevel((levels) => levels.sentence),
+      }
     } catch (error) {
       console.error('Error generating summary:', error)
       throw error

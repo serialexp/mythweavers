@@ -146,6 +146,17 @@ export interface SummarySegment {
   summary: string
 }
 
+/**
+ * The three summary lengths produced by a single summary pass, matching the
+ * Snowflake refinement levels: `sentence` is L1, `paragraph` is L2 and
+ * `detailed` is L3 (`Node.summary`).
+ */
+export interface NodeSummaryLevels {
+  detailed: string
+  paragraph: string
+  sentence: string
+}
+
 export interface Node {
   id: string
   storyId: string

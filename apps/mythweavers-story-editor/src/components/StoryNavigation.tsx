@@ -180,10 +180,38 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   const isDropTarget = () => dropTarget()?.nodeId === props.treeNode.id
   const dropPosition = () => dropTarget()?.position
 
+  // A chapter with exactly one scene renders as a single row: the chapter's
+  // title with the scene's content controls folded in. The scene node still
+  // exists and is still what gets selected — it just doesn't get its own row
+  // until the chapter has more than one.
+  const mergedSceneId = (): string | null => {
+    const n = node()
+    if (!n || n.type !== 'chapter') return null
+    if (props.treeNode.children.length !== 1) return null
+    const child = nodeStore.nodes[props.treeNode.children[0].id]
+    return child?.type === 'scene' ? child.id : null
+  }
+
+  // The node holding this row's actual content: the merged scene when
+  // collapsed, otherwise the row's own node.
+  const contentNodeId = () => mergedSceneId() ?? props.treeNode.id
+  const contentNode = () => nodeStore.nodes[contentNodeId()]
+
+  // Direct child count, shown on container rows so the shape of the tree is
+  // readable without expanding everything. A merged single-scene chapter has
+  // a count of 1, so it stays hidden there too.
+  const childCount = () => (node()?.type === 'scene' ? 0 : props.treeNode.children.length)
+
+  const childCountLabel = () => {
+    const firstChild = nodeStore.nodes[props.treeNode.children[0]?.id]
+    if (!firstChild) return ''
+    return `${childCount()} ${getTypeLabel(firstChild.type, childCount())}`
+  }
+
   const isExpanded = () => nodeStore.isExpanded(props.treeNode.id)
-  const isSelected = () => nodeStore.selectedNodeId === props.treeNode.id
-  const hasChildren = () => props.treeNode.children.length > 0
-  const isActive = () => messagesStore.isNodeActive(props.treeNode.id)
+  const isSelected = () => nodeStore.selectedNodeId === contentNodeId()
+  const hasChildren = () => props.treeNode.children.length > 0 && !mergedSceneId()
+  const isActive = () => messagesStore.isNodeActive(contentNodeId())
 
   // Check if this chapter has script changes
   const hasScriptChanges = () => {
@@ -218,7 +246,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
   // Check if scene has content but no summary
   const needsSummary = () => {
-    const n = node()
+    const n = contentNode()
     if (!n || (n.type !== 'chapter' && n.type !== 'scene')) return false
 
     // Check if node has a summary
@@ -228,7 +256,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     // Check if scene has any messages with content
     const sceneMessages = messagesStore.messages.filter(
       (msg) =>
-        (msg.sceneId === props.treeNode.id) &&
+        msg.sceneId === contentNodeId() &&
         msg.role === 'assistant' &&
         !msg.isQuery &&
         msg.content &&
@@ -238,18 +266,39 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     return sceneMessages.length > 0
   }
 
+  // Which Snowflake summary levels this node has. L1/L2 come from outlining or
+  // from a summary pass (which now fills all three); L3 is the canonical
+  // `summary`. Reads the merged scene for a collapsed single-scene chapter.
+  const summaryLevels = () => {
+    const n = contentNode()
+    return [
+      { label: 'L1', filled: !!n?.sentenceSummary?.trim(), name: 'one-sentence' },
+      { label: 'L2', filled: !!n?.paragraphSummary?.trim(), name: 'paragraph' },
+      { label: 'L3', filled: !!n?.summary?.trim(), name: 'full' },
+    ]
+  }
+
+  // Nothing to show for a node that has never been summarized — the amber
+  // warning already covers "has content but no summary".
+  const hasAnySummaryLevel = () => summaryLevels().some((level) => level.filled)
+
+  const summaryLevelsTooltip = () =>
+    summaryLevels()
+      .map((level) => `${level.label} ${level.name}: ${level.filled ? 'yes' : 'no'}`)
+      .join('\n')
+
   // Check if scene has any branch messages
   const hasBranches = () => {
-    const n = node()
+    const n = contentNode()
     if (!n || n.type !== 'scene') return false
 
     // Use pre-computed Set for O(1) lookup instead of filtering all messages
-    return messagesStore.hasNodeBranches(props.treeNode.id)
+    return messagesStore.hasNodeBranches(contentNodeId())
   }
 
   // Check if scene is missing a storyTime
   const needsStoryTime = () => {
-    const n = node()
+    const n = contentNode()
     if (!n || n.type !== 'scene') return false
     return n.storyTime === undefined || n.storyTime === null
   }
@@ -259,7 +308,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     const selectedId = navigationStore.selectedStorylineId
     if (!selectedId) return false // No filter active
 
-    const n = node()
+    const n = contentNode()
     if (!n || n.type !== 'scene') return false
 
     return (n.activeContextItemIds || []).includes(selectedId)
@@ -267,14 +316,14 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
   // Get word count for this scene (pre-calculated by backend)
   const wordCount = () => {
-    const n = node()
+    const n = contentNode()
     if (!n || n.type !== 'scene') return 0
     return n.wordCount || 0
   }
 
   // Determine color based on word count relative to average
   const getWordCountColor = () => {
-    const n = node()
+    const n = contentNode()
     if (!n || n.type !== 'scene') return undefined
     const count = wordCount()
     if (count === 0) return '#6b7280' // gray for empty scenes
@@ -292,7 +341,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
   // Get the icon based on includeInFull state
   const getIncludeIcon = () => {
-    const n = node()
+    const n = contentNode()
     const includeVal = n?.includeInFull ?? 2 // default to full content
     switch (includeVal) {
       case 0:
@@ -309,7 +358,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   // Get tooltip text based on includeInFull state
   const getIncludeTooltip = () => {
     const count = wordCount()
-    const n = node()
+    const n = contentNode()
     const includeVal = n?.includeInFull ?? 2
     const hasSummary = !!n?.summary
     const stateText = includeVal === 0 ? 'Not included' : includeVal === 2 ? 'Full content' : 'Summary only'
@@ -321,7 +370,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   // If node has no summary, skip state 1 (summary): 2 -> 0 -> 2
   const handleCycleInclude = (e: MouseEvent) => {
     e.stopPropagation()
-    const n = node()
+    const n = contentNode()
     if (!n || n.type !== 'scene') return
 
     const currentVal = n.includeInFull ?? 2
@@ -342,7 +391,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
       else nextVal = 2 // not included (or summary) -> full
     }
 
-    nodeStore.updateNode(props.treeNode.id, { includeInFull: nextVal })
+    nodeStore.updateNode(n.id, { includeInFull: nextVal })
   }
 
   const getIcon = () => {
@@ -399,9 +448,10 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
     clearSelection()
 
-    // Only select scene nodes (scenes contain the actual content/messages)
-    if (n.type === 'scene') {
-      nodeStore.selectNode(props.treeNode.id)
+    // Only select scene nodes (scenes contain the actual content/messages).
+    // A chapter with its single scene merged in selects that scene.
+    if (n.type === 'scene' || mergedSceneId()) {
+      nodeStore.selectNode(contentNodeId())
       // Call the callback if provided (for mobile auto-close)
       props.onSelectChapter?.()
     } else if (hasChildren()) {
@@ -414,21 +464,20 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     e.stopPropagation()
     const n = node()
     if (!n) return
-    let childType: NodeType
     switch (n.type) {
       case 'book':
-        childType = 'arc'
-        break
+        nodeStore.addNode(props.treeNode.id, 'arc')
+        return
       case 'arc':
-        childType = 'chapter'
-        break
+        // New chapters get their first scene automatically
+        nodeStore.addChapter(props.treeNode.id)
+        return
       case 'chapter':
-        childType = 'scene'
-        break
+        nodeStore.addNode(props.treeNode.id, 'scene')
+        return
       default:
         return // Scenes can't have children (messages are separate)
     }
-    nodeStore.addNode(props.treeNode.id, childType)
   }
 
   const handleEdit = (e?: MouseEvent) => {
@@ -793,7 +842,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
   const handleGenerateSummary = async () => {
     try {
-      await nodeStore.generateNodeSummary(props.treeNode.id, messagesStore.messages, generateNodeSummary)
+      await nodeStore.generateNodeSummary(contentNodeId(), messagesStore.messages, generateNodeSummary)
     } catch (error) {
       console.error('Failed to generate summary:', error)
       alert(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -807,12 +856,13 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     let text: string | undefined
 
     if (source === 'summary') {
-      text = n.summary
+      // Summaries live on the scene, which for a merged row is not this node
+      text = contentNode()?.summary
       if (!text) return
     } else {
       // Get content from messages in this node
       const nodeMessages = messagesStore.messages.filter(
-        (msg) => msg.sceneId === props.treeNode.id && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
+        (msg) => msg.sceneId === contentNodeId() && msg.role === 'assistant' && msg.type !== 'chapter' && !msg.isQuery,
       )
       text = nodeMessages.map((msg) => msg.content).join('\n\n')
       if (!text.trim()) return
@@ -860,11 +910,11 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   const getNodeHeaderClasses = (): string => {
     const classes = [styles.nodeHeader]
 
-    if (isSelected() && node()?.includeInFull === 2) {
+    if (isSelected() && contentNode()?.includeInFull === 2) {
       classes.push(styles.nodeHeaderSelectedIncludeInFull)
     } else if (isSelected()) {
       classes.push(styles.nodeHeaderSelected)
-    } else if (node()?.includeInFull === 2) {
+    } else if (contentNode()?.includeInFull === 2) {
       classes.push(styles.nodeHeaderIncludeInFull)
     }
 
@@ -926,11 +976,12 @@ const NodeItem: Component<NodeItemProps> = (props) => {
           <span
             class={styles.nodeTitle}
             style={{ color: matchesStorylineFilter() ? 'var(--primary-color)' : getStatusColor() }}
-            title={`ID: ${props.treeNode.id}`}
+            title={
+              mergedSceneId() ? `ID: ${props.treeNode.id}\nScene ID: ${mergedSceneId()}` : `ID: ${props.treeNode.id}`
+            }
             onDblClick={handleEdit}
           >
-            {node()?.title}{' '}
-            <span style={{ opacity: 0.5, 'font-size': '0.8em' }}>({props.treeNode.id.slice(0, 8)})</span>
+            {node()?.title}
           </span>
         </Show>
 
@@ -952,6 +1003,12 @@ const NodeItem: Component<NodeItemProps> = (props) => {
 
         <div class={styles.nodeControls}>
           <div class={styles.nodeIndicators}>
+            <Show when={childCount() > 1}>
+              <span class={styles.childCount} title={childCountLabel()}>
+                {childCount()}
+              </span>
+            </Show>
+
             <Show when={hasScriptErrors()}>
               <span
                 class={styles.indicatorIcon}
@@ -1002,7 +1059,21 @@ const NodeItem: Component<NodeItemProps> = (props) => {
               </span>
             </Show>
 
-            <Show when={node()?.type === 'scene'}>
+            <Show when={hasAnySummaryLevel()}>
+              <span class={styles.summaryLevels} title={summaryLevelsTooltip()}>
+                <For each={summaryLevels()}>
+                  {(level) => (
+                    <span
+                      class={level.filled ? `${styles.summaryLevel} ${styles.summaryLevelActive}` : styles.summaryLevel}
+                    >
+                      {level.label}
+                    </span>
+                  )}
+                </For>
+              </span>
+            </Show>
+
+            <Show when={contentNode()?.type === 'scene'}>
               <span
                 class={styles.indicatorIcon}
                 title={getIncludeTooltip()}
@@ -1013,7 +1084,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
               </span>
             </Show>
 
-            <Show when={node()?.isSummarizing}>
+            <Show when={contentNode()?.isSummarizing}>
               <span class={styles.loadingIndicator} title="Generating summary...">
                 <span class={styles.spinner}>⟳</span>
               </span>
@@ -1057,7 +1128,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
               Edit Title
             </DropdownItem>
             <Show when={node()?.type === 'chapter' || node()?.type === 'scene'}>
-              <Show when={node()?.summary}>
+              <Show when={contentNode()?.summary}>
                 <DropdownItem
                   icon={<PhFileTextIcon weight="fill" />}
                   onClick={() => handleGenerateTitle('summary')}
@@ -1094,14 +1165,18 @@ const NodeItem: Component<NodeItemProps> = (props) => {
             <Show when={node()?.type === 'chapter' || node()?.type === 'scene'}>
               <DropdownItem
                 icon={
-                  node()?.isSummarizing ? undefined : node()?.summary ? <PhCheckCircleIcon /> : <PhFileTextIcon />
+                  contentNode()?.isSummarizing ? undefined : contentNode()?.summary ? (
+                    <PhCheckCircleIcon />
+                  ) : (
+                    <PhFileTextIcon />
+                  )
                 }
                 onClick={handleGenerateSummary}
-                disabled={node()?.isSummarizing}
+                disabled={contentNode()?.isSummarizing}
               >
-                {node()?.isSummarizing
+                {contentNode()?.isSummarizing
                   ? 'Generating...'
-                  : node()?.summary
+                  : contentNode()?.summary
                     ? 'Regenerate Summary'
                     : 'Generate Summary'}
               </DropdownItem>
@@ -1115,22 +1190,22 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                 onSelect={(status) => nodeStore.updateNode(props.treeNode.id, { status })}
               />
             </Show>
-            <Show when={node()?.type === 'scene'}>
+            <Show when={contentNode()?.type === 'scene'}>
               <DropdownItem
                 icon={<PhCircleHalfIcon weight="fill" />}
-                onClick={() => nodeStore.setIncludeForPrecedingScenes(props.treeNode.id, 1)}
+                onClick={() => nodeStore.setIncludeForPrecedingScenes(contentNodeId(), 1)}
               >
                 Use Summaries Before
               </DropdownItem>
               <DropdownItem
                 icon={<PhCircleIcon />}
-                onClick={() => nodeStore.setIncludeForPrecedingScenes(props.treeNode.id, 0)}
+                onClick={() => nodeStore.setIncludeForPrecedingScenes(contentNodeId(), 0)}
               >
                 Exclude All Before
               </DropdownItem>
               <DropdownItem
                 icon={<PhScissorsIcon />}
-                onClick={() => props.onSplitScene?.(props.treeNode.id)}
+                onClick={() => props.onSplitScene?.(contentNodeId())}
               >
                 Split into Chapters/Scenes
               </DropdownItem>
@@ -1139,7 +1214,10 @@ const NodeItem: Component<NodeItemProps> = (props) => {
               icon={<PhPlusCircleIcon />}
               onClick={() => {
                 const n = node()
-                if (n) nodeStore.insertNodeBefore(props.treeNode.id, n.type)
+                if (!n) return
+                const inserted = nodeStore.insertNodeBefore(props.treeNode.id, n.type)
+                // New chapters get their first scene automatically
+                if (inserted?.type === 'chapter') nodeStore.ensureFirstScene(inserted.id)
               }}
             >
               Insert {node()?.type === 'book' ? 'Book' : node()?.type === 'arc' ? 'Arc' : node()?.type === 'chapter' ? 'Chapter' : 'Scene'} Before

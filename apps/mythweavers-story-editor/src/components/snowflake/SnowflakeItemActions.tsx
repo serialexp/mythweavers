@@ -122,14 +122,23 @@ export const SnowflakeItemActions: Component<SnowflakeItemActionsProps> = (props
       >
         <Show when={childType()}>
           {(type) => (
-            <DropdownItem icon={<PhPlusCircleIcon />} onClick={() => nodeStore.addNode(props.node.id, type())}>
+            <DropdownItem
+              icon={<PhPlusCircleIcon />}
+              onClick={() =>
+                // New chapters get their first scene automatically
+                type() === 'chapter' ? nodeStore.addChapter(props.node.id) : nodeStore.addNode(props.node.id, type())
+              }
+            >
               {`Add ${type()}`}
             </DropdownItem>
           )}
         </Show>
         <DropdownItem
           icon={<PhPlusCircleIcon />}
-          onClick={() => nodeStore.insertNodeBefore(props.node.id, props.node.type)}
+          onClick={() => {
+            const inserted = nodeStore.insertNodeBefore(props.node.id, props.node.type)
+            if (inserted?.type === 'chapter') nodeStore.ensureFirstScene(inserted.id)
+          }}
         >
           {`Insert ${props.node.type} before`}
         </DropdownItem>

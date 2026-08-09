@@ -1,7 +1,7 @@
 import { batch } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import { saveService } from '../services/saveService'
-import { Node, NodeType } from '../types/core'
+import { Node, NodeSummaryLevels, NodeType } from '../types/core'
 import { generateMessageId } from '../utils/id'
 import { currentStoryStore } from './currentStoryStore'
 import { on } from './storeEvents'
@@ -344,6 +344,27 @@ export const nodeStore = {
     return newNode
   },
 
+  // Chapters hold no content themselves — scenes do. A chapter without any
+  // scene has nowhere to put messages, so chapter creation seeds a first
+  // scene. The navigation collapses that scene into the chapter row while it
+  // is the only one, so this stays invisible until a second scene is added.
+  ensureFirstScene(chapterId: string, title = 'Scene 1'): Node | null {
+    const chapter = nodeState.nodes[chapterId]
+    if (!chapter || chapter.type !== 'chapter') return null
+
+    const hasChild = Object.values(nodeState.nodes).some((n) => n.parentId === chapterId)
+    if (hasChild) return null
+
+    return this.addNode(chapterId, 'scene', title)
+  },
+
+  // Add a chapter along with its first scene
+  addChapter(parentId: string, title = 'New chapter'): Node {
+    const chapter = this.addNode(parentId, 'chapter', title)
+    this.ensureFirstScene(chapter.id)
+    return chapter
+  },
+
   // Insert a new node before another node
   insertNodeBefore(beforeNodeId: string, type: NodeType, title = `New ${type}`): Node | null {
     const beforeNode = nodeState.nodes[beforeNodeId]
@@ -654,6 +675,12 @@ export const nodeStore = {
   // and `node.summary` is also populated with the concatenation as a legacy
   // fallback for callers that haven't been updated to read segments yet.
   //
+  // Each pass returns all three Snowflake levels, so `sentenceSummary` (L1)
+  // and `paragraphSummary` (L2) are written alongside `summary` (L3). Levels
+  // are overwritten: a summary of what is actually written supersedes any
+  // outline text that was planned for the scene. A level the model failed to
+  // produce is left untouched rather than blanked.
+  //
   // `messages` is the full messages array — passed by the caller to avoid a
   // circular import. We need `id`, `type`, and `options` (in addition to the
   // filter fields) so we can compute branch targets and segment boundaries.
@@ -672,7 +699,7 @@ export const nodeStore = {
       nodeId: string
       messageContents: string[]
       viewpointCharacterId?: string
-    }) => Promise<string>,
+    }) => Promise<NodeSummaryLevels>,
   ): Promise<string> {
     const node = nodeState.nodes[nodeId]
     if (!node) {
@@ -741,6 +768,8 @@ export const nodeStore = {
 
       // Summarize each segment independently.
       const segmentSummaries: { startMessageId: string; endMessageId: string; summary: string }[] = []
+      const paragraphLevels: string[] = []
+      const sentenceLevels: string[] = []
       for (let i = 0; i < segments.length; i++) {
         const segment = segments[i]
         const messageContents = segment.messages.map((msg) => msg.content)
@@ -755,18 +784,27 @@ export const nodeStore = {
         segmentSummaries.push({
           startMessageId: segment.startMessageId,
           endMessageId: segment.endMessageId,
-          summary: segmentSummary.trim(),
+          summary: segmentSummary.detailed.trim(),
         })
+        // Only `summary` is tracked per segment (see `SummarySegment`); the
+        // shorter levels are whole-scene fields, so collect and join them.
+        if (segmentSummary.paragraph.trim()) paragraphLevels.push(segmentSummary.paragraph.trim())
+        if (segmentSummary.sentence.trim()) sentenceLevels.push(segmentSummary.sentence.trim())
       }
 
       // Combined string for legacy `summary` consumers. Segment-aware
       // consumers should read `summarySegments` instead.
       const combinedSummary = segmentSummaries.map((s) => s.summary).join('\n\n')
+      const combinedParagraph = paragraphLevels.join('\n\n')
+      const combinedSentence = sentenceLevels.join(' ')
 
       // Update the node with both fields
       batch(() => {
         setNodeState('nodes', nodeId, 'summary', combinedSummary)
         setNodeState('nodes', nodeId, 'summarySegments', segmentSummaries)
+        // Don't blank a level the model failed to return
+        if (combinedParagraph) setNodeState('nodes', nodeId, 'paragraphSummary', combinedParagraph)
+        if (combinedSentence) setNodeState('nodes', nodeId, 'sentenceSummary', combinedSentence)
         setNodeState('nodes', nodeId, 'isSummarizing', false)
       })
 

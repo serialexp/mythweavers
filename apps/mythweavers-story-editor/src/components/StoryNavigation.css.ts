@@ -140,6 +140,47 @@ export const indicatorIcon = style({
   transition: 'transform 0.2s ease, opacity 0.2s ease',
 })
 
+// Snowflake summary levels (L1/L2/L3), lit when that level exists
+export const summaryLevels = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '2px',
+})
+
+export const summaryLevel = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: '1.1em',
+  padding: '0 2px',
+  fontSize: '0.6rem',
+  fontWeight: 600,
+  lineHeight: 1.6,
+  letterSpacing: '0.02em',
+  borderRadius: tokens.radius.sm,
+  color: tokens.color.text.muted,
+  backgroundColor: tokens.color.bg.base,
+  opacity: 0.45,
+})
+
+export const summaryLevelActive = style({
+  color: tokens.color.text.inverse,
+  backgroundColor: tokens.color.accent.primary,
+  opacity: 1,
+})
+
+// Direct child count on container rows (books/arcs/chapters)
+export const childCount = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: `0 ${tokens.space['1']}`,
+  fontSize: tokens.font.size.xs,
+  fontVariantNumeric: 'tabular-nums',
+  color: tokens.color.text.muted,
+  backgroundColor: tokens.color.bg.base,
+  borderRadius: tokens.radius.default,
+})
+
 // Container for both indicators and actions
 export const nodeControls = style({
   display: 'flex',
