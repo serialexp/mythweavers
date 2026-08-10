@@ -153,6 +153,12 @@ export type PostAuthLogoutErrors = {
     /**
      * Default Response
      */
+    403: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
     500: {
         error: string;
     };
@@ -299,6 +305,435 @@ export type PostAuthChangePasswordResponses = {
 
 export type PostAuthChangePasswordResponse = PostAuthChangePasswordResponses[keyof PostAuthChangePasswordResponses];
 
+export type PostOauthRegisterData = {
+    body: {
+        /**
+         * Callback URLs. https, or http with a loopback host for native apps.
+         */
+        redirect_uris: Array<string>;
+        /**
+         * Human-readable name shown on the consent screen
+         */
+        client_name?: string;
+        client_uri?: string;
+        logo_uri?: string;
+        scope?: string;
+        grant_types?: Array<string>;
+        response_types?: Array<string>;
+        token_endpoint_auth_method?: string;
+        software_id?: string;
+        software_version?: string;
+        [key: string]: unknown | Array<string> | string | Array<string> | Array<string> | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/oauth/register';
+};
+
+export type PostOauthRegisterErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+};
+
+export type PostOauthRegisterError = PostOauthRegisterErrors[keyof PostOauthRegisterErrors];
+
+export type PostOauthRegisterResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        client_id: string;
+        client_id_issued_at: number;
+        client_name: string;
+        redirect_uris: Array<string>;
+        grant_types: Array<string>;
+        response_types: Array<string>;
+        token_endpoint_auth_method: string;
+        [key: string]: unknown | string | number | Array<string> | Array<string> | Array<string>;
+    };
+};
+
+export type PostOauthRegisterResponse = PostOauthRegisterResponses[keyof PostOauthRegisterResponses];
+
+export type GetOauthAuthorizeData = {
+    body?: never;
+    path?: never;
+    query?: {
+        client_id?: string;
+        redirect_uri?: string;
+        response_type?: string;
+        scope?: string;
+        state?: string;
+        code_challenge?: string;
+        code_challenge_method?: string;
+        resource?: string;
+    };
+    url: '/oauth/authorize';
+};
+
+export type GetOauthAuthorizeErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+};
+
+export type GetOauthAuthorizeError = GetOauthAuthorizeErrors[keyof GetOauthAuthorizeErrors];
+
+export type PostOauthRevokeData = {
+    body: {
+        /**
+         * Access token or refresh token to revoke
+         */
+        token: string;
+        token_type_hint?: string;
+        client_id?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/oauth/revoke';
+};
+
+export type PostOauthRevokeErrors = {
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+};
+
+export type PostOauthRevokeError = PostOauthRevokeErrors[keyof PostOauthRevokeErrors];
+
+export type PostOauthRevokeResponses = {
+    /**
+     * Default Response
+     */
+    200: null;
+};
+
+export type PostOauthRevokeResponse = PostOauthRevokeResponses[keyof PostOauthRevokeResponses];
+
+export type PostOauthTokenData = {
+    body: {
+        /**
+         * OAuth grant type
+         */
+        grant_type: string;
+        /**
+         * Device flow: code from POST /oauth/device
+         */
+        device_code?: string;
+        /**
+         * Authorization code flow: the one-time code
+         */
+        code?: string;
+        /**
+         * Authorization code flow: PKCE verifier
+         */
+        code_verifier?: string;
+        /**
+         * Authorization code flow: must match the authorize request
+         */
+        redirect_uri?: string;
+        /**
+         * Refresh flow: the current refresh token
+         */
+        refresh_token?: string;
+        /**
+         * Optional space-delimited scope, never wider than the grant
+         */
+        scope?: string;
+        /**
+         * RFC 8707 resource indicator
+         */
+        resource?: string;
+        /**
+         * Client identifier
+         */
+        client_id?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/oauth/token';
+};
+
+export type PostOauthTokenErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostOauthTokenError = PostOauthTokenErrors[keyof PostOauthTokenErrors];
+
+export type PostOauthTokenResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Access token for API calls
+         */
+        access_token: string;
+        /**
+         * Token type
+         */
+        token_type: 'Bearer';
+        /**
+         * Seconds until the access token expires
+         */
+        expires_in: number;
+        /**
+         * Rotating refresh token (authorization code and refresh grants only)
+         */
+        refresh_token?: string;
+        /**
+         * Space-delimited granted scopes
+         */
+        scope?: string;
+        [key: string]: unknown | string | 'Bearer' | number | undefined;
+    };
+};
+
+export type PostOauthTokenResponse = PostOauthTokenResponses[keyof PostOauthTokenResponses];
+
+export type GetOauthConsentByRequestIdData = {
+    body?: never;
+    path: {
+        /**
+         * Opaque authorization request handle from the consent URL
+         */
+        requestId: string;
+    };
+    query?: never;
+    url: '/oauth/consent/{requestId}';
+};
+
+export type GetOauthConsentByRequestIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+};
+
+export type GetOauthConsentByRequestIdError = GetOauthConsentByRequestIdErrors[keyof GetOauthConsentByRequestIdErrors];
+
+export type GetOauthConsentByRequestIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Name the client registered itself under
+         */
+        client_name: string;
+        client_uri: string | null;
+        logo_uri: string | null;
+        /**
+         * Where the user will be sent back to. A loopback URL means a CLI on this machine.
+         */
+        redirect_uri: string;
+        scopes: Array<{
+            scope: string;
+            description: string;
+        }>;
+        expires_at: string;
+    };
+};
+
+export type GetOauthConsentByRequestIdResponse = GetOauthConsentByRequestIdResponses[keyof GetOauthConsentByRequestIdResponses];
+
+export type PostOauthConsentByRequestIdData = {
+    body: {
+        /**
+         * Whether the user granted access
+         */
+        decision: 'approve' | 'deny';
+    };
+    path: {
+        /**
+         * Opaque authorization request handle from the consent URL
+         */
+        requestId: string;
+    };
+    query?: never;
+    url: '/oauth/consent/{requestId}';
+};
+
+export type PostOauthConsentByRequestIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        error: string;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+};
+
+export type PostOauthConsentByRequestIdError = PostOauthConsentByRequestIdErrors[keyof PostOauthConsentByRequestIdErrors];
+
+export type PostOauthConsentByRequestIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * URL the consent page must navigate to. Do not fetch it — it belongs to the client.
+         */
+        redirect_to: string;
+    };
+};
+
+export type PostOauthConsentByRequestIdResponse = PostOauthConsentByRequestIdResponses[keyof PostOauthConsentByRequestIdResponses];
+
 export type PostOauthDeviceData = {
     body: {
         /**
@@ -351,72 +786,6 @@ export type PostOauthDeviceResponses = {
 };
 
 export type PostOauthDeviceResponse = PostOauthDeviceResponses[keyof PostOauthDeviceResponses];
-
-export type PostOauthTokenData = {
-    body: {
-        /**
-         * OAuth grant type for device flow
-         */
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code';
-        /**
-         * Device code from initial request
-         */
-        device_code: string;
-        /**
-         * Optional client identifier
-         */
-        client_id?: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/oauth/token';
-};
-
-export type PostOauthTokenErrors = {
-    /**
-     * Default Response
-     */
-    400: {
-        /**
-         * OAuth error code
-         */
-        error: 'authorization_pending' | 'slow_down' | 'expired_token' | 'access_denied' | 'invalid_request';
-        /**
-         * Human-readable error description
-         */
-        error_description?: string;
-    };
-    /**
-     * Default Response
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type PostOauthTokenError = PostOauthTokenErrors[keyof PostOauthTokenErrors];
-
-export type PostOauthTokenResponses = {
-    /**
-     * Default Response
-     */
-    200: {
-        /**
-         * Access token for API calls
-         */
-        access_token: string;
-        /**
-         * Token type
-         */
-        token_type: 'Bearer';
-        /**
-         * Seconds until token expires
-         */
-        expires_in: number;
-    };
-};
-
-export type PostOauthTokenResponse = PostOauthTokenResponses[keyof PostOauthTokenResponses];
 
 export type PostOauthApproveData = {
     body: {
@@ -471,38 +840,438 @@ export type PostOauthApproveResponses = {
 
 export type PostOauthApproveResponse = PostOauthApproveResponses[keyof PostOauthApproveResponses];
 
-export type GetDeviceData = {
+export type PostRegisterData = {
+    body: {
+        /**
+         * Callback URLs. https, or http with a loopback host for native apps.
+         */
+        redirect_uris: Array<string>;
+        /**
+         * Human-readable name shown on the consent screen
+         */
+        client_name?: string;
+        client_uri?: string;
+        logo_uri?: string;
+        scope?: string;
+        grant_types?: Array<string>;
+        response_types?: Array<string>;
+        token_endpoint_auth_method?: string;
+        software_id?: string;
+        software_version?: string;
+        [key: string]: unknown | Array<string> | string | Array<string> | Array<string> | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/register';
+};
+
+export type PostRegisterErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+};
+
+export type PostRegisterError = PostRegisterErrors[keyof PostRegisterErrors];
+
+export type PostRegisterResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        client_id: string;
+        client_id_issued_at: number;
+        client_name: string;
+        redirect_uris: Array<string>;
+        grant_types: Array<string>;
+        response_types: Array<string>;
+        token_endpoint_auth_method: string;
+        [key: string]: unknown | string | number | Array<string> | Array<string> | Array<string>;
+    };
+};
+
+export type PostRegisterResponse = PostRegisterResponses[keyof PostRegisterResponses];
+
+export type GetAuthorizeData = {
     body?: never;
     path?: never;
     query?: {
-        /**
-         * Pre-filled user code
-         */
-        code?: string;
+        client_id?: string;
+        redirect_uri?: string;
+        response_type?: string;
+        scope?: string;
+        state?: string;
+        code_challenge?: string;
+        code_challenge_method?: string;
+        resource?: string;
     };
-    url: '/device/';
+    url: '/authorize';
 };
 
-export type GetDeviceResponses = {
+export type GetAuthorizeErrors = {
     /**
      * Default Response
      */
-    200: unknown;
+    400: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
 };
 
-export type PostDeviceData = {
+export type GetAuthorizeError = GetAuthorizeErrors[keyof GetAuthorizeErrors];
+
+export type PostRevokeData = {
+    body: {
+        /**
+         * Access token or refresh token to revoke
+         */
+        token: string;
+        token_type_hint?: string;
+        client_id?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/revoke';
+};
+
+export type PostRevokeErrors = {
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+};
+
+export type PostRevokeError = PostRevokeErrors[keyof PostRevokeErrors];
+
+export type PostRevokeResponses = {
+    /**
+     * Default Response
+     */
+    200: null;
+};
+
+export type PostRevokeResponse = PostRevokeResponses[keyof PostRevokeResponses];
+
+export type PostTokenData = {
+    body: {
+        /**
+         * OAuth grant type
+         */
+        grant_type: string;
+        /**
+         * Device flow: code from POST /oauth/device
+         */
+        device_code?: string;
+        /**
+         * Authorization code flow: the one-time code
+         */
+        code?: string;
+        /**
+         * Authorization code flow: PKCE verifier
+         */
+        code_verifier?: string;
+        /**
+         * Authorization code flow: must match the authorize request
+         */
+        redirect_uri?: string;
+        /**
+         * Refresh flow: the current refresh token
+         */
+        refresh_token?: string;
+        /**
+         * Optional space-delimited scope, never wider than the grant
+         */
+        scope?: string;
+        /**
+         * RFC 8707 resource indicator
+         */
+        resource?: string;
+        /**
+         * Client identifier
+         */
+        client_id?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/token';
+};
+
+export type PostTokenErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * OAuth error code
+         */
+        error: string;
+        /**
+         * Human-readable error description
+         */
+        error_description?: string;
+        [key: string]: unknown | string | undefined;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: string;
+    };
+};
+
+export type PostTokenError = PostTokenErrors[keyof PostTokenErrors];
+
+export type PostTokenResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Access token for API calls
+         */
+        access_token: string;
+        /**
+         * Token type
+         */
+        token_type: 'Bearer';
+        /**
+         * Seconds until the access token expires
+         */
+        expires_in: number;
+        /**
+         * Rotating refresh token (authorization code and refresh grants only)
+         */
+        refresh_token?: string;
+        /**
+         * Space-delimited granted scopes
+         */
+        scope?: string;
+        [key: string]: unknown | string | 'Bearer' | number | undefined;
+    };
+};
+
+export type PostTokenResponse = PostTokenResponses[keyof PostTokenResponses];
+
+export type GetMyAccessTokensData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/device/';
+    url: '/my/access-tokens';
 };
 
-export type PostDeviceResponses = {
+export type GetMyAccessTokensErrors = {
     /**
      * Default Response
      */
-    200: unknown;
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
 };
+
+export type GetMyAccessTokensError = GetMyAccessTokensErrors[keyof GetMyAccessTokensErrors];
+
+export type GetMyAccessTokensResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        connections: Array<{
+            /**
+             * Opaque connection id. Pass to DELETE to revoke.
+             */
+            id: string;
+            /**
+             * "oauth" for a browser-authorized client, "token" for a device-flow or manual token
+             */
+            kind: 'oauth' | 'token';
+            /**
+             * Client name, as the client registered itself
+             */
+            name: string;
+            /**
+             * OAuth client_id, when there is one
+             */
+            clientId: string | null;
+            /**
+             * Space-delimited granted scopes
+             */
+            scope: string | null;
+            /**
+             * RFC 8707 audience this connection is bound to
+             */
+            resource: string | null;
+            createdAt: string;
+            /**
+             * When an access token from this connection was last used
+             */
+            lastUsed: string | null;
+            /**
+             * When the connection lapses if unused
+             */
+            expiresAt: string | null;
+        }>;
+    };
+};
+
+export type GetMyAccessTokensResponse = GetMyAccessTokensResponses[keyof GetMyAccessTokensResponses];
+
+export type DeleteMyAccessTokensByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Connection id from GET /my/access-tokens
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/access-tokens/{id}';
+};
+
+export type DeleteMyAccessTokensByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyAccessTokensByIdError = DeleteMyAccessTokensByIdErrors[keyof DeleteMyAccessTokensByIdErrors];
+
+export type DeleteMyAccessTokensByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyAccessTokensByIdResponse = DeleteMyAccessTokensByIdResponses[keyof DeleteMyAccessTokensByIdResponses];
 
 export type GetMyAdventuresData = {
     body?: never;
@@ -549,21 +1318,9 @@ export type GetMyAdventuresResponses = {
             updatedAt: string;
         }>;
         pagination: {
-            /**
-             * Current page number
-             */
             page: number;
-            /**
-             * Items per page
-             */
             pageSize: number;
-            /**
-             * Total number of items
-             */
             total: number;
-            /**
-             * Total number of pages
-             */
             totalPages: number;
         };
     };
@@ -6229,6 +6986,815 @@ export type PatchMyScenesByIdResponses = {
 
 export type PatchMyScenesByIdResponse = PatchMyScenesByIdResponses[keyof PatchMyScenesByIdResponses];
 
+export type PostMyNodesData = {
+    body: {
+        /**
+         * Story, book, arc or chapter. The new node is whatever that parent contains.
+         */
+        parentId: string;
+        /**
+         * Node name
+         */
+        name: string;
+        /**
+         * Optional client-supplied cuid2
+         */
+        id?: string;
+        /**
+         * "start", "end", or a 0-based index among siblings. Siblings are renumbered to stay contiguous.
+         */
+        position?: 'start' | 'end' | number;
+        [key: string]: unknown | string | string | string | 'start' | 'end' | number | undefined;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/nodes';
+};
+
+export type PostMyNodesErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyNodesError = PostMyNodesErrors[keyof PostMyNodesErrors];
+
+export type PostMyNodesResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        success: true;
+        node: {
+            kind: 'book' | 'arc' | 'chapter' | 'scene';
+            id: string;
+            name: string;
+            parentId: string;
+            sortOrder: number;
+            storyId: string;
+        };
+    };
+};
+
+export type PostMyNodesResponse = PostMyNodesResponses[keyof PostMyNodesResponses];
+
+export type PatchMyNodesByIdData = {
+    body: {
+        /**
+         * "start", "end", or a 0-based index among siblings. Siblings are renumbered to stay contiguous.
+         */
+        position?: 'start' | 'end' | number;
+        /**
+         * Soft-delete (or restore) the node. deletedAt is maintained automatically.
+         */
+        deleted?: boolean;
+        [key: string]: unknown | 'start' | 'end' | number | boolean | undefined;
+    };
+    path: {
+        /**
+         * Node ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/nodes/{id}';
+};
+
+export type PatchMyNodesByIdErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PatchMyNodesByIdError = PatchMyNodesByIdErrors[keyof PatchMyNodesByIdErrors];
+
+export type PatchMyNodesByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        node: {
+            kind: 'book' | 'arc' | 'chapter' | 'scene';
+            id: string;
+            name: string;
+            parentId: string;
+            sortOrder: number;
+            storyId: string;
+        };
+    };
+};
+
+export type PatchMyNodesByIdResponse = PatchMyNodesByIdResponses[keyof PatchMyNodesByIdResponses];
+
+export type PostMyNodesByIdMoveData = {
+    body: {
+        /**
+         * New parent. Must contain the same kind of node, and be in the same story.
+         */
+        parentId?: string;
+        /**
+         * "start", "end", or a 0-based index among siblings. Siblings are renumbered to stay contiguous.
+         */
+        position?: 'start' | 'end' | number;
+    };
+    path: {
+        /**
+         * Node ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/nodes/{id}/move';
+};
+
+export type PostMyNodesByIdMoveErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyNodesByIdMoveError = PostMyNodesByIdMoveErrors[keyof PostMyNodesByIdMoveErrors];
+
+export type PostMyNodesByIdMoveResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        node: {
+            kind: 'book' | 'arc' | 'chapter' | 'scene';
+            id: string;
+            name: string;
+            parentId: string;
+            sortOrder: number;
+            storyId: string;
+        };
+    };
+};
+
+export type PostMyNodesByIdMoveResponse = PostMyNodesByIdMoveResponses[keyof PostMyNodesByIdMoveResponses];
+
+export type GetMyNodesByIdContentData = {
+    body?: never;
+    path: {
+        /**
+         * Node ID
+         */
+        id: string;
+    };
+    query?: {
+        /**
+         * Refuse the read rather than return more than this many words (default 6000).
+         */
+        maxWords?: number;
+    };
+    url: '/my/nodes/{id}/content';
+};
+
+export type GetMyNodesByIdContentErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    413: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyNodesByIdContentError = GetMyNodesByIdContentErrors[keyof GetMyNodesByIdContentErrors];
+
+export type GetMyNodesByIdContentResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        storyId: string;
+        root: {
+            kind: string;
+            id: string;
+            name: string;
+        };
+        words: number;
+        chapters: Array<{
+            id: string;
+            name: string;
+            status: string | null;
+            words: number;
+            scenes: Array<{
+                id: string;
+                name: string;
+                status: string | null;
+                perspective: string | null;
+                viewpointCharacterId: string | null;
+                viewpointCharacterName: string | null;
+                goal: string | null;
+                includeInFull: number;
+                words: number;
+                messages: Array<{
+                    id: string;
+                    /**
+                     * null for normal prose; branch / event / background / audio for structural messages
+                     */
+                    type: string | null;
+                    isQuery: boolean;
+                    options: unknown | null;
+                    paragraphs: Array<{
+                        /**
+                         * Paragraph ID — use this to edit it
+                         */
+                        id: string;
+                        /**
+                         * Paragraph text as stored. Mostly plain text; may contain inline HTML such as <em> or <strong>.
+                         */
+                        body: string;
+                        state: string | null;
+                        words: number;
+                    }>;
+                }>;
+            }>;
+        }>;
+    };
+};
+
+export type GetMyNodesByIdContentResponse = GetMyNodesByIdContentResponses[keyof GetMyNodesByIdContentResponses];
+
+export type GetMyStoriesByStoryIdOutlineData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query?: {
+        /**
+         * Limit the outline to the subtree under this node
+         */
+        rootId?: string;
+        /**
+         * Deepest level to include. Defaults to chapter — scenes are opt-in because they multiply the size.
+         */
+        depth?: 'book' | 'arc' | 'chapter' | 'scene';
+        /**
+         * Include summary / sentenceSummary / paragraphSummary on every node
+         */
+        includeSummaries?: boolean;
+        /**
+         * Include POV, goal and context-inclusion flags on scenes
+         */
+        includeSceneDetail?: boolean;
+    };
+    url: '/my/stories/{storyId}/outline';
+};
+
+export type GetMyStoriesByStoryIdOutlineErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdOutlineError = GetMyStoriesByStoryIdOutlineErrors[keyof GetMyStoriesByStoryIdOutlineErrors];
+
+export type GetMyStoriesByStoryIdOutlineResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        storyId: string;
+        storyName: string;
+        root: {
+            kind: 'story' | 'book' | 'arc' | 'chapter' | 'scene';
+            id: string;
+            name: string;
+        };
+        /**
+         * Story tree level
+         */
+        depth: 'book' | 'arc' | 'chapter' | 'scene';
+        /**
+         * Sum of cached chapter word counts in scope
+         */
+        totalWords: number;
+        counts: {
+            book: number;
+            arc: number;
+            chapter: number;
+            scene: number;
+        };
+        /**
+         * Depth-first flattening of the tree. Rebuild the hierarchy from parentId if you need it nested.
+         */
+        nodes: Array<{
+            /**
+             * Story tree level
+             */
+            kind: 'book' | 'arc' | 'chapter' | 'scene';
+            /**
+             * Node ID
+             */
+            id: string;
+            /**
+             * Node name
+             */
+            name: string;
+            /**
+             * Parent node ID (null at the requested root)
+             */
+            parentId: string | null;
+            /**
+             * Depth below the requested root, starting at 0
+             */
+            depth: number;
+            /**
+             * Position among siblings
+             */
+            sortOrder: number;
+            /**
+             * draft | needs_work | review | done
+             */
+            status?: string | null;
+            /**
+             * Cached word count. Chapters store one; books and arcs sum their chapters. Absent on scenes.
+             */
+            wordCount?: number;
+            /**
+             * Publication timestamp (chapters only)
+             */
+            publishedAt?: string | null;
+            summary?: string | null;
+            sentenceSummary?: string | null;
+            paragraphSummary?: string | null;
+            /**
+             * FIRST | SECOND | THIRD (scenes only)
+             */
+            perspective?: string | null;
+            viewpointCharacterId?: string | null;
+            goal?: string | null;
+            /**
+             * 0 = excluded from context, 1 = summary only, 2 = full content
+             */
+            includeInFull?: number;
+        }>;
+    };
+};
+
+export type GetMyStoriesByStoryIdOutlineResponse = GetMyStoriesByStoryIdOutlineResponses[keyof GetMyStoriesByStoryIdOutlineResponses];
+
+export type GetMyStoriesByStoryIdSearchData = {
+    body?: never;
+    path: {
+        /**
+         * Story ID
+         */
+        storyId: string;
+    };
+    query: {
+        /**
+         * Case-insensitive substring to look for
+         */
+        q: string;
+        /**
+         * Which parts of the story to search. Defaults to all.
+         */
+        scope?: 'prose' | 'characters' | 'context' | 'summaries' | 'all';
+        /**
+         * Maximum hits per scope (default 40)
+         */
+        limit?: number;
+    };
+    url: '/my/stories/{storyId}/search';
+};
+
+export type GetMyStoriesByStoryIdSearchErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyStoriesByStoryIdSearchError = GetMyStoriesByStoryIdSearchErrors[keyof GetMyStoriesByStoryIdSearchErrors];
+
+export type GetMyStoriesByStoryIdSearchResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        storyId: string;
+        query: string;
+        scope: 'prose' | 'characters' | 'context' | 'summaries' | 'all';
+        /**
+         * True when a scope hit the limit and results were cut off
+         */
+        truncated: boolean;
+        hits: Array<{
+            kind: 'prose' | 'character' | 'contextItem' | 'summary';
+            /**
+             * Matching text with a little surrounding context
+             */
+            snippet: string;
+            id?: string;
+            name?: string;
+            field?: string;
+            type?: string;
+            nodeKind?: string;
+            paragraphId?: string;
+            messageId?: string;
+            sceneId?: string;
+            sceneName?: string;
+            chapterId?: string;
+            chapterName?: string;
+        }>;
+    };
+};
+
+export type GetMyStoriesByStoryIdSearchResponse = GetMyStoriesByStoryIdSearchResponses[keyof GetMyStoriesByStoryIdSearchResponses];
+
+export type PostMyProseEditsData = {
+    body: {
+        /**
+         * Edits to apply in order, in a single transaction. If any fails, none are applied.
+         */
+        edits: Array<{
+            op: 'replace';
+            /**
+             * Paragraph to overwrite
+             */
+            paragraphId: string;
+            /**
+             * Paragraph text. Blank lines split it into multiple paragraphs.
+             */
+            text: string;
+            /**
+             * The opening text of the paragraph as you last read it. The edit is rejected with 409 if the paragraph no longer starts with this, so a concurrent edit cannot be silently overwritten. Compared after stripping tags and collapsing whitespace.
+             */
+            expect: string;
+            /**
+             * Paragraph state to apply to the written text
+             */
+            state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT';
+        } | {
+            op: 'insert_after';
+            paragraphId: string;
+            /**
+             * Paragraph text. Blank lines split it into multiple paragraphs.
+             */
+            text: string;
+            /**
+             * Paragraph state to apply to the written text
+             */
+            state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT';
+        } | {
+            op: 'insert_before';
+            paragraphId: string;
+            /**
+             * Paragraph text. Blank lines split it into multiple paragraphs.
+             */
+            text: string;
+            /**
+             * Paragraph state to apply to the written text
+             */
+            state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT';
+        } | {
+            op: 'append';
+            /**
+             * Scene to append a new message to
+             */
+            sceneId: string;
+            /**
+             * Paragraph text. Blank lines split it into multiple paragraphs.
+             */
+            text: string;
+            /**
+             * Paragraph state to apply to the written text
+             */
+            state?: 'AI' | 'DRAFT' | 'REVISE' | 'FINAL' | 'SDT';
+        } | {
+            op: 'delete';
+            paragraphId: string;
+            /**
+             * Optional guard, same semantics as on replace.
+             */
+            expect?: string;
+        }>;
+    };
+    path?: never;
+    query?: never;
+    url: '/my/prose/edits';
+};
+
+export type PostMyProseEditsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    409: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyProseEditsError = PostMyProseEditsErrors[keyof PostMyProseEditsErrors];
+
+export type PostMyProseEditsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        /**
+         * Number of edits applied
+         */
+        applied: number;
+        /**
+         * IDs of paragraphs created
+         */
+        created: Array<string>;
+        /**
+         * IDs of paragraphs given a new revision
+         */
+        updated: Array<string>;
+        /**
+         * IDs of paragraphs removed
+         */
+        deleted: Array<string>;
+        /**
+         * Chapters whose cached word count was refreshed
+         */
+        chaptersRecounted: Array<string>;
+    };
+};
+
+export type PostMyProseEditsResponse = PostMyProseEditsResponses[keyof PostMyProseEditsResponses];
+
 export type GetMyStoriesByStoryIdCharactersData = {
     body?: never;
     path: {
@@ -9882,6 +11448,10 @@ export type DeleteMyFilesByIdResponses = {
              */
             sceneDefaultBackground: number;
             /**
+             * Maps using this file as their background image
+             */
+            mapImage: number;
+            /**
              * Sum across all reference types
              */
             total: number;
@@ -10003,6 +11573,10 @@ export type GetMyFilesByIdResponses = {
              * Scenes using this as their default background
              */
             sceneDefaultBackground: number;
+            /**
+             * Maps using this file as their background image
+             */
+            mapImage: number;
             /**
              * Sum across all reference types
              */
@@ -18162,6 +19736,19 @@ export type GetMyStoriesByStoryIdExportZipErrors = {
     /**
      * Default Response
      */
+    413: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
     500: {
         /**
          * Error message
@@ -18751,6 +20338,10 @@ export type PostMyLlmGenerateData = {
         tool_choice?: 'auto' | 'required' | 'none' | {
             name: string;
         };
+        /**
+         * OpenAI prompt-caching routing key. Requests sharing a key are routed to the same cache for better prefix-cache hit rates. Only forwarded to genuine OpenAI upstreams.
+         */
+        prompt_cache_key?: string;
         metadata?: {
             [key: string]: unknown;
         };

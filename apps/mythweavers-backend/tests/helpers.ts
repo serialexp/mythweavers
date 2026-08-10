@@ -12,7 +12,7 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-zod-openapi'
-import { isAllowedOrigin } from '../src/lib/cors.js'
+import { corsDelegator } from '../src/lib/cors.js'
 import { prisma } from '../src/lib/prisma.js'
 import { registerApplicationRoutes } from '../src/register-routes.js'
 
@@ -41,11 +41,9 @@ async function buildAppInternal() {
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
 
-  // Register plugins
-  await app.register(cors, {
-    origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
-    credentials: true,
-  })
+  // Register plugins. Must stay the same CORS configuration as src/index.ts,
+  // or the CORS tests pass against a policy production never uses.
+  await app.register(cors, { delegator: corsDelegator })
 
   await app.register(cookie, {
     secret: 'test-secret',
@@ -107,8 +105,17 @@ async function buildAppInternal() {
 }
 
 export async function cleanDatabase() {
-  // Clean up in reverse order of dependencies, batched in a transaction for speed
+  // Clean up in reverse order of dependencies, batched in a transaction for speed.
+  //
+  // OAuthClient and DeviceCode have no FK to User, so nothing cascades them when
+  // users are deleted — without explicit deletes they survive every reset and
+  // accumulate across the whole suite (suites pass alone, fail in a full run).
   await prisma.$transaction([
+    prisma.accessToken.deleteMany(),
+    prisma.oAuthRefreshToken.deleteMany(),
+    prisma.oAuthAuthorizationRequest.deleteMany(),
+    prisma.oAuthClient.deleteMany(),
+    prisma.deviceCode.deleteMany(),
     prisma.file.deleteMany(),
     prisma.story.deleteMany(),
     prisma.tag.deleteMany(),

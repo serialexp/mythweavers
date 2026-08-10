@@ -212,11 +212,13 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
   // Load stories and adventure count on mount
   onMount(() => {
     loadStories()
-    getMyAdventures().then(({ data }) => {
-      setAdventureCount(data?.adventures?.length ?? 0)
-    }).catch(() => {
-      // Silently fail — count just won't show
-    })
+    getMyAdventures()
+      .then(({ data }) => {
+        setAdventureCount(data?.adventures?.length ?? 0)
+      })
+      .catch(() => {
+        // Silently fail — count just won't show
+      })
   })
 
   const handleLoadStory = async (storyId: string, _type: 'local' | 'server') => {
@@ -494,11 +496,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
             {isDark() ? '☀️' : '🌙'}
           </IconButton>
 
-          <IconButton
-            variant="ghost"
-            onClick={() => setShowAISettings(true)}
-            aria-label="AI Settings"
-          >
+          <IconButton variant="ghost" onClick={() => setShowAISettings(true)} aria-label="AI Settings">
             <PhGearIcon />
           </IconButton>
 
@@ -512,11 +510,15 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
               </Show>
             }
           >
-            <Dropdown alignRight trigger={
-              <IconButton variant="ghost" aria-label={authStore.user?.username || 'User'}>
-                <PhUserCircleIcon size={20} />
-              </IconButton>
-            }>
+            <Dropdown
+              alignRight
+              trigger={
+                <IconButton variant="ghost" aria-label={authStore.user?.username || 'User'}>
+                  <PhUserCircleIcon size={20} />
+                </IconButton>
+              }
+            >
+              <DropdownItem onClick={() => navigate('/connections')}>Connected apps</DropdownItem>
               <DropdownItem danger onClick={handleLogout}>
                 Logout
               </DropdownItem>
@@ -527,116 +529,108 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
 
       <div class={styles.contentArea}>
         <Card
-        style={{
-          width: '100%',
-          'max-width': '800px',
-          flex: '1',
-          display: 'flex',
-          'flex-direction': 'column',
-          'min-height': '0',
-          overflow: 'hidden',
-        }}
-      >
-        <Tabs
-          activeTab={activeTab()}
-          onTabChange={(id) => {
-            const tab = id as 'load' | 'adventures'
-            setActiveTab(tab)
+          style={{
+            width: '100%',
+            'max-width': '800px',
+            flex: '1',
+            display: 'flex',
+            'flex-direction': 'column',
+            'min-height': '0',
+            overflow: 'hidden',
           }}
-          size="md"
-          style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
         >
-          <TabList style={{ 'flex-shrink': '0' }}>
-            <Tab id="load">Stories ({combinedStories().length})</Tab>
-            <Tab id="adventures">Adventures{adventureCount() != null ? ` (${adventureCount()})` : ''}</Tab>
-          </TabList>
+          <Tabs
+            activeTab={activeTab()}
+            onTabChange={(id) => {
+              const tab = id as 'load' | 'adventures'
+              setActiveTab(tab)
+            }}
+            size="md"
+            style={{ display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0' }}
+          >
+            <TabList style={{ 'flex-shrink': '0' }}>
+              <Tab id="load">Stories ({combinedStories().length})</Tab>
+              <Tab id="adventures">Adventures{adventureCount() != null ? ` (${adventureCount()})` : ''}</Tab>
+            </TabList>
 
-          <TabPanel id="load" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
-            <CardBody>
-              <div style={{ display: 'flex', gap: '0.5rem', 'margin-bottom': '1rem' }}>
-                <Button variant="primary" onClick={() => setShowNewStory(true)}>
-                  New Story
-                </Button>
-                <Button variant="secondary" onClick={() => setShowClaudeChatImport(true)}>
-                  Import Claude Chat
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleImportMythWeavers}
-                  disabled={!serverAvailable() || importingMythWeavers()}
-                >
-                  {importingMythWeavers() ? 'Importing...' : 'Import MythWeavers'}
-                </Button>
-              </div>
-
-              <Show
-                when={!loading()}
-                fallback={
-                  <div
-                    style={{
-                      display: 'flex',
-                      'align-items': 'center',
-                      'justify-content': 'center',
-                      gap: '0.5rem',
-                      padding: '2rem',
-                    }}
+            <TabPanel id="load" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
+              <CardBody>
+                <div style={{ display: 'flex', gap: '0.5rem', 'margin-bottom': '1rem' }}>
+                  <Button variant="primary" onClick={() => setShowNewStory(true)}>
+                    New Story
+                  </Button>
+                  <Button variant="secondary" onClick={() => setShowClaudeChatImport(true)}>
+                    Import Claude Chat
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleImportMythWeavers}
+                    disabled={!serverAvailable() || importingMythWeavers()}
                   >
-                    <Spinner size="sm" />
-                    <Text as="span" color="secondary">Loading stories...</Text>
-                  </div>
-                }
-              >
+                    {importingMythWeavers() ? 'Importing...' : 'Import MythWeavers'}
+                  </Button>
+                </div>
+
                 <Show
-                  when={combinedStories().length > 0}
+                  when={!loading()}
                   fallback={
-                    <Text
-                      size="lg"
-                      color="secondary"
-                      align="center"
-                      style={{ padding: '3rem' }}
+                    <div
+                      style={{
+                        display: 'flex',
+                        'align-items': 'center',
+                        'justify-content': 'center',
+                        gap: '0.5rem',
+                        padding: '2rem',
+                      }}
                     >
-                      No saved stories found. Create a new story to get started!
-                    </Text>
+                      <Spinner size="sm" />
+                      <Text as="span" color="secondary">
+                        Loading stories...
+                      </Text>
+                    </div>
                   }
                 >
-                  <StoryList
-                    stories={combinedStories()}
-                    onLoadStory={handleLoadStory}
-                    onDeleteStory={handleDeleteStory}
-                    onExportZip={serverAvailable() ? handleExportZip : undefined}
-                    onSyncToServer={serverAvailable() ? handleSyncToServer : undefined}
-                    syncing={syncing()}
-                    editingEnabled={true}
-                    serverAvailable={serverAvailable()}
-                    onRename={loadStories}
-                  />
-                  <Show when={hasMoreServerStories()}>
-                    <div style={{ display: 'flex', 'justify-content': 'center', 'margin-top': '1rem' }}>
-                      <Button variant="secondary" onClick={loadMoreServerStories} disabled={loadingMore()}>
-                        {loadingMore() ? 'Loading...' : 'Load more stories'}
-                      </Button>
-                    </div>
+                  <Show
+                    when={combinedStories().length > 0}
+                    fallback={
+                      <Text size="lg" color="secondary" align="center" style={{ padding: '3rem' }}>
+                        No saved stories found. Create a new story to get started!
+                      </Text>
+                    }
+                  >
+                    <StoryList
+                      stories={combinedStories()}
+                      onLoadStory={handleLoadStory}
+                      onDeleteStory={handleDeleteStory}
+                      onExportZip={serverAvailable() ? handleExportZip : undefined}
+                      onSyncToServer={serverAvailable() ? handleSyncToServer : undefined}
+                      syncing={syncing()}
+                      editingEnabled={true}
+                      serverAvailable={serverAvailable()}
+                      onRename={loadStories}
+                    />
+                    <Show when={hasMoreServerStories()}>
+                      <div style={{ display: 'flex', 'justify-content': 'center', 'margin-top': '1rem' }}>
+                        <Button variant="secondary" onClick={loadMoreServerStories} disabled={loadingMore()}>
+                          {loadingMore() ? 'Loading...' : 'Load more stories'}
+                        </Button>
+                      </div>
+                    </Show>
                   </Show>
                 </Show>
-              </Show>
-            </CardBody>
-          </TabPanel>
+              </CardBody>
+            </TabPanel>
 
-          <TabPanel id="adventures" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
-            <CardBody>
-              <AdventureList onCountChange={setAdventureCount} />
-            </CardBody>
-          </TabPanel>
-        </Tabs>
-      </Card>
+            <TabPanel id="adventures" style={{ flex: '1', 'overflow-y': 'auto', 'min-height': '0' }}>
+              <CardBody>
+                <AdventureList onCountChange={setAdventureCount} />
+              </CardBody>
+            </TabPanel>
+          </Tabs>
+        </Card>
       </div>
 
-      <Modal
-        open={showNewStory()}
-        onClose={() => setShowNewStory(false)}
-        title="New Story"
-        size="md"
-      >
+      <Modal open={showNewStory()} onClose={() => setShowNewStory(false)} title="New Story" size="md">
         <NewStoryForm
           serverAvailable={serverAvailable()}
           onCreateStory={(name, storageMode, calendarPresetId) => {
@@ -648,10 +642,7 @@ export const StoryLandingPage: Component<StoryLandingPageProps> = (props) => {
         />
       </Modal>
 
-      <AISettingsPanel
-        show={showAISettings()}
-        onClose={() => setShowAISettings(false)}
-      />
+      <AISettingsPanel show={showAISettings()} onClose={() => setShowAISettings(false)} />
 
       <ClaudeChatImportModal
         show={showClaudeChatImport()}

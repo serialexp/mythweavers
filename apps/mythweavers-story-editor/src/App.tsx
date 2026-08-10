@@ -1,23 +1,24 @@
-import { Route, useNavigate, useParams } from '@solidjs/router'
+import { Route, useLocation, useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { Component, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from 'solid-js'
 import './styles/variables.css'
 import './App.css'
-import * as styles from './App.css.ts'
 import { Spinner } from '@mythweavers/ui'
+import * as styles from './App.css.ts'
 import { ConflictResolutionDialog } from './components/ConflictResolutionDialog'
 import { ContextPreviewModal } from './components/ContextPreviewModal'
 import { CopyTokenModal } from './components/CopyTokenModal'
 import { ErrorNotifications } from './components/ErrorNotifications'
 import { GlobalStatusIndicator } from './components/GlobalStatusIndicator'
 import { LoginForm } from './components/LoginForm'
+import { MassRewriteDialog } from './components/MassRewriteDialog'
 // SceneEditorWrapper import removed - component used via lazy loading or routes
 import { MessageList } from './components/MessageList'
 import { MessageRewriterDialog } from './components/MessageRewriterDialog'
-import { MassRewriteDialog } from './components/MassRewriteDialog'
-import { SingleRewriteDialog } from './components/SingleRewriteDialog'
+import { PasswordForEncryptionDialog } from './components/PasswordForEncryptionDialog'
 import { PendingEntitiesModal } from './components/PendingEntitiesModal'
 import { SearchModal } from './components/SearchModal'
 import { ServerStatusIndicator } from './components/ServerStatusIndicator'
+import { SingleRewriteDialog } from './components/SingleRewriteDialog'
 import { StorageFullModal } from './components/StorageFullModal'
 import { StoryHeader } from './components/StoryHeader'
 import { StoryInput } from './components/StoryInput'
@@ -28,31 +29,33 @@ import { SnowflakeView } from './components/snowflake/SnowflakeView'
 import { useCacheManagement } from './hooks/useCacheManagement'
 import { useOllama } from './hooks/useOllama'
 import { useStoryGeneration } from './hooks/useStoryGeneration'
+import { AdventurePage } from './pages/AdventurePage'
+import ConnectionsPage from './pages/ConnectionsPage'
+import DeviceAuthorizationPage from './pages/DeviceAuthorizationPage'
+import OAuthConsentPage from './pages/OAuthConsentPage'
+import UsagePage from './pages/UsagePage'
+import { saveService } from './services/saveService'
 import { authStore } from './stores/authStore'
 import { calendarStore } from './stores/calendarStore'
-import { languageStore } from './stores/languageStore'
 import { charactersStore } from './stores/charactersStore'
 import { contextItemsStore } from './stores/contextItemsStore'
 import { currentStoryStore } from './stores/currentStoryStore'
+import { effectiveSettings } from './stores/effectiveSettingsStore'
 import { headerStore } from './stores/headerStore'
+import { languageStore } from './stores/languageStore'
 import { mapsStore } from './stores/mapsStore'
 import { messagesStore } from './stores/messagesStore'
-import { plotPointsStore } from './stores/plotPointsStore'
 import { modelsStore } from './stores/modelsStore'
 import { nodeStore } from './stores/nodeStore'
+import { plotPointsStore } from './stores/plotPointsStore'
 import { rewriteDialogStore } from './stores/rewriteDialogStore'
 import { serverStore } from './stores/serverStore'
 import { settingsStore } from './stores/settingsStore'
-import { effectiveSettings } from './stores/effectiveSettingsStore'
 import { ApiStory } from './types/api'
 import { Character, ContextItem, Message, Node } from './types/core'
 import type { BranchConversionResult } from './utils/claudeChatImport'
 import { importClaudeChat, importClaudeChatWithBranches } from './utils/claudeChatImporter'
-import { PasswordForEncryptionDialog } from './components/PasswordForEncryptionDialog'
-import { AdventurePage } from './pages/AdventurePage'
-import UsagePage from './pages/UsagePage'
-import DeviceAuthorizationPage from './pages/DeviceAuthorizationPage'
-import { saveService } from './services/saveService'
+import { safeRedirectTarget } from './utils/redirect'
 import { storyManager } from './utils/storyManager'
 
 type StoryLoadResult =
@@ -80,11 +83,14 @@ function getStoryLoadError(error: unknown, status?: number): Omit<Extract<StoryL
   }
 }
 
-// Component to redirect to login
+// Component to redirect to login, remembering where the user was headed so the
+// OAuth consent and device pages survive a sign-in detour.
 const RedirectToLogin: Component = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   onMount(() => {
-    navigate('/login', { replace: true })
+    const target = `${location.pathname}${location.search}`
+    navigate(`/login?redirect=${encodeURIComponent(target)}`, { replace: true })
   })
   return <div class={styles.app}>Redirecting...</div>
 }
@@ -114,14 +120,10 @@ const App: Component = () => {
   const storyLoaded = createMemo(() => currentStoryStore.isInitialized)
 
   // Initialize story generation hook
-  const {
-    handleAutoOrManualSubmit,
-    handleSubmit,
-    regenerateLastMessage,
-    handleShowContextPreview,
-  } = useStoryGeneration({
-    generateResponse,
-  })
+  const { handleAutoOrManualSubmit, handleSubmit, regenerateLastMessage, handleShowContextPreview } =
+    useStoryGeneration({
+      generateResponse,
+    })
 
   // Initialize cache management
   useCacheManagement()
@@ -273,15 +275,14 @@ const App: Component = () => {
         coverArtFileId: story.coverArtFileId ?? null,
         coverArtUrl: (story as { coverArtUrl?: string | null }).coverArtUrl ?? null,
         defaultBackgroundFileId: story.defaultBackgroundFileId ?? null,
-        defaultBackgroundUrl:
-          (story as { defaultBackgroundUrl?: string | null }).defaultBackgroundUrl ?? null,
+        defaultBackgroundUrl: (story as { defaultBackgroundUrl?: string | null }).defaultBackgroundUrl ?? null,
       })
 
       // Load story-level AI overrides (provider/model from story become overrides)
       console.log('[loadServerStoryData] Loading AI overrides...')
       const aiOverrides = story.aiOverrides ?? null
       // Migrate legacy: if story has provider/model but no aiOverrides, treat them as overrides
-      if (!aiOverrides && (story.provider && story.provider !== 'ollama' || story.model)) {
+      if (!aiOverrides && ((story.provider && story.provider !== 'ollama') || story.model)) {
         currentStoryStore.loadAIOverrides({
           provider: story.provider !== 'ollama' ? story.provider : null,
           model: story.model || null,
@@ -659,7 +660,7 @@ const App: Component = () => {
       // Load story-level AI overrides
       const localAiOverrides = (story as any).aiOverrides ?? null
       // Migrate legacy: if story has provider/model but no aiOverrides, treat them as overrides
-      if (!localAiOverrides && (story.provider && story.provider !== 'ollama' || story.model)) {
+      if (!localAiOverrides && ((story.provider && story.provider !== 'ollama') || story.model)) {
         currentStoryStore.loadAIOverrides({
           provider: story.provider !== 'ollama' ? story.provider : null,
           model: story.model || null,
@@ -921,10 +922,7 @@ const App: Component = () => {
     <>
       {/* Decrypt API keys dialog — shown when backend has encrypted secrets but this device doesn't have them */}
       <Show when={authStore.isAuthenticated && !authStore.isOfflineMode && settingsStore.needsDecryption()}>
-        <PasswordForEncryptionDialog
-          mode="decrypt"
-          onClose={() => settingsStore.dismissDecryption()}
-        />
+        <PasswordForEncryptionDialog mode="decrypt" onClose={() => settingsStore.dismissDecryption()} />
       </Show>
 
       {/* Auth loading indicator */}
@@ -938,10 +936,12 @@ const App: Component = () => {
       </Show>
 
       <Route path="/device" component={DeviceAuthorizationPage} />
+      <Route path="/oauth/consent" component={OAuthConsentPage} />
       <Route
         path="/login"
         component={() => {
           const navigate = useNavigate()
+          const [params] = useSearchParams()
 
           return (
             <LoginForm
@@ -954,8 +954,9 @@ const App: Component = () => {
                   console.log('[App] Setting user in authStore')
                   authStore.setUser(user)
                 }
-                console.log('[App] Navigating to /stories')
-                navigate('/stories', { replace: true })
+                const destination = safeRedirectTarget(params.redirect)
+                console.log('[App] Navigating to', destination)
+                navigate(destination, { replace: true })
               }}
             />
           )
@@ -974,7 +975,7 @@ const App: Component = () => {
 
       {/* Story selection routes with tab segments */}
       <Route
-        path={["/stories/list", "/stories/new", "/stories"]}
+        path={['/stories/list', '/stories/new', '/stories']}
         component={() => {
           const navigate = useNavigate()
           return (
@@ -1181,7 +1182,6 @@ const App: Component = () => {
                               onShowContextPreview={handleShowContextPreviewModal}
                             />
                           </main>
-
                         </div>
 
                         <ContextPreviewModal
@@ -1439,6 +1439,18 @@ const App: Component = () => {
 
       {/* Usage history - balance ledger and LLM generation costs */}
       <Route path="/usage" component={() => <UsagePage />} />
+
+      {/* Connected apps - OAuth clients and standalone access tokens */}
+      <Route
+        path="/connections"
+        component={() => (
+          <Show when={!authStore.isLoading} fallback={<div class={styles.app}>Loading...</div>}>
+            <Show when={authStore.isAuthenticated} fallback={<RedirectToLogin />}>
+              <ConnectionsPage />
+            </Show>
+          </Show>
+        )}
+      />
 
       {/* World Pulse Adventure - standalone CYOA with world trajectory */}
       <Route path="/adventure/:id" component={() => <AdventurePage />} />

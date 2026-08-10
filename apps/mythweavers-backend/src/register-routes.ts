@@ -4,6 +4,8 @@ import adminUsersRoutes from './routes/admin/users.js'
 import authRoutes from './routes/auth/index.js'
 import publicAuthorsRoutes from './routes/authors/public.js'
 import calendarPresetsRoutes from './routes/calendars/presets.js'
+import mcpRoutes from './routes/mcp.js'
+import myAccessTokensRoutes from './routes/my/access-tokens.js'
 import myAdventuresRoutes from './routes/my/adventures.js'
 import myArcsRoutes from './routes/my/arcs.js'
 import myBackgroundRoutes from './routes/my/background.js'
@@ -27,6 +29,8 @@ import myMapsRoutes from './routes/my/maps.js'
 import myMessageRevisionsRoutes from './routes/my/message-revisions.js'
 import myMessagesBatchRoutes from './routes/my/messages-batch.js'
 import myMessagesRoutes from './routes/my/messages.js'
+import myNodesRoutes from './routes/my/nodes.js'
+import myOutlineRoutes from './routes/my/outline.js'
 import myParagraphRevisionsRoutes from './routes/my/paragraph-revisions.js'
 import myParagraphsRoutes from './routes/my/paragraphs.js'
 import myPathSegmentsRoutes from './routes/my/path-segments.js'
@@ -34,6 +38,7 @@ import myPathsRoutes from './routes/my/paths.js'
 import myPawnsRoutes from './routes/my/pawns.js'
 import myPlotPointStatesRoutes from './routes/my/plot-point-states.js'
 import myPreferencesRoutes from './routes/my/preferences.js'
+import myProseRoutes from './routes/my/prose.js'
 import myPublishingRoutes from './routes/my/publishing.js'
 import myReadingStatusRoutes from './routes/my/reading-status.js'
 import myRoyalRoadRoutes from './routes/my/royal-road.js'
@@ -47,17 +52,30 @@ import oauthRoutes from './routes/oauth/index.js'
 import publicStoriesRoutes from './routes/stories/public.js'
 import publicTagRoutes from './routes/tags/public.js'
 import stripeWebhookRoutes from './routes/webhooks/stripe.js'
+import wellKnownRoutes from './routes/well-known.js'
 import wsRoutes from './routes/ws.js'
 
 export async function registerApplicationRoutes(server: FastifyInstance): Promise<void> {
+  await server.register(wellKnownRoutes)
   await server.register(authRoutes, { prefix: '/auth' })
   await server.register(oauthRoutes, { prefix: '/oauth' })
+  // Root aliases for the spec endpoints only. When a client's authorization-server
+  // metadata fetch fails (CORS hiccup, transient 5xx) the MCP SDK falls back to
+  // guessing /authorize, /token and /register at the origin root. Mounting those
+  // four turns a total failure into a working flow; the device and consent
+  // routes are deliberately not aliased, since nothing ever guesses them.
+  await server.register(oauthRoutes, { prefix: '', rootAlias: true })
+  await server.register(myAccessTokensRoutes, { prefix: '/my' })
   await server.register(myAdventuresRoutes, { prefix: '/my' })
   await server.register(myStoriesRoutes, { prefix: '/my/stories' })
   await server.register(myBooksRoutes, { prefix: '/my' })
   await server.register(myArcsRoutes, { prefix: '/my' })
   await server.register(myChaptersRoutes, { prefix: '/my' })
   await server.register(myScenesRoutes, { prefix: '/my' })
+  // Unified node + prose surface, shared with the MCP tools via services/story.
+  await server.register(myNodesRoutes, { prefix: '/my' })
+  await server.register(myOutlineRoutes, { prefix: '/my' })
+  await server.register(myProseRoutes, { prefix: '/my' })
   await server.register(myCharactersRoutes, { prefix: '/my' })
   await server.register(myContextItemsRoutes, { prefix: '/my' })
   await server.register(myMessagesRoutes, { prefix: '/my' })
@@ -91,6 +109,7 @@ export async function registerApplicationRoutes(server: FastifyInstance): Promis
   await server.register(myLlmRoutes, { prefix: '/my' })
   await server.register(myBookshelfRoutes, { prefix: '/my' })
   await server.register(myReadingStatusRoutes, { prefix: '/my' })
+  await server.register(mcpRoutes)
   await server.register(stripeWebhookRoutes, { prefix: '/webhooks' })
   await server.register(wsRoutes)
   await server.register(adminLlmRoutes, { prefix: '/admin' })

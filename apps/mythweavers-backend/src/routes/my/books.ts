@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
+import { createNode, updateNode } from '../../services/story/index.js'
 
 // Node type schema
 const nodeTypeSchema = z.enum(['story', 'non-story', 'context']).meta({
@@ -57,18 +58,23 @@ const bookSchema = z.strictObject({
     description: 'Spine art file ID',
     example: 'clx1234567890',
   }),
-  defaultBackgroundFileId: z.string().nullable().meta({
-    description:
-      'Book-level default background image file ID. Inherited downward by ' +
-      'arcs/chapters/scenes that do not set their own.',
-    example: 'clx1234567890',
-  }),
-  defaultBackgroundUrl: z.string().nullable().optional().meta({
-    description:
-      'Resolved URL of the book-level default background (from the joined ' +
-      'file, if loaded).',
-    example: '/files/1/2025/12/forest.jpg',
-  }),
+  defaultBackgroundFileId: z
+    .string()
+    .nullable()
+    .meta({
+      description:
+        'Book-level default background image file ID. Inherited downward by ' +
+        'arcs/chapters/scenes that do not set their own.',
+      example: 'clx1234567890',
+    }),
+  defaultBackgroundUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .meta({
+      description: 'Resolved URL of the book-level default background (from the joined ' + 'file, if loaded).',
+      example: '/files/1/2025/12/forest.jpg',
+    }),
   deleted: z.boolean().meta({
     description: 'Whether the book is soft-deleted',
     example: false,
@@ -211,58 +217,28 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { storyId } = request.params
-        const { id, name, sentenceSummary, paragraphSummary, summary, nodeType, sortOrder } = request.body
+      const userId = request.user!.id
+      const { storyId } = request.params
 
-        // Verify story exists and is owned by user
-        const story = await prisma.story.findFirst({
-          where: {
-            id: storyId,
-            ownerId: userId,
-          },
-        })
+      // Ownership, kind derivation and sortOrder all live in the shared node
+      // service, so this route and /my/nodes can never drift apart.
+      const created = await createNode(
+        userId,
+        { parentId: storyId, ...request.body },
+        { trusted: true, expectKind: 'book' },
+      )
 
-        if (!story) {
-          return reply.status(404).send({ error: 'Story not found' })
-        }
+      const book = await prisma.book.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { coverArtFile: true, defaultBackgroundFile: true },
+      })
 
-        // Determine sort order if not provided
-        let finalSortOrder = sortOrder
-        if (finalSortOrder === undefined) {
-          const maxBook = await prisma.book.findFirst({
-            where: { storyId },
-            orderBy: { sortOrder: 'desc' },
-            select: { sortOrder: true },
-          })
-          finalSortOrder = maxBook ? maxBook.sortOrder + 1 : 0
-        }
+      fastify.log.info({ bookId: book.id, storyId, userId }, 'Book created')
 
-        const book = await prisma.book.create({
-          data: {
-            ...(id && { id }), // Use client-provided ID if present
-            name,
-            sentenceSummary: sentenceSummary || null,
-            paragraphSummary: paragraphSummary || null,
-            summary: summary || null,
-            storyId,
-            sortOrder: finalSortOrder,
-            nodeType: nodeType || 'story',
-          },
-          include: { coverArtFile: true, defaultBackgroundFile: true },
-        })
-
-        fastify.log.info({ bookId: book.id, storyId, userId }, 'Book created')
-
-        return reply.status(201).send({
-          success: true as const,
-          book: formatBook(book),
-        })
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to create book')
-        return reply.status(500).send({ error: 'Failed to create book' })
-      }
+      return reply.status(201).send({
+        success: true as const,
+        book: formatBook(book),
+      })
     },
   )
 
@@ -383,42 +359,22 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { id } = request.params
-        const updates = request.body
+    async (request) => {
+      const userId = request.user!.id
+      const { id } = request.params
 
-        // Check if book exists and user owns the parent story
-        const existingBook = await prisma.book.findFirst({
-          where: {
-            id,
-            story: {
-              ownerId: userId,
-            },
-          },
-        })
+      await updateNode(userId, id, request.body, { trusted: true, expectKind: 'book' })
 
-        if (!existingBook) {
-          return reply.status(404).send({ error: 'Book not found' })
-        }
+      const book = await prisma.book.findUniqueOrThrow({
+        where: { id },
+        include: { coverArtFile: true, defaultBackgroundFile: true },
+      })
 
-        // Update book
-        const book = await prisma.book.update({
-          where: { id },
-          data: updates,
-          include: { coverArtFile: true, defaultBackgroundFile: true },
-        })
+      fastify.log.info({ bookId: book.id, userId }, 'Book updated')
 
-        fastify.log.info({ bookId: book.id, userId }, 'Book updated')
-
-        return {
-          success: true as const,
-          book: formatBook(book),
-        }
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to update book')
-        return reply.status(500).send({ error: 'Failed to update book' })
+      return {
+        success: true as const,
+        book: formatBook(book),
       }
     },
   )
@@ -428,19 +384,15 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/books/:id',
     {
       schema: {
-        description:
-          'Delete a book. By default performs soft delete; use ?permanent=true for hard delete.',
+        description: 'Delete a book. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-books'],
         security: [{ sessionAuth: [] }],
         params: bookIdParamSchema,
         querystring: z.strictObject({
-          permanent: z
-            .enum(['true', 'false'])
-            .optional()
-            .meta({
-              description: 'If true, permanently delete (no recovery possible)',
-              example: 'false',
-            }),
+          permanent: z.enum(['true', 'false']).optional().meta({
+            description: 'If true, permanently delete (no recovery possible)',
+            example: 'false',
+          }),
         }),
         response: {
           200: deleteBookResponseSchema,
@@ -494,9 +446,7 @@ const myBooksRoutes: FastifyPluginAsyncZod = async (fastify) => {
           const now = new Date()
           const arcIds = existingBook.arcs.map((a) => a.id)
           const chapterIds = existingBook.arcs.flatMap((a) => a.chapters.map((c) => c.id))
-          const sceneIds = existingBook.arcs.flatMap((a) =>
-            a.chapters.flatMap((c) => c.scenes.map((s) => s.id)),
-          )
+          const sceneIds = existingBook.arcs.flatMap((a) => a.chapters.flatMap((c) => c.scenes.map((s) => s.id)))
           await prisma.$transaction([
             prisma.book.update({
               where: { id },

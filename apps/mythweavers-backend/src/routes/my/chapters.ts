@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
+import { createNode, updateNode } from '../../services/story/index.js'
 
 // Node type schema
 const nodeTypeSchema = z.enum(['story', 'non-story', 'context']).meta({
@@ -53,18 +54,22 @@ const chapterSchema = z.strictObject({
     description: 'Chapter status: draft, needs_work, review, done',
     example: 'draft',
   }),
-  defaultBackgroundFileId: z.string().nullable().meta({
-    description:
-      'Chapter-level default background image file ID. Inherited downward by ' +
-      'scenes that do not set their own.',
-    example: 'clx1234567890',
-  }),
-  defaultBackgroundUrl: z.string().nullable().optional().meta({
-    description:
-      'Resolved URL of the chapter-level default background (from the joined ' +
-      'file, if loaded).',
-    example: '/files/1/2025/12/forest.jpg',
-  }),
+  defaultBackgroundFileId: z
+    .string()
+    .nullable()
+    .meta({
+      description:
+        'Chapter-level default background image file ID. Inherited downward by ' + 'scenes that do not set their own.',
+      example: 'clx1234567890',
+    }),
+  defaultBackgroundUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .meta({
+      description: 'Resolved URL of the chapter-level default background (from the joined ' + 'file, if loaded).',
+      example: '/files/1/2025/12/forest.jpg',
+    }),
   deleted: z.boolean().meta({
     description: 'Whether the chapter is soft-deleted',
     example: false,
@@ -221,61 +226,27 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { arcId } = request.params
-        const { id, name, sentenceSummary, paragraphSummary, summary, nodeType, sortOrder } = request.body
+      const userId = request.user!.id
+      const { arcId } = request.params
 
-        // Verify arc exists and user owns the parent story
-        const arc = await prisma.arc.findFirst({
-          where: {
-            id: arcId,
-            book: {
-              story: {
-                ownerId: userId,
-              },
-            },
-          },
-        })
+      // Ownership, kind derivation and sortOrder all live in the shared node
+      // service, so this route and /my/nodes can never drift apart. (The old
+      // inline version silently dropped `status` on create; the service honours
+      // it, matching what the request body has always advertised.)
+      const created = await createNode(
+        userId,
+        { parentId: arcId, ...request.body },
+        { trusted: true, expectKind: 'chapter' },
+      )
 
-        if (!arc) {
-          return reply.status(404).send({ error: 'Arc not found' })
-        }
+      const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id: created.id } })
 
-        // Determine sort order if not provided
-        let finalSortOrder = sortOrder
-        if (finalSortOrder === undefined) {
-          const maxChapter = await prisma.chapter.findFirst({
-            where: { arcId },
-            orderBy: { sortOrder: 'desc' },
-            select: { sortOrder: true },
-          })
-          finalSortOrder = maxChapter ? maxChapter.sortOrder + 1 : 0
-        }
+      fastify.log.info({ chapterId: chapter.id, arcId, userId }, 'Chapter created')
 
-        const chapter = await prisma.chapter.create({
-          data: {
-            ...(id && { id }), // Use client-provided ID if present
-            name,
-            sentenceSummary: sentenceSummary || null,
-            paragraphSummary: paragraphSummary || null,
-            summary: summary || null,
-            arcId,
-            sortOrder: finalSortOrder,
-            nodeType: nodeType || 'story',
-          },
-        })
-
-        fastify.log.info({ chapterId: chapter.id, arcId, userId }, 'Chapter created')
-
-        return reply.status(201).send({
-          success: true as const,
-          chapter: formatChapter(chapter),
-        })
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to create chapter')
-        return reply.status(500).send({ error: 'Failed to create chapter' })
-      }
+      return reply.status(201).send({
+        success: true as const,
+        chapter: formatChapter(chapter),
+      })
     },
   )
 
@@ -402,51 +373,20 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { id } = request.params
-        const updates = request.body
+    async (request) => {
+      const userId = request.user!.id
+      const { id } = request.params
 
-        // Check if chapter exists and user owns the parent story
-        const existingChapter = await prisma.chapter.findFirst({
-          where: {
-            id,
-            arc: {
-              book: {
-                story: {
-                  ownerId: userId,
-                },
-              },
-            },
-          },
-        })
+      // publishedOn arrives as an ISO string; the service coerces it.
+      await updateNode(userId, id, request.body, { trusted: true, expectKind: 'chapter' })
 
-        if (!existingChapter) {
-          return reply.status(404).send({ error: 'Chapter not found' })
-        }
+      const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id } })
 
-        // Convert publishedOn string to Date if provided
-        const data: any = { ...updates }
-        if (data.publishedOn !== undefined && data.publishedOn !== null) {
-          data.publishedOn = new Date(data.publishedOn)
-        }
+      fastify.log.info({ chapterId: chapter.id, userId }, 'Chapter updated')
 
-        // Update chapter
-        const chapter = await prisma.chapter.update({
-          where: { id },
-          data,
-        })
-
-        fastify.log.info({ chapterId: chapter.id, userId }, 'Chapter updated')
-
-        return {
-          success: true as const,
-          chapter: formatChapter(chapter),
-        }
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to update chapter')
-        return reply.status(500).send({ error: 'Failed to update chapter' })
+      return {
+        success: true as const,
+        chapter: formatChapter(chapter),
       }
     },
   )
@@ -456,19 +396,15 @@ const myChaptersRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/chapters/:id',
     {
       schema: {
-        description:
-          'Delete a chapter. By default performs soft delete; use ?permanent=true for hard delete.',
+        description: 'Delete a chapter. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-chapters'],
         security: [{ sessionAuth: [] }],
         params: chapterIdParamSchema,
         querystring: z.strictObject({
-          permanent: z
-            .enum(['true', 'false'])
-            .optional()
-            .meta({
-              description: 'If true, permanently delete (no recovery possible)',
-              example: 'false',
-            }),
+          permanent: z.enum(['true', 'false']).optional().meta({
+            description: 'If true, permanently delete (no recovery possible)',
+            example: 'false',
+          }),
         }),
         response: {
           200: deleteChapterResponseSchema,

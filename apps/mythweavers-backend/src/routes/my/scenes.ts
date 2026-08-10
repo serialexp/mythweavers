@@ -1,9 +1,9 @@
-import type { Prisma } from '@prisma/client'
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
+import { createNode, updateNode } from '../../services/story/index.js'
 
 // Perspective schema
 const perspectiveSchema = z.enum(['FIRST', 'THIRD']).meta({
@@ -46,11 +46,14 @@ const sceneSchema = z.strictObject({
   }),
   sentenceSummary: z.string().nullable().meta({ description: 'One-sentence Snowflake summary' }),
   paragraphSummary: z.string().nullable().meta({ description: 'Paragraph-length Snowflake summary' }),
-  summarySegments: z.array(summarySegmentSchema).nullable().meta({
-    description:
-      'Per-segment summaries for branching scenes. Null when the scene has ' +
-      'no segmented summary; readers fall back to `summary`.',
-  }),
+  summarySegments: z
+    .array(summarySegmentSchema)
+    .nullable()
+    .meta({
+      description:
+        'Per-segment summaries for branching scenes. Null when the scene has ' +
+        'no segmented summary; readers fall back to `summary`.',
+    }),
   chapterId: z.string().meta({
     description: 'Parent chapter ID',
     example: 'clx9876543210',
@@ -97,18 +100,23 @@ const sceneSchema = z.strictObject({
     description: 'When this scene occurs in story timeline (minutes)',
     example: 1440,
   }),
-  defaultBackgroundFileId: z.string().nullable().meta({
-    description:
-      'Scene-level default background image file ID. Innermost level — ' +
-      'overrides any inherited default at the start of this scene.',
-    example: 'clx1234567890',
-  }),
-  defaultBackgroundUrl: z.string().nullable().optional().meta({
-    description:
-      'Resolved URL of the scene-level default background (from the joined ' +
-      'file, if loaded).',
-    example: '/files/1/2025/12/forest.jpg',
-  }),
+  defaultBackgroundFileId: z
+    .string()
+    .nullable()
+    .meta({
+      description:
+        'Scene-level default background image file ID. Innermost level — ' +
+        'overrides any inherited default at the start of this scene.',
+      example: 'clx1234567890',
+    }),
+  defaultBackgroundUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .meta({
+      description: 'Resolved URL of the scene-level default background (from the joined ' + 'file, if loaded).',
+      example: '/files/1/2025/12/forest.jpg',
+    }),
   deleted: z.boolean().meta({
     description: 'Whether the scene is soft-deleted',
     example: false,
@@ -203,8 +211,7 @@ const updateSceneBodySchema = z.strictObject({
   sentenceSummary: z.string().nullable().optional().meta({ description: 'One-sentence Snowflake summary' }),
   paragraphSummary: z.string().nullable().optional().meta({ description: 'Paragraph-length Snowflake summary' }),
   summarySegments: z.array(summarySegmentSchema).nullable().optional().meta({
-    description:
-      'Per-segment summaries for branching scenes. Send `null` to clear.',
+    description: 'Per-segment summaries for branching scenes. Send `null` to clear.',
   }),
   sortOrder: z.number().int().optional().meta({
     description: 'Sort order within chapter',
@@ -295,9 +302,7 @@ function formatScene(scene: any) {
   const { defaultBackgroundFile, summarySegments, ...rest } = scene
   return {
     ...rest,
-    summarySegments: (summarySegments ?? null) as
-      | z.infer<typeof summarySegmentSchema>[]
-      | null,
+    summarySegments: (summarySegments ?? null) as z.infer<typeof summarySegmentSchema>[] | null,
     defaultBackgroundUrl: defaultBackgroundFile?.path ?? null,
     createdAt: scene.createdAt.toISOString(),
     updatedAt: scene.updatedAt.toISOString(),
@@ -328,85 +333,27 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { chapterId } = request.params
-        const {
-          id,
-          name,
-          sentenceSummary,
-          paragraphSummary,
-          summary,
-          summarySegments,
-          sortOrder,
-          includeInFull,
-          perspective,
-          viewpointCharacterId,
-          activeCharacterIds,
-          activeContextItemIds,
-          goal,
-          storyTime,
-        } = request.body
+      const userId = request.user!.id
+      const { chapterId } = request.params
 
-        // Verify chapter exists and user owns the parent story
-        const chapter = await prisma.chapter.findFirst({
-          where: {
-            id: chapterId,
-            arc: {
-              book: {
-                story: {
-                  ownerId: userId,
-                },
-              },
-            },
-          },
-        })
+      // Ownership, kind derivation and sortOrder all live in the shared node
+      // service, so this route and /my/nodes can never drift apart. (The old
+      // inline version silently dropped `status` on create; the service honours
+      // it, matching what the request body has always advertised.)
+      const created = await createNode(
+        userId,
+        { parentId: chapterId, ...request.body },
+        { trusted: true, expectKind: 'scene' },
+      )
 
-        if (!chapter) {
-          return reply.status(404).send({ error: 'Chapter not found' })
-        }
+      const scene = await prisma.scene.findUniqueOrThrow({ where: { id: created.id } })
 
-        // Determine sort order if not provided
-        let finalSortOrder = sortOrder
-        if (finalSortOrder === undefined) {
-          const maxScene = await prisma.scene.findFirst({
-            where: { chapterId },
-            orderBy: { sortOrder: 'desc' },
-            select: { sortOrder: true },
-          })
-          finalSortOrder = maxScene ? maxScene.sortOrder + 1 : 0
-        }
+      fastify.log.info({ sceneId: scene.id, chapterId, userId }, 'Scene created')
 
-        const scene = await prisma.scene.create({
-          data: {
-            id, // Use client-provided ID if given
-            name,
-            sentenceSummary: sentenceSummary || null,
-            paragraphSummary: paragraphSummary || null,
-            summary: summary || null,
-            summarySegments: (summarySegments ?? null) as Prisma.InputJsonValue,
-            chapterId,
-            sortOrder: finalSortOrder,
-            includeInFull: includeInFull ?? 2, // Default to 2 (full content) for new scenes
-            perspective: perspective || null,
-            viewpointCharacterId: viewpointCharacterId || null,
-            activeCharacterIds: (activeCharacterIds || null) as Prisma.InputJsonValue,
-            activeContextItemIds: (activeContextItemIds || null) as Prisma.InputJsonValue,
-            goal: goal || null,
-            storyTime: storyTime || null,
-          },
-        })
-
-        fastify.log.info({ sceneId: scene.id, chapterId, userId }, 'Scene created')
-
-        return reply.status(201).send({
-          success: true as const,
-          scene: formatScene(scene),
-        })
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to create scene')
-        return reply.status(500).send({ error: 'Failed to create scene' })
-      }
+      return reply.status(201).send({
+        success: true as const,
+        scene: formatScene(scene),
+      })
     },
   )
 
@@ -537,47 +484,19 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { id } = request.params
-        const updates = request.body
+    async (request) => {
+      const userId = request.user!.id
+      const { id } = request.params
 
-        // Check if scene exists and user owns the parent story
-        const existingScene = await prisma.scene.findFirst({
-          where: {
-            id,
-            chapter: {
-              arc: {
-                book: {
-                  story: {
-                    ownerId: userId,
-                  },
-                },
-              },
-            },
-          },
-        })
+      await updateNode(userId, id, request.body, { trusted: true, expectKind: 'scene' })
 
-        if (!existingScene) {
-          return reply.status(404).send({ error: 'Scene not found' })
-        }
+      const scene = await prisma.scene.findUniqueOrThrow({ where: { id } })
 
-        // Update scene
-        const scene = await prisma.scene.update({
-          where: { id },
-          data: updates as Prisma.SceneUpdateInput,
-        })
+      fastify.log.info({ sceneId: scene.id, userId }, 'Scene updated')
 
-        fastify.log.info({ sceneId: scene.id, userId }, 'Scene updated')
-
-        return {
-          success: true as const,
-          scene: formatScene(scene),
-        }
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to update scene')
-        return reply.status(500).send({ error: 'Failed to update scene' })
+      return {
+        success: true as const,
+        scene: formatScene(scene),
       }
     },
   )
@@ -587,19 +506,15 @@ const myScenesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/scenes/:id',
     {
       schema: {
-        description:
-          'Delete a scene. By default performs soft delete; use ?permanent=true for hard delete.',
+        description: 'Delete a scene. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-scenes'],
         security: [{ sessionAuth: [] }],
         params: sceneIdParamSchema,
         querystring: z.strictObject({
-          permanent: z
-            .enum(['true', 'false'])
-            .optional()
-            .meta({
-              description: 'If true, permanently delete (no recovery possible)',
-              example: 'false',
-            }),
+          permanent: z.enum(['true', 'false']).optional().meta({
+            description: 'If true, permanently delete (no recovery possible)',
+            example: 'false',
+          }),
         }),
         response: {
           200: deleteSceneResponseSchema,

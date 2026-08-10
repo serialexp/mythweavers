@@ -1,3 +1,89 @@
+# ACTION NEEDED FROM BART: run the OAuth migration on dev (2026-08-10)
+
+MCP now speaks the full OAuth 2.1 browser flow, so `claude mcp add --transport
+http mythweavers <url>` with no token works end to end. The migration
+`20260810044235_add_oauth_authorization_code_flow` is generated and **applied to
+`mythweavers_test` only** — there is no `.env` in this checkout, so I could not
+touch the dev database.
+
+```
+pnpm db:migrate          # applies the existing migration to dev
+```
+
+It is additive only (3 new tables, 4 nullable columns on `AccessToken`), so
+there is nothing destructive to review.
+
+Two other things worth knowing:
+
+- **The OpenAPI client is already regenerated.** I dumped the spec from the
+  Fastify app directly rather than starting the dev server, so
+  `apps/mythweavers-story-editor/src/api-client` is current. Re-running
+  `pnpm generate:client` against a live backend should be a no-op; if it
+  isn't, trust the live one.
+- **`.env.example` was wrong**: it said `PORT=3001` / `API_URL=...:3001`
+  against a server that defaults to 3201. Fixed, and `EDITOR_URL` added.
+  If your real `.env` has the 3001 value, fix it there too — every OAuth URL
+  derives from `API_URL`, and the server now refuses to boot if it has a
+  trailing slash or a path.
+
+To verify manually once the migration is in and the dev stack is up:
+`claude mcp remove mythweavers` then
+`claude mcp add --transport http mythweavers http://localhost:3201/mcp` with no
+header. The browser should open the consent page; approve, and `mw_outline`
+should work. Then revoke it from the new **Connected apps** page (user menu on
+the story list) and confirm the next tool call 401s.
+
+---
+
+# ACTION NEEDED FROM BART: migration for `Map.fileId` foreign key (2026-08-10)
+
+`apps/mythweavers-backend/prisma/schema.prisma` now declares the relation that
+`Map.fileId` never had:
+
+```prisma
+file File? @relation("MapImage", fields: [fileId], references: [id], onDelete: SetNull)
+```
+
+I did not generate the migration — per the repo rules, Prisma has to generate it
+and you have to run it.
+
+**Why it matters.** `Map.fileId` was a bare `String?`. Every other `File`
+reference in the schema is `onDelete: SetNull`, and the delete endpoint's own
+comment claims "deleting the row safely nulls each reference rather than
+orphaning anything" — but with no FK, that cascade never fired for maps.
+`fileUsageCountSelect` omitted maps too, so `GET /my/files/:id` reported a map's
+image as **unused**. Delete it on that basis and the map is silently orphaned,
+which is what `GET /my/files/paodvxt2xmtmirnn1o1keus7 404` on production looks
+like. Both are fixed here; the count fix is live already, the cascade needs the
+migration.
+
+**This migration will fail on a database that already has orphans** — and
+production has at least one, since that is the bug. Postgres refuses to add a
+foreign key that existing rows violate. Find them first:
+
+```sql
+SELECT m.id, m.name, m."fileId"
+FROM "Map" m
+LEFT JOIN "File" f ON f.id = m."fileId"
+WHERE m."fileId" IS NOT NULL AND f.id IS NULL;
+```
+
+Each row is a map whose image is gone. Nulling `fileId` loses nothing that still
+exists, and the UI now says "This map has no image yet" for a null instead of
+showing an empty canvas — but it is your data, so it is your call whether to null
+them or re-upload the images first. Once the query returns no rows:
+
+```
+pnpm db:migrate   # name it something like add_map_file_relation
+```
+
+**Worth checking while you are in there:** whether that file was deleted through
+the UI (confirming the theory above) or vanished some other way — e.g. uploaded
+in a different environment, since `File` rows carry a `localPath`/`r2Key` that
+only the uploading environment can resolve.
+
+---
+
 # OpenAI explicit prompt-cache breakpoints — handoff (2026-07-23)
 
 **Root cause (proven empirically against gpt-5.6-sol):** OpenAI *implicit* prompt

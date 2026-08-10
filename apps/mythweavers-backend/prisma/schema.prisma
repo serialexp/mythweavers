@@ -112,6 +112,9 @@ model User {
   imageUsageLogs    ImageUsageLog[]
   royalRoadAccount  RoyalRoadAccount?
 
+  oauthAuthorizationRequests OAuthAuthorizationRequest[]
+  oauthRefreshTokens         OAuthRefreshToken[]
+
   @@index([email])
   @@index([username])
 }
@@ -140,8 +143,21 @@ model AccessToken {
   expiresAt DateTime? // null = never expires
   createdAt DateTime  @default(now())
 
+  /// RFC 8707 audience this token was minted for. NULL on device-flow tokens,
+  /// hand-made tokens, and everything issued before the authorization-code
+  /// flow existed — those are audience-less and accepted at every resource.
+  resource  String?
+  /// Space-delimited granted scopes. NULL on audience-less legacy tokens.
+  scope     String?
+  /// client_id of the OAuth client. NULL = not issued via authorization_code.
+  clientId  String?
+  /// Refresh-token family. Revoking the family deletes every token carrying it.
+  familyId  String?
+
   @@index([token])
   @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
 }
 
 model DeviceCode {
@@ -155,6 +171,102 @@ model DeviceCode {
 
   @@index([deviceCode])
   @@index([userCode])
+}
+
+/// An OAuth 2.1 client, created by RFC 7591 dynamic registration. Registration
+/// is open (that is what lets an MCP client self-enrol), so the cleanup
+/// scheduler prunes clients that never completed a token exchange.
+model OAuthClient {
+  id                      String    @id @default(cuid())
+  /// Public identifier handed to the client. Format: mwc_<32 hex>.
+  clientId                String    @unique
+  /// sha256-hex. Null for public clients, which is all DCR mints today.
+  clientSecretHash        String?
+  clientName              String    @default("Unnamed MCP client")
+  redirectUris            String[]
+  grantTypes              String[]  @default(["authorization_code", "refresh_token"])
+  responseTypes           String[]  @default(["code"])
+  tokenEndpointAuthMethod String    @default("none")
+  scope                   String?
+  clientUri               String?
+  logoUri                 String?
+  softwareId              String?
+  softwareVersion         String?
+  /// Verbatim RFC 7591 metadata as submitted, so registration reads echo it
+  /// back unchanged even as first-class columns are added over time.
+  metadata                Json
+  createdAt               DateTime  @default(now())
+  /// Null until the client completes its first token exchange.
+  lastUsedAt              DateTime?
+
+  authorizationRequests OAuthAuthorizationRequest[]
+  refreshTokens         OAuthRefreshToken[]
+
+  @@index([createdAt])
+  @@index([lastUsedAt])
+}
+
+/// A pending `/oauth/authorize` request, and — once the user consents — the
+/// one-time authorization code it produced.
+model OAuthAuthorizationRequest {
+  id                  String      @id @default(cuid())
+  /// Opaque handle carried in the consent-page URL. Kept separate from `id` so
+  /// a row identifier never lands in a browser address bar or Referer header.
+  requestId           String      @unique
+  clientId            String
+  client              OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  redirectUri         String
+  state               String?
+  scope               String
+  /// RFC 8707 audience requested by the client. Null when it sent none.
+  resource            String?
+  codeChallenge       String
+  codeChallengeMethod String      @default("S256")
+  /// Set when the user approves; null while consent is pending.
+  userId              Int?
+  user                User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// sha256-hex of the one-time authorization code. Null until approved.
+  codeHash            String?     @unique
+  approvedAt          DateTime?
+  deniedAt            DateTime?
+  /// Set when the code is redeemed. A second redemption is a replay and burns
+  /// every token the first redemption produced (OAuth 2.1 section 4.1.3).
+  consumedAt          DateTime?
+  /// Consent window.
+  expiresAt           DateTime
+  /// Code lifetime, set at approval time.
+  codeExpiresAt       DateTime?
+  createdAt           DateTime    @default(now())
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@index([clientId])
+}
+
+/// A rotating refresh token. Every token rotated out of one grant shares a
+/// `familyId`; presenting an already-used member revokes the whole family.
+model OAuthRefreshToken {
+  id           String      @id @default(cuid())
+  /// sha256-hex of the opaque token (mwr_<64 hex>). Plaintext is never stored.
+  tokenHash    String      @unique
+  familyId     String
+  userId       Int
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  scope        String
+  resource     String?
+  /// First redemption timestamp. Non-null on a second redemption = reuse.
+  usedAt       DateTime?
+  /// Id of the token this one rotated into, for audit and graph walking.
+  replacedById String?
+  revokedAt    DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime    @default(now())
+
+  @@index([familyId])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 model Adventure {
@@ -793,6 +905,7 @@ model File {
   arcDefaultBackgrounds     Arc[]       @relation("ArcDefaultBackground")
   chapterDefaultBackgrounds Chapter[]   @relation("ChapterDefaultBackground")
   sceneDefaultBackgrounds   Scene[]     @relation("SceneDefaultBackground")
+  mapImages                 Map[]       @relation("MapImage")
 
   imageUsageLogs ImageUsageLog[] @relation("ImageUsageLogFile")
 
@@ -844,7 +957,12 @@ model Map {
   storyId        String
   story          Story      @relation(fields: [storyId], references: [id], onDelete: Cascade)
   name           String
+  // The map's background image. This was a bare String? for a long time, which
+  // meant the SetNull cascade every other File reference relies on never fired
+  // here: deleting a file left the map pointing at an id that no longer
+  // resolved, and the map then rendered as an unexplained empty canvas.
   fileId         String?
+  file           File?      @relation("MapImage", fields: [fileId], references: [id], onDelete: SetNull)
   borderColor    String?
   propertySchema Json? // Schema defining available properties and state fields for landmarks
   landmarks      Landmark[]

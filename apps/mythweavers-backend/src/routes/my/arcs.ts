@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
+import { createNode, updateNode } from '../../services/story/index.js'
 
 // Node type schema
 const nodeTypeSchema = z.enum(['story', 'non-story', 'context']).meta({
@@ -35,18 +36,23 @@ const arcSchema = z.strictObject({
     example: 0,
   }),
   nodeType: nodeTypeSchema,
-  defaultBackgroundFileId: z.string().nullable().meta({
-    description:
-      'Arc-level default background image file ID. Inherited downward by ' +
-      'chapters/scenes that do not set their own.',
-    example: 'clx1234567890',
-  }),
-  defaultBackgroundUrl: z.string().nullable().optional().meta({
-    description:
-      'Resolved URL of the arc-level default background (from the joined ' +
-      'file, if loaded).',
-    example: '/files/1/2025/12/forest.jpg',
-  }),
+  defaultBackgroundFileId: z
+    .string()
+    .nullable()
+    .meta({
+      description:
+        'Arc-level default background image file ID. Inherited downward by ' +
+        'chapters/scenes that do not set their own.',
+      example: 'clx1234567890',
+    }),
+  defaultBackgroundUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .meta({
+      description: 'Resolved URL of the arc-level default background (from the joined ' + 'file, if loaded).',
+      example: '/files/1/2025/12/forest.jpg',
+    }),
   deleted: z.boolean().meta({
     description: 'Whether the arc is soft-deleted',
     example: false,
@@ -180,59 +186,25 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { bookId } = request.params
-        const { id, name, sentenceSummary, paragraphSummary, summary, nodeType, sortOrder } = request.body
+      const userId = request.user!.id
+      const { bookId } = request.params
 
-        // Verify book exists and user owns the parent story
-        const book = await prisma.book.findFirst({
-          where: {
-            id: bookId,
-            story: {
-              ownerId: userId,
-            },
-          },
-        })
+      // Ownership, kind derivation and sortOrder all live in the shared node
+      // service, so this route and /my/nodes can never drift apart.
+      const created = await createNode(
+        userId,
+        { parentId: bookId, ...request.body },
+        { trusted: true, expectKind: 'arc' },
+      )
 
-        if (!book) {
-          return reply.status(404).send({ error: 'Book not found' })
-        }
+      const arc = await prisma.arc.findUniqueOrThrow({ where: { id: created.id } })
 
-        // Determine sort order if not provided
-        let finalSortOrder = sortOrder
-        if (finalSortOrder === undefined) {
-          const maxArc = await prisma.arc.findFirst({
-            where: { bookId },
-            orderBy: { sortOrder: 'desc' },
-            select: { sortOrder: true },
-          })
-          finalSortOrder = maxArc ? maxArc.sortOrder + 1 : 0
-        }
+      fastify.log.info({ arcId: arc.id, bookId, userId }, 'Arc created')
 
-        const arc = await prisma.arc.create({
-          data: {
-            ...(id && { id }), // Use client-provided ID if present
-            name,
-            sentenceSummary: sentenceSummary || null,
-            paragraphSummary: paragraphSummary || null,
-            summary: summary || null,
-            bookId,
-            sortOrder: finalSortOrder,
-            nodeType: nodeType || 'story',
-          },
-        })
-
-        fastify.log.info({ arcId: arc.id, bookId, userId }, 'Arc created')
-
-        return reply.status(201).send({
-          success: true as const,
-          arc: formatArc(arc),
-        })
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to create arc')
-        return reply.status(500).send({ error: 'Failed to create arc' })
-      }
+      return reply.status(201).send({
+        success: true as const,
+        arc: formatArc(arc),
+      })
     },
   )
 
@@ -355,43 +327,19 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
-      try {
-        const userId = request.user!.id
-        const { id } = request.params
-        const updates = request.body
+    async (request) => {
+      const userId = request.user!.id
+      const { id } = request.params
 
-        // Check if arc exists and user owns the parent story
-        const existingArc = await prisma.arc.findFirst({
-          where: {
-            id,
-            book: {
-              story: {
-                ownerId: userId,
-              },
-            },
-          },
-        })
+      await updateNode(userId, id, request.body, { trusted: true, expectKind: 'arc' })
 
-        if (!existingArc) {
-          return reply.status(404).send({ error: 'Arc not found' })
-        }
+      const arc = await prisma.arc.findUniqueOrThrow({ where: { id } })
 
-        // Update arc
-        const arc = await prisma.arc.update({
-          where: { id },
-          data: updates,
-        })
+      fastify.log.info({ arcId: arc.id, userId }, 'Arc updated')
 
-        fastify.log.info({ arcId: arc.id, userId }, 'Arc updated')
-
-        return {
-          success: true as const,
-          arc: formatArc(arc),
-        }
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to update arc')
-        return reply.status(500).send({ error: 'Failed to update arc' })
+      return {
+        success: true as const,
+        arc: formatArc(arc),
       }
     },
   )
@@ -401,19 +349,15 @@ const myArcsRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/arcs/:id',
     {
       schema: {
-        description:
-          'Delete an arc. By default performs soft delete; use ?permanent=true for hard delete.',
+        description: 'Delete an arc. By default performs soft delete; use ?permanent=true for hard delete.',
         tags: ['my-arcs'],
         security: [{ sessionAuth: [] }],
         params: arcIdParamSchema,
         querystring: z.strictObject({
-          permanent: z
-            .enum(['true', 'false'])
-            .optional()
-            .meta({
-              description: 'If true, permanently delete (no recovery possible)',
-              example: 'false',
-            }),
+          permanent: z.enum(['true', 'false']).optional().meta({
+            description: 'If true, permanently delete (no recovery possible)',
+            example: 'false',
+          }),
         }),
         response: {
           200: deleteArcResponseSchema,

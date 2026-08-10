@@ -21,8 +21,10 @@ import { z } from 'zod'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const packageJson = JSON.parse(readFileSync(path.join(__dirname, '../package.json'), 'utf-8'))
 const VERSION = packageJson.version
-import { isAllowedOrigin } from './lib/cors.js'
+import { corsDelegator } from './lib/cors.js'
 import { startCostSyncScheduler, stopCostSyncScheduler } from './lib/cost-sync-scheduler.js'
+import { startOAuthCleanupScheduler, stopOAuthCleanupScheduler } from './lib/oauth-cleanup-scheduler.js'
+import { assertOAuthUrlsSane } from './lib/oauth-urls.js'
 import { prisma } from './lib/prisma.js'
 import { registerApplicationRoutes } from './register-routes.js'
 import { startWorker as startRoyalRoadWorker, stopWorker as stopRoyalRoadWorker } from './workers/royal-road.js'
@@ -47,6 +49,12 @@ const server = Fastify({
   },
 })
 
+// Every URL an OAuth client is told to use derives from API_URL. A trailing
+// slash or a stray path makes the resource identifier mismatch what clients
+// compute, and they fail discovery before a request ever reaches us — so fail
+// loudly at boot instead.
+assertOAuthUrlsSane()
+
 // Set Zod validator and serializer compilers
 server.setValidatorCompiler(validatorCompiler)
 server.setSerializerCompiler(serializerCompiler)
@@ -59,15 +67,11 @@ function sanitizeHeaders(headers: Record<string, unknown>) {
   return sanitized
 }
 
-// Credentialed CORS must use an explicit allowlist. Requests without an
-// Origin header (CLI/server-to-server) remain valid.
-await server.register(cors, {
-  origin: (origin, cb) => {
-    cb(null, isAllowedOrigin(origin))
-  },
-  credentials: true,
-  exposedHeaders: ['Content-Disposition'],
-})
+// Credentialed CORS uses an explicit allowlist; requests without an Origin
+// header (CLI/server-to-server) remain valid. The OAuth discovery surface and
+// /mcp are additionally reachable from any origin, without credentials — see
+// corsDelegator.
+await server.register(cors, { delegator: corsDelegator })
 
 // Cookie support (required for session management)
 await server.register(cookie, {
@@ -253,6 +257,7 @@ try {
 
   // Start background cost sync scheduler
   startCostSyncScheduler(server.log)
+  startOAuthCleanupScheduler(server.log)
 
   // Start Royal Road publishing worker (no-op unless ROYAL_ROAD_WORKER_ENABLED=true)
   startRoyalRoadWorker(server.log)
@@ -271,6 +276,7 @@ signals.forEach((signal) => {
     shuttingDown = true
     server.log.info(`Received ${signal}, closing server...`)
     stopCostSyncScheduler()
+    stopOAuthCleanupScheduler()
     stopRoyalRoadWorker()
 
     // Backstop: server.close() can stall indefinitely on connections whose
