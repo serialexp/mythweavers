@@ -59,6 +59,7 @@ const fileUsageSchema = z
     arcDefaultBackground: z.number().int().meta({ description: 'Arcs using this as their default background' }),
     chapterDefaultBackground: z.number().int().meta({ description: 'Chapters using this as their default background' }),
     sceneDefaultBackground: z.number().int().meta({ description: 'Scenes using this as their default background' }),
+    mapImage: z.number().int().meta({ description: 'Maps using this file as their background image' }),
     total: z.number().int().meta({ description: 'Sum across all reference types' }),
   })
   .meta({
@@ -96,6 +97,7 @@ const fileUsageCountSelect = {
   arcDefaultBackgrounds: true,
   chapterDefaultBackgrounds: true,
   sceneDefaultBackgrounds: true,
+  mapImages: true,
 } as const
 
 type PrismaFileCount = {
@@ -110,6 +112,7 @@ type PrismaFileCount = {
   arcDefaultBackgrounds: number
   chapterDefaultBackgrounds: number
   sceneDefaultBackgrounds: number
+  mapImages: number
 }
 
 /**
@@ -130,6 +133,7 @@ function buildFileUsage(c: PrismaFileCount) {
     arcDefaultBackground: c.arcDefaultBackgrounds,
     chapterDefaultBackground: c.chapterDefaultBackgrounds,
     sceneDefaultBackground: c.sceneDefaultBackgrounds,
+    mapImage: c.mapImages,
   }
   const total = Object.values(usage).reduce((sum, v) => sum + v, 0)
   return { ...usage, total }
@@ -144,10 +148,7 @@ function buildFileUsage(c: PrismaFileCount) {
  * chain) and gates on `ownerId: userId`, so this cannot be used by user A
  * to peek at user B's files even if they pass user B's storyId.
  */
-async function collectFileIdsReferencedByStory(
-  userId: number,
-  storyId: string,
-): Promise<string[]> {
+async function collectFileIdsReferencedByStory(userId: number, storyId: string): Promise<string[]> {
   const ids = new Set<string>()
   const add = (v: string | null | undefined) => {
     if (v) ids.add(v)
@@ -445,17 +446,12 @@ const fileRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // background/audio embeds under this story. Ownership of the story
       // is enforced by the joined `where` on each query, so this can't be
       // used to discover another user's files.
-      const referencedFileIds: string[] = storyId
-        ? await collectFileIdsReferencedByStory(userId, storyId)
-        : []
+      const referencedFileIds: string[] = storyId ? await collectFileIdsReferencedByStory(userId, storyId) : []
 
       const where = {
         ownerId: userId,
         ...(storyId && {
-          OR: [
-            { storyId },
-            ...(referencedFileIds.length > 0 ? [{ id: { in: referencedFileIds } }] : []),
-          ],
+          OR: [{ storyId }, ...(referencedFileIds.length > 0 ? [{ id: { in: referencedFileIds } }] : [])],
         }),
       }
 
