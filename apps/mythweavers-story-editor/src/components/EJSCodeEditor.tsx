@@ -32,6 +32,10 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
   let editorContainer: HTMLDivElement | undefined
   let view: EditorView | undefined
   const readOnlyCompartment = new Compartment()
+  // Set while we are pushing an external value into the document, so the
+  // updateListener does not echo that same value back out through onChange
+  // (which would mean writing to the signal we are currently reading).
+  let applyingExternalValue = false
 
   onMount(() => {
     // Detect if user prefers dark mode
@@ -66,7 +70,7 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
         ...(isDarkMode ? [oneDark] : []),
         ...(props.placeholder ? [placeholder(props.placeholder)] : []),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
+          if (update.docChanged && !applyingExternalValue) {
             const value = update.state.doc.toString()
             props.onChange(value)
           }
@@ -136,16 +140,29 @@ export const EJSCodeEditor: Component<EJSCodeEditorProps> = (props) => {
     }
   })
 
-  // Update editor when value changes externally
+  // Update editor when value changes externally (e.g. an AI adjustment).
+  // Read props.value unconditionally so the effect always subscribes to it —
+  // short-circuiting on `view` first would leave the effect tracking nothing
+  // if it ever ran before onMount, and it would then never fire again.
   createEffect(() => {
-    if (view && props.value !== view.state.doc.toString()) {
+    const nextValue = props.value ?? ''
+    if (!view) return
+    if (nextValue === view.state.doc.toString()) return
+
+    applyingExternalValue = true
+    try {
       view.dispatch({
         changes: {
           from: 0,
           to: view.state.doc.length,
-          insert: props.value,
+          insert: nextValue,
         },
+        // Keep the cursor inside the new document instead of letting CodeMirror
+        // map a stale offset past the end.
+        selection: { anchor: Math.min(view.state.selection.main.anchor, nextValue.length) },
       })
+    } finally {
+      applyingExternalValue = false
     }
   })
 

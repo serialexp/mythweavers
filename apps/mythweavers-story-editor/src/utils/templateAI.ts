@@ -66,6 +66,7 @@ async function generateWithFactory(
 ): Promise<string> {
   const client = LLMClientFactory.getClient(provider)
   let result = ''
+  let streamError: string | null = null
 
   const generator = client.generate({
     model,
@@ -76,10 +77,25 @@ async function generateWithFactory(
   for await (const event of generator) {
     if (event.type === 'chunk') {
       result += event.text
+    } else if (event.type === 'error') {
+      // The stream reports failures (HTTP errors, upstream provider errors,
+      // insufficient credit) as events rather than throwing. Swallowing these
+      // used to make the call resolve to '' — which callers then happily wrote
+      // over the user's text. Remember it and throw once the stream drains.
+      streamError = event.error || 'The model request failed'
     }
   }
 
-  return result.trim()
+  if (streamError) {
+    throw new Error(streamError)
+  }
+
+  const trimmed = result.trim()
+  if (!trimmed) {
+    throw new Error('The model returned an empty response — nothing was changed.')
+  }
+
+  return trimmed
 }
 
 /**
@@ -88,12 +104,14 @@ async function generateWithFactory(
  * @param currentResolvedState - The resolved script state
  * @param changeRequest - User's instruction for the change
  * @param storyContent - Optional story content from scenes to provide context
+ * @param options.entityLabel - What is being edited ('Character', 'Context Item'), used in the task label
  */
 export const generateTemplateChange = async (
   currentTemplate: string,
   currentResolvedState: any,
   changeRequest: string,
   storyContent?: string,
+  options?: { entityLabel?: string },
 ): Promise<string> => {
   const { provider, model } = settingsStore
 
@@ -104,11 +122,18 @@ export const generateTemplateChange = async (
   // Build messages for the request
   let messages: ChatMessage[]
   if (storyContent) {
-    // Use caching-optimized structure when story content is present
+    // Use caching-optimized structure when story content is present.
+    // The task label lives in the *uncached* trailing message, so varying it
+    // per entity type does not break the shared system+story cache prefix.
     messages = createStoryContextMessages({
       storyContent,
-      taskDescription: 'Update Character Template',
-      taskDetails: createTemplateTaskDetails(currentTemplate, currentResolvedState, changeRequest),
+      taskDescription: `Update ${options?.entityLabel ?? 'Character'} Template`,
+      taskDetails: createTemplateTaskDetails(
+        currentTemplate,
+        currentResolvedState,
+        changeRequest,
+        options?.entityLabel,
+      ),
     })
   } else {
     const prompt = createTemplatePrompt(currentTemplate, currentResolvedState, changeRequest, storyContent)
@@ -244,17 +269,20 @@ function createTemplateWithPlotPointsTaskDetails(
 ): string {
   const stateJson = JSON.stringify(currentResolvedState, null, 2)
 
-  const plotPointsSection = existingPlotPoints.length > 0
-    ? `EXISTING PLOT POINTS:
-${existingPlotPoints.map((pp) => {
-  const optionsStr = pp.type === 'enum' && pp.options ? ` (options: ${pp.options.join(', ')})` : ''
-  return `- ${pp.key}: ${pp.type}${optionsStr}, default: ${JSON.stringify(pp.default)}`
-}).join('\n')}
+  const plotPointsSection =
+    existingPlotPoints.length > 0
+      ? `EXISTING PLOT POINTS:
+${existingPlotPoints
+  .map((pp) => {
+    const optionsStr = pp.type === 'enum' && pp.options ? ` (options: ${pp.options.join(', ')})` : ''
+    return `- ${pp.key}: ${pp.type}${optionsStr}, default: ${JSON.stringify(pp.default)}`
+  })
+  .join('\n')}
 
 You can reference these in the template as plotPoints.keyName.
 You can also EXTEND existing enum plot points by adding new options.
 `
-    : `No existing plot points defined. You can propose new ones.
+      : `No existing plot points defined. You can propose new ones.
 `
 
   return `TASK: Update this character's EJS template and optionally propose plot points.
@@ -281,37 +309,53 @@ INSTRUCTIONS:
    - Character growth and development
 3. Keep the description concise: aim for two to three paragraphs at most
 4. Do NOT include event descriptions or knowledge of events - those are provided as separate context
-${requestPlotPoints ? `5. If the change involves tracking story state (e.g., emotional states, relationship status), propose a plot point
+${
+  requestPlotPoints
+    ? `5. If the change involves tracking story state (e.g., emotional states, relationship status), propose a plot point
 6. Plot points should be ENUMs with meaningful state options
 7. Only propose plot points that you actually USE in the template
-8. Reference message IDs from the story content when proposing state changes` : `5. Do NOT propose new plot points or state changes - only update the template text
-6. You may reference existing plot points in the template using plotPoints.keyName`}
+8. Reference message IDs from the story content when proposing state changes`
+    : `5. Do NOT propose new plot points or state changes - only update the template text
+6. You may reference existing plot points in the template using plotPoints.keyName`
+}
 
 OUTPUT FORMAT (strict JSON, no markdown):
 {
   "template": "The updated EJS template text",
-  "plotPoints": [${requestPlotPoints ? `
+  "plotPoints": [${
+    requestPlotPoints
+      ? `
     {
       "key": "characterKnowsSecret",
       "isNew": true,
       "options": ["unaware", "suspicious", "knows"],
       "default": "unaware"
-    }` : ''}
+    }`
+      : ''
+  }
   ],
-  "stateChanges": [${requestPlotPoints ? `
+  "stateChanges": [${
+    requestPlotPoints
+      ? `
     {
       "messageId": "the_message_id_where_state_changes",
       "key": "characterKnowsSecret",
       "value": "knows"
-    }` : ''}
+    }`
+      : ''
+  }
   ]
 }
 
 IMPORTANT:
 - Output ONLY valid JSON, no explanations
 - "plotPoints" and "stateChanges" can be empty arrays${requestPlotPoints ? '' : ' (must be empty since plot point creation is disabled)'}
-${requestPlotPoints ? `- For extending existing enums, set "isNew": false and only include NEW options
-- Use exact message IDs from [MSG:id] markers in story content` : '- Do NOT include any entries in plotPoints or stateChanges arrays'}
+${
+  requestPlotPoints
+    ? `- For extending existing enums, set "isNew": false and only include NEW options
+- Use exact message IDs from [MSG:id] markers in story content`
+    : '- Do NOT include any entries in plotPoints or stateChanges arrays'
+}
 
 OUTPUT JSON NOW:`
 }
@@ -412,10 +456,11 @@ function createTemplateTaskDetails(
   currentTemplate: string,
   currentResolvedState: any,
   changeRequest: string,
+  entityLabel = 'Character',
 ): string {
   const stateJson = JSON.stringify(currentResolvedState, null, 2)
 
-  return `TASK: Update this character's EJS template based on the story content.
+  return `TASK: Update this ${entityLabel.toLowerCase()}'s EJS template based on the story content.
 
 CURRENT TEMPLATE:
 ${currentTemplate}

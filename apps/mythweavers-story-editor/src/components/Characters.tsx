@@ -1,5 +1,14 @@
 import { Button, ListDetailPanel, type ListDetailPanelRef, Stack } from '@mythweavers/ui'
 import { type Component, Show, batch, createMemo, createSignal } from 'solid-js'
+import {
+  PhArrowLeftIcon,
+  PhCalendarIcon,
+  PhCheckIcon,
+  PhPencilSimpleIcon,
+  PhPlusIcon,
+  PhStarIcon,
+  PhXIcon,
+} from 'solidjs-phosphor'
 import { calendarStore } from '../stores/calendarStore'
 import { charactersStore } from '../stores/charactersStore'
 import type { Character } from '../types/core'
@@ -13,7 +22,6 @@ import { FilePicker } from './FilePicker'
 import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { StoryTimePicker } from './StoryTimePicker'
 import { TemplateChangeRequest } from './TemplateChangeRequest'
-import { PhArrowLeftIcon, PhCalendarIcon, PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhStarIcon, PhXIcon } from 'solidjs-phosphor'
 
 export interface CharactersRef {
   addNew: () => void
@@ -53,8 +61,8 @@ export const Characters: Component<CharactersProps> = (props) => {
   // Sort characters alphabetically by display name
   const sortedCharacters = createMemo(() =>
     [...charactersStore.characters].sort((a, b) =>
-      getCharacterDisplayName(a).localeCompare(getCharacterDisplayName(b))
-    )
+      getCharacterDisplayName(a).localeCompare(getCharacterDisplayName(b)),
+    ),
   )
 
   // Expose addNew method via ref
@@ -307,7 +315,7 @@ export const Characters: Component<CharactersProps> = (props) => {
                   currentTemplate={editDescription()}
                   onTemplateChange={setEditDescription}
                   placeholder="Describe how you want to change this character's description"
-                  includeStoryContent={true}
+                  entityLabel="Character"
                 />
                 <EJSRenderer template={editDescription()} mode="preview-always" />
                 <div class={styles.marginTop}>
@@ -453,7 +461,7 @@ export const Characters: Component<CharactersProps> = (props) => {
               currentTemplate={newCharacterDescription()}
               onTemplateChange={setNewCharacterDescription}
               placeholder="Describe how you want to change this character's description"
-              includeStoryContent={true}
+              entityLabel="Character"
             />
             <EJSRenderer template={newCharacterDescription()} mode="preview-always" />
             <div class={styles.marginTop}>

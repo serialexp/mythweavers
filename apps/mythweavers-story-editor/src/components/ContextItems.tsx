@@ -10,6 +10,7 @@ import {
   Tabs,
 } from '@mythweavers/ui'
 import { type Component, Show, batch, createMemo, createSignal } from 'solid-js'
+import { PhArrowLeftIcon, PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhXIcon } from 'solidjs-phosphor'
 import { contextItemsStore } from '../stores/contextItemsStore'
 import type { ContextItem } from '../types/core'
 import { generateMessageId } from '../utils/id'
@@ -18,7 +19,6 @@ import { EJSCodeEditor } from './EJSCodeEditor'
 import { EJSRenderer } from './EJSRenderer'
 import { ScriptHelpTabs } from './ScriptHelpTabs'
 import { TemplateChangeRequest } from './TemplateChangeRequest'
-import { PhArrowLeftIcon, PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhXIcon } from 'solidjs-phosphor'
 
 export interface ContextItemsRef {
   addNew: () => void
@@ -224,6 +224,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                   currentTemplate={editDescription()}
                   onTemplateChange={setEditDescription}
                   placeholder="Describe how you want to change this description"
+                  entityLabel="Context Item"
                 />
                 <EJSRenderer template={editDescription()} mode="preview-always" />
                 <ScriptHelpTabs />
@@ -266,11 +267,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                     Global (active in all chapters)
                   </label>
                 </div>
-                <Stack
-                  direction="horizontal"
-                  gap="sm"
-                  class={styles.actionRow}
-                >
+                <Stack direction="horizontal" gap="sm" class={styles.actionRow}>
                   <Button
                     variant="primary"
                     onClick={saveEdit}
@@ -329,6 +326,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
               currentTemplate={newItemDescription()}
               onTemplateChange={setNewItemDescription}
               placeholder="Describe how you want to change this description"
+              entityLabel="Context Item"
             />
             <EJSRenderer template={newItemDescription()} mode="preview-always" />
             <ScriptHelpTabs />
@@ -371,11 +369,7 @@ export const ContextItems: Component<ContextItemsProps> = (props) => {
                 Global (active in all chapters)
               </label>
             </div>
-            <Stack
-              direction="horizontal"
-              gap="sm"
-              class={styles.actionRow}
-            >
+            <Stack direction="horizontal" gap="sm" class={styles.actionRow}>
               <Button
                 variant="primary"
                 onClick={addContextItem}

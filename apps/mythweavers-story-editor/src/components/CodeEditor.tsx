@@ -48,6 +48,9 @@ export const CodeEditor: Component<CodeEditorProps> = (props) => {
   let editorContainer: HTMLDivElement | undefined
   let view: EditorView | undefined
   const readOnlyCompartment = new Compartment()
+  // Set while pushing an external value into the document, so the
+  // updateListener does not echo it straight back out through onChange.
+  let applyingExternalValue = false
 
   // Create custom completion source from props
   const createCustomCompletions = (completions: CodeEditorCompletion[]) => {
@@ -105,7 +108,7 @@ export const CodeEditor: Component<CodeEditorProps> = (props) => {
         javascript(),
         ...(isDarkMode ? [oneDark] : []),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
+          if (update.docChanged && !applyingExternalValue) {
             const value = update.state.doc.toString()
             props.onChange(value)
           }
@@ -129,16 +132,25 @@ export const CodeEditor: Component<CodeEditorProps> = (props) => {
     })
   })
 
-  // Update editor when value changes externally
+  // Update editor when value changes externally. Read props.value first so the
+  // effect always subscribes to it, regardless of whether the view exists yet.
   createEffect(() => {
-    if (view && props.value !== view.state.doc.toString()) {
+    const nextValue = props.value ?? ''
+    if (!view) return
+    if (nextValue === view.state.doc.toString()) return
+
+    applyingExternalValue = true
+    try {
       view.dispatch({
         changes: {
           from: 0,
           to: view.state.doc.length,
-          insert: props.value,
+          insert: nextValue,
         },
+        selection: { anchor: Math.min(view.state.selection.main.anchor, nextValue.length) },
       })
+    } finally {
+      applyingExternalValue = false
     }
   })
 

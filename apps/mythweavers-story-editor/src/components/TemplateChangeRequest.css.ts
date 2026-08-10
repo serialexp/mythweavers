@@ -1,5 +1,5 @@
-import { style } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
+import { style } from '@vanilla-extract/css'
 
 export const contextNodesInfo = style({
   display: 'flex',
@@ -36,4 +36,8 @@ export const noContextWarning = style({
   backgroundColor: tokens.color.bg.raised,
   borderRadius: tokens.radius.default,
   border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+})
+
+export const buttonLabel = style({
+  marginLeft: tokens.space['1'],
 })
