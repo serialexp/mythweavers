@@ -192,7 +192,9 @@ export interface Node {
   perspective?: 'FIRST' | 'THIRD' // Narrative perspective for this scene
 
   // Story timeline (minutes from 0 BBY - negative = BBY, positive = ABY)
-  storyTime?: number // When this node occurs in story time (typically set on scenes)
+  // Only persisted for scenes. `null` explicitly clears it; `undefined` leaves
+  // the stored value untouched, because the API skips absent keys.
+  storyTime?: number | null // When this node occurs in story time (typically set on scenes)
 
   // Publishing (chapter-only in practice, but kept on the union so any Node
   // carrying a chapter publishedAt flows through unchanged). null = draft,

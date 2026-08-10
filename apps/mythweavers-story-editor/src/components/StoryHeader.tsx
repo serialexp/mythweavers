@@ -15,6 +15,7 @@ import { navigationStore } from '../stores/navigationStore'
 import { searchModalStore } from '../stores/searchModalStore'
 import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { settingsStore } from '../stores/settingsStore'
+import { timelineViewStore } from '../stores/timelineViewStore'
 import { viewModeStore } from '../stores/viewModeStore'
 import { Character, Message } from '../types/core'
 import type { BranchConversionResult } from '../utils/claudeChatImport'
@@ -30,10 +31,11 @@ import { SaveIndicator } from './SaveIndicator'
 import { Settings } from './Settings'
 import { StoryNavigation } from './StoryNavigation'
 import { StoryStats } from './StoryStats'
+import { TimelineView } from './TimelineView'
 import { QuickLlmDialog } from './QuickLlmDialog'
 import { quickLlmStore } from '../stores/quickLlmStore'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
-import { PhArrowsOutCardinalIcon, PhBookIcon, PhBookOpenIcon, PhCalendarBlankIcon, PhCaretDownIcon, PhCaretUpIcon, PhChatDotsIcon, PhCodeIcon, PhCpuIcon, PhDotsThreeIcon, PhGearIcon, PhGlobeIcon, PhMagnifyingGlassIcon, PhMapTrifoldIcon, PhMoonIcon, PhPlusIcon, PhSignOutIcon, PhSunIcon, PhTranslateIcon, PhTreeStructureIcon, PhUsersIcon } from 'solidjs-phosphor'
+import { PhArrowsOutCardinalIcon, PhBookIcon, PhBookOpenIcon, PhCalendarBlankIcon, PhCaretDownIcon, PhCaretUpIcon, PhChatDotsIcon, PhClockIcon, PhCodeIcon, PhCpuIcon, PhDotsThreeIcon, PhGearIcon, PhGlobeIcon, PhMagnifyingGlassIcon, PhMapTrifoldIcon, PhMoonIcon, PhPlusIcon, PhSignOutIcon, PhSunIcon, PhTranslateIcon, PhTreeStructureIcon, PhUsersIcon } from 'solidjs-phosphor'
 
 interface StoryHeaderProps {
   onLoadStory: (
@@ -68,7 +70,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
   const [activeSection, setActiveSection] = createSignal<
-    'settings' | 'characters' | 'context' | 'maps' | 'navigation' | null
+    'settings' | 'characters' | 'context' | 'maps' | 'timeline' | 'navigation' | null
   >(null)
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768)
   const [showTravelTimeCalculator, setShowTravelTimeCalculator] = createSignal(false)
@@ -111,6 +113,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
               contextItemsStore.setShowContextItems(false)
               mapsStore.setShowMaps(false)
               navigationStore.setShowNavigation(false)
+              timelineViewStore.setShowTimeline(false)
             }
           }}
           aria-label={isCollapsed() ? 'Show header' : 'Hide header'}
@@ -138,6 +141,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                 charactersStore.setShowCharacters(false)
                 contextItemsStore.setShowContextItems(false)
                 mapsStore.setShowMaps(false)
+                timelineViewStore.setShowTimeline(false)
               }}
               title={activeSection() === 'navigation' ? 'Hide chapters' : 'Navigate chapters'}
             >
@@ -154,6 +158,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                 contextItemsStore.setShowContextItems(false)
                 mapsStore.setShowMaps(false)
                 navigationStore.setShowNavigation(false)
+                timelineViewStore.setShowTimeline(false)
               }}
               variant={activeSection() === 'characters' ? 'active' : 'default'}
               title={activeSection() === 'characters' ? 'Hide characters' : 'Show characters'}
@@ -169,6 +174,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                 contextItemsStore.setShowContextItems(newSection === 'context')
                 mapsStore.setShowMaps(false)
                 navigationStore.setShowNavigation(false)
+                timelineViewStore.setShowTimeline(false)
               }}
               variant={activeSection() === 'context' ? 'active' : 'default'}
               title={activeSection() === 'context' ? 'Hide context items' : 'Show context items'}
@@ -184,11 +190,28 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                 contextItemsStore.setShowContextItems(false)
                 mapsStore.setShowMaps(newSection === 'maps')
                 navigationStore.setShowNavigation(false)
+                timelineViewStore.setShowTimeline(false)
               }}
               variant={activeSection() === 'maps' ? 'active' : 'default'}
               title={activeSection() === 'maps' ? 'Hide maps' : 'Show maps'}
             >
               <PhMapTrifoldIcon />
+            </HeaderButton>
+            <HeaderButton
+              onClick={() => {
+                const newSection = activeSection() === 'timeline' ? null : 'timeline'
+                setActiveSection(newSection)
+                settingsStore.setShowSettings(false)
+                charactersStore.setShowCharacters(false)
+                contextItemsStore.setShowContextItems(false)
+                mapsStore.setShowMaps(false)
+                navigationStore.setShowNavigation(false)
+                timelineViewStore.setShowTimeline(newSection === 'timeline')
+              }}
+              variant={activeSection() === 'timeline' ? 'active' : 'default'}
+              title={activeSection() === 'timeline' ? 'Hide timeline' : 'Show timeline'}
+            >
+              <PhClockIcon />
             </HeaderButton>
             {/* View Mode Dropdown */}
             <Show when={messagesStore.hasStoryMessages}>
@@ -301,6 +324,7 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
                   contextItemsStore.setShowContextItems(false)
                   mapsStore.setShowMaps(false)
                   navigationStore.setShowNavigation(false)
+                  timelineViewStore.setShowTimeline(false)
                 }}
               >
                 Story Settings
@@ -451,6 +475,23 @@ export const StoryHeader: Component<StoryHeaderProps> = (props) => {
         position="left"
       >
         <Maps />
+      </OverlayPanel>
+
+      <OverlayPanel
+        show={timelineViewStore.showTimeline}
+        onClose={() => {
+          timelineViewStore.setShowTimeline(false)
+          setActiveSection(null)
+        }}
+        title="Timeline"
+        position="left"
+      >
+        <TimelineView
+          onSelectScene={() => {
+            timelineViewStore.setShowTimeline(false)
+            setActiveSection(null)
+          }}
+        />
       </OverlayPanel>
 
       {/* Mobile only: Navigation overlay */}

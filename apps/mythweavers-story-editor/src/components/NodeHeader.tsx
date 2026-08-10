@@ -343,7 +343,9 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
   }
 
   const handleSaveTime = (time: number | null) => {
-    nodeStore.updateNode(props.node.id, { storyTime: time ?? undefined })
+    // Pass null straight through: the API treats an absent key as "leave it
+    // alone", so coercing to undefined here made "Clear" a no-op on the server.
+    nodeStore.updateNode(props.node.id, { storyTime: time })
     setIsEditingTime(false)
     setShowDropdown(false)
   }

@@ -196,7 +196,8 @@ export async function createServerStoryFromSnapshot(
           activeCharacterIds: node.activeCharacterIds?.flatMap((id) => characterIds.get(id) ?? []),
           activeContextItemIds: node.activeContextItemIds?.flatMap((id) => contextItemIds.get(id) ?? []),
           goal: node.goal,
-          storyTime: node.storyTime,
+          // The create payload has no `null` case; an unset time is simply omitted.
+          storyTime: node.storyTime ?? undefined,
         },
       })
     }
