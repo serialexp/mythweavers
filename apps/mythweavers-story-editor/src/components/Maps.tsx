@@ -1,6 +1,15 @@
 import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
 import * as PIXI from 'pixi.js'
 import { Component, Show, batch, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
+import {
+  PhArrowLeftIcon,
+  PhCheckIcon,
+  PhPencilSimpleIcon,
+  PhPlusIcon,
+  PhTrashIcon,
+  PhWarningIcon,
+  PhXIcon,
+} from 'solidjs-phosphor'
 import { useFleetManager } from '../hooks/maps/useFleetManager'
 import { useHyperlaneManager } from '../hooks/maps/useHyperlaneManager'
 import { useLandmarkManager } from '../hooks/maps/useLandmarkManager'
@@ -29,16 +38,15 @@ import {
 } from '../utils/maps/voronoiRenderer'
 import { evaluateTemplate } from '../utils/scriptEngine'
 import { getChapterAtStoryTime, getTimelineRange } from '../utils/timelineUtils'
-import * as styles from './Maps.css'
 import { EJSCodeEditor } from './EJSCodeEditor'
-import { MapToolbar } from './maps/MapToolbar'
-import { PawnDetail } from './maps/PawnDetail'
-import { PathDetail } from './maps/PathDetail'
+import * as styles from './Maps.css'
 import { LandmarkDetail } from './maps/LandmarkDetail'
 import { LandmarksList } from './maps/LandmarksList'
 import { MapTimeline } from './maps/MapTimeline'
+import { MapToolbar } from './maps/MapToolbar'
+import { PathDetail } from './maps/PathDetail'
+import { PawnDetail } from './maps/PawnDetail'
 import { createFleetMovementsFromPath } from './maps/fleetMovementHandler'
-import { PhArrowLeftIcon, PhCheckIcon, PhPencilSimpleIcon, PhPlusIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 export const Maps: Component = () => {
   const [canvasContainer, setCanvasContainer] = createSignal<HTMLDivElement | undefined>(undefined)
@@ -47,11 +55,15 @@ export const Maps: Component = () => {
 
   // Use the PIXI map hook
   const pixiMap = usePixiMap(canvasContainer)
-  const { app, viewport, containers, initialize, isReady, render: renderPixi } = pixiMap
+  const { app, viewport, containers, initialize, isReady, error: pixiError, render: renderPixi } = pixiMap
 
   // Use the map loader hook
   const mapLoader = useMapLoader()
-  const { mapSprite, loadMap: loadMapImage } = mapLoader
+  const { mapSprite, error: loaderError, loadMap: loadMapImage } = mapLoader
+
+  // A dead renderer is reported ahead of a failed image: with no renderer the
+  // image never had a chance, so naming the texture would point at a symptom.
+  const mapError = () => pixiError() ?? loaderError()
 
   const [newMapName, setNewMapName] = createSignal('')
   const [newMapBorderColor, setNewMapBorderColor] = createSignal('')
@@ -959,7 +971,12 @@ export const Maps: Component = () => {
   // Show placement indicator when adding new landmark
   createEffect(() => {
     if (isAddingNew()) {
-      mapInteractions.updatePreview(mapEditorStore.newLandmarkPos, mapEditorStore.editColor, mapEditorStore.editSize, mapEditorStore.editType)
+      mapInteractions.updatePreview(
+        mapEditorStore.newLandmarkPos,
+        mapEditorStore.editColor,
+        mapEditorStore.editSize,
+        mapEditorStore.editType,
+      )
     } else {
       mapInteractions.hidePreview()
     }
@@ -1182,7 +1199,11 @@ export const Maps: Component = () => {
 
     // Only proceed if fields are empty
     const getProperty = (key: string) => (mapEditorStore.editProperties[key] as string) || ''
-    const hasExistingInfo = getProperty('population') || getProperty('industry') || mapEditorStore.editDescription || getProperty('planetaryBodies')
+    const hasExistingInfo =
+      getProperty('population') ||
+      getProperty('industry') ||
+      mapEditorStore.editDescription ||
+      getProperty('planetaryBodies')
     if (hasExistingInfo && !confirm('This will overwrite existing information. Continue?')) {
       return
     }
@@ -1753,11 +1774,7 @@ export const Maps: Component = () => {
           <div class={styles.detailTitleContainer}>
             <span class={styles.detailTitleText}>{map.name}</span>
             <div class={styles.detailTitleActions}>
-              <button
-                class={styles.iconButton}
-                onClick={startEditingBorderColor}
-                title="Edit border color template"
-              >
+              <button class={styles.iconButton} onClick={startEditingBorderColor} title="Edit border color template">
                 <PhPencilSimpleIcon />
               </button>
               <button
@@ -1815,10 +1832,20 @@ export const Maps: Component = () => {
             {/* Map Viewer Area */}
             <div class={styles.mapViewer}>
               <div class={styles.mapContainer}>
-                <div
-                  ref={setCanvasContainer}
-                  class={styles.mapCanvas}
-                />
+                <div ref={setCanvasContainer} class={styles.mapCanvas} />
+                <Show when={mapError()}>
+                  {(error) => (
+                    <div class={styles.mapErrorOverlay}>
+                      <div class={styles.mapErrorCard}>
+                        <div class={styles.mapErrorTitle}>
+                          <PhWarningIcon />
+                          <span>{error().title}</span>
+                        </div>
+                        <div class={styles.mapErrorDetail}>{error().detail}</div>
+                      </div>
+                    </div>
+                  )}
+                </Show>
               </div>
 
               <Show
@@ -1827,12 +1854,7 @@ export const Maps: Component = () => {
                   <Show
                     when={selectedFleet() || isAddingFleet()}
                     fallback={
-                      <Show
-                        when={selectedLandmark() || isAddingNew()}
-                        fallback={
-                          <LandmarksList />
-                        }
-                      >
+                      <Show when={selectedLandmark() || isAddingNew()} fallback={<LandmarksList />}>
                         <LandmarkDetail
                           selectedLandmark={selectedLandmark}
                           quickColors={quickColors}

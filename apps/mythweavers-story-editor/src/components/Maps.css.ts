@@ -440,6 +440,49 @@ export const mapCanvas = style({
   left: 0,
 })
 
+/**
+ * Sits over the canvas when the map cannot be shown. The wrapper ignores
+ * pointer events so the diagnostic grid underneath can still be panned --
+ * seeing it move is itself evidence the renderer is alive.
+ */
+export const mapErrorOverlay = style({
+  position: 'absolute',
+  inset: 0,
+  zIndex: 150,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '1rem',
+  pointerEvents: 'none',
+})
+
+export const mapErrorCard = style({
+  pointerEvents: 'auto',
+  maxWidth: '420px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  padding: '1rem',
+  borderRadius: '6px',
+  background: tokens.color.bg.base,
+  border: `1px solid ${tokens.color.semantic.error}`,
+  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+})
+
+export const mapErrorTitle = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  fontWeight: 600,
+  color: tokens.color.semantic.error,
+})
+
+export const mapErrorDetail = style({
+  fontSize: '0.85rem',
+  lineHeight: 1.5,
+  color: tokens.color.text.secondary,
+})
+
 export const noMapMessage = style({
   display: 'flex',
   alignItems: 'center',
