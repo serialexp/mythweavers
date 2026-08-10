@@ -41,3 +41,9 @@ The basics — Rewrite menu in InlineMenu with 5 presets (grammar, show-don't-te
 - **Rewrite revision tracking**: persist accepted rewrites as a `versionType: 'rewrite'` revision so users can see/revert AI edits separately from their own typing.
 - **Cancel in-flight rewrite**: if the user starts a rewrite and changes their mind, we currently just block on `isRewriting`. Add an abort button.
 - **Preset model overrides**: today all rewrites resolve through the `'rewrite:selection'` call type → `rewriting` category. Per-preset overrides (e.g. always use a small/cheap model for `grammar`) would save tokens.
+
+## Adventure mode — duplicate character descriptions in narrative prompts
+
+`buildResolutionMessages` and `buildWorldStepMessages` (`apps/mythweavers-story-editor/src/pages/adventure/prompts.ts`) already emit a `[CHARACTER PROFILES]` block for the protagonist + deuteragonist. If the user *also* puts the deuteragonist on the character roster, that person is described twice per turn, in two differently-framed blocks. Pre-existing, and more likely to bite now that the roster is always injected regardless of the living-world toggle.
+
+Options: have `formatLiveWorldState` skip a card whose name matches the extracted protagonist/deuteragonist name, or surface it in `CharacterPanel` ("the deuteragonist is already described above").

@@ -3,12 +3,9 @@ import { Button } from '@mythweavers/ui'
 import { adventureStore } from '../../stores/adventureStore'
 import { generateMessageId } from '../../utils/id'
 import type {
-  CharacterCard,
   PlotPoint,
   AgendaItem,
-  Disposition,
 } from '../../hooks/useAdventurePersistence'
-import { DISPOSITIONS } from '../../hooks/useAdventurePersistence'
 import { useEngine } from './useAdventureEngine'
 import * as styles from '../AdventurePage.css'
 
@@ -21,44 +18,17 @@ const PLOT_STATUSES: PlotPoint['status'][] = [
 ]
 
 /**
- * World panel — view & edit the living world state (characters, plot
- * points, agenda) that gets injected into every narrative turn.
+ * World panel — view & edit the automated part of the living world state
+ * (plot points, agenda) plus the analysis activity log, all injected into
+ * every narrative turn.
  *
- * Phase 1: fully manual. Phase 2 (later) will fold in updates from the
- * analysis model and add an activity log.
+ * Only rendered when `livingWorldEnabled` is on: these are the fields the
+ * background analysis pass maintains. The cast lives in its own always-
+ * available `CharacterPanel` — see the comment there.
  */
 export const WorldPanel: Component = () => {
   const engine = useEngine()
   const persist = () => engine.persist()
-
-  // --- Character handlers ---
-
-  const addCharacter = () => {
-    const card: CharacterCard = {
-      id: generateMessageId(),
-      name: 'New character',
-      description: '',
-      motive: '',
-      disposition: 'indifference',
-    }
-    adventureStore.upsertCharacter(card)
-    persist()
-  }
-
-  const patchChar = (id: string, patch: Partial<Omit<CharacterCard, 'id'>>) => {
-    adventureStore.patchCharacter(id, patch)
-    persist()
-  }
-
-  const toggleArchived = (c: CharacterCard) => {
-    patchChar(c.id, { archived: !c.archived })
-  }
-
-  const deleteChar = (id: string) => {
-    if (!confirm('Delete this character entirely? Use archive instead to keep them on the roster off-screen.')) return
-    adventureStore.removeCharacter(id)
-    persist()
-  }
 
   // --- Plot point handlers ---
 
@@ -106,9 +76,8 @@ export const WorldPanel: Component = () => {
     persist()
   }
 
-  // Reactive derived lists. Use functions inside For callbacks; the lists
-  // themselves can be plain getters because the For tracks them.
-  const characterList = () => Object.values(adventureStore.characters)
+  // Reactive derived list. Use a function inside For callbacks; the list
+  // itself can be a plain getter because the For tracks it.
   const plotList = () => Object.values(adventureStore.plotPoints)
 
   /**
@@ -122,161 +91,14 @@ export const WorldPanel: Component = () => {
    * and narrative turns can run for 30+ seconds; locking that long would
    * be a worse UX than the (negligible) risk of an edit landing one turn
    * later than expected.
+   *
+   * The banner explaining the lock lives in `CharacterPanel`, which renders
+   * directly above this panel whenever this one is visible.
    */
   const isLocked = () => adventureStore.isAnalyzing
 
   return (
     <>
-      {/* Lock banner */}
-      <Show when={isLocked()}>
-        <div class={styles.worldPanelLockBanner}>
-          🔒 Analysis pass is updating the world state — edits paused for a few
-          seconds. Your changes will be re-enabled as soon as it finishes.
-        </div>
-      </Show>
-
-      {/* Characters */}
-      <div class={styles.storyPanelSection}>
-        <div class={styles.storyPanelSectionHeader}>
-          <label class={styles.formLabel}>👥 Characters</label>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={addCharacter}
-            disabled={isLocked()}
-          >
-            + Add
-          </Button>
-        </div>
-        <div class={styles.directiveHint}>
-          Per-character cards injected into every narrative turn. Keep
-          descriptions and motives concise — one paragraph / one sentence
-          each. Disposition is the character's standing stance toward the
-          protagonist (hatred → love). Archived characters stay on file but
-          are not shown to the model.
-        </div>
-
-        <Show
-          when={characterList().length > 0}
-          fallback={
-            <div class={styles.worldPanelEmpty}>
-              No characters yet. Add the protagonist's allies, antagonists, or
-              recurring NPCs as you meet them.
-            </div>
-          }
-        >
-          <div class={styles.worldPanelList}>
-            <For each={characterList()}>
-              {(c) => {
-                const isArchived = () =>
-                  !!adventureStore.characters[c.id]?.archived
-                return (
-                  <div
-                    class={`${styles.worldPanelCard} ${
-                      isArchived() ? styles.worldPanelCardArchived : ''
-                    }`}
-                  >
-                    <div class={styles.worldPanelCardHeader}>
-                      <input
-                        class={styles.worldPanelCardTitle}
-                        value={c.name}
-                        onInput={(e) =>
-                          patchChar(c.id, { name: e.currentTarget.value })
-                        }
-                        placeholder="Character name"
-                        disabled={isLocked()}
-                      />
-                      <div class={styles.worldPanelCardActions}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleArchived(c)}
-                          disabled={isLocked()}
-                          title={
-                            isArchived()
-                              ? 'Unarchive — re-include in narrative prompts'
-                              : 'Archive — keep on file, exclude from prompts'
-                          }
-                        >
-                          {isArchived() ? '↩︎' : '📥'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteChar(c.id)}
-                          disabled={isLocked()}
-                          title="Delete entirely"
-                        >
-                          ✕
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div class={styles.worldPanelInlineGrid}>
-                      <div class={styles.worldPanelField}>
-                        <label class={styles.worldPanelFieldLabel}>
-                          Motive
-                        </label>
-                        <input
-                          class={styles.worldPanelFieldInput}
-                          value={c.motive}
-                          onInput={(e) =>
-                            patchChar(c.id, { motive: e.currentTarget.value })
-                          }
-                          placeholder="What they currently want"
-                          disabled={isLocked()}
-                        />
-                      </div>
-                      <div class={styles.worldPanelField}>
-                        <label
-                          class={styles.worldPanelFieldLabel}
-                          title="Standing stance toward the protagonist on a 7-step scale, anchored at hatred and love."
-                        >
-                          Disposition
-                        </label>
-                        <select
-                          class={styles.worldPanelFieldSelect}
-                          value={c.disposition ?? 'indifference'}
-                          onChange={(e) =>
-                            patchChar(c.id, {
-                              disposition: e.currentTarget
-                                .value as Disposition,
-                            })
-                          }
-                          disabled={isLocked()}
-                        >
-                          <For each={DISPOSITIONS}>
-                            {(d) => <option value={d}>{d}</option>}
-                          </For>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div class={styles.worldPanelField}>
-                      <label class={styles.worldPanelFieldLabel}>
-                        Description
-                      </label>
-                      <textarea
-                        class={styles.worldPanelFieldTextarea}
-                        value={c.description}
-                        onInput={(e) =>
-                          patchChar(c.id, {
-                            description: e.currentTarget.value,
-                          })
-                        }
-                        placeholder="One paragraph: appearance, personality, voice, relevant skills."
-                        rows={3}
-                        disabled={isLocked()}
-                      />
-                    </div>
-                  </div>
-                )
-              }}
-            </For>
-          </div>
-        </Show>
-      </div>
-
       {/* Plot points */}
       <div class={styles.storyPanelSection}>
         <div class={styles.storyPanelSectionHeader}>

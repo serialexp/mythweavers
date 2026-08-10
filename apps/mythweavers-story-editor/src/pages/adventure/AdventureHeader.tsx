@@ -10,6 +10,7 @@ import { QuickLlmDialog } from '../../components/QuickLlmDialog'
 import { AdventureSettingsModal } from '../../components/AdventureSettingsModal'
 import { OverlayPanel } from '../../components/OverlayPanel'
 import { useEngine } from './useAdventureEngine'
+import { CharacterPanel } from './CharacterPanel'
 import { WorldPanel } from './WorldPanel'
 import * as styles from '../AdventurePage.css'
 
@@ -205,8 +206,7 @@ export const AdventureHeader: Component<{
             <div class={styles.directiveHint}>
               Foundational context injected at the start of every LLM call.
               Use for world background, lore, and rules that rarely change.
-              For per-character / per-plot tracking, use the structured
-              sections below — they update during the story.
+              For per-character tracking, use the structured sections below.
             </div>
             <textarea
               class={styles.directiveTextarea}
@@ -277,11 +277,16 @@ export const AdventureHeader: Component<{
             </Show>
           </div>
 
-          {/* Living-world fields (state + synthesized arc) — only meaningful
-              when the living-world subsystem is on; hidden otherwise to keep
-              the panel to World Bible + Per-Turn Directive. */}
+          {/* Cast — always visible, independent of the living-world toggle.
+              The toggle governs whether the analysis pass maintains these
+              cards, not whether you get to have them. */}
+          <CharacterPanel />
+
+          {/* Automated living-world fields (plot points, agenda, activity log
+              + synthesized arc) — only meaningful when the living-world
+              subsystem is on, since nothing maintains them otherwise. */}
           <Show when={adventureStore.livingWorldEnabled}>
-            {/* Living world state — characters, plot points, agenda */}
+            {/* Plot points, analysis activity, world agenda */}
             <WorldPanel />
 
             {/* Synthesized global storyline */}

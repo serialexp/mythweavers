@@ -3,9 +3,15 @@ import {
   buildConditionsMessages,
   buildSharedHistory,
   CONDITIONS_SYSTEM_PROMPT,
+  formatLiveWorldState,
   paragraphRangeForAction,
 } from './prompts'
-import type { AdventureTurn, CharacterCard } from '../../hooks/useAdventurePersistence'
+import type {
+  AdventureTurn,
+  AgendaItem,
+  CharacterCard,
+  PlotPoint,
+} from '../../hooks/useAdventurePersistence'
 
 const protag = 'Maren, a young field medic with steady hands.'
 
@@ -90,6 +96,159 @@ describe('buildConditionsMessages', () => {
   it('ends with the output instruction', () => {
     const messages = buildConditionsMessages('narrative', '', protag)
     expect(messages[1].content).toContain('Output ONLY the ledger')
+  })
+})
+
+describe('formatLiveWorldState', () => {
+  const activePoint: PlotPoint = {
+    id: 'p1',
+    title: 'The missing manifest',
+    description: 'Someone tore a page out of the harbour ledger.',
+    status: 'active',
+  }
+
+  const resolvedPoint: PlotPoint = {
+    id: 'p2',
+    title: 'The broken lamp',
+    description: 'Already dealt with.',
+    status: 'resolved',
+  }
+
+  const agendaItem: AgendaItem = {
+    id: 'a1',
+    description: 'The harbourmaster locks the gate',
+    when: 'at dusk',
+  }
+
+  describe('full detail (default)', () => {
+    it('renders motive and disposition alongside the description', () => {
+      const block = formatLiveWorldState({ characters: { c1: rosterChar } })
+      expect(block).toContain('motive: Keep his crew alive')
+      expect(block).toContain('disposition: warmth')
+      expect(block).toContain('A weathered ship captain.')
+    })
+
+    it('explains the disposition scale in the roster header', () => {
+      const block = formatLiveWorldState({ characters: { c1: rosterChar } })
+      expect(block).toContain('7-step scale')
+    })
+
+    it('prefixes ids only when asked, leaving the card text otherwise identical', () => {
+      const state = { characters: { c1: rosterChar } }
+      expect(formatLiveWorldState(state)).toContain(
+        '- Captain Voss (motive: Keep his crew alive; disposition: warmth): A weathered ship captain.',
+      )
+      expect(formatLiveWorldState(state, { includeIds: true })).toContain(
+        '- [id: c1] Captain Voss (motive: Keep his crew alive; disposition: warmth): A weathered ship captain.',
+      )
+    })
+
+    it('treats an explicit "full" the same as the default', () => {
+      const state = { characters: { c1: rosterChar } }
+      expect(formatLiveWorldState({ ...state, characterDetail: 'full' })).toBe(
+        formatLiveWorldState(state),
+      )
+    })
+  })
+
+  describe('description detail', () => {
+    const descState = {
+      characters: { c1: rosterChar },
+      characterDetail: 'description' as const,
+    }
+
+    it('renders name and description only', () => {
+      const block = formatLiveWorldState(descState)
+      expect(block).toContain('- Captain Voss: A weathered ship captain.')
+      expect(block).not.toContain('motive')
+      expect(block).not.toContain('disposition')
+    })
+
+    it('drops the disposition-scale explanation from the roster header', () => {
+      const block = formatLiveWorldState(descState)
+      expect(block).toContain('[CHARACTER ROSTER')
+      expect(block).not.toContain('7-step scale')
+    })
+
+    it('still prefixes ids when asked', () => {
+      expect(formatLiveWorldState(descState, { includeIds: true })).toContain(
+        '- [id: c1] Captain Voss: A weathered ship captain.',
+      )
+    })
+
+    it('returns null for an empty roster, so nothing is injected at all', () => {
+      expect(
+        formatLiveWorldState({ characters: {}, characterDetail: 'description' }),
+      ).toBeNull()
+    })
+
+    it('returns null when every character is archived', () => {
+      expect(
+        formatLiveWorldState({
+          characters: { c2: archivedChar },
+          characterDetail: 'description',
+        }),
+      ).toBeNull()
+    })
+  })
+
+  it('excludes archived characters in both detail modes', () => {
+    const characters = { c1: rosterChar, c2: archivedChar }
+    for (const characterDetail of ['full', 'description'] as const) {
+      const block = formatLiveWorldState({ characters, characterDetail })
+      expect(block).toContain('Captain Voss')
+      expect(block).not.toContain('Old Sal')
+    }
+  })
+
+  it('excludes resolved plot points', () => {
+    const block = formatLiveWorldState({
+      plotPoints: { p1: activePoint, p2: resolvedPoint },
+    })
+    expect(block).toContain('The missing manifest')
+    expect(block).not.toContain('The broken lamp')
+  })
+
+  it('returns null when there is nothing to show', () => {
+    expect(formatLiveWorldState({})).toBeNull()
+    expect(
+      formatLiveWorldState({ plotPoints: { p2: resolvedPoint }, agenda: [] }),
+    ).toBeNull()
+  })
+
+  describe('closing instruction', () => {
+    it('mentions the agenda only when there is one', () => {
+      const withAgenda = formatLiveWorldState({
+        characters: { c1: rosterChar },
+        agenda: [agendaItem],
+      })
+      expect(withAgenda).toContain('agenda items WILL happen on the timing shown')
+
+      const withoutAgenda = formatLiveWorldState({
+        characters: { c1: rosterChar },
+      })
+      expect(withoutAgenda).not.toContain('agenda')
+    })
+
+    it('mentions dispositions and motives only in full detail', () => {
+      const full = formatLiveWorldState({ characters: { c1: rosterChar } })
+      expect(full).toContain('NPC dispositions and motives do not flex')
+
+      const desc = formatLiveWorldState({
+        characters: { c1: rosterChar },
+        characterDetail: 'description',
+      })
+      expect(desc).not.toContain('NPC dispositions and motives do not flex')
+      expect(desc).toContain('do not bend to the protagonist')
+    })
+
+    it('says nothing about characters when the roster is empty', () => {
+      const block = formatLiveWorldState({ plotPoints: { p1: activePoint } })
+      expect(block).toContain('The narrative must respect this state.')
+      expect(block).toContain('Carry items forward')
+      expect(block).not.toContain('NPC dispositions')
+      expect(block).not.toContain('agenda')
+    })
   })
 })
 

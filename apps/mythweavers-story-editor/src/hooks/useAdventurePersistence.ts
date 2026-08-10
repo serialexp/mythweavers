@@ -244,14 +244,20 @@ export interface PersistedState {
    */
   directorEnabled?: boolean
   /**
-   * When true (default), the engine maintains a "living world state" in
+   * When true (default), the engine *automates* the living world state in
    * the background: an analysis pass runs after each turn and patches
    * characters / plot points / agenda via tool calls, a synthesis pass
    * rebuilds the model-synthesized storyline, and the resulting state
    * is injected into every writer prompt (`appendLiveWorldState`).
-   * When false, all three are skipped — no background LLM calls fire,
-   * and the writer prompts contain no characters/plot points/agenda
-   * block. The user can still hand-author a story arc; the
+   *
+   * When false, all three are skipped — no background LLM calls fire.
+   * This governs the automation, not the existence of the cast: the
+   * characters below stay editable and still reach every writer prompt,
+   * as name + description (`LiveWorldState.characterDetail`), since motive
+   * and disposition are fields the analysis pass maintains and are hidden
+   * in the UI while it's off. Plot points, the agenda and the synthesized
+   * storyline are omitted from prompts entirely — nothing keeps them
+   * current. The user can still hand-author a story arc; the
    * storyline-gate continues to run against whatever's in the textarea.
    */
   livingWorldEnabled?: boolean
@@ -268,8 +274,10 @@ export interface PersistedState {
    * Injected into the narrative prompt after the cache breakpoint so the
    * model has a structured, evolving view of who/what is in play.
    *
-   * In Phase 1 these are user-edited only. In Phase 2 a cheap analysis
-   * model patches them via tool calls after each resolution turn.
+   * All three are user-editable; a cheap analysis model also patches them
+   * via tool calls after each resolution turn while `livingWorldEnabled`
+   * is on. `characters` is the exception to that toggle — the cast is
+   * always authorable and always injected; see `livingWorldEnabled` above.
    */
   characters?: Record<string, CharacterCard>
   plotPoints?: Record<string, PlotPoint>

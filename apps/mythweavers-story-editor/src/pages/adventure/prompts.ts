@@ -398,7 +398,7 @@ HARD RULES:
   BAD:  "He rubs his eyes with thumb and forefinger, pulls a dented flask from his coat, and mutters 'You don't remember a damn thing, do you?'"
 - Do NOT script the prose: no quoted or paraphrased dialogue lines, no specific gestures (rubbing eyes, scraping a chair, shoving hands in pockets), no choreographed movement or distances, no sensory description. If you catch yourself writing the sentence the character would say or the move they'd make, stop — state what it ACCOMPLISHES instead.
 - ${beats.min}–${beats.max} beats. Each beat is one short sentence: an actor and the gist of their action or message.
-- When an on-screen NPC acts or reacts, that IS a beat — name the NPC and the gist of what they do, grounded in their established disposition + motive. Do not break reactions out into a separate list.
+- When an on-screen NPC acts or reacts, that IS a beat — name the NPC and the gist of what they do, grounded in what the character roster, world bible and prior turns have established about them. Do not break reactions out into a separate list.
 - The beats are the whole plan: the writer renders them faithfully and will not invent new beats or fix wonky ones. Make them coherent, in-character, and self-sufficient.`;
 
 export const DIRECTOR_RESOLUTION_INSTRUCTION = (
@@ -543,6 +543,24 @@ export interface LiveWorldState {
   characters?: Record<string, CharacterCard>;
   plotPoints?: Record<string, PlotPoint>;
   agenda?: AgendaItem[];
+  /**
+   * How much of each character card to render. `"full"` (the default) emits
+   * motive + disposition alongside the description; `"description"` emits
+   * name + description only.
+   *
+   * The cast is available whether or not the living-world subsystem is on,
+   * but motive and disposition are fields that subsystem *maintains* — with
+   * it off they are neither collected in the UI nor meaningful, so the
+   * roster degrades to name + description rather than shipping stale or
+   * empty fields the model would feel obliged to reason about.
+   *
+   * It rides on the state object rather than the format options so the
+   * detail level travels through all six narrative builders without
+   * changing their signatures. The tool-calling analysis and synthesis
+   * passes force `"full"` explicitly — they patch these fields, so they
+   * must always see them.
+   */
+  characterDetail?: "full" | "description";
 }
 
 export interface FormatLiveWorldStateOptions {
@@ -568,6 +586,7 @@ export function formatLiveWorldState(
 ): string | null {
   const { includeIds = false } = options;
   const idPrefix = (id: string) => (includeIds ? `[id: ${id}] ` : "");
+  const descriptionOnly = state.characterDetail === "description";
 
   const activeChars = Object.values(state.characters ?? {}).filter(
     (c) => !c.archived,
@@ -592,14 +611,18 @@ export function formatLiveWorldState(
 
   if (activeChars.length > 0) {
     const lines = activeChars.map((c) => {
+      const desc = c.description?.trim() || "—";
+      if (descriptionOnly) {
+        return `- ${idPrefix(c.id)}${c.name}: ${desc}`;
+      }
       const motive = c.motive?.trim() || "—";
       const disposition = c.disposition ?? "indifference";
-      const desc = c.description?.trim() || "—";
       return `- ${idPrefix(c.id)}${c.name} (motive: ${motive}; disposition: ${disposition}): ${desc}`;
     });
-    parts.push(
-      `[CHARACTER ROSTER — currently in or near the story. Disposition is on a 7-step scale toward the protagonist: hatred → hostility → distrust → indifference → warmth → devotion → love.]\n${lines.join("\n")}`,
-    );
+    const header = descriptionOnly
+      ? "[CHARACTER ROSTER — currently in or near the story.]"
+      : "[CHARACTER ROSTER — currently in or near the story. Disposition is on a 7-step scale toward the protagonist: hatred → hostility → distrust → indifference → warmth → devotion → love.]";
+    parts.push(`${header}\n${lines.join("\n")}`);
   }
 
   if (activePoints.length > 0) {
@@ -628,9 +651,26 @@ export function formatLiveWorldState(
     );
   }
 
-  parts.push(
-    "The narrative must respect this state. NPC dispositions, motives, and the world agenda do not flex to the protagonist's preferences. Carry items forward; do not invent contradictions. Agenda items WILL happen on the timing shown unless the protagonist directly intervenes.",
-  );
+  // Closing instruction, assembled from the sections that are actually
+  // present. A blanket sentence about dispositions, motives and the agenda
+  // reads as a reference to material the model can't see whenever one of
+  // those sections was omitted — which is exactly the shape that invites it
+  // to invent the missing part.
+  const closing: string[] = ["The narrative must respect this state."];
+  if (activeChars.length > 0) {
+    closing.push(
+      descriptionOnly
+        ? "The characters on file are who their descriptions say they are; they do not bend to the protagonist's preferences."
+        : "NPC dispositions and motives do not flex to the protagonist's preferences.",
+    );
+  }
+  if (agenda.length > 0) {
+    closing.push(
+      "The world agenda does not flex to the protagonist's preferences: agenda items WILL happen on the timing shown unless the protagonist directly intervenes.",
+    );
+  }
+  closing.push("Carry items forward; do not invent contradictions.");
+  parts.push(closing.join(" "));
 
   return parts.join("\n\n");
 }
@@ -1522,9 +1562,14 @@ export function buildAnalysisUserMessage(
   protagonist?: string,
   options: BuildAnalysisOptions = {},
 ): string {
+  // Force full detail: this pass patches motive and disposition via tool
+  // calls, so it must see them regardless of what the caller's narrative
+  // prompts render.
   const stateBlock =
-    formatLiveWorldState(liveWorldState, { includeIds: true }) ??
-    "(empty — no characters, plot points, or agenda items yet)";
+    formatLiveWorldState(
+      { ...liveWorldState, characterDetail: "full" },
+      { includeIds: true },
+    ) ?? "(empty — no characters, plot points, or agenda items yet)";
 
   const sections: string[] = [];
 
@@ -1663,10 +1708,11 @@ export interface BuildConditionsOptions {
 /**
  * Build messages for the conditions pass. Modelled on the analysis pass: a
  * tight system prompt + a user message assembled from the protagonist, the
- * on-file named characters (if the living-world roster is available), the
- * current ledger, and the most recent narrative. Returns the updated ledger
- * text. Does NOT use the full shared history — physical state is grounded in
- * recent events, so we keep the prompt small and cheap.
+ * on-file named characters (the roster is available whether or not the
+ * living-world subsystem is on), the current ledger, and the most recent
+ * narrative. Returns the updated ledger text. Does NOT use the full shared
+ * history — physical state is grounded in recent events, so we keep the
+ * prompt small and cheap.
  */
 export function buildConditionsMessages(
   recentNarrative: string,
@@ -1693,8 +1739,10 @@ export function buildConditionsMessages(
       : '[PROTAGONIST — who "the protagonist" refers to]\n(no description on file — refer to them as "the protagonist")',
   );
 
-  // Named characters on file, when the living-world roster is available. Gives
-  // the model the cast to track without it having to guess names.
+  // Named characters on file. Gives the model the cast to track without it
+  // having to guess names. Only names + descriptions are relevant here, so
+  // this pass reads the roster directly rather than going through
+  // `formatLiveWorldState` — `characterDetail` doesn't apply.
   const activeChars = Object.values(liveWorldState?.characters ?? {}).filter(
     (c) => !c.archived,
   );
@@ -1832,8 +1880,11 @@ export function buildSynthesisUserMessage(
   liveWorldState: LiveWorldState,
   options: BuildSynthesisOptions = {},
 ): string {
+  // Force full detail — synthesis reasons about where the cast stands, so
+  // motive and disposition are load-bearing here even if the narrative
+  // prompts are running on a description-only roster.
   const stateBlock =
-    formatLiveWorldState(liveWorldState) ??
+    formatLiveWorldState({ ...liveWorldState, characterDetail: "full" }) ??
     "(no characters or plot points are tracked yet — work from the narrative alone)";
 
   const sections: string[] = [];

@@ -25,6 +25,7 @@ import {
   cleanNarrative,
   rollSteering,
   ANALYSIS_TOOLS,
+  type LiveWorldState,
   type SteeringBucket,
 } from './prompts'
 import { applyAnalysisToolCall } from './applyAnalysisToolCall'
@@ -155,23 +156,35 @@ export function createAdventureEngine(
 
   /**
    * Returns the live world state object passed to writer/director/revision
-   * prompt builders — or `undefined` when the living-world subsystem is
-   * disabled. The four prompt builders all treat `liveWorldState` as
-   * optional and skip the `appendLiveWorldState` injection if undefined,
-   * so this is the single chokepoint that cleanly elides the characters /
-   * plot points / agenda block from every prompt when the toggle is off.
+   * prompt builders. The single chokepoint deciding how much of the world
+   * state each narrative prompt sees.
+   *
+   * The cast always ships: characters are author-owned and available whether
+   * or not the living-world subsystem is on. What the toggle governs is
+   * whether anything *maintains* them — so with it off, the roster degrades
+   * to name + description (`characterDetail: 'description'`, matching the UI,
+   * which hides the motive and disposition inputs in that mode) and the
+   * plot points / agenda are omitted entirely, since nothing keeps them
+   * current. `formatLiveWorldState` renders only the sections present, so an
+   * empty roster still yields no injected block at all.
    *
    * (Internal usages inside `runAnalysisPass` / `runSynthesisPass` build
-   * the same object directly — those passes themselves are gated above
-   * and won't run when the toggle is off, so their construction site
-   * doesn't need this guard.)
+   * their own object directly — those passes are gated on the toggle and
+   * force `characterDetail: 'full'`, since they patch and reason about the
+   * very fields this function may omit.)
    */
-  function liveWorldStateForPrompt() {
-    if (!adventureStore.livingWorldEnabled) return undefined
+  function liveWorldStateForPrompt(): LiveWorldState {
+    if (!adventureStore.livingWorldEnabled) {
+      return {
+        characters: adventureStore.characters,
+        characterDetail: 'description',
+      }
+    }
     return {
       characters: adventureStore.characters,
       plotPoints: adventureStore.plotPoints,
       agenda: adventureStore.agenda,
+      characterDetail: 'full',
     }
   }
 
@@ -1109,11 +1122,11 @@ export function createAdventureEngine(
    * Background conditions pass — maintains the physical-state ledger for the
    * protagonist + on-page named characters. Runs after each finalized turn
    * (when `conditionTrackingEnabled`), independent of the living-world
-   * subsystem: it tracks the protagonist even when the cast/plot roster is
+   * subsystem: it tracks the protagonist even when plot/agenda tracking is
    * off. Reads the most recent few turns of narrative + the current ledger +
-   * (if living world is on) the character roster, and writes an updated
-   * ledger back to the store. The result is injected into every narrative
-   * pass via `conditionsForPrompt()`.
+   * the character roster (always available), and writes an updated ledger
+   * back to the store. The result is injected into every narrative pass via
+   * `conditionsForPrompt()`.
    *
    * Modelled on `runAnalysisPass` — small, recent-narrative-only prompt, no
    * shared-history cache prefix. Skipped on the empty state and while another
@@ -1151,8 +1164,9 @@ export function createAdventureEngine(
         recentNarrative,
         adventureStore.conditions,
         adventureStore.protagonistInput || undefined,
-        // Hand over the roster only when living world is on — otherwise the
-        // model tracks the protagonist + whoever it can detect in the prose.
+        // Only the names + descriptions are read here, so the roster is
+        // useful in either detail mode — the pass needs the cast to know
+        // whose state to track, not their motives.
         liveWorldStateForPrompt(),
         {
           settingDescription: adventureStore.settingDescription,

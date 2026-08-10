@@ -104,17 +104,20 @@ const ADVENTURE_SETTINGS: SettingDescriptor[] = [
   },
   {
     key: 'livingWorldEnabled',
-    label: 'Track living world (characters / plot points / agenda)',
+    label: 'Automate the living world (update cast / plot points / agenda)',
     hint:
       'When on, a background analysis pass runs after each turn to patch ' +
       'the cast, plot points and NPC agendas, a synthesis pass rebuilds the ' +
-      'model-side storyline summary, and that live world state is injected ' +
-      'into every writer prompt. Turn this off for shorter / more freeform ' +
-      'sessions where you don\'t want the extra background LLM traffic or ' +
-      'the prompt bloat from auto-tracked world state. Off-mode still ' +
-      'respects the world bible, the author storyline and per-turn ' +
-      'directives — it just stops the engine from maintaining its own ' +
-      'evolving picture of the cast.',
+      'model-side storyline summary, and all of that is injected into every ' +
+      'writer prompt. Turn this off for shorter / more freeform sessions ' +
+      'where you don\'t want the extra background LLM traffic or the prompt ' +
+      'bloat from auto-tracked world state. Off-mode is not character-less: ' +
+      'you can still add and describe characters yourself and they still ' +
+      'reach every writer prompt (by name and description — motive and ' +
+      'disposition are fields this automation maintains, so they\'re hidden ' +
+      'while it\'s off). What stops is the engine maintaining its own ' +
+      'evolving picture: plot points, the world agenda and the synthesized ' +
+      'story arc go with it.',
   },
   {
     key: 'conditionTrackingEnabled',
