@@ -6,6 +6,14 @@ import { DIAGNOSTIC_GRID_LABEL, drawDiagnosticGrid } from '../../utils/maps/diag
 import { MapError, checkTextureFit, describeError, getMaxTextureSize } from '../../utils/maps/mapDiagnostics'
 import { PixiContainers } from './usePixiMap'
 
+/**
+ * World size used when there is no image to measure. Landmarks are stored as
+ * normalised 0..1 coordinates, so any square extent places them in the right
+ * positions relative to each other -- only the aspect ratio is a guess, and a
+ * guess is worth more than showing nothing.
+ */
+const PLACEHOLDER_EXTENT = 2000
+
 export interface UseMapLoaderReturn {
   mapSprite: Accessor<PIXI.Sprite | null>
   /** Set when the map image could not be shown. Null while healthy. */
@@ -52,6 +60,71 @@ export function useMapLoader(): UseMapLoaderReturn {
       labelContainer.removeChildren()
     }
 
+    /**
+     * Everything that has to happen once the world extent is known, with or
+     * without a picture. Landmark positions are multiplied by the sprite's
+     * dimensions and the interaction handlers convert screen coordinates
+     * through the same sprite, so both are downstream of a sprite existing --
+     * but neither needs that sprite to have an image in it.
+     */
+    const settle = (sprite: PIXI.Sprite, width: number, height: number) => {
+      // Add map to viewport (behind landmarks) before accessing dimensions
+      viewport.addChildAt(sprite, 0)
+      setMapSprite(sprite)
+
+      // Fit viewport to map using texture dimensions (sprite dimensions may not be ready yet)
+      viewport.worldWidth = width
+      viewport.worldHeight = height
+
+      // Re-scale the grid to the map that actually loaded, so its bounds
+      // rectangle marks where the image should be rather than the 2000x2000
+      // placeholder the viewport starts with.
+      const grid = viewport.getChildByLabel(DIAGNOSTIC_GRID_LABEL)
+      if (grid instanceof PIXI.Graphics) {
+        drawDiagnosticGrid(grid, width, height)
+      }
+      viewport.fit()
+      viewport.moveCenter(width / 2, height / 2)
+
+      // Setup viewport interactions (if callback provided)
+      if (onInteractionsSetup) {
+        onInteractionsSetup()
+      }
+
+      // Load landmarks (if callback provided)
+      if (onLandmarksLoad) {
+        onLandmarksLoad(() => {
+          // This callback will be provided by the parent component
+          // to add individual landmarks
+        })
+      }
+    }
+
+    /**
+     * Stands in for a map whose image cannot be shown. Texture.WHITE is a 1x1
+     * pixel scaled to the placeholder extent and then hidden: it exists purely
+     * to give landmarks and hit-testing a coordinate space, so the diagnostic
+     * grid stays visible through it rather than being painted over.
+     *
+     * Without this, a broken image took the landmarks down with it -- they are
+     * stored independently of the picture and are perfectly renderable, but
+     * every consumer reads its dimensions from the sprite.
+     */
+    const settleWithoutImage = () => {
+      const placeholder = new PIXI.Sprite(PIXI.Texture.WHITE)
+      placeholder.width = PLACEHOLDER_EXTENT
+      placeholder.height = PLACEHOLDER_EXTENT
+      placeholder.visible = false
+      settle(placeholder, PLACEHOLDER_EXTENT, PLACEHOLDER_EXTENT)
+    }
+
+    // No image to try. The store already recorded why, so don't overwrite its
+    // more specific explanation with a generic one here.
+    if (!imageData) {
+      settleWithoutImage()
+      return
+    }
+
     // Load new map texture
     let texture: PIXI.Texture
 
@@ -83,6 +156,7 @@ export function useMapLoader(): UseMapLoaderReturn {
         title: 'The map image could not be loaded',
         detail: `${describeError(err)}. The file may be missing, still uploading, or in a format this browser cannot read.`,
       })
+      settleWithoutImage()
       return
     }
 
@@ -92,6 +166,7 @@ export function useMapLoader(): UseMapLoaderReturn {
         title: 'The map image could not be loaded',
         detail: 'The image finished loading but produced no texture. It may be corrupt or zero-sized.',
       })
+      settleWithoutImage()
       return
     }
 
@@ -102,42 +177,17 @@ export function useMapLoader(): UseMapLoaderReturn {
     if (oversize) {
       console.error('[useMapLoader]', oversize.title, texture.width, texture.height)
       setError(oversize)
+      // Deliberately the real dimensions, not the placeholder: the landmarks
+      // then sit where they belong on a map we simply cannot paint.
+      const blank = new PIXI.Sprite(PIXI.Texture.WHITE)
+      blank.width = texture.width
+      blank.height = texture.height
+      blank.visible = false
+      settle(blank, texture.width, texture.height)
       return
     }
 
-    const sprite = new PIXI.Sprite(texture)
-
-    // Add map to viewport (behind landmarks) before accessing dimensions
-    viewport.addChildAt(sprite, 0)
-
-    setMapSprite(sprite)
-
-    // Fit viewport to map using texture dimensions (sprite dimensions may not be ready yet)
-    viewport.worldWidth = texture.width
-    viewport.worldHeight = texture.height
-
-    // Re-scale the grid to the map that actually loaded, so its bounds
-    // rectangle marks where the image should be rather than the 2000x2000
-    // placeholder the viewport starts with.
-    const grid = viewport.getChildByLabel(DIAGNOSTIC_GRID_LABEL)
-    if (grid instanceof PIXI.Graphics) {
-      drawDiagnosticGrid(grid, texture.width, texture.height)
-    }
-    viewport.fit()
-    viewport.moveCenter(texture.width / 2, texture.height / 2)
-
-    // Setup viewport interactions (if callback provided)
-    if (onInteractionsSetup) {
-      onInteractionsSetup()
-    }
-
-    // Load landmarks (if callback provided)
-    if (onLandmarksLoad) {
-      onLandmarksLoad(() => {
-        // This callback will be provided by the parent component
-        // to add individual landmarks
-      })
-    }
+    settle(new PIXI.Sprite(texture), texture.width, texture.height)
   }
 
   return {

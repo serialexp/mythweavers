@@ -63,7 +63,9 @@ export const Maps: Component = () => {
 
   // A dead renderer is reported ahead of a failed image: with no renderer the
   // image never had a chance, so naming the texture would point at a symptom.
-  const mapError = () => pixiError() ?? loaderError()
+  // The store's explanation outranks the loader's, because it knows *why* there
+  // was nothing to load -- the loader only ever sees an empty string.
+  const mapError = () => pixiError() ?? mapsStore.selectedMap?.imageError ?? loaderError()
 
   const [newMapName, setNewMapName] = createSignal('')
   const [newMapBorderColor, setNewMapBorderColor] = createSignal('')
@@ -1315,13 +1317,23 @@ export const Maps: Component = () => {
   })
 
   // Handle map selection change (wait for PIXI to be ready)
-  // Track imageData explicitly so the effect re-runs when it's loaded
+  // Track imageData explicitly so the effect re-runs when it's loaded.
+  // detailsLoaded is tracked too: when the image fails, imageData stays '' and
+  // never changes, so it alone would leave the landmarks that *did* arrive
+  // unrendered. An empty imageData is passed through rather than skipped --
+  // the loader draws the landmarks against a placeholder extent.
   createEffect(
     on(
-      () => [mapsStore.selectedMap?.id, mapsStore.selectedMap?.imageData, isReady()] as const,
-      ([mapId, imageData, ready]) => {
-        if (mapId && imageData && ready) {
-          loadMap(imageData)
+      () =>
+        [
+          mapsStore.selectedMap?.id,
+          mapsStore.selectedMap?.imageData,
+          mapsStore.selectedMap?.detailsLoaded,
+          isReady(),
+        ] as const,
+      ([mapId, imageData, , ready]) => {
+        if (mapId && ready) {
+          loadMap(imageData ?? '')
         }
       },
     ),

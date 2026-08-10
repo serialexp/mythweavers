@@ -2,6 +2,7 @@
 
 import type { Paragraph } from '@mythweavers/shared'
 import type { NormalizedTokenUsage } from '@mythweavers/llm'
+import type { MapError } from '../utils/maps/mapDiagnostics'
 import { ModelPricing } from './llm'
 
 // Branch option for story branching
@@ -255,6 +256,17 @@ export interface StoryMap {
   landmarks: Landmark[]
   fleets: Fleet[]
   hyperlanes: Hyperlane[]
+  /**
+   * Set once ensureMapDetails has finished, successfully or not. `imageData`
+   * cannot serve as this signal: it stays '' when the image fails, so a viewer
+   * watching it alone would never learn that the landmarks had arrived.
+   */
+  detailsLoaded?: boolean
+  /**
+   * Why the image is missing, when it is. Recorded here rather than thrown
+   * because the landmarks are still worth showing without it.
+   */
+  imageError?: MapError
 }
 
 export interface Landmark {

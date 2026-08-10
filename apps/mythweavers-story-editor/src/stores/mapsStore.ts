@@ -12,6 +12,7 @@ import { saveService } from '../services/saveService'
 import { ApiLandmark, ApiPath, ApiPawn, apiLandmarkToLandmark, pathToHyperlane, pawnToFleet } from '../types/api'
 import { Fleet, FleetMovement, Hyperlane, Landmark, StoryMap } from '../types/core'
 import { generateMessageId } from '../utils/id'
+import { MapError, describeError } from '../utils/maps/mapDiagnostics'
 import { storage } from '../utils/storage'
 import { currentStoryStore } from './currentStoryStore'
 import { errorStore } from './errorStore'
@@ -19,6 +20,68 @@ import { on } from './storeEvents'
 
 // Track if maps have been loaded
 let mapsLoaded = false
+
+interface FileMetadataResult {
+  file: { path?: string } | null
+  error?: MapError
+}
+
+/**
+ * A map whose `fileId` is null simply never had an image attached, which is a
+ * normal state for a freshly created map rather than a failure. It still gets
+ * a message, because an unexplained empty canvas is the thing we are trying to
+ * stop shipping.
+ */
+const MISSING_FILE_REFERENCE: FileMetadataResult = {
+  file: null,
+  error: {
+    title: 'This map has no image yet',
+    detail: 'No image file is attached to this map. Any landmarks it already has are shown on the grid below.',
+  },
+}
+
+/**
+ * Looks up a map's image metadata, distinguishing "the file is gone" from
+ * "the lookup itself failed". The previous `.catch(() => null)` collapsed both
+ * into an empty imageData, which then read as "this map has no picture" and
+ * left the user with an unexplained black rectangle.
+ */
+async function fetchFileMetadata(fileId: string): Promise<FileMetadataResult> {
+  try {
+    const response = await getMyFilesById({ path: { id: fileId } })
+    const file = response.data?.file
+    return file ? { file } : MISSING_FILE_REFERENCE
+  } catch (err) {
+    // The SDK is configured with throwOnError, so every non-2xx lands here.
+    const failure = err as { response?: { status?: number }; status?: number }
+    const status = failure?.response?.status ?? failure?.status
+
+    if (status === 404) {
+      console.error(`[mapsStore] Map references file ${fileId}, which the server does not have`)
+      return {
+        file: null,
+        error: {
+          title: 'The image this map points to no longer exists',
+          detail: [
+            `This map references file ${fileId}, but the server has no such file.`,
+            'It was most likely deleted, or it belongs to a different account -- the server',
+            'reports both the same way so that file IDs cannot be probed.',
+            'Edit the map and upload the image again to fix it.',
+          ].join(' '),
+        },
+      }
+    }
+
+    console.error('[mapsStore] Failed to look up map image metadata', err)
+    return {
+      file: null,
+      error: {
+        title: 'The map image could not be looked up',
+        detail: `${describeError(err)}${status ? ` (HTTP ${status})` : ''}. The map itself loaded, but its image record could not be read.`,
+      },
+    }
+  }
+}
 
 const [mapsState, setMapsState] = createStore({
   maps: [] as StoryMap[],
@@ -336,12 +399,8 @@ export const mapsStore = {
         const fileId = mapResponse.data?.map?.fileId
 
         // Load image, landmarks, pawns (fleets), and paths (hyperlanes) in parallel
-        const [fileMetadata, landmarksData, pawnsData, pathsData] = await Promise.all([
-          fileId
-            ? getMyFilesById({ path: { id: fileId } })
-                .then((r) => r.data?.file)
-                .catch(() => null)
-            : Promise.resolve(null),
+        const [fileResult, landmarksData, pawnsData, pathsData] = await Promise.all([
+          fileId ? fetchFileMetadata(fileId) : Promise.resolve(MISSING_FILE_REFERENCE),
           getMyMapsByMapIdLandmarks({ path: { mapId } })
             .then((r) => r.data?.landmarks || [])
             .catch(() => []),
@@ -355,25 +414,43 @@ export const mapsStore = {
 
         // Fetch image with credentials and create blob URL
         let imageData = ''
-        if (fileMetadata?.path) {
+        let imageError = fileResult.error
+        const filePath = fileResult.file?.path
+        if (filePath) {
           try {
-            const imageUrl = `${getApiBaseUrl()}${fileMetadata.path}`
+            const imageUrl = `${getApiBaseUrl()}${filePath}`
             const response = await fetch(imageUrl, { credentials: 'include' })
             if (response.ok) {
               const blob = await response.blob()
               imageData = URL.createObjectURL(blob)
             } else {
               console.error(`[mapsStore] Failed to fetch image: ${response.status}`)
+              imageError = {
+                title: 'The map image could not be downloaded',
+                detail: [
+                  `The file record exists, but the server returned ${response.status} for its contents.`,
+                  'This usually means the file was uploaded in a different environment, so the bytes',
+                  'live somewhere this server cannot reach.',
+                ].join(' '),
+              }
             }
           } catch (err) {
             console.error('[mapsStore] Error fetching image:', err)
+            imageError = {
+              title: 'The map image could not be downloaded',
+              detail: `${describeError(err)}. The request for the image never completed.`,
+            }
           }
         }
 
         // Update the map with detailed data
         // Convert API types to local types using mappers
         setMapsState('maps', (m) => m.id === mapId, {
-          imageData: imageData || '',
+          imageData,
+          // Cleared explicitly on success: the store is long-lived, so leaving a
+          // stale error behind would outlive the problem it described.
+          imageError: imageData ? undefined : imageError,
+          detailsLoaded: true,
           landmarks: (landmarksData || []).map((l: ApiLandmark) => apiLandmarkToLandmark(l)),
           fleets: (pawnsData || []).map((p: ApiPawn) => pawnToFleet(p)),
           hyperlanes: (pathsData || []).map((p: ApiPath) => pathToHyperlane(p)), // Segments loaded separately if needed
