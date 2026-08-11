@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildConditionsMessages,
+  buildDirectorMessages,
+  buildResolutionMessages,
+  buildRevisionMessages,
   buildSharedHistory,
+  buildWorldStepMessages,
   CONDITIONS_SYSTEM_PROMPT,
+  CONTINUE_STORY_INSTRUCTION,
   formatLiveWorldState,
   paragraphRangeForAction,
+  RESOLUTION_INSTRUCTION,
+  WORLD_STEP_INSTRUCTION,
 } from './prompts'
+import type { LLMMessage } from '../../types/llm'
 import type {
   AdventureTurn,
   AgendaItem,
@@ -293,6 +301,234 @@ describe('paragraphRangeForAction', () => {
 
   it('counts a sentence fragment with no terminator as one sentence', () => {
     expect(paragraphRangeForAction('I open the door')).toEqual({ min: 2, max: 4 })
+  })
+})
+
+describe('response length', () => {
+  const UNBOUNDED = 'Length: as long as the scene needs and no longer.'
+  const turns: AdventureTurn[] = [
+    { playerAction: null, narrative: 'The harbour wakes around you.' },
+    { playerAction: 'I ask the captain about the ledger.', narrative: 'He stiffens.' },
+  ]
+  // Five sentences → the scaled 4-6 band, so a bounded build is visibly
+  // different from the 2-4 default and we can tell the two apart.
+  const longAction =
+    'I stand up. I walk over to the captain. I ask him about the missing crew. If he lies, I call him out. Then I search his cabin.'
+
+  const systemContents = (messages: LLMMessage[]) =>
+    messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n')
+
+  describe('writer instruction constants', () => {
+    const INSTRUCTIONS = [
+      ['RESOLUTION_INSTRUCTION', RESOLUTION_INSTRUCTION],
+      ['WORLD_STEP_INSTRUCTION', WORLD_STEP_INSTRUCTION],
+      ['CONTINUE_STORY_INSTRUCTION', CONTINUE_STORY_INSTRUCTION],
+    ] as const
+
+    for (const [name, instruction] of INSTRUCTIONS) {
+      it(`${name} renders the paragraph target it is given`, () => {
+        expect(instruction({ min: 5, max: 7 })).toContain('- 5-7 paragraphs.')
+      })
+
+      it(`${name} defaults to the 2-4 band`, () => {
+        expect(instruction()).toContain('- 2-4 paragraphs.')
+      })
+
+      it(`${name} drops the target entirely for null`, () => {
+        const text = instruction(null)
+        expect(text).not.toContain('paragraphs.')
+        expect(text).toContain(UNBOUNDED)
+      })
+    }
+  })
+
+  describe('buildResolutionMessages', () => {
+    const build = (action: string | null, options?: { unboundedLength: boolean }) =>
+      systemContents(
+        buildResolutionMessages(
+          turns,
+          'A storm-battered coastal town.',
+          action,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          options,
+        ),
+      )
+
+    it('scales the target off the player action by default', () => {
+      expect(build(longAction)).toContain('- 4-6 paragraphs.')
+    })
+
+    it('replaces the target with the unbounded rule when unlocked', () => {
+      const text = build(longAction, { unboundedLength: true })
+      expect(text).toContain(UNBOUNDED)
+      expect(text).not.toContain('paragraphs.')
+    })
+  })
+
+  describe('buildResolutionMessages party-split block', () => {
+    const build = (options?: { unboundedLength: boolean }) =>
+      systemContents(
+        buildResolutionMessages(
+          turns,
+          'A storm-battered coastal town.',
+          longAction,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'Maren, a field medic.',
+          'Lyra, a quick-witted rogue.',
+          true,
+          options,
+        ),
+      )
+
+    it('gives each half its own paragraph budget by default', () => {
+      const text = build()
+      expect(text).toContain('4-6 paragraphs.]')
+      // The deuteragonist half has its own, smaller budget.
+      expect(text).toContain('1-3 paragraphs.]')
+    })
+
+    it('unlocks both halves together', () => {
+      const text = build({ unboundedLength: true })
+      expect(text).not.toContain('paragraphs.')
+      expect(text).toContain('as long as the scene needs.]')
+    })
+  })
+
+  describe('buildWorldStepMessages', () => {
+    for (const mode of ['world-step', 'continue'] as const) {
+      it(`${mode} keeps the default band when bounded`, () => {
+        const text = systemContents(
+          buildWorldStepMessages(
+            turns,
+            'A storm-battered coastal town.',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            mode,
+          ),
+        )
+        expect(text).toContain('- 2-4 paragraphs.')
+      })
+
+      it(`${mode} honours the unbounded option`, () => {
+        const text = systemContents(
+          buildWorldStepMessages(
+            turns,
+            'A storm-battered coastal town.',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            mode,
+            { unboundedLength: true },
+          ),
+        )
+        expect(text).toContain(UNBOUNDED)
+        expect(text).not.toContain('paragraphs.')
+      })
+    }
+  })
+
+  // The director instruction lives in a user message, not a system one, so
+  // this reads the whole conversation rather than reusing systemContents.
+  describe('director beat skeleton', () => {
+    const skeleton = (action: string | null) => {
+      const all = buildDirectorMessages(
+        turns,
+        'A storm-battered coastal town.',
+        action,
+        undefined,
+        'resolution',
+      )
+        .map((m) => m.content)
+        .join('\n\n')
+      const start = all.indexOf('OUTPUT FORMAT')
+      return all.slice(start, all.indexOf('HARD RULES', start))
+    }
+
+    // Regression: the skeleton used to hardcode four numbered beats directly
+    // above a "N–M beats" rule, so a long action asking for 8–10 beats was
+    // shown a 4-beat template.
+    it('matches the beat budget it was given', () => {
+      const short = skeleton('I open the door.')
+      expect(short).toContain('2. <beat>')
+      expect(short).not.toContain('3. <beat>')
+      expect(short).toContain('up to 4 beats')
+
+      const long = skeleton(longAction)
+      expect(long).toContain('4. <beat>')
+      expect(long).not.toContain('5. <beat>')
+      expect(long).toContain('up to 6 beats')
+    })
+  })
+
+  describe('buildRevisionMessages', () => {
+    const build = (
+      kind: 'resolution' | 'world-step' | 'continue',
+      options?: { unboundedLength: boolean },
+    ) =>
+      systemContents(
+        buildRevisionMessages(
+          turns,
+          'A storm-battered coastal town.',
+          longAction,
+          'The original narrative.',
+          '1. He knows something he was never told.',
+          undefined,
+          kind,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          options,
+        ),
+      )
+
+    it('scales off the action for resolution revisions only', () => {
+      expect(build('resolution')).toContain('- 4-6 paragraphs.')
+      expect(build('world-step')).toContain('- 2-4 paragraphs.')
+      expect(build('continue')).toContain('- 2-4 paragraphs.')
+    })
+
+    // A turn generated unbounded must not be revised back under a cap.
+    for (const kind of ['resolution', 'world-step', 'continue'] as const) {
+      it(`${kind} revisions inherit the unbounded setting`, () => {
+        const text = build(kind, { unboundedLength: true })
+        expect(text).toContain(UNBOUNDED)
+        expect(text).not.toContain('paragraphs.')
+      })
+    }
   })
 })
 

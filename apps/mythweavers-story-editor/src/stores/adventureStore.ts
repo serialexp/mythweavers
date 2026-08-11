@@ -53,6 +53,14 @@ interface AdventureState {
    * Independent of the living-world subsystem.
    */
   conditionTrackingEnabled: boolean
+  /**
+   * When true, the writer prompts carry no paragraph target at all — the
+   * `- N-M paragraphs.` rule is replaced with permission to run as long as
+   * the scene needs (see `BuildNarrativeOptions.unboundedLength`). Applies
+   * to the resolution / world-step / continue / revision passes; the
+   * director's beat budget is deliberately left bounded. Defaults to false.
+   */
+  unboundedLengthEnabled: boolean
 
   // Living world state
   characters: Record<string, CharacterCard>
@@ -195,6 +203,7 @@ const [state, setState] = createStore<AdventureState>({
   directorEnabled: false,
   livingWorldEnabled: true,
   conditionTrackingEnabled: false,
+  unboundedLengthEnabled: false,
 
   characters: {},
   plotPoints: {},
@@ -284,6 +293,9 @@ export const adventureStore = {
   },
   get conditionTrackingEnabled() {
     return state.conditionTrackingEnabled
+  },
+  get unboundedLengthEnabled() {
+    return state.unboundedLengthEnabled
   },
   get characters() {
     return state.characters
@@ -441,6 +453,9 @@ export const adventureStore = {
   },
   setConditionTrackingEnabled(v: boolean) {
     setState('conditionTrackingEnabled', v)
+  },
+  setUnboundedLengthEnabled(v: boolean) {
+    setState('unboundedLengthEnabled', v)
   },
 
   // --- Living world state CRUD ---
@@ -682,6 +697,7 @@ export const adventureStore = {
       directorEnabled: state.directorEnabled,
       livingWorldEnabled: state.livingWorldEnabled,
       conditionTrackingEnabled: state.conditionTrackingEnabled,
+      unboundedLengthEnabled: state.unboundedLengthEnabled,
       gateApprovalEnabled: state.gateApprovalEnabled,
       partySplit: state.partySplit || undefined,
       characters: { ...state.characters },
@@ -744,6 +760,7 @@ export const adventureStore = {
         directorEnabled: saved?.directorEnabled ?? false,
         livingWorldEnabled: saved?.livingWorldEnabled ?? true,
         conditionTrackingEnabled: saved?.conditionTrackingEnabled ?? false,
+        unboundedLengthEnabled: saved?.unboundedLengthEnabled ?? false,
         gateApprovalEnabled: saved?.gateApprovalEnabled ?? false,
         pendingGateBrief: null,
         pendingGateKind: null,
@@ -807,6 +824,7 @@ export const adventureStore = {
         directorEnabled: false,
         livingWorldEnabled: true,
         conditionTrackingEnabled: false,
+        unboundedLengthEnabled: false,
         gateApprovalEnabled: false,
         pendingGateBrief: null,
         pendingGateKind: null,

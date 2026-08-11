@@ -47,3 +47,7 @@ The basics — Rewrite menu in InlineMenu with 5 presets (grammar, show-don't-te
 `buildResolutionMessages` and `buildWorldStepMessages` (`apps/mythweavers-story-editor/src/pages/adventure/prompts.ts`) already emit a `[CHARACTER PROFILES]` block for the protagonist + deuteragonist. If the user *also* puts the deuteragonist on the character roster, that person is described twice per turn, in two differently-framed blocks. Pre-existing, and more likely to bite now that the roster is always injected regardless of the living-world toggle.
 
 Options: have `formatLiveWorldState` skip a card whose name matches the extracted protagonist/deuteragonist name, or surface it in `CharacterPanel` ("the deuteragonist is already described above").
+
+## Adventure mode — duplicated SETTING_GEN_PROMPT
+
+`apps/mythweavers-story-editor/src/components/NewAdventureForm.tsx:54` carries its own copy of `SETTING_GEN_PROMPT` (`apps/mythweavers-story-editor/src/pages/adventure/prompts.ts:202`). The two have already diverged — the form's version has an extra "base concept" paragraph — and both hardcode "2-4 sentences", so any length or wording change has to be made twice. Should be one exported builder in `prompts.ts` that takes the optional base concept.

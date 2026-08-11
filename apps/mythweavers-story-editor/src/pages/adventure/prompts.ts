@@ -260,6 +260,59 @@ export function paragraphRangeForAction(
 }
 
 /**
+ * Options shared by the narrative (writer) prompt builders. A trailing
+ * options bag rather than yet another positional parameter — these builders
+ * already take a dozen-plus positional arguments.
+ */
+export interface BuildNarrativeOptions {
+  /**
+   * When true, the writer prompt carries no paragraph target at all: the
+   * `- N-M paragraphs.` rule is replaced by explicit permission to run as
+   * long as the scene needs. Per-adventure opt-in
+   * (`adventureStore.unboundedLengthEnabled`).
+   *
+   * The bounded budget is a ceiling the model obeys even when the action
+   * doesn't fit inside it, which makes busy turns read as a cramped
+   * summary. Note that unbounded turns can run into the model's max-token
+   * ceiling and truncate mid-sentence — the budget is not raised to
+   * compensate.
+   *
+   * Deliberately does NOT apply to the director pass: its beat count still
+   * scales with the action, so a director-driven turn stays bounded from
+   * that direction.
+   */
+  unboundedLength?: boolean;
+}
+
+/**
+ * The length rule for a writer prompt's RULES list — a fixed paragraph
+ * target, or, for `null`, permission to run as long as the scene needs.
+ *
+ * Stating the unbounded case explicitly beats saying nothing: a model given
+ * no length signal at all tends to fall back to its trained-in default
+ * rather than actually using the room.
+ */
+function lengthRule(paragraphs: ParagraphRange | null): string {
+  return paragraphs
+    ? `- ${paragraphs.min}-${paragraphs.max} paragraphs.`
+    : "- Length: as long as the scene needs and no longer. Do not pad to fill space; do not compress events to save it. End when the beat lands.";
+}
+
+/**
+ * The same idea as `lengthRule`, phrased for inline use mid-sentence (the
+ * party-split block describes each half's budget inside a bracketed
+ * instruction). `bounded` renders the phrase when a budget applies — a
+ * callback so it only runs when there IS a range, and so the two halves of
+ * a split party can render their (different) budgets their own way.
+ */
+function lengthPhrase(
+  paragraphs: ParagraphRange | null,
+  bounded: (range: ParagraphRange) => string,
+): string {
+  return paragraphs ? bounded(paragraphs) : "as long as the scene needs";
+}
+
+/**
  * Role-specific instruction for pass 1 (resolution).
  *
  * Narrates the direct consequences of the player's action. NPCs react
@@ -268,10 +321,11 @@ export function paragraphRangeForAction(
  * the scene there (when auto-advance is off).
  *
  * The paragraph budget scales with the player action's length — see
- * `paragraphRangeForAction`.
+ * `paragraphRangeForAction`. Pass `null` for no budget at all
+ * (`BuildNarrativeOptions.unboundedLength`).
  */
 export const RESOLUTION_INSTRUCTION = (
-  paragraphs: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+  paragraphs: ParagraphRange | null = DEFAULT_PARAGRAPH_RANGE,
 ) => `YOUR ROLE THIS TURN: Resolve the player's action.
 
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
@@ -282,7 +336,7 @@ SCOPE OF THIS TURN:
 RULES:
 - POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
-- ${paragraphs.min}-${paragraphs.max} paragraphs.
+${lengthRule(paragraphs)}
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
 - NPCs react consistently with their established personalities and current motivations.`;
@@ -317,7 +371,7 @@ Output ONLY the sentence. No labels, no formatting, no meta-commentary.`;
  * the next player input.
  */
 export const WORLD_STEP_INSTRUCTION = (
-  paragraphs: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+  paragraphs: ParagraphRange | null = DEFAULT_PARAGRAPH_RANGE,
 ) => `YOUR ROLE THIS TURN: Let the world move.
 
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
@@ -329,7 +383,7 @@ SCOPE OF THIS TURN:
 RULES:
 - POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
-- ${paragraphs.min}-${paragraphs.max} paragraphs.
+${lengthRule(paragraphs)}
 - Only include world events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
 - NPCs must act consistently with their established personalities, goals, and current motivations.`;
@@ -345,7 +399,7 @@ RULES:
  * forward without typing an action.
  */
 export const CONTINUE_STORY_INSTRUCTION = (
-  paragraphs: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
+  paragraphs: ParagraphRange | null = DEFAULT_PARAGRAPH_RANGE,
 ) => `YOUR ROLE THIS TURN: Continue the story.
 
 Write ONLY the story narrative — no metadata, no headings, no XML tags.
@@ -358,7 +412,7 @@ SCOPE OF THIS TURN:
 RULES:
 - POINT OF VIEW: Write in **second person, present tense** addressing the protagonist as "you".
 - Show, don't tell. Vivid sensory details, dialogue, action.
-- ${paragraphs.min}-${paragraphs.max} paragraphs.
+${lengthRule(paragraphs)}
 - Only include events the protagonist could plausibly observe. No unexplained knowledge of distant events.
 - Everything must be physically plausible within the established world.
 - Every character — the protagonist included — must act consistently with their established personality, goals, and current motivations.`;
@@ -381,16 +435,19 @@ RULES:
  * in sync with the paragraph budget the writer is given — a long action
  * planned as 2–4 beats but written as 4–6 paragraphs would force the
  * writer to pad, and the reverse would compress the scene.
+ *
+ * The director keeps a bounded beat budget even when the writer is running
+ * unbounded (`BuildNarrativeOptions.unboundedLength`): the beat list is a
+ * plan, not a length target, and an unbounded writer is free to render each
+ * beat at whatever length it needs. Worth knowing that this does still cap
+ * how much *happens* per turn while the director is on.
  */
 const DIRECTOR_COMMON_RULES = (
   beats: ParagraphRange = DEFAULT_PARAGRAPH_RANGE,
 ) => `OUTPUT FORMAT — you MUST follow this exactly:
 BEATS:
-1. <beat>
-2. <beat>
-3. <beat>
-4. <beat>
-
+${Array.from({ length: beats.min }, (_, i) => `${i + 1}. <beat>`).join("\n")}
+${beats.max > beats.min ? `(…and so on, up to ${beats.max} beats)\n` : ""}
 HARD RULES:
 - Output ONLY the numbered BEATS list
 - Plan SUBSTANCE, not staging. Each beat names an actor and what they do or communicate at the level of INTENT — what changes, what's revealed, what's demanded. The writer invents the actual words, gestures, movement, and sensory detail that render it.
@@ -1028,6 +1085,7 @@ export function buildResolutionMessages(
   deuteragonistInput?: string,
   /** When true, the party is split — the deuteragonist is NOT present in this scene. */
   partySplit?: boolean,
+  options: BuildNarrativeOptions = {},
 ): LLMMessage[] {
   const messages = buildSharedHistory(
     turns,
@@ -1074,7 +1132,9 @@ export function buildResolutionMessages(
   // history — the steering text changes every turn, so it must not be inside the
   // cached prefix.
   const steeringBlock = steering ? `\n\n${steeringGuidance(steering)}` : "";
-  const paragraphRange = paragraphRangeForAction(playerAction);
+  const paragraphRange = options.unboundedLength
+    ? null
+    : paragraphRangeForAction(playerAction);
   const protagName = extractName(protagonistInput, "the protagonist");
   const deutName = extractName(deuteragonistInput, "the deuteragonist");
   const partySplitBlock = partySplit
@@ -1083,11 +1143,11 @@ export function buildResolutionMessages(
 Generate BOTH scenes in a single response. Wrap each in its own XML tag:
 
 <protagonist>
-[Narrative of what ${protagName} experiences — second person, present tense, addressing ${protagName} as "you". ${paragraphRange.min}-${paragraphRange.max} paragraphs.]
+[Narrative of what ${protagName} experiences — second person, present tense, addressing ${protagName} as "you". ${lengthPhrase(paragraphRange, (r) => `${r.min}-${r.max} paragraphs`)}.]
 </protagonist>
 
 <deuteragonist>
-[Narrative of what ${deutName} experiences simultaneously — third person, present tense, using ${deutName}'s name. 1-3 paragraphs.]
+[Narrative of what ${deutName} experiences simultaneously — third person, present tense, using ${deutName}'s name. ${lengthPhrase(paragraphRange, () => "1-3 paragraphs")}.]
 </deuteragonist>
 
 Each section must be a complete, self-contained narrative. Do NOT add any text outside the tags. Do NOT nest the tags.`
@@ -1273,6 +1333,7 @@ export function buildWorldStepMessages(
    * role instruction and closing user nudge.
    */
   mode: "world-step" | "continue" = "world-step",
+  options: BuildNarrativeOptions = {},
 ): LLMMessage[] {
   const messages = buildSharedHistory(
     turns,
@@ -1306,10 +1367,17 @@ export function buildWorldStepMessages(
 
   // No player action drives this pass, so the narrative budget stays at
   // the default — the world moves at its own pace regardless of how long
-  // the player's last instruction was.
+  // the player's last instruction was. Unless the adventure has length
+  // unlocked entirely, in which case there is no budget to scale.
+  const paragraphRange = options.unboundedLength
+    ? null
+    : DEFAULT_PARAGRAPH_RANGE;
   messages.push({
     role: "system",
-    content: mode === "continue" ? CONTINUE_STORY_INSTRUCTION() : WORLD_STEP_INSTRUCTION(),
+    content:
+      mode === "continue"
+        ? CONTINUE_STORY_INSTRUCTION(paragraphRange)
+        : WORLD_STEP_INSTRUCTION(paragraphRange),
   });
 
   // Director brief (if the two-model flow is enabled) lands AFTER the role
@@ -1371,6 +1439,7 @@ export function buildRevisionMessages(
   worldBible?: string,
   liveWorldState?: LiveWorldState,
   conditions?: string,
+  options: BuildNarrativeOptions = {},
 ): LLMMessage[] {
   const messages = buildSharedHistory(
     turns,
@@ -1389,10 +1458,13 @@ export function buildRevisionMessages(
       ? `\n\n${steeringGuidance(steering)}`
       : "";
   // Only resolution revisions scale off the player action; world-step and
-  // continue keep the default budget.
-  const paragraphRange = paragraphRangeForAction(
-    kind === "resolution" ? playerAction : null,
-  );
+  // continue keep the default budget. A revision inherits the adventure's
+  // length setting, so a turn generated unbounded is revised unbounded —
+  // otherwise the revision pass would quietly re-impose the cap the turn
+  // was written without.
+  const paragraphRange = options.unboundedLength
+    ? null
+    : paragraphRangeForAction(kind === "resolution" ? playerAction : null);
   const roleInstruction =
     kind === "world-step"
       ? WORLD_STEP_INSTRUCTION(paragraphRange)

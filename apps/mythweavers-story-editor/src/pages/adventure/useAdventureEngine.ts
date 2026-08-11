@@ -25,6 +25,7 @@ import {
   cleanNarrative,
   rollSteering,
   ANALYSIS_TOOLS,
+  type BuildNarrativeOptions,
   type LiveWorldState,
   type SteeringBucket,
 } from './prompts'
@@ -202,6 +203,20 @@ export function createAdventureEngine(
   }
 
   /**
+   * Prompt-shape options common to the three writer builders (resolution,
+   * world-step/continue, revision). Same chokepoint idea as
+   * `liveWorldStateForPrompt()` — one place that reads the store, so the
+   * builders stay pure and testable.
+   *
+   * Deliberately NOT passed to `buildDirectorMessages`: the director's beat
+   * budget stays bounded even when the writer is unbounded, since the beat
+   * list is a plan rather than a length target.
+   */
+  function narrativeOptions(): BuildNarrativeOptions {
+    return { unboundedLength: adventureStore.unboundedLengthEnabled }
+  }
+
+  /**
    * Run the optional "director" pass: a grounded analysis-class model that
    * produces a numbered BEATS plan for the writer call that follows. Output is
    * NOT streamed to the UI — the brief is plumbing for the writer, and
@@ -374,6 +389,7 @@ export function createAdventureEngine(
       adventureStore.protagonistInput || undefined,
       adventureStore.deuteragonistInput || undefined,
       mode,
+      narrativeOptions(),
     )
 
     const { narrative, streamErrors } = await streamPass(
@@ -565,6 +581,7 @@ export function createAdventureEngine(
         adventureStore.protagonistInput || undefined,
         adventureStore.deuteragonistInput || undefined,
         adventureStore.partySplit || undefined,
+        narrativeOptions(),
       )
 
       const { narrative, raw, streamErrors } = await streamPass(
@@ -1467,6 +1484,7 @@ export function createAdventureEngine(
         adventureStore.worldBible,
         liveWorldStateForPrompt(),
         conditionsForPrompt(),
+        narrativeOptions(),
       )
 
       const revisionResolved = resolveModel('adventure-revision')

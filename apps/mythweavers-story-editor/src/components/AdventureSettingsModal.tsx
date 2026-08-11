@@ -23,6 +23,7 @@ const SETTERS: Record<
   directorEnabled: adventureStore.setDirectorEnabled,
   livingWorldEnabled: adventureStore.setLivingWorldEnabled,
   conditionTrackingEnabled: adventureStore.setConditionTrackingEnabled,
+  unboundedLengthEnabled: adventureStore.setUnboundedLengthEnabled,
 }
 
 /**
@@ -51,6 +52,7 @@ export const AdventureSettingsModal: Component<AdventureSettingsModalProps> = (
           directorEnabled: adventureStore.directorEnabled,
           livingWorldEnabled: adventureStore.livingWorldEnabled,
           conditionTrackingEnabled: adventureStore.conditionTrackingEnabled,
+          unboundedLengthEnabled: adventureStore.unboundedLengthEnabled,
         }}
         onChange={(key, value) => {
           SETTERS[key](value)

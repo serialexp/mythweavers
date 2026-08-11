@@ -15,6 +15,7 @@ export interface AdventureSettingsValues {
   directorEnabled: boolean
   livingWorldEnabled: boolean
   conditionTrackingEnabled: boolean
+  unboundedLengthEnabled: boolean
 }
 
 /**
@@ -31,6 +32,7 @@ export const ADVENTURE_SETTING_DEFAULTS: AdventureSettingsValues = {
   directorEnabled: false,
   livingWorldEnabled: true,
   conditionTrackingEnabled: false,
+  unboundedLengthEnabled: false,
 }
 
 interface SettingDescriptor {
@@ -118,6 +120,20 @@ const ADVENTURE_SETTINGS: SettingDescriptor[] = [
       'while it\'s off). What stops is the engine maintaining its own ' +
       'evolving picture: plot points, the world agenda and the synthesized ' +
       'story arc go with it.',
+  },
+  {
+    key: 'unboundedLengthEnabled',
+    label: 'Unlock response length (no paragraph target)',
+    hint:
+      'Every writer prompt normally carries a paragraph target — 2-4 by ' +
+      'default, scaling up to 8-10 for a long multi-sentence action. It is a ' +
+      'ceiling the model obeys even when your action needs more room than ' +
+      'that, which is what makes busy turns read as a cramped, garbled ' +
+      'summary. When on, the target is replaced with permission to run as ' +
+      'long as the scene needs and stop when the beat lands. Two things to ' +
+      'know: long turns can hit your max tokens ceiling (4096 by default) ' +
+      'and get cut off mid-sentence, and with the director enabled its beat ' +
+      'plan still bounds how much happens per turn.',
   },
   {
     key: 'conditionTrackingEnabled',

@@ -317,6 +317,20 @@ export interface PersistedState {
    */
   conditionTrackingEnabled?: boolean
   /**
+   * When true, the writer prompts carry no paragraph target: the
+   * `- N-M paragraphs.` rule is replaced with permission to run as long as
+   * the scene needs (`BuildNarrativeOptions.unboundedLength`). Applies to
+   * the resolution / world-step / continue / revision passes; the
+   * director's beat budget stays bounded. Default: false.
+   *
+   * The bounded budget (2-4 paragraphs, scaling to 8-10 for a long action)
+   * is a ceiling the model obeys even when the action doesn't fit inside
+   * it, which makes busy turns read as a cramped summary. Note unbounded
+   * turns can hit the model's max-token ceiling and truncate mid-sentence;
+   * the token budget is deliberately not raised to compensate.
+   */
+  unboundedLengthEnabled?: boolean
+  /**
    * Model-maintained ledger of physical state for the protagonist +
    * on-page named characters. One concise line per character,
    * protagonist first. Regenerated each turn by the conditions pass;
