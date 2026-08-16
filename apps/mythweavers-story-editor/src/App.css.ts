@@ -25,6 +25,14 @@ export const desktopNavigation = style({
   borderRight: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
   background: tokens.color.bg.raised,
   overflow: 'hidden',
+
+  '@media': {
+    // Deep nesting plus the indicator strip crowds titles at 400px. Screens
+    // this wide can spare the room without squeezing the editor.
+    '(min-width: 1280px)': {
+      width: '500px',
+    },
+  },
 })
 
 export const chatContainer = style({
