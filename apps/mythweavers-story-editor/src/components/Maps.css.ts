@@ -108,32 +108,6 @@ export const mapNameInput = style({
   fontSize: '0.9rem',
 })
 
-export const fileUpload = style({
-  position: 'relative',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.5rem',
-})
-
-export const fileInput = style({
-  display: 'none',
-})
-
-export const fileInputLabel = style({
-  padding: '0.75rem',
-  background: tokens.color.bg.elevated,
-  color: tokens.color.text.primary,
-  border: `2px dashed ${tokens.color.border.default}`,
-  borderRadius: '4px',
-  cursor: 'pointer',
-  textAlign: 'center',
-  transition: 'all 0.2s',
-  ':hover': {
-    background: tokens.color.surface.hover,
-    borderColor: tokens.color.accent.primary,
-  },
-})
-
 export const selectedFile = style({
   padding: '0.5rem',
   background: tokens.color.bg.elevated,
@@ -1385,26 +1359,6 @@ export const mapDetailContent = style({
 })
 
 // Border color editor
-export const borderColorEditor = style({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.5rem',
-  padding: '1rem',
-  background: tokens.color.bg.raised,
-  borderRadius: '4px',
-  border: `1px solid ${tokens.color.border.default}`,
-})
-
-globalStyle(`${borderColorEditor} h4`, {
-  margin: '0 0 0.5rem 0',
-  color: tokens.color.text.primary,
-})
-
-export const borderColorActions = style({
-  display: 'flex',
-  gap: '0.5rem',
-})
-
 // Loading overlay for map loading
 export const loadingOverlay = style({
   position: 'absolute',

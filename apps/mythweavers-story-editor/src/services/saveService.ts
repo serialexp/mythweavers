@@ -72,6 +72,7 @@ import {
   Node,
   StoryMap,
 } from '../types/core'
+import { uploadStoryImage } from '../utils/uploadStoryImage'
 
 // Convert base64 data URI to Blob without using fetch (CSP-compliant)
 function base64ToBlob(dataUri: string): Blob {
@@ -83,6 +84,17 @@ function base64ToBlob(dataUri: string): Blob {
     bytes[i] = binaryString.charCodeAt(i)
   }
   return new Blob([bytes], { type: mimeType })
+}
+
+/**
+ * Same bytes, named for upload. The extension follows the declared MIME type
+ * rather than being assumed: the file list shows this name back to the user,
+ * and calling a JPEG `.png` was only ever harmless because nothing looked.
+ */
+function base64ToFile(dataUri: string, baseName: string): File {
+  const blob = base64ToBlob(dataUri)
+  const extension = blob.type.split('/')[1]?.split('+')[0] || 'png'
+  return new File([blob], `${baseName}.${extension}`, { type: blob.type })
 }
 
 // Base fields shared by all save operations
@@ -1029,33 +1041,17 @@ export class SaveService {
         break
 
       case 'map-insert': {
-        let fileId: string | undefined
+        // The picker uploads the image up front and hands the store a fileId.
+        // The base64 branch remains for maps that carry their own bytes -- a
+        // local story's map reaching the server for the first time.
+        let fileId = operation.data.fileId ?? undefined
 
-        // If map has imageData, upload it first
-        if (operation.data.imageData) {
-          const blob = base64ToBlob(operation.data.imageData)
-
-          // Upload file using multipart/form-data
-          const formData = new FormData()
-          formData.append('file', blob, `${operation.data.name || 'map'}.png`)
-          if (storyId) {
-            formData.append('storyId', storyId)
-          }
-
-          const response = await fetch(`${getApiBaseUrl()}/my/files`, {
-            method: 'POST',
-            credentials: 'include',
-            body: formData,
-          })
-
-          if (!response.ok) {
-            const message = await response.text()
-            throw new Error(message || `Map image upload failed with status ${response.status}`)
-          }
-
-          const result = await response.json()
-          fileId = result.file?.id
-          if (!fileId) throw new Error('Map image upload did not return a file ID')
+        if (!fileId && operation.data.imageData) {
+          const uploaded = await uploadStoryImage(
+            base64ToFile(operation.data.imageData, operation.data.name || 'map'),
+            storyId,
+          )
+          fileId = uploaded.id
         }
 
         // Create map with fileId. The ID is the one the store already put in its
@@ -1079,6 +1075,10 @@ export class SaveService {
             name: operation.data.name,
             borderColor: operation.data.borderColor,
             propertySchema: operation.data.propertySchema,
+            // Undefined leaves the server's file reference alone; null clears
+            // it. A map whose details were never loaded has no fileId to send,
+            // which is exactly the "leave it alone" case.
+            fileId: operation.data.fileId,
           },
         })
         break

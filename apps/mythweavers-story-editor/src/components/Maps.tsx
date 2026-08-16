@@ -1,15 +1,7 @@
 import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
 import * as PIXI from 'pixi.js'
 import { Component, Show, batch, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
-import {
-  PhArrowLeftIcon,
-  PhCheckIcon,
-  PhPencilSimpleIcon,
-  PhPlusIcon,
-  PhTrashIcon,
-  PhWarningIcon,
-  PhXIcon,
-} from 'solidjs-phosphor'
+import { PhArrowLeftIcon, PhPencilSimpleIcon, PhPlusIcon, PhTrashIcon, PhWarningIcon } from 'solidjs-phosphor'
 import { useFleetManager } from '../hooks/maps/useFleetManager'
 import { useHyperlaneManager } from '../hooks/maps/useHyperlaneManager'
 import { useLandmarkManager } from '../hooks/maps/useLandmarkManager'
@@ -42,6 +34,8 @@ import { EJSCodeEditor } from './EJSCodeEditor'
 import * as styles from './Maps.css'
 import { LandmarkDetail } from './maps/LandmarkDetail'
 import { LandmarksList } from './maps/LandmarksList'
+import { MapImageField, MapImageValue } from './maps/MapImageField'
+import { MapSettingsModal } from './maps/MapSettingsModal'
 import { MapTimeline } from './maps/MapTimeline'
 import { MapToolbar } from './maps/MapToolbar'
 import { PathDetail } from './maps/PathDetail'
@@ -69,10 +63,12 @@ export const Maps: Component = () => {
 
   const [newMapName, setNewMapName] = createSignal('')
   const [newMapBorderColor, setNewMapBorderColor] = createSignal('')
-  const [selectedFile, setSelectedFile] = createSignal<File | null>(null)
-  const [selectedFileName, setSelectedFileName] = createSignal('')
-  const [editingMapBorderColor, setEditingMapBorderColor] = createSignal(false)
-  const [editMapBorderColorValue, setEditMapBorderColorValue] = createSignal('')
+  const [newMapImage, setNewMapImage] = createSignal<MapImageValue>({
+    fileId: null,
+    imageData: '',
+    previewUrl: null,
+  })
+  const [showMapSettings, setShowMapSettings] = createSignal(false)
   // Unified selection state
   type Selection =
     | { type: 'none' }
@@ -984,35 +980,22 @@ export const Maps: Component = () => {
     }
   })
 
-  // Handle file selection
-  const handleFileSelect = (e: Event) => {
-    const input = e.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (file?.type.startsWith('image/')) {
-      setSelectedFile(file)
-      setSelectedFileName(file.name)
-    }
-  }
+  // Whether the create form has an image to work with. Server stories reference
+  // an uploaded file; local ones carry the bytes.
+  const newMapHasImage = () => Boolean(newMapImage().fileId || newMapImage().imageData)
 
   // Add new map
   const handleAddMap = async () => {
     const name = newMapName().trim()
     const borderColor = newMapBorderColor().trim()
-    const file = selectedFile()
+    const image = newMapImage()
 
-    if (!name || !file) return
+    if (!name || !newMapHasImage()) return
 
-    // Convert file to base64
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const imageData = e.target?.result as string
-      await mapsStore.addMap(name, imageData, borderColor || undefined)
-      setNewMapName('')
-      setNewMapBorderColor('')
-      setSelectedFile(null)
-      setSelectedFileName('')
-    }
-    reader.readAsDataURL(file)
+    await mapsStore.addMap(name, { imageData: image.imageData, fileId: image.fileId }, borderColor || undefined)
+    setNewMapName('')
+    setNewMapBorderColor('')
+    setNewMapImage({ fileId: null, imageData: '', previewUrl: null })
   }
 
   // Handle map selection from ListDetailPanel
@@ -1029,24 +1012,6 @@ export const Maps: Component = () => {
         await mapsStore.deleteMap(mapsStore.selectedMapId)
         panelRef?.clearSelection()
       }
-    }
-  }
-
-  // Handle save border color
-  const handleSaveBorderColor = async () => {
-    if (mapsStore.selectedMapId) {
-      await mapsStore.updateMap(mapsStore.selectedMapId, {
-        borderColor: editMapBorderColorValue() || undefined,
-      })
-      setEditingMapBorderColor(false)
-    }
-  }
-
-  // Start editing border color
-  const startEditingBorderColor = () => {
-    if (mapsStore.selectedMap) {
-      setEditMapBorderColorValue(mapsStore.selectedMap.borderColor || '')
-      setEditingMapBorderColor(true)
     }
   }
 
@@ -1755,24 +1720,13 @@ export const Maps: Component = () => {
               minHeight="60px"
             />
 
-            <div class={styles.fileUpload}>
-              <input
-                type="file"
-                id="map-file-input"
-                class={styles.fileInput}
-                accept="image/*"
-                onChange={handleFileSelect}
-              />
-              <label for="map-file-input" class={styles.fileInputLabel}>
-                {selectedFileName() || 'Choose map image...'}
-              </label>
-            </div>
+            <MapImageField value={newMapImage()} onChange={setNewMapImage} />
 
             <div class={styles.addMapFormActions}>
               <button
                 class={styles.addMapButton}
                 onClick={handleAddMap}
-                disabled={!newMapName().trim() || !selectedFile()}
+                disabled={!newMapName().trim() || !newMapHasImage()}
               >
                 <PhPlusIcon /> Add Map
               </button>
@@ -1786,7 +1740,7 @@ export const Maps: Component = () => {
           <div class={styles.detailTitleContainer}>
             <span class={styles.detailTitleText}>{map.name}</span>
             <div class={styles.detailTitleActions}>
-              <button class={styles.iconButton} onClick={startEditingBorderColor} title="Edit border color template">
+              <button class={styles.iconButton} onClick={() => setShowMapSettings(true)} title="Map settings">
                 <PhPencilSimpleIcon />
               </button>
               <button
@@ -1806,27 +1760,6 @@ export const Maps: Component = () => {
               <div class={styles.loadingOverlay}>
                 <div class={styles.loadingSpinner} />
                 <span>Loading map...</span>
-              </div>
-            </Show>
-
-            {/* Edit Border Color Form */}
-            <Show when={editingMapBorderColor()}>
-              <div class={styles.borderColorEditor}>
-                <h4>Edit Border Color Template</h4>
-                <EJSCodeEditor
-                  value={editMapBorderColorValue()}
-                  onChange={setEditMapBorderColorValue}
-                  placeholder="Border color template"
-                  minHeight="100px"
-                />
-                <div class={styles.borderColorActions}>
-                  <button class={styles.addMapButton} onClick={handleSaveBorderColor}>
-                    <PhCheckIcon /> Save
-                  </button>
-                  <button class={styles.cancelButton} onClick={() => setEditingMapBorderColor(false)}>
-                    <PhXIcon /> Cancel
-                  </button>
-                </div>
               </div>
             </Show>
 
@@ -1903,6 +1836,12 @@ export const Maps: Component = () => {
             </div>
           </div>
         )}
+      />
+
+      <MapSettingsModal
+        isOpen={showMapSettings()}
+        map={mapsStore.selectedMap ?? null}
+        onClose={() => setShowMapSettings(false)}
       />
     </Show>
   )

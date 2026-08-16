@@ -84,6 +84,57 @@ async function fetchFileMetadata(fileId: string): Promise<FileMetadataResult> {
   }
 }
 
+interface MapImageResult {
+  imageData: string
+  imageError?: MapError
+}
+
+/**
+ * Turn a File id into something renderable: look the file record up, then pull
+ * the bytes with credentials and wrap them in an object URL. The bytes cannot
+ * be handed to PIXI as a bare URL because the files endpoint is cookie
+ * authenticated, and a texture load does not carry credentials.
+ *
+ * Every failure is reported as an `imageError` rather than thrown -- a map
+ * whose picture is missing is still worth showing for its landmarks.
+ */
+async function resolveMapImage(fileId: string | null | undefined): Promise<MapImageResult> {
+  const fileResult = fileId ? await fetchFileMetadata(fileId) : MISSING_FILE_REFERENCE
+  const filePath = fileResult.file?.path
+
+  if (!filePath) {
+    return { imageData: '', imageError: fileResult.error }
+  }
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}${filePath}`, { credentials: 'include' })
+    if (!response.ok) {
+      console.error(`[mapsStore] Failed to fetch image: ${response.status}`)
+      return {
+        imageData: '',
+        imageError: {
+          title: 'The map image could not be downloaded',
+          detail: [
+            `The file record exists, but the server returned ${response.status} for its contents.`,
+            'This usually means the file was uploaded in a different environment, so the bytes',
+            'live somewhere this server cannot reach.',
+          ].join(' '),
+        },
+      }
+    }
+    return { imageData: URL.createObjectURL(await response.blob()) }
+  } catch (err) {
+    console.error('[mapsStore] Error fetching image:', err)
+    return {
+      imageData: '',
+      imageError: {
+        title: 'The map image could not be downloaded',
+        detail: `${describeError(err)}. The request for the image never completed.`,
+      },
+    }
+  }
+}
+
 const [mapsState, setMapsState] = createStore({
   maps: [] as StoryMap[],
   showMaps: false,
@@ -172,11 +223,18 @@ export const mapsStore = {
   // Actions
   setMaps: (maps: StoryMap[]) => setMapsState('maps', maps),
 
-  addMap: async (name: string, imageData: string, borderColor?: string) => {
+  addMap: async (name: string, image: { imageData: string; fileId?: string | null }, borderColor?: string) => {
+    // A map picked from the file library arrives as a reference with no bytes,
+    // and the canvas cannot render a reference. Resolve it now: the map is
+    // selected the moment it is created, so there is no later load to wait for.
+    const resolved = !image.imageData && image.fileId ? await resolveMapImage(image.fileId) : null
+
     const newMap: StoryMap = {
       id: generateMessageId(),
       name,
-      imageData,
+      imageData: resolved ? resolved.imageData : image.imageData,
+      imageError: resolved?.imageError,
+      fileId: image.fileId,
       borderColor,
       landmarks: [],
       fleets: [],
@@ -203,7 +261,31 @@ export const mapsStore = {
   },
 
   updateMap: async (id: string, updates: Partial<StoryMap>) => {
-    setMapsState('maps', (map) => map.id === id, updates)
+    // A changed fileId means the picture on screen is now the wrong one. Resolve
+    // the new bytes before touching state so the swap lands in a single update
+    // and the canvas never renders a name/image mismatch. `imageData` supplied
+    // by the caller (local stories, which carry their own base64) wins -- there
+    // is no file to fetch in that case.
+    const previousFileId = mapsState.maps.find((map) => map.id === id)?.fileId
+    // `undefined` (never had one) and `null` (explicitly none) are both "no
+    // file", and treating them as different would make a local story's map --
+    // which has no fileId at all -- look like it had just been cleared, wiping
+    // the picture on every save.
+    const fileIdChanged = updates.fileId !== undefined && (updates.fileId ?? null) !== (previousFileId ?? null)
+    const refreshedImage =
+      fileIdChanged && updates.imageData === undefined ? await resolveMapImage(updates.fileId) : null
+
+    const patch: Partial<StoryMap> = { ...updates }
+    if (refreshedImage) {
+      patch.imageData = refreshedImage.imageData
+      patch.imageError = refreshedImage.imageError
+    } else if (updates.imageData) {
+      // Whatever the old complaint was, it was about an image that is no longer
+      // the one being displayed.
+      patch.imageError = undefined
+    }
+
+    setMapsState('maps', (map) => map.id === id, patch)
 
     // Save to server if server story
     const storyId = currentStoryStore.id
@@ -364,6 +446,7 @@ export const mapsStore = {
       id: map.id,
       name: map.name,
       imageData: '', // Will be loaded lazily
+      fileId: map.fileId,
       borderColor: map.borderColor,
       propertySchema: map.propertySchema,
       landmarkCount: map.landmarkCount,
@@ -401,8 +484,8 @@ export const mapsStore = {
 
         // Load image, landmarks, pawns (fleets), their movements, and paths
         // (hyperlanes) in parallel
-        const [fileResult, landmarksData, pawnsData, movementsData, pathsData] = await Promise.all([
-          fileId ? fetchFileMetadata(fileId) : Promise.resolve(MISSING_FILE_REFERENCE),
+        const [imageResult, landmarksData, pawnsData, movementsData, pathsData] = await Promise.all([
+          resolveMapImage(fileId),
           getMyMapsByMapIdLandmarks({ path: { mapId } })
             .then((r) => r.data?.landmarks || [])
             .catch(() => []),
@@ -417,44 +500,14 @@ export const mapsStore = {
             .catch(() => []),
         ])
 
-        // Fetch image with credentials and create blob URL
-        let imageData = ''
-        let imageError = fileResult.error
-        const filePath = fileResult.file?.path
-        if (filePath) {
-          try {
-            const imageUrl = `${getApiBaseUrl()}${filePath}`
-            const response = await fetch(imageUrl, { credentials: 'include' })
-            if (response.ok) {
-              const blob = await response.blob()
-              imageData = URL.createObjectURL(blob)
-            } else {
-              console.error(`[mapsStore] Failed to fetch image: ${response.status}`)
-              imageError = {
-                title: 'The map image could not be downloaded',
-                detail: [
-                  `The file record exists, but the server returned ${response.status} for its contents.`,
-                  'This usually means the file was uploaded in a different environment, so the bytes',
-                  'live somewhere this server cannot reach.',
-                ].join(' '),
-              }
-            }
-          } catch (err) {
-            console.error('[mapsStore] Error fetching image:', err)
-            imageError = {
-              title: 'The map image could not be downloaded',
-              detail: `${describeError(err)}. The request for the image never completed.`,
-            }
-          }
-        }
-
         // Update the map with detailed data
         // Convert API types to local types using mappers
         setMapsState('maps', (m) => m.id === mapId, {
-          imageData,
+          fileId: fileId ?? null,
+          imageData: imageResult.imageData,
           // Cleared explicitly on success: the store is long-lived, so leaving a
           // stale error behind would outlive the problem it described.
-          imageError: imageData ? undefined : imageError,
+          imageError: imageResult.imageData ? undefined : imageResult.imageError,
           detailsLoaded: true,
           landmarks: (landmarksData || []).map((l: ApiLandmark) => apiLandmarkToLandmark(l)),
           fleets: (pawnsData || []).map((p: ApiPawn) => pawnToFleet(p, movementsData || [])),

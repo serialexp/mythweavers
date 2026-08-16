@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import type { FastifyInstance } from 'fastify'
+import { prisma } from '../src/lib/prisma.js'
 import { buildApp, cleanDatabase } from './helpers.js'
 
 let app: FastifyInstance
@@ -1828,5 +1829,169 @@ describe('PUT /my/paths/:pathId/segments', () => {
     })
 
     expect(response.statusCode).toBe(401)
+  })
+})
+
+// Creating a File row directly: the upload endpoint is exercised elsewhere, and
+// what matters here is only that the map points at it.
+async function createFile(ownerId: string, name: string) {
+  return prisma.file.create({
+    data: {
+      ownerId,
+      localPath: `/tmp/${name}.png`,
+      r2Key: null,
+      visibility: 'private',
+      path: `/files/1/2025/12/${name}.png`,
+      sha256: `sha-${name}`,
+      width: 100,
+      height: 100,
+      bytes: 1024,
+      mimeType: 'image/png',
+    },
+  })
+}
+
+describe('Map image (fileId)', () => {
+  test('should attach a file at creation', async () => {
+    const { userId, cookies } = await registerUser('mapfile1@example.com', 'mapfile1')
+    const file = await createFile(userId, 'original')
+
+    const storyResponse = await app.inject({ method: 'POST', url: '/my/stories', payload: { name: 'Story' }, cookies })
+    const { story } = storyResponse.json()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${story.id}/maps`,
+      payload: { name: 'Galaxy', fileId: file.id },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().map.fileId).toBe(file.id)
+  })
+
+  test('should replace the image on an existing map', async () => {
+    // The whole point of the map settings dialog: a broken or wrong image has to
+    // be fixable after the fact.
+    const { userId, cookies } = await registerUser('mapfile2@example.com', 'mapfile2')
+    const original = await createFile(userId, 'original')
+    const replacement = await createFile(userId, 'replacement')
+
+    const storyResponse = await app.inject({ method: 'POST', url: '/my/stories', payload: { name: 'Story' }, cookies })
+    const { story } = storyResponse.json()
+    const created = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${story.id}/maps`,
+      payload: { name: 'Galaxy', fileId: original.id },
+      cookies,
+    })
+    const { map } = created.json()
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/maps/${map.id}`,
+      payload: { fileId: replacement.id },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().map.fileId).toBe(replacement.id)
+  })
+
+  test('should clear the image when fileId is null', async () => {
+    const { userId, cookies } = await registerUser('mapfile3@example.com', 'mapfile3')
+    const file = await createFile(userId, 'original')
+
+    const storyResponse = await app.inject({ method: 'POST', url: '/my/stories', payload: { name: 'Story' }, cookies })
+    const { story } = storyResponse.json()
+    const created = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${story.id}/maps`,
+      payload: { name: 'Galaxy', fileId: file.id },
+      cookies,
+    })
+    const { map } = created.json()
+
+    const response = await app.inject({ method: 'PUT', url: `/my/maps/${map.id}`, payload: { fileId: null }, cookies })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().map.fileId).toBeNull()
+  })
+
+  test('should leave the image alone when fileId is omitted', async () => {
+    // A rename must not detach the picture. The client omits fileId whenever it
+    // has not loaded the map's details, so this is the common case.
+    const { userId, cookies } = await registerUser('mapfile4@example.com', 'mapfile4')
+    const file = await createFile(userId, 'original')
+
+    const storyResponse = await app.inject({ method: 'POST', url: '/my/stories', payload: { name: 'Story' }, cookies })
+    const { story } = storyResponse.json()
+    const created = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${story.id}/maps`,
+      payload: { name: 'Galaxy', fileId: file.id },
+      cookies,
+    })
+    const { map } = created.json()
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/maps/${map.id}`,
+      payload: { name: 'Renamed' },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().map.name).toBe('Renamed')
+    expect(response.json().map.fileId).toBe(file.id)
+  })
+
+  test("should reject another user's file", async () => {
+    const { cookies } = await registerUser('mapfile5@example.com', 'mapfile5')
+    const other = await registerUser('mapfile6@example.com', 'mapfile6')
+    const foreignFile = await createFile(other.userId, 'foreign')
+
+    const storyResponse = await app.inject({ method: 'POST', url: '/my/stories', payload: { name: 'Story' }, cookies })
+    const { story } = storyResponse.json()
+    const created = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${story.id}/maps`,
+      payload: { name: 'Galaxy' },
+      cookies,
+    })
+    const { map } = created.json()
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/maps/${map.id}`,
+      payload: { fileId: foreignFile.id },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json().error).toBe('Invalid file ID')
+  })
+
+  test('should reject a file that does not exist', async () => {
+    const { cookies } = await registerUser('mapfile7@example.com', 'mapfile7')
+
+    const storyResponse = await app.inject({ method: 'POST', url: '/my/stories', payload: { name: 'Story' }, cookies })
+    const { story } = storyResponse.json()
+    const created = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${story.id}/maps`,
+      payload: { name: 'Galaxy' },
+      cookies,
+    })
+    const { map } = created.json()
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/maps/${map.id}`,
+      payload: { fileId: 'no-such-file' },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(400)
   })
 })

@@ -143,6 +143,56 @@ describe('SaveService queue merge behaviour', () => {
     expect(queue).toHaveLength(1)
     expect(queue[0].type).toBe('node-delete')
   })
+
+  it('carries a replaced map image into a create that has not flushed yet', async () => {
+    // Opening map settings straight after adding a map is an ordinary thing to
+    // do, and it collapses into a single create. If the merge dropped fileId the
+    // map would be created pointing at the image the user just replaced.
+    await service.queueSave({
+      type: 'map-insert',
+      entityType: 'map',
+      entityId: 'map-1',
+      storyId: 'story-1',
+      data: { id: 'map-1', name: 'Outer Rim', fileId: 'file-original', imageData: '' },
+    })
+
+    await service.queueSave({
+      type: 'map-update',
+      entityType: 'map',
+      entityId: 'map-1',
+      storyId: 'story-1',
+      data: { id: 'map-1', name: 'Outer Rim', fileId: 'file-replacement', imageData: '' },
+    })
+
+    const queue = getQueue()
+    expect(queue).toHaveLength(1)
+    expect(queue[0].type).toBe('map-insert')
+    expect(queue[0].data.fileId).toBe('file-replacement')
+  })
+
+  it('keeps a cleared map image cleared when it merges into a create', async () => {
+    // null is a real value here -- "this map has no picture" -- and must not be
+    // treated as "nothing to say about the picture".
+    await service.queueSave({
+      type: 'map-insert',
+      entityType: 'map',
+      entityId: 'map-2',
+      storyId: 'story-1',
+      data: { id: 'map-2', name: 'Core Worlds', fileId: 'file-original', imageData: '' },
+    })
+
+    await service.queueSave({
+      type: 'map-update',
+      entityType: 'map',
+      entityId: 'map-2',
+      storyId: 'story-1',
+      data: { id: 'map-2', name: 'Core Worlds', fileId: null, imageData: '' },
+    })
+
+    const queue = getQueue()
+    expect(queue).toHaveLength(1)
+    expect(queue[0].data.fileId).toBeNull()
+  })
 })
 
 describe('SaveService failure reporting', () => {

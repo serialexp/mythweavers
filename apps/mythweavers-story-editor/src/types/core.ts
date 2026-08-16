@@ -250,6 +250,14 @@ export interface StoryMap {
   id: string
   name: string
   imageData: string // Base64 encoded image or blob URL
+  /**
+   * The File row the image lives in, for server stories. Distinguish the two
+   * empty values: `undefined` means "not known yet" (details never loaded), so
+   * an update must leave the server's value alone, while `null` means "this map
+   * deliberately has no image" and does clear it. Local stories keep their
+   * picture in `imageData` and leave this unset.
+   */
+  fileId?: string | null
   borderColor?: string // EJS template for landmark border colors
   propertySchema?: PropertySchema // Schema for landmark properties and state fields
   landmarkCount?: number // Number of landmarks (from list endpoint, before details loaded)
