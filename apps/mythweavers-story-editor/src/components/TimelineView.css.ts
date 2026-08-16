@@ -341,7 +341,31 @@ export const chipDot = style({
 export const chipLabel = style({
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  maxWidth: '160px',
+  // Wider than the scene title alone needed, since the chapter now leads it.
+  maxWidth: '220px',
+})
+
+/**
+ * The chapter that owns the scene. Muted rather than a distinct colour so it
+ * reads as context on both plain and selected chips, where the text colour
+ * flips to the inverse token.
+ *
+ * Capped and ellipsised on its own so a long chapter title truncates before the
+ * scene title does: the chapter leads the label, so without this the ellipsis
+ * would eat the more specific half.
+ */
+export const chipChapter = style({
+  display: 'inline-block',
+  verticalAlign: 'bottom',
+  maxWidth: '96px',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  opacity: 0.65,
+})
+
+/** Kept out of `chipChapter` so the truncation cap applies to the title alone. */
+export const chipSeparator = style({
+  opacity: 0.65,
 })
 
 // --- Marquee -----------------------------------------------------------------

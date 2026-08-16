@@ -20,8 +20,19 @@ export const timelineViewStore = {
   get showTimeline() {
     return timelineState.showTimeline
   },
-  get viewport() {
-    return timelineState.viewport
+  /**
+   * A fresh snapshot on every read, never the live store node.
+   *
+   * `setViewport` hands Solid a plain object, and Solid merges that into the
+   * existing node rather than replacing it — the object identity survives every
+   * write. Handing that object out would mean a caller who captures the viewport
+   * as a fixed reference (the pan base, the pinch base) is really holding a view
+   * of the *current* viewport, so each pointermove would measure its delta
+   * against an already-moved base and compound into a runaway pan.
+   */
+  get viewport(): Viewport | null {
+    const stored = timelineState.viewport
+    return stored ? { start: stored.start, end: stored.end } : null
   },
 
   setShowTimeline: (show: boolean) => setTimelineState('showTimeline', show),
