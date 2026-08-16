@@ -1,12 +1,19 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { CLIENT_ID_CONFLICT_MESSAGE, isUniqueConstraintError, resolveClientId } from '../../lib/client-id.js'
 import { prisma } from '../../lib/prisma.js'
 import { transformDates } from '../../lib/transform-dates.js'
 import { errorSchema } from '../../schemas/common.js'
 
 // Schemas
 const createPathSegmentBodySchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .meta({ description: 'Optional client-provided ID (generated if omitted)', example: 'clx1234567890' }),
   order: z.number().int().min(0).meta({ description: 'Segment order in path', example: 0 }),
   startX: z.number().meta({ description: 'Start X coordinate', example: 100.5 }),
   startY: z.number().meta({ description: 'Start Y coordinate', example: 200.3 }),
@@ -14,6 +21,32 @@ const createPathSegmentBodySchema = z.strictObject({
   endY: z.number().meta({ description: 'End Y coordinate', example: 250.8 }),
   startLandmarkId: z.string().optional().meta({ description: 'Start landmark ID (optional)', example: 'clx123' }),
   endLandmarkId: z.string().optional().meta({ description: 'End landmark ID (optional)', example: 'clx456' }),
+})
+
+/**
+ * One segment inside a bulk replace. Unlike the single-segment create this has no
+ * `pathId` -- the path comes from the URL, and a segment cannot move between paths.
+ */
+const replacePathSegmentSchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .meta({ description: 'Segment ID; existing segments keep theirs, new ones may supply one', example: 'clx123' }),
+  order: z.number().int().min(0).meta({ description: 'Segment order in path', example: 0 }),
+  startX: z.number().meta({ description: 'Start X coordinate', example: 100.5 }),
+  startY: z.number().meta({ description: 'Start Y coordinate', example: 200.3 }),
+  endX: z.number().meta({ description: 'End X coordinate', example: 150.2 }),
+  endY: z.number().meta({ description: 'End Y coordinate', example: 250.8 }),
+  startLandmarkId: z.string().nullish().meta({ description: 'Start landmark ID (optional)', example: 'clx123' }),
+  endLandmarkId: z.string().nullish().meta({ description: 'End landmark ID (optional)', example: 'clx456' }),
+})
+
+const replacePathSegmentsBodySchema = z.strictObject({
+  segments: z
+    .array(replacePathSegmentSchema)
+    .meta({ description: 'The complete segment list for this path; anything omitted is deleted' }),
 })
 
 const updatePathSegmentBodySchema = z.strictObject({
@@ -44,6 +77,11 @@ const pathSegmentSchema = z.strictObject({
 const createPathSegmentResponseSchema = z.strictObject({
   success: z.literal(true),
   segment: pathSegmentSchema,
+})
+
+const replacePathSegmentsResponseSchema = z.strictObject({
+  success: z.literal(true),
+  segments: z.array(pathSegmentSchema).meta({ description: 'The reconciled segment list (sorted by order)' }),
 })
 
 const listPathSegmentsResponseSchema = z.strictObject({
@@ -96,7 +134,7 @@ const pathSegmentRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { pathId } = request.params
-      const segmentData = request.body
+      const { id, ...segmentData } = request.body
       const userId = request.user!.id
 
       // Verify path exists and user owns it
@@ -142,18 +180,182 @@ const pathSegmentRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
       }
 
+      // A client-provided ID that already names a segment is a retried create, not
+      // an error -- see src/lib/client-id.ts.
+      const clientId = await resolveClientId({
+        id,
+        find: (segmentId) => prisma.pathSegment.findUnique({ where: { id: segmentId } }),
+        inScope: (existing) => existing.pathId === pathId,
+      })
+
+      if (clientId.status === 'conflict') {
+        return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+      }
+
+      if (clientId.status === 'replay') {
+        return reply.code(201).send({
+          success: true as const,
+          segment: transformDates(clientId.existing),
+        })
+      }
+
       // Create segment
-      const segment = await prisma.pathSegment.create({
-        data: {
-          pathId,
-          mapId: path.mapId,
-          ...segmentData,
+      try {
+        const segment = await prisma.pathSegment.create({
+          data: {
+            id,
+            pathId,
+            mapId: path.mapId,
+            ...segmentData,
+          },
+        })
+
+        return reply.code(201).send({
+          success: true as const,
+          segment: transformDates(segment),
+        })
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+        }
+        throw error
+      }
+    },
+  )
+
+  // PUT /my/paths/:pathId/segments - Replace the whole segment list for a path
+  //
+  // A path's segments are authored as one shape: the editor builds the entire
+  // ordered list and commits it in a single action, and there is no UI for editing
+  // an individual segment. Writing them one POST at a time would also make the
+  // client's save queue -- which retries a failed operation as a whole -- capable of
+  // leaving a half-written path behind and duplicating segments on the retry. So the
+  // whole list is one idempotent request.
+  //
+  // It reconciles by ID rather than deleting and re-inserting, because the client
+  // sends the segment list along with every path update (including speed-multiplier
+  // tweaks); re-inserting would churn IDs on edits that changed no geometry at all.
+  fastify.put(
+    '/paths/:pathId/segments',
+    {
+      schema: {
+        description: 'Replace all segments of a path in one request',
+        tags: ['maps', 'paths', 'segments'],
+        params: pathIdParamsSchema,
+        body: replacePathSegmentsBodySchema,
+        response: {
+          200: replacePathSegmentsResponseSchema,
+          400: errorSchema,
+          401: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { pathId } = request.params
+      const { segments } = request.body
+      const userId = request.user!.id
+
+      // Verify path exists and user owns it
+      const path = await prisma.path.findUnique({
+        where: { id: pathId },
+        include: {
+          map: {
+            include: {
+              story: {
+                select: { ownerId: true },
+              },
+            },
+          },
         },
       })
 
-      return reply.code(201).send({
+      if (!path) {
+        return reply.code(404).send({ error: 'Path not found' })
+      }
+
+      if (path.map.story.ownerId !== userId) {
+        return reply.code(403).send({ error: 'Access denied' })
+      }
+
+      // Every referenced landmark must live on this path's map. Resolved in one
+      // query rather than two per segment, since a long lane snaps to many.
+      const referencedLandmarkIds = [
+        ...new Set(
+          segments.flatMap((segment) =>
+            [segment.startLandmarkId, segment.endLandmarkId].filter((id): id is string => Boolean(id)),
+          ),
+        ),
+      ]
+
+      if (referencedLandmarkIds.length > 0) {
+        const landmarks = await prisma.landmark.findMany({
+          where: { id: { in: referencedLandmarkIds } },
+          select: { id: true, mapId: true },
+        })
+        const validLandmarkIds = new Set(landmarks.filter((l) => l.mapId === path.mapId).map((l) => l.id))
+        const unknown = referencedLandmarkIds.find((id) => !validLandmarkIds.has(id))
+        if (unknown) {
+          return reply.code(400).send({ error: `Invalid landmark ID: ${unknown}` })
+        }
+      }
+
+      // Two segments claiming the same ID would make the upsert loop write one row
+      // twice and silently drop the other.
+      const providedIds = segments.map((segment) => segment.id).filter((id): id is string => Boolean(id))
+      if (new Set(providedIds).size !== providedIds.length) {
+        return reply.code(400).send({ error: 'Duplicate segment IDs in request' })
+      }
+
+      // An ID belonging to a different path would be stolen by the upsert.
+      if (providedIds.length > 0) {
+        const foreign = await prisma.pathSegment.findFirst({
+          where: { id: { in: providedIds }, NOT: { pathId } },
+          select: { id: true },
+        })
+        if (foreign) {
+          return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+        }
+      }
+
+      const reconciled = await prisma.$transaction(async (tx) => {
+        // An empty `notIn` deletes every segment, which is exactly right for an
+        // empty request body: the path is being emptied, not left alone.
+        await tx.pathSegment.deleteMany({
+          where: { pathId, id: { notIn: providedIds } },
+        })
+
+        for (const { id, startLandmarkId, endLandmarkId, ...geometry } of segments) {
+          const data = {
+            ...geometry,
+            startLandmarkId: startLandmarkId ?? null,
+            endLandmarkId: endLandmarkId ?? null,
+          }
+
+          if (id) {
+            await tx.pathSegment.upsert({
+              where: { id },
+              create: { id, pathId, mapId: path.mapId, ...data },
+              update: data,
+            })
+          } else {
+            await tx.pathSegment.create({
+              data: { pathId, mapId: path.mapId, ...data },
+            })
+          }
+        }
+
+        return tx.pathSegment.findMany({
+          where: { pathId },
+          orderBy: { order: 'asc' },
+        })
+      })
+
+      return reply.code(200).send({
         success: true as const,
-        segment: transformDates(segment),
+        segments: reconciled.map((segment) => transformDates(segment)),
       })
     },
   )

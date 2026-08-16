@@ -1,11 +1,18 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { CLIENT_ID_CONFLICT_MESSAGE, isUniqueConstraintError, resolveClientId } from '../../lib/client-id.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
 
 // Schemas
 const createPawnBodySchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .meta({ description: 'Optional client-provided ID (generated if omitted)', example: 'clx1234567890' }),
   name: z.string().min(1).meta({ description: 'Pawn name', example: 'Millennium Falcon' }),
   description: z.string().optional().meta({ description: 'Pawn description', example: 'Fast freighter' }),
   designation: z.string().optional().meta({ description: 'Designation/callsign', example: 'YT-1300' }),
@@ -85,6 +92,7 @@ const pawnRoutes: FastifyPluginAsyncZod = async (fastify) => {
         body: createPawnBodySchema,
         response: {
           201: createPawnResponseSchema,
+          400: errorSchema,
           401: errorSchema,
           403: errorSchema,
           404: errorSchema,
@@ -94,7 +102,7 @@ const pawnRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { mapId } = request.params
-      const pawnData = request.body
+      const { id, ...pawnData } = request.body
       const userId = request.user!.id
 
       // Verify map exists and user owns it
@@ -115,19 +123,46 @@ const pawnRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(403).send({ error: 'Access denied' })
       }
 
-      // Create pawn
-      const pawn = await prisma.pawn.create({
-        data: {
-          mapId,
-          ...pawnData,
-          speed: pawnData.speed ?? 1.0,
-        },
+      // A client-provided ID that already names a pawn is a retried create, not an
+      // error -- see src/lib/client-id.ts.
+      const clientId = await resolveClientId({
+        id,
+        find: (pawnId) => prisma.pawn.findUnique({ where: { id: pawnId } }),
+        inScope: (existing) => existing.mapId === mapId,
       })
 
-      return reply.code(201).send({
-        success: true as const,
-        pawn,
-      })
+      if (clientId.status === 'conflict') {
+        return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+      }
+
+      if (clientId.status === 'replay') {
+        return reply.code(201).send({
+          success: true as const,
+          pawn: clientId.existing,
+        })
+      }
+
+      // Create pawn
+      try {
+        const pawn = await prisma.pawn.create({
+          data: {
+            id,
+            mapId,
+            ...pawnData,
+            speed: pawnData.speed ?? 1.0,
+          },
+        })
+
+        return reply.code(201).send({
+          success: true as const,
+          pawn,
+        })
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+        }
+        throw error
+      }
     },
   )
 

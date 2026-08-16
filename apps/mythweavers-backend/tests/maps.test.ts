@@ -1225,3 +1225,608 @@ describe('PathSegment Endpoints', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------------------
+
+type Cookies = Record<string, string>
+
+/** Story + map, the setup every map-domain test needs. */
+async function createStoryAndMap(cookies: Cookies, name = 'Map') {
+  const storyResponse = await app.inject({
+    method: 'POST',
+    url: '/my/stories',
+    payload: { name: 'Story' },
+    cookies,
+  })
+  const { story } = storyResponse.json()
+
+  const mapResponse = await app.inject({
+    method: 'POST',
+    url: `/my/stories/${story.id}/maps`,
+    payload: { name },
+    cookies,
+  })
+
+  return { story, map: mapResponse.json().map }
+}
+
+async function createPath(cookies: Cookies, mapId: string) {
+  const response = await app.inject({
+    method: 'POST',
+    url: `/my/maps/${mapId}/paths`,
+    payload: {},
+    cookies,
+  })
+  return response.json().path
+}
+
+/**
+ * The editor generates IDs locally and puts entities in its store before the save
+ * queue ever runs, so the server has to keep the ID it is given -- otherwise every
+ * edit made before the next page load addresses a row that does not exist.
+ */
+describe('Client-provided IDs', () => {
+  describe('maps', () => {
+    test('should honour a client-provided ID', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const storyResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        payload: { name: 'Story' },
+        cookies,
+      })
+      const { story } = storyResponse.json()
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/my/stories/${story.id}/maps`,
+        payload: { id: 'client-map-1', name: 'Galaxy Map' },
+        cookies,
+      })
+
+      expect(response.statusCode).toBe(201)
+      expect(response.json().map.id).toBe('client-map-1')
+    })
+
+    test('should treat a repeated create as a replay of the same map', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const storyResponse = await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        payload: { name: 'Story' },
+        cookies,
+      })
+      const { story } = storyResponse.json()
+
+      const payload = { id: 'client-map-1', name: 'Galaxy Map' }
+      await app.inject({ method: 'POST', url: `/my/stories/${story.id}/maps`, payload, cookies })
+      const replay = await app.inject({ method: 'POST', url: `/my/stories/${story.id}/maps`, payload, cookies })
+
+      expect(replay.statusCode).toBe(201)
+      expect(replay.json().map.id).toBe('client-map-1')
+
+      const listResponse = await app.inject({ method: 'GET', url: `/my/stories/${story.id}/maps`, cookies })
+      expect(listResponse.json().maps).toHaveLength(1)
+    })
+
+    test('should return 400 when the ID belongs to another story', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const first = await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        payload: { name: 'Story A' },
+        cookies,
+      })
+      const second = await app.inject({
+        method: 'POST',
+        url: '/my/stories',
+        payload: { name: 'Story B' },
+        cookies,
+      })
+
+      await app.inject({
+        method: 'POST',
+        url: `/my/stories/${first.json().story.id}/maps`,
+        payload: { id: 'client-map-1', name: 'Map' },
+        cookies,
+      })
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/my/stories/${second.json().story.id}/maps`,
+        payload: { id: 'client-map-1', name: 'Map' },
+        cookies,
+      })
+
+      expect(response.statusCode).toBe(400)
+      expect(response.json().error).toBeDefined()
+    })
+  })
+
+  describe('landmarks', () => {
+    test('should honour a client-provided ID and replay a repeated create', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { map } = await createStoryAndMap(cookies)
+
+      const payload = { id: 'client-landmark-1', x: 0.1, y: 0.2, name: 'Capital', description: 'Seat of power' }
+      const created = await app.inject({
+        method: 'POST',
+        url: `/my/maps/${map.id}/landmarks`,
+        payload,
+        cookies,
+      })
+      expect(created.statusCode).toBe(201)
+      expect(created.json().landmark.id).toBe('client-landmark-1')
+
+      const replay = await app.inject({ method: 'POST', url: `/my/maps/${map.id}/landmarks`, payload, cookies })
+      expect(replay.statusCode).toBe(201)
+      expect(replay.json().landmark.id).toBe('client-landmark-1')
+
+      const list = await app.inject({ method: 'GET', url: `/my/maps/${map.id}/landmarks`, cookies })
+      expect(list.json().landmarks).toHaveLength(1)
+    })
+
+    test('should return 400 when the ID belongs to another map', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { story, map } = await createStoryAndMap(cookies, 'Map A')
+      const otherMap = await app.inject({
+        method: 'POST',
+        url: `/my/stories/${story.id}/maps`,
+        payload: { name: 'Map B' },
+        cookies,
+      })
+
+      const payload = { id: 'client-landmark-1', x: 0.1, y: 0.2, name: 'Capital', description: 'Seat of power' }
+      await app.inject({ method: 'POST', url: `/my/maps/${map.id}/landmarks`, payload, cookies })
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/my/maps/${otherMap.json().map.id}/landmarks`,
+        payload,
+        cookies,
+      })
+
+      expect(response.statusCode).toBe(400)
+    })
+  })
+
+  describe('pawns', () => {
+    test('should honour a client-provided ID and replay a repeated create', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { map } = await createStoryAndMap(cookies)
+
+      const payload = { id: 'client-pawn-1', name: 'Falcon', defaultX: 0.5, defaultY: 0.5 }
+      const created = await app.inject({ method: 'POST', url: `/my/maps/${map.id}/pawns`, payload, cookies })
+      expect(created.statusCode).toBe(201)
+      expect(created.json().pawn.id).toBe('client-pawn-1')
+
+      const replay = await app.inject({ method: 'POST', url: `/my/maps/${map.id}/pawns`, payload, cookies })
+      expect(replay.statusCode).toBe(201)
+      expect(replay.json().pawn.id).toBe('client-pawn-1')
+
+      const list = await app.inject({ method: 'GET', url: `/my/maps/${map.id}/pawns`, cookies })
+      expect(list.json().pawns).toHaveLength(1)
+    })
+
+    test('should let an update land immediately after a create', async () => {
+      // The whole point of the change: no reload between creating and editing.
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { map } = await createStoryAndMap(cookies)
+
+      await app.inject({
+        method: 'POST',
+        url: `/my/maps/${map.id}/pawns`,
+        payload: { id: 'client-pawn-1', name: 'Falcon', defaultX: 0.5, defaultY: 0.5 },
+        cookies,
+      })
+
+      const response = await app.inject({
+        method: 'PUT',
+        url: '/my/pawns/client-pawn-1',
+        payload: { name: 'Millennium Falcon' },
+        cookies,
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json().pawn.name).toBe('Millennium Falcon')
+    })
+
+    test('should return 400 when the ID belongs to another map', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { story, map } = await createStoryAndMap(cookies, 'Map A')
+      const otherMap = await app.inject({
+        method: 'POST',
+        url: `/my/stories/${story.id}/maps`,
+        payload: { name: 'Map B' },
+        cookies,
+      })
+
+      const payload = { id: 'client-pawn-1', name: 'Falcon', defaultX: 0.5, defaultY: 0.5 }
+      await app.inject({ method: 'POST', url: `/my/maps/${map.id}/pawns`, payload, cookies })
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/my/maps/${otherMap.json().map.id}/pawns`,
+        payload,
+        cookies,
+      })
+
+      expect(response.statusCode).toBe(400)
+    })
+  })
+
+  describe('paths and segments', () => {
+    test('should honour a client-provided path ID and replay a repeated create', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { map } = await createStoryAndMap(cookies)
+
+      const payload = { id: 'client-path-1', speedMultiplier: 5 }
+      const created = await app.inject({ method: 'POST', url: `/my/maps/${map.id}/paths`, payload, cookies })
+      expect(created.statusCode).toBe(201)
+      expect(created.json().path.id).toBe('client-path-1')
+
+      const replay = await app.inject({ method: 'POST', url: `/my/maps/${map.id}/paths`, payload, cookies })
+      expect(replay.statusCode).toBe(201)
+      expect(replay.json().path.speedMultiplier).toBe(5)
+
+      const list = await app.inject({ method: 'GET', url: `/my/maps/${map.id}/paths`, cookies })
+      expect(list.json().paths).toHaveLength(1)
+    })
+
+    test('should honour a client-provided segment ID and replay a repeated create', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { map } = await createStoryAndMap(cookies)
+      const path = await createPath(cookies, map.id)
+
+      const payload = { id: 'client-segment-1', order: 0, startX: 0.1, startY: 0.1, endX: 0.2, endY: 0.2 }
+      const created = await app.inject({ method: 'POST', url: `/my/paths/${path.id}/segments`, payload, cookies })
+      expect(created.statusCode).toBe(201)
+      expect(created.json().segment.id).toBe('client-segment-1')
+
+      const replay = await app.inject({ method: 'POST', url: `/my/paths/${path.id}/segments`, payload, cookies })
+      expect(replay.statusCode).toBe(201)
+
+      const list = await app.inject({ method: 'GET', url: `/my/paths/${path.id}/segments`, cookies })
+      expect(list.json().segments).toHaveLength(1)
+    })
+
+    test('should return 400 when a segment ID belongs to another path', async () => {
+      const { cookies } = await registerUser('test@example.com', 'testuser')
+      const { map } = await createStoryAndMap(cookies)
+      const path = await createPath(cookies, map.id)
+      const otherPath = await createPath(cookies, map.id)
+
+      const payload = { id: 'client-segment-1', order: 0, startX: 0.1, startY: 0.1, endX: 0.2, endY: 0.2 }
+      await app.inject({ method: 'POST', url: `/my/paths/${path.id}/segments`, payload, cookies })
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/my/paths/${otherPath.id}/segments`,
+        payload,
+        cookies,
+      })
+
+      expect(response.statusCode).toBe(400)
+    })
+  })
+
+  test('should still generate an ID when none is provided', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/my/maps/${map.id}/pawns`,
+      payload: { name: 'Falcon', defaultX: 0.5, defaultY: 0.5 },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().pawn.id).toBeTruthy()
+  })
+})
+
+describe('PUT /my/paths/:pathId/segments', () => {
+  const segment = (order: number, offset: number) => ({
+    order,
+    startX: offset,
+    startY: offset,
+    endX: offset + 0.1,
+    endY: offset + 0.1,
+  })
+
+  test('should replace the segment list', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+
+    await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [segment(0, 0.1), segment(1, 0.2)] },
+      cookies,
+    })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [segment(0, 0.5), segment(1, 0.6), segment(2, 0.7)] },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(200)
+    const { segments } = response.json()
+    expect(segments).toHaveLength(3)
+    expect(segments.map((s: { order: number }) => s.order)).toEqual([0, 1, 2])
+    expect(segments[0].startX).toBe(0.5)
+  })
+
+  test('should keep the IDs of segments that are sent back unchanged', async () => {
+    // The client sends the whole segment list along with every path update, so an
+    // update that changed nothing must not churn IDs.
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+
+    const first = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [segment(0, 0.1), segment(1, 0.2)] },
+      cookies,
+    })
+    const originalIds = first.json().segments.map((s: { id: string }) => s.id)
+
+    const second = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: {
+        segments: first.json().segments.map((s: { id: string; order: number }) => ({
+          ...segment(s.order, 0.1 * (s.order + 1)),
+          id: s.id,
+        })),
+      },
+      cookies,
+    })
+
+    expect(second.json().segments.map((s: { id: string }) => s.id)).toEqual(originalIds)
+  })
+
+  test('should delete segments that are omitted', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+
+    const first = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [segment(0, 0.1), segment(1, 0.2), segment(2, 0.3)] },
+      cookies,
+    })
+    const kept = first.json().segments[0]
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [{ ...segment(0, 0.1), id: kept.id }] },
+      cookies,
+    })
+
+    expect(response.json().segments).toHaveLength(1)
+    expect(response.json().segments[0].id).toBe(kept.id)
+  })
+
+  test('should empty the path when given an empty list, leaving the path itself', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+
+    await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [segment(0, 0.1)] },
+      cookies,
+    })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [] },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().segments).toEqual([])
+
+    const pathResponse = await app.inject({ method: 'GET', url: `/my/paths/${path.id}`, cookies })
+    expect(pathResponse.statusCode).toBe(200)
+  })
+
+  test('should honour client-provided segment IDs', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [{ ...segment(0, 0.1), id: 'client-segment-1' }] },
+      cookies,
+    })
+
+    expect(response.json().segments[0].id).toBe('client-segment-1')
+  })
+
+  test('should accept landmark references on the same map', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+
+    const landmarkResponse = await app.inject({
+      method: 'POST',
+      url: `/my/maps/${map.id}/landmarks`,
+      payload: { x: 0.1, y: 0.1, name: 'Junction', description: 'A junction' },
+      cookies,
+    })
+    const landmark = landmarkResponse.json().landmark
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [{ ...segment(0, 0.1), startLandmarkId: landmark.id }] },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().segments[0].startLandmarkId).toBe(landmark.id)
+  })
+
+  test('should return 400 for a landmark on a different map and write nothing', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { story, map } = await createStoryAndMap(cookies, 'Map A')
+    const path = await createPath(cookies, map.id)
+
+    const otherMapResponse = await app.inject({
+      method: 'POST',
+      url: `/my/stories/${story.id}/maps`,
+      payload: { name: 'Map B' },
+      cookies,
+    })
+    const landmarkResponse = await app.inject({
+      method: 'POST',
+      url: `/my/maps/${otherMapResponse.json().map.id}/landmarks`,
+      payload: { x: 0.1, y: 0.1, name: 'Elsewhere', description: 'Another map' },
+      cookies,
+    })
+    const foreignLandmark = landmarkResponse.json().landmark
+
+    await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [segment(0, 0.1)] },
+      cookies,
+    })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: {
+        segments: [segment(0, 0.9), { ...segment(1, 0.8), startLandmarkId: foreignLandmark.id }],
+      },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(400)
+
+    // The rejected request must not have partially applied.
+    const list = await app.inject({ method: 'GET', url: `/my/paths/${path.id}/segments`, cookies })
+    expect(list.json().segments).toHaveLength(1)
+    expect(list.json().segments[0].startX).toBe(0.1)
+  })
+
+  test('should return 400 for duplicate segment IDs', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: {
+        segments: [
+          { ...segment(0, 0.1), id: 'dupe' },
+          { ...segment(1, 0.2), id: 'dupe' },
+        ],
+      },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  test('should return 400 for a segment ID owned by another path', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+    const otherPath = await createPath(cookies, map.id)
+
+    const first = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [segment(0, 0.1)] },
+      cookies,
+    })
+    const stolenId = first.json().segments[0].id
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${otherPath.id}/segments`,
+      payload: { segments: [{ ...segment(0, 0.5), id: stolenId }] },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  test('should leave sibling paths untouched', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+    const { map } = await createStoryAndMap(cookies)
+    const path = await createPath(cookies, map.id)
+    const sibling = await createPath(cookies, map.id)
+
+    await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${sibling.id}/segments`,
+      payload: { segments: [segment(0, 0.1), segment(1, 0.2)] },
+      cookies,
+    })
+
+    await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [] },
+      cookies,
+    })
+
+    const siblingSegments = await app.inject({ method: 'GET', url: `/my/paths/${sibling.id}/segments`, cookies })
+    expect(siblingSegments.json().segments).toHaveLength(2)
+  })
+
+  test('should return 404 for a non-existent path', async () => {
+    const { cookies } = await registerUser('test@example.com', 'testuser')
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/my/paths/nonexistent/segments',
+      payload: { segments: [] },
+      cookies,
+    })
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  test('should return 403 for a path owned by another user', async () => {
+    const owner = await registerUser('owner@example.com', 'owner')
+    const intruder = await registerUser('intruder@example.com', 'intruder')
+    const { map } = await createStoryAndMap(owner.cookies)
+    const path = await createPath(owner.cookies, map.id)
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/my/paths/${path.id}/segments`,
+      payload: { segments: [] },
+      cookies: intruder.cookies,
+    })
+
+    expect(response.statusCode).toBe(403)
+  })
+
+  test('should return 401 without authentication', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/my/paths/someid/segments',
+      payload: { segments: [] },
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+})

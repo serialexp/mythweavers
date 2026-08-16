@@ -1,11 +1,18 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { CLIENT_ID_CONFLICT_MESSAGE, isUniqueConstraintError, resolveClientId } from '../../lib/client-id.js'
 import { prisma } from '../../lib/prisma.js'
 import { errorSchema } from '../../schemas/common.js'
 
 // Schemas
 const createLandmarkBodySchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .meta({ description: 'Optional client-provided ID (generated if omitted)', example: 'clx1234567890' }),
   x: z.number().meta({ description: 'X coordinate (0-1 normalized)', example: 0.5 }),
   y: z.number().meta({ description: 'Y coordinate (0-1 normalized)', example: 0.3 }),
   name: z.string().min(1).meta({ description: 'Landmark name', example: 'Capital City' }),
@@ -98,6 +105,7 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
         body: createLandmarkBodySchema,
         response: {
           201: createLandmarkResponseSchema,
+          400: errorSchema,
           401: errorSchema,
           403: errorSchema,
           404: errorSchema,
@@ -107,7 +115,7 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { mapId } = request.params
-      const { properties, ...coreData } = request.body
+      const { id, properties, ...coreData } = request.body
       const userId = request.user!.id
 
       // Verify map exists and user owns it
@@ -128,20 +136,47 @@ const landmarkRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(403).send({ error: 'Access denied' })
       }
 
-      // Create landmark
-      const landmark = await prisma.landmark.create({
-        data: {
-          mapId,
-          ...coreData,
-          type: coreData.type || 'point',
-          properties: properties || {},
-        },
+      // A client-provided ID that already names a landmark is a retried create, not
+      // an error -- see src/lib/client-id.ts.
+      const clientId = await resolveClientId({
+        id,
+        find: (landmarkId) => prisma.landmark.findUnique({ where: { id: landmarkId } }),
+        inScope: (existing) => existing.mapId === mapId,
       })
 
-      return reply.code(201).send({
-        success: true as const,
-        landmark: landmark as z.infer<typeof landmarkDetailSchema>,
-      })
+      if (clientId.status === 'conflict') {
+        return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+      }
+
+      if (clientId.status === 'replay') {
+        return reply.code(201).send({
+          success: true as const,
+          landmark: clientId.existing as z.infer<typeof landmarkDetailSchema>,
+        })
+      }
+
+      // Create landmark
+      try {
+        const landmark = await prisma.landmark.create({
+          data: {
+            id,
+            mapId,
+            ...coreData,
+            type: coreData.type || 'point',
+            properties: properties || {},
+          },
+        })
+
+        return reply.code(201).send({
+          success: true as const,
+          landmark: landmark as z.infer<typeof landmarkDetailSchema>,
+        })
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+        }
+        throw error
+      }
     },
   )
 

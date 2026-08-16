@@ -61,23 +61,19 @@ Every REST endpoint MUST have:
 
 ### CRITICAL: Route Registration
 
-**When creating a new route file, you MUST register it in TWO places:**
+**When creating a new route file, register it in `src/register-routes.ts`:**
 
-1. **`src/index.ts`** - Main server (for production/dev)
-   ```typescript
-   import myNewRoutes from './routes/my/new-routes.js'
-   // ...
-   await server.register(myNewRoutes, { prefix: '/my' })
-   ```
+```typescript
+import myNewRoutes from './routes/my/new-routes.js'
+// ...
+await server.register(myNewRoutes, { prefix: '/my' })
+```
 
-2. **`tests/helpers.ts`** - Test helper (for tests)
-   ```typescript
-   import myNewRoutes from '../src/routes/my/new-routes.js'
-   // ...
-   await app.register(myNewRoutes, { prefix: '/my' })
-   ```
+That is the only place. Both `src/index.ts` and `tests/helpers.ts` call
+`registerApplicationRoutes()` from that file, so production and the test app cannot drift apart — and registering
+again in either of them would double-register the plugin.
 
-**Forgetting to add routes to `tests/helpers.ts` will cause all tests to fail with 404 errors!**
+**Forgetting to register the routes will cause every test for them to fail with 404 errors.**
 
 ### Pattern: Complete Endpoint Definition
 

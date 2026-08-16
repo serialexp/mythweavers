@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { CLIENT_ID_CONFLICT_MESSAGE, isUniqueConstraintError, resolveClientId } from '../../lib/client-id.js'
 import { prisma } from '../../lib/prisma.js'
 import { transformDates } from '../../lib/transform-dates.js'
 import { errorSchema, propertySchemaSchema } from '../../schemas/common.js'
@@ -20,6 +21,12 @@ function transformMap<T extends { propertySchema: unknown }>(
 
 // Schemas
 const createMapBodySchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .meta({ description: 'Optional client-provided ID (generated if omitted)', example: 'clx1234567890' }),
   name: z.string().min(1).meta({ description: 'Map name', example: 'Galaxy Map' }),
   fileId: z.string().optional().meta({ description: 'File ID for map image', example: 'clx123' }),
   borderColor: z.string().optional().meta({ description: 'Border color (hex)', example: '#FF0000' }),
@@ -103,7 +110,7 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { storyId } = request.params
-      const { name, fileId, borderColor, propertySchema } = request.body
+      const { id, name, fileId, borderColor, propertySchema } = request.body
       const userId = request.user!.id
 
       // Verify story exists and user owns it
@@ -132,21 +139,48 @@ const mapRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
       }
 
-      // Create map
-      const map = await prisma.map.create({
-        data: {
-          storyId,
-          name,
-          fileId,
-          borderColor,
-          propertySchema: propertySchema ?? undefined,
-        },
+      // A client-provided ID that already names a map is a retried create, not an
+      // error -- see src/lib/client-id.ts.
+      const clientId = await resolveClientId({
+        id,
+        find: (mapId) => prisma.map.findUnique({ where: { id: mapId } }),
+        inScope: (existing) => existing.storyId === storyId,
       })
 
-      return reply.code(201).send({
-        success: true as const,
-        map: transformMap(transformDates(map)),
-      })
+      if (clientId.status === 'conflict') {
+        return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+      }
+
+      if (clientId.status === 'replay') {
+        return reply.code(201).send({
+          success: true as const,
+          map: transformMap(transformDates(clientId.existing)),
+        })
+      }
+
+      // Create map
+      try {
+        const map = await prisma.map.create({
+          data: {
+            id,
+            storyId,
+            name,
+            fileId,
+            borderColor,
+            propertySchema: propertySchema ?? undefined,
+          },
+        })
+
+        return reply.code(201).send({
+          success: true as const,
+          map: transformMap(transformDates(map)),
+        })
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+        }
+        throw error
+      }
     },
   )
 

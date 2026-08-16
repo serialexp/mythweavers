@@ -35,6 +35,7 @@ import myParagraphRevisionsRoutes from './routes/my/paragraph-revisions.js'
 import myParagraphsRoutes from './routes/my/paragraphs.js'
 import myPathSegmentsRoutes from './routes/my/path-segments.js'
 import myPathsRoutes from './routes/my/paths.js'
+import myPawnMovementsRoutes from './routes/my/pawn-movements.js'
 import myPawnsRoutes from './routes/my/pawns.js'
 import myPlotPointStatesRoutes from './routes/my/plot-point-states.js'
 import myPreferencesRoutes from './routes/my/preferences.js'
@@ -95,6 +96,7 @@ export async function registerApplicationRoutes(server: FastifyInstance): Promis
   await server.register(myLandmarksRoutes, { prefix: '/my' })
   await server.register(myLandmarkStatesRoutes, { prefix: '/my' })
   await server.register(myPawnsRoutes, { prefix: '/my' })
+  await server.register(myPawnMovementsRoutes, { prefix: '/my' })
   await server.register(myPathsRoutes, { prefix: '/my' })
   await server.register(myPathSegmentsRoutes, { prefix: '/my' })
   await server.register(myPlotPointStatesRoutes, { prefix: '/my' })

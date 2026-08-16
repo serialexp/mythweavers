@@ -1,12 +1,19 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
+import { CLIENT_ID_CONFLICT_MESSAGE, isUniqueConstraintError, resolveClientId } from '../../lib/client-id.js'
 import { prisma } from '../../lib/prisma.js'
 import { transformDates } from '../../lib/transform-dates.js'
 import { errorSchema } from '../../schemas/common.js'
 
 // Schemas
 const createPathBodySchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .meta({ description: 'Optional client-provided ID (generated if omitted)', example: 'clx1234567890' }),
   speedMultiplier: z
     .number()
     .optional()
@@ -99,6 +106,7 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
         body: createPathBodySchema,
         response: {
           201: createPathResponseSchema,
+          400: errorSchema,
           401: errorSchema,
           403: errorSchema,
           404: errorSchema,
@@ -108,7 +116,7 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       const { mapId } = request.params
-      const { speedMultiplier } = request.body
+      const { id, speedMultiplier } = request.body
       const userId = request.user!.id
 
       // Verify map exists and user owns it
@@ -129,18 +137,45 @@ const pathRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.code(403).send({ error: 'Access denied' })
       }
 
-      // Create path
-      const path = await prisma.path.create({
-        data: {
-          mapId,
-          speedMultiplier: speedMultiplier ?? 10.0,
-        },
+      // A client-provided ID that already names a path is a retried create, not an
+      // error -- see src/lib/client-id.ts.
+      const clientId = await resolveClientId({
+        id,
+        find: (pathId) => prisma.path.findUnique({ where: { id: pathId } }),
+        inScope: (existing) => existing.mapId === mapId,
       })
 
-      return reply.code(201).send({
-        success: true as const,
-        path: transformDates(path),
-      })
+      if (clientId.status === 'conflict') {
+        return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+      }
+
+      if (clientId.status === 'replay') {
+        return reply.code(201).send({
+          success: true as const,
+          path: transformDates(clientId.existing),
+        })
+      }
+
+      // Create path
+      try {
+        const path = await prisma.path.create({
+          data: {
+            id,
+            mapId,
+            speedMultiplier: speedMultiplier ?? 10.0,
+          },
+        })
+
+        return reply.code(201).send({
+          success: true as const,
+          path: transformDates(path),
+        })
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          return reply.code(400).send({ error: CLIENT_ID_CONFLICT_MESSAGE })
+        }
+        throw error
+      }
     },
   )
 
