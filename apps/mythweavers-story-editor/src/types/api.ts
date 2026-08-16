@@ -1,7 +1,16 @@
 // API-related types
 
 import { CalendarConfig } from '@mythweavers/shared'
-import { Character, ContextItem, Fleet, Hyperlane, HyperlaneSegment, Landmark, Message } from './core'
+import {
+  Character,
+  ContextItem,
+  Fleet,
+  FleetMovement,
+  Hyperlane,
+  HyperlaneSegment,
+  Landmark,
+  Message,
+} from './core'
 
 // ============================================================================
 // API to Local Type Mappers
@@ -33,6 +42,40 @@ export interface ApiPath {
   mapId: string
   speedMultiplier: number
   segments?: ApiPathSegment[] // Optional - only included when includeSegments=true
+}
+
+/**
+ * One segment as the bulk replace endpoint accepts it. `pathId` and `mapId` are
+ * implied by the URL, and both landmark references are explicit nulls rather than
+ * omissions so that clearing a snap is expressible.
+ */
+export interface ApiPathSegmentBody {
+  id?: string
+  order: number
+  startX: number
+  startY: number
+  endX: number
+  endY: number
+  startLandmarkId: string | null
+  endLandmarkId: string | null
+}
+
+/**
+ * API PawnMovement type (from unified backend)
+ */
+export interface ApiPawnMovement {
+  id: string
+  storyId: string
+  mapId: string
+  pawnId: string
+  startStoryTime: number
+  endStoryTime: number
+  startX: number
+  startY: number
+  endX: number
+  endY: number
+  createdAt: string
+  updatedAt: string
 }
 
 /**
@@ -70,9 +113,32 @@ export interface ApiLandmark {
 }
 
 /**
- * Convert API Pawn to local Fleet type
+ * Convert API PawnMovement to the local FleetMovement type
  */
-export function pawnToFleet(pawn: ApiPawn): Fleet {
+export function pawnMovementToFleetMovement(movement: ApiPawnMovement): FleetMovement {
+  return {
+    id: movement.id,
+    storyId: movement.storyId,
+    mapId: movement.mapId,
+    fleetId: movement.pawnId, // API 'pawnId' maps to local 'fleetId'
+    startStoryTime: movement.startStoryTime,
+    endStoryTime: movement.endStoryTime,
+    startX: movement.startX,
+    startY: movement.startY,
+    endX: movement.endX,
+    endY: movement.endY,
+    createdAt: movement.createdAt,
+    updatedAt: movement.updatedAt,
+  }
+}
+
+/**
+ * Convert API Pawn to local Fleet type
+ *
+ * Movements are fetched for the whole map in one request, so the caller passes the
+ * map's movements and each pawn picks out its own.
+ */
+export function pawnToFleet(pawn: ApiPawn, movements: ApiPawnMovement[] = []): Fleet {
   return {
     id: pawn.id,
     mapId: pawn.mapId,
@@ -85,7 +151,7 @@ export function pawnToFleet(pawn: ApiPawn): Fleet {
     color: pawn.color ?? undefined,
     size: (pawn.size as Fleet['size']) ?? undefined,
     variant: (pawn.variant as Fleet['variant']) ?? undefined,
-    movements: [], // Movements are loaded separately if needed
+    movements: movements.filter((m) => m.pawnId === pawn.id).map(pawnMovementToFleetMovement),
   }
 }
 
@@ -163,11 +229,16 @@ export function hyperlaneToPath(hyperlane: Hyperlane): Omit<ApiPath, 'id' | 'map
 }
 
 /**
- * Convert local HyperlaneSegment to API PathSegment format (for saving)
+ * Convert local HyperlaneSegment to the body shape of the bulk segment replace.
+ *
+ * No `pathId`: the path comes from the URL. That matters because a segment built
+ * by the map editor has no hyperlane yet -- the lane it belongs to is created in
+ * the same action -- so reading the path from the segment would send an empty
+ * string.
  */
-export function hyperlaneSegmentToPathSegment(segment: HyperlaneSegment): Omit<ApiPathSegment, 'id' | 'mapId'> {
+export function hyperlaneSegmentToSegmentBody(segment: HyperlaneSegment): ApiPathSegmentBody {
   return {
-    pathId: segment.hyperlaneId, // Local 'hyperlaneId' maps to API 'pathId'
+    id: segment.id,
     order: segment.order,
     startX: segment.startX,
     startY: segment.startY,

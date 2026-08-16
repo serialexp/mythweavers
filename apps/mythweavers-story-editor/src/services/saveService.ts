@@ -11,6 +11,7 @@ import {
   deleteMyMessagesById,
   deleteMyParagraphsById,
   deleteMyPathsById,
+  deleteMyPawnMovementsById,
   deleteMyPawnsById,
   deleteMyScenesById,
   patchMyArcsById,
@@ -26,6 +27,7 @@ import {
   postMyMapsByMapIdLandmarks,
   postMyMapsByMapIdPaths,
   postMyMapsByMapIdPawns,
+  postMyPawnsByPawnIdMovements,
   postMyMessageRevisionsByRevisionIdParagraphsBatch,
   postMyMessagesByIdRegenerate,
   postMyScenesBySceneIdMessages,
@@ -36,6 +38,8 @@ import {
   putMyLandmarksById,
   putMyMapsById,
   putMyPathsById,
+  putMyPathsByPathIdSegments,
+  putMyPawnMovementsById,
   putMyPawnsById,
   postMyStoriesByStoryIdMessagesReorder,
   postMyStoriesByStoryIdNodesBulkUpdate,
@@ -56,6 +60,7 @@ import {
   patchMyScenesBySceneIdBackground,
   getApiBaseUrl,
 } from '../client/config'
+import { hyperlaneSegmentToSegmentBody } from '../types/api'
 import {
   Character,
   ContextItem,
@@ -1053,8 +1058,8 @@ export class SaveService {
           if (!fileId) throw new Error('Map image upload did not return a file ID')
         }
 
-        // Create map with fileId
-        // Note: id is passed for client-side ID generation
+        // Create map with fileId. The ID is the one the store already put in its
+        // state, so edits made before the next reload address the same row.
         await postMyStoriesByStoryIdMaps({
           path: { storyId },
           body: {
@@ -1062,7 +1067,7 @@ export class SaveService {
             name: operation.data.name,
             borderColor: operation.data.borderColor,
             fileId,
-          } as { name: string; id?: string; fileId?: string; borderColor?: string },
+          },
         })
         break
       }
@@ -1087,6 +1092,7 @@ export class SaveService {
         await postMyMapsByMapIdLandmarks({
           path: { mapId: operation.data.mapId },
           body: {
+            id: operation.data.id,
             x: operation.data.x,
             y: operation.data.y,
             name: operation.data.name,
@@ -1317,6 +1323,7 @@ export class SaveService {
         await postMyMapsByMapIdPawns({
           path: { mapId: operation.data.mapId },
           body: {
+            id: operation.data.id,
             name: operation.data.name,
             description: operation.data.description,
             designation: operation.data.designation,
@@ -1352,27 +1359,58 @@ export class SaveService {
         await deleteMyPawnsById({ path: { id: entityId } })
         break
 
+      // The movement's story and map are derived from the pawn server-side, so only
+      // the timing and the coordinates travel in the body.
       case 'fleet-movement-insert': {
-        throw new Error('Pawn movement persistence is not supported by the unified API')
+        await postMyPawnsByPawnIdMovements({
+          path: { pawnId: operation.data.fleetId },
+          body: {
+            id: operation.data.id,
+            startStoryTime: operation.data.startStoryTime,
+            endStoryTime: operation.data.endStoryTime,
+            startX: operation.data.startX,
+            startY: operation.data.startY,
+            endX: operation.data.endX,
+            endY: operation.data.endY,
+          },
+        })
+        break
       }
 
       case 'fleet-movement-update': {
-        throw new Error('Pawn movement persistence is not supported by the unified API')
+        await putMyPawnMovementsById({
+          path: { id: entityId },
+          body: {
+            startStoryTime: operation.data.startStoryTime,
+            endStoryTime: operation.data.endStoryTime,
+            startX: operation.data.startX,
+            startY: operation.data.startY,
+            endX: operation.data.endX,
+            endY: operation.data.endY,
+          },
+        })
+        break
       }
 
       case 'fleet-movement-delete': {
-        throw new Error('Pawn movement persistence is not supported by the unified API')
+        await deleteMyPawnMovementsById({ path: { id: entityId } })
+        break
       }
 
       case 'hyperlane-insert': {
-        // Hyperlane → Path migration
+        // Hyperlane → Path migration. The geometry lives in the segments, so a path
+        // written without them is an empty lane -- both calls are the one save.
         await postMyMapsByMapIdPaths({
           path: { mapId: operation.data.mapId },
           body: {
+            id: operation.data.id,
             speedMultiplier: operation.data.speedMultiplier,
           },
         })
-        // TODO: PathSegments need to be created separately - segments not yet migrated
+        await putMyPathsByPathIdSegments({
+          path: { pathId: operation.data.id },
+          body: { segments: (operation.data.segments ?? []).map(hyperlaneSegmentToSegmentBody) },
+        })
         break
       }
 
@@ -1384,6 +1422,19 @@ export class SaveService {
             speedMultiplier: operation.data.speedMultiplier,
           },
         })
+        // The store spreads the whole hyperlane into every update, so the segments
+        // ride along even when only the speed changed. The endpoint reconciles by
+        // ID, so re-sending an unchanged list is a no-op rather than ID churn.
+        //
+        // An empty array is sent through deliberately -- that is a lane whose
+        // segments were all removed. Only an absent list is skipped, since that is
+        // an update that says nothing about the geometry.
+        if (operation.data.segments) {
+          await putMyPathsByPathIdSegments({
+            path: { pathId: entityId },
+            body: { segments: operation.data.segments.map(hyperlaneSegmentToSegmentBody) },
+          })
+        }
         break
       }
 

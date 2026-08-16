@@ -6,6 +6,7 @@ import {
   getMyMapsById,
   getMyMapsByMapIdLandmarks,
   getMyMapsByMapIdPaths,
+  getMyMapsByMapIdPawnMovements,
   getMyMapsByMapIdPawns,
 } from '../client/config'
 import { saveService } from '../services/saveService'
@@ -398,14 +399,18 @@ export const mapsStore = {
         const mapResponse = await getMyMapsById({ path: { id: mapId } })
         const fileId = mapResponse.data?.map?.fileId
 
-        // Load image, landmarks, pawns (fleets), and paths (hyperlanes) in parallel
-        const [fileResult, landmarksData, pawnsData, pathsData] = await Promise.all([
+        // Load image, landmarks, pawns (fleets), their movements, and paths
+        // (hyperlanes) in parallel
+        const [fileResult, landmarksData, pawnsData, movementsData, pathsData] = await Promise.all([
           fileId ? fetchFileMetadata(fileId) : Promise.resolve(MISSING_FILE_REFERENCE),
           getMyMapsByMapIdLandmarks({ path: { mapId } })
             .then((r) => r.data?.landmarks || [])
             .catch(() => []),
           getMyMapsByMapIdPawns({ path: { mapId } })
             .then((r) => r.data?.pawns || [])
+            .catch(() => []),
+          getMyMapsByMapIdPawnMovements({ path: { mapId } })
+            .then((r) => r.data?.movements || [])
             .catch(() => []),
           getMyMapsByMapIdPaths({ path: { mapId }, query: { includeSegments: 'true' } } as any)
             .then((r) => r.data?.paths || [])
@@ -452,7 +457,7 @@ export const mapsStore = {
           imageError: imageData ? undefined : imageError,
           detailsLoaded: true,
           landmarks: (landmarksData || []).map((l: ApiLandmark) => apiLandmarkToLandmark(l)),
-          fleets: (pawnsData || []).map((p: ApiPawn) => pawnToFleet(p)),
+          fleets: (pawnsData || []).map((p: ApiPawn) => pawnToFleet(p, movementsData || [])),
           hyperlanes: (pathsData || []).map((p: ApiPath) => pathToHyperlane(p)), // Segments loaded separately if needed
         })
       } catch (error) {
@@ -632,10 +637,15 @@ export const mapsStore = {
 
   // Hyperlane actions
   addHyperlane: (mapId: string, hyperlane: Omit<Hyperlane, 'id' | 'mapId'>) => {
+    const id = generateMessageId()
+    // The map editor builds segments before the lane that owns them exists, so it
+    // leaves `hyperlaneId` blank. Filling it in here keeps the freshly created shape
+    // identical to the one that comes back from the server on the next load.
     const newHyperlane: Hyperlane = {
       ...hyperlane,
-      id: generateMessageId(),
+      id,
       mapId,
+      segments: (hyperlane.segments ?? []).map((segment) => ({ ...segment, hyperlaneId: id, mapId })),
     }
     // Update state immediately for responsive UI
     setMapsState(
