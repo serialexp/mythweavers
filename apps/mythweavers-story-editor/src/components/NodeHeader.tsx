@@ -10,7 +10,7 @@ import { massRewriteDialogStore } from '../stores/massRewriteDialogStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { Node as StoryNode } from '../types/core'
-import { getAvatarInitial, getCharacterDisplayName } from '../utils/character'
+import { getAvatarInitial, getCharacterDisplayName, resolveViewpointCharacter } from '../utils/character'
 import { buildNodeMarkdown, buildPrecedingContextMarkdown } from '../utils/nodeContentExport'
 import { getScenesInStoryOrder } from '../utils/nodeTraversal'
 import { CharacterSelect } from './CharacterSelect'
@@ -448,21 +448,17 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
   // Get the protagonist character
   const protagonist = createMemo(() => charactersStore.characters.find((char) => char.isMainCharacter))
 
-  // Get the viewpoint character for this scene (or default to protagonist)
-  const viewpointCharacter = createMemo(() => {
+  // Viewpoint for this scene, resolved by the same rule the navigation tree
+  // uses: an unset viewpoint inherits the protagonist.
+  const viewpoint = createMemo(() => {
     if (props.node.type !== 'scene') return null
-
-    // If a specific viewpoint character is set, use it
-    if (props.node.viewpointCharacterId) {
-      return charactersStore.characters.find((char) => char.id === props.node.viewpointCharacterId)
-    }
-
-    // Otherwise default to protagonist
-    return protagonist()
+    return resolveViewpointCharacter(props.node.viewpointCharacterId, charactersStore.characters)
   })
 
+  const viewpointCharacter = createMemo(() => viewpoint()?.character ?? null)
+
   // Check if viewpoint is explicitly set (not defaulting to protagonist)
-  const hasExplicitViewpoint = createMemo(() => props.node.type === 'scene' && !!props.node.viewpointCharacterId)
+  const hasExplicitViewpoint = createMemo(() => !!viewpoint()?.isExplicit)
 
   // Get all storylines (plot-type context items)
   const storylines = createMemo(() => contextItemsStore.contextItems.filter((item) => item.type === 'plot'))

@@ -51,3 +51,17 @@ Options: have `formatLiveWorldState` skip a card whose name matches the extracte
 ## Adventure mode — duplicated SETTING_GEN_PROMPT
 
 `apps/mythweavers-story-editor/src/components/NewAdventureForm.tsx:54` carries its own copy of `SETTING_GEN_PROMPT` (`apps/mythweavers-story-editor/src/pages/adventure/prompts.ts:202`). The two have already diverged — the form's version has an extra "base concept" paragraph — and both hardcode "2-4 sentences", so any length or wording change has to be made twice. Should be one exported builder in `prompts.ts` that takes the optional base concept.
+
+## Character avatar markup still duplicated in two places
+
+`CharacterAvatar` / `AvatarInitial` now live in
+`apps/mythweavers-story-editor/src/components/CharacterAvatar.tsx` and are used by
+`CharacterSelect` and the story navigation tree. Two components still hand-roll the same
+image-or-initial markup against their own styles:
+
+- `components/NodeHeader.tsx:560` (active-character chips)
+- `components/ChapterContextManager.tsx:127`
+
+Both should move to `CharacterAvatar`; the only reason they didn't in the POV-badge change is
+that their local styles differ slightly (sizes/borders) and swapping them is a visual change
+worth eyeballing on its own.

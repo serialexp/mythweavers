@@ -1,10 +1,11 @@
 import { Dropdown } from '@mythweavers/ui'
 import { Component, For, Show, createMemo } from 'solid-js'
+import { PhCaretDownIcon, PhStarIcon } from 'solidjs-phosphor'
 import { charactersStore } from '../stores/charactersStore'
 import type { Character } from '../types/core'
-import { getAvatarInitial, getCharacterDisplayName } from '../utils/character'
+import { getCharacterDisplayName } from '../utils/character'
+import { AvatarInitial, CharacterAvatar } from './CharacterAvatar'
 import * as styles from './CharacterSelect.css'
-import { PhCaretDownIcon, PhStarIcon } from 'solidjs-phosphor'
 
 export interface CharacterSelectProps {
   /** Currently selected character ID */
@@ -170,9 +171,7 @@ export const CharacterSelectByName: Component<CharacterSelectByNameProps> = (pro
             // Show value even if no matching character (for manual entry)
             props.value ? (
               <>
-                <div class={`${styles.avatarPlaceholder} ${isSmall() ? styles.avatarPlaceholderSmall : ''}`}>
-                  {getAvatarInitial(props.value)}
-                </div>
+                <AvatarInitial name={props.value} size={isSmall() ? 'sm' : 'md'} />
                 <span class={styles.characterName}>{props.value}</span>
               </>
             ) : (
@@ -218,28 +217,5 @@ export const CharacterSelectByName: Component<CharacterSelectByNameProps> = (pro
         }}
       </For>
     </Dropdown>
-  )
-}
-
-// Internal avatar component
-function CharacterAvatar(props: { character: Character; size: 'sm' | 'md' }) {
-  const isSmall = () => props.size === 'sm'
-  const displayName = () => getCharacterDisplayName(props.character)
-
-  return (
-    <Show
-      when={props.character.profileImageData}
-      fallback={
-        <div class={`${styles.avatarPlaceholder} ${isSmall() ? styles.avatarPlaceholderSmall : ''}`}>
-          {getAvatarInitial(displayName())}
-        </div>
-      }
-    >
-      <img
-        src={props.character.profileImageData!}
-        alt={displayName()}
-        class={`${styles.avatar} ${isSmall() ? styles.avatarSmall : ''}`}
-      />
-    </Show>
   )
 }

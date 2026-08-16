@@ -169,6 +169,13 @@ export const summaryLevelActive = style({
   opacity: 1,
 })
 
+// POV character avatar on scene rows
+export const povAvatar = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  flexShrink: 0,
+})
+
 // Direct child count on container rows (books/arcs/chapters)
 export const childCount = style({
   display: 'inline-flex',

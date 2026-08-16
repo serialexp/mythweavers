@@ -1,5 +1,5 @@
-import { style } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
+import { style } from '@vanilla-extract/css'
 
 export const trigger = style({
   display: 'flex',
@@ -47,39 +47,6 @@ export const triggerChevron = style({
   color: tokens.color.text.muted,
   flexShrink: 0,
   marginLeft: 'auto',
-})
-
-export const avatar = style({
-  width: '24px',
-  height: '24px',
-  borderRadius: tokens.radius.full,
-  objectFit: 'cover',
-  flexShrink: 0,
-})
-
-export const avatarSmall = style({
-  width: '20px',
-  height: '20px',
-})
-
-export const avatarPlaceholder = style({
-  width: '24px',
-  height: '24px',
-  borderRadius: tokens.radius.full,
-  backgroundColor: tokens.color.bg.elevated,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: tokens.font.size.xs,
-  fontWeight: tokens.font.weight.semibold,
-  color: tokens.color.text.muted,
-  flexShrink: 0,
-})
-
-export const avatarPlaceholderSmall = style({
-  width: '20px',
-  height: '20px',
-  fontSize: '10px',
 })
 
 export const characterName = style({

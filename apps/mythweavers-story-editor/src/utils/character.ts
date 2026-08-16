@@ -8,6 +8,42 @@ export function getCharacterDisplayName(character: Character): string {
   return [character.firstName, character.middleName, character.lastName].filter(Boolean).join(' ') || 'Unnamed'
 }
 
+export interface ViewpointResolution {
+  /** The POV character, or undefined when there is nobody to show. */
+  character: Character | undefined
+  /** True when the scene names a viewpoint character rather than inheriting one. */
+  isExplicit: boolean
+  /**
+   * True when the scene names a viewpoint character that no longer exists.
+   * Callers should surface this rather than silently showing the protagonist:
+   * the scene claims a POV we cannot resolve.
+   */
+  isDangling: boolean
+}
+
+/**
+ * Resolve the POV character for a scene.
+ *
+ * A scene with no `viewpointCharacterId` inherits the story's protagonist —
+ * generation treats it that way, so the UI shows the same thing, marked as
+ * inherited so a deliberate choice stays distinguishable from a default.
+ */
+export function resolveViewpointCharacter(
+  viewpointCharacterId: string | null | undefined,
+  characters: Character[],
+): ViewpointResolution {
+  if (viewpointCharacterId) {
+    const character = characters.find((char) => char.id === viewpointCharacterId)
+    return { character, isExplicit: true, isDangling: !character }
+  }
+
+  return {
+    character: characters.find((char) => char.isMainCharacter),
+    isExplicit: false,
+    isDangling: false,
+  }
+}
+
 /**
  * Get a short name for a character
  * Returns nickname if available, otherwise firstName

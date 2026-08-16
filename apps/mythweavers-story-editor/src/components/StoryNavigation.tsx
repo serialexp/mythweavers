@@ -3,6 +3,7 @@ import { Dropdown, DropdownItem } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { useOllama } from '../hooks/useOllama'
 import { cacheStore } from '../stores/cacheStore'
+import { charactersStore } from '../stores/charactersStore'
 import { copyPreviewStore } from '../stores/copyPreviewStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { messagesStore } from '../stores/messagesStore'
@@ -18,7 +19,9 @@ import { buildNodeMarkdown, buildPrecedingContextMarkdown, buildTreeMarkdown } f
 import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 import { estimateTokensFromText } from '../utils/templateAI'
 import { createAnthropicClient } from '../utils/anthropicClient'
+import { getCharacterDisplayName, resolveViewpointCharacter } from '../utils/character'
 import { BackgroundOptionsModal } from './BackgroundOptionsModal'
+import { CharacterAvatar } from './CharacterAvatar'
 import { ChapterPublishingModal } from './ChapterPublishingModal'
 import { BookDetailsModal } from './BookDetailsModal'
 import { CharacterUpdateModal } from './CharacterUpdateModal'
@@ -31,7 +34,7 @@ import { RoyalRoadPublishingPanel } from './RoyalRoadPublishingPanel'
 import { StoryPublishingModal } from './StoryPublishingModal'
 import * as styles from './StoryNavigation.css'
 import { DropPosition, TreeDragDropProvider, useTreeDragDrop } from './TreeDragDropContext'
-import { PhArrowCounterClockwiseIcon, PhArrowDownIcon, PhArrowUpIcon, PhBookIcon, PhBookOpenIcon, PhCaretDownIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleHalfIcon, PhCircleIcon, PhClockIcon, PhCodeIcon, PhDotsThreeIcon, PhFileTextIcon, PhFloppyDiskIcon, PhGlobeIcon, PhImageIcon, PhInfoIcon, PhPencilSimpleIcon, PhPlusCircleIcon, PhScissorsIcon, PhSignOutIcon, PhTrashIcon, PhTreeStructureIcon, PhUsersIcon, PhWarningIcon } from 'solidjs-phosphor'
+import { PhArrowCounterClockwiseIcon, PhArrowDownIcon, PhArrowUpIcon, PhBookIcon, PhBookOpenIcon, PhCaretDownIcon, PhCaretRightIcon, PhCheckCircleIcon, PhCircleHalfIcon, PhCircleIcon, PhClockIcon, PhCodeIcon, PhDotsThreeIcon, PhFileTextIcon, PhFloppyDiskIcon, PhGlobeIcon, PhImageIcon, PhInfoIcon, PhPencilSimpleIcon, PhPlusCircleIcon, PhScissorsIcon, PhSignOutIcon, PhTrashIcon, PhTreeStructureIcon, PhUserIcon, PhUsersIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 interface NodeItemProps {
   treeNode: TreeNode
@@ -301,6 +304,31 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     const n = contentNode()
     if (!n || n.type !== 'scene') return false
     return n.storyTime === undefined || n.storyTime === null
+  }
+
+  // POV character for this row. Only scenes carry a viewpoint — a chapter with
+  // several scenes has no single POV, so those rows show nothing. A merged
+  // single-scene chapter does show one, because that row *is* the scene.
+  //
+  // Mirrors NodeHeader: an unset viewpoint falls back to the protagonist, and
+  // the fallback renders dimmed so a deliberate choice stays distinguishable
+  // from an inherited default.
+  // Memoised: every row resolves this, and each resolution scans the cast.
+  const pov = createMemo(() => {
+    const n = contentNode()
+    if (!n || n.type !== 'scene') return null
+    return resolveViewpointCharacter(n.viewpointCharacterId, charactersStore.characters)
+  })
+
+  const povCharacter = () => pov()?.character
+  const povIsExplicit = () => !!pov()?.isExplicit
+  const povIsDangling = () => !!pov()?.isDangling
+
+  const povTooltip = () => {
+    const character = povCharacter()
+    if (!character) return ''
+    const name = getCharacterDisplayName(character)
+    return povIsExplicit() ? `POV: ${name}` : `POV: ${name} (default — story protagonist)`
   }
 
   // Check if scene matches the active storyline filter
@@ -1070,6 +1098,24 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                     </span>
                   )}
                 </For>
+              </span>
+            </Show>
+
+            <Show when={povCharacter()}>
+              {(character) => (
+                <span class={styles.povAvatar}>
+                  <CharacterAvatar character={character()} size="xs" muted={!povIsExplicit()} title={povTooltip()} />
+                </span>
+              )}
+            </Show>
+
+            <Show when={povIsDangling()}>
+              <span
+                class={styles.indicatorIcon}
+                title="This scene's viewpoint character no longer exists"
+                style={{ color: '#f59e0b' }}
+              >
+                <PhUserIcon />
               </span>
             </Show>
 
