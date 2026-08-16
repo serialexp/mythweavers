@@ -3,6 +3,7 @@ import { Component, Show, createEffect, createMemo, createSignal, onCleanup, onM
 import * as styles from './Message.css'
 import { useOllama } from '../hooks/useOllama'
 import { useStoryGeneration } from '../hooks/useStoryGeneration'
+import { generationStore } from '../stores/generationStore'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -20,6 +21,7 @@ import { MessageActionsDropdown } from './MessageActionsDropdown'
 import { MessageRegenerateButton } from './MessageRegenerateButton'
 import { MessageScriptModal } from './MessageScriptModal'
 import { MessageVersionHistory } from './MessageVersionHistory'
+import { GenerationProgress } from './GenerationProgress'
 import { SceneEditorWrapper } from './SceneEditorWrapper'
 import { ScriptDataDiff } from './ScriptDataDiff'
 import { PhArrowCircleDownIcon, PhArrowsClockwiseIcon, PhCaretDownIcon, PhCaretUpIcon, PhCheckIcon, PhClockCounterClockwiseIcon, PhCodeIcon, PhInfoIcon, PhLightbulbIcon, PhPencilSimpleIcon, PhRewindIcon, PhTargetIcon, PhXIcon } from 'solidjs-phosphor'
@@ -50,6 +52,12 @@ export const Message: Component<MessageProps> = (props) => {
       props.message.type !== 'audio'
     )
   })
+  // True while this specific message is the one currently being generated
+  const isStreamingThisMessage = createMemo(() => generationStore.isStreaming(props.message.id))
+
+  // Non-story messages (queries, events) render raw content — show the live stream for those
+  const displayContent = createMemo(() => generationStore.textFor(props.message.id) ?? props.message.content)
+
   const [editInstruction, setEditInstruction] = createSignal('')
   const [showAnalysisDebug, setShowAnalysisDebug] = createSignal(false)
   const [showScriptModal, setShowScriptModal] = createSignal(false)
@@ -660,7 +668,14 @@ export const Message: Component<MessageProps> = (props) => {
                 />
               </div>
             </Show>
-            <SceneEditorWrapper messageId={props.message.id} editable={!props.isGenerating} />
+            {/* While this message is streaming, show progress instead of the editor —
+                the editor only ever receives complete content. */}
+            <Show
+              when={isStreamingThisMessage()}
+              fallback={<SceneEditorWrapper messageId={props.message.id} editable={!props.isGenerating} />}
+            >
+              <GenerationProgress />
+            </Show>
             {/* Think section for story content */}
             <Show when={props.message.think}>
               <Show when={!props.message.showThink}>
@@ -705,7 +720,7 @@ export const Message: Component<MessageProps> = (props) => {
                       <Show when={props.message.type === 'event'}>
                         <span class={styles.eventIcon}>📌 </span>
                       </Show>
-                      {props.message.content}
+                      {displayContent()}
                     </>
                   }
                 >

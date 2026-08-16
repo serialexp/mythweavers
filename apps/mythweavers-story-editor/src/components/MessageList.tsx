@@ -1,5 +1,6 @@
 import { IconButton } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
+import { generationStore } from '../stores/generationStore'
 import { createDisplayMessagesMemo } from '../utils/messageFiltering'
 import MessageListItems from './MessageListItems'
 import * as styles from './MessageList.css'
@@ -202,15 +203,14 @@ export const MessageList: Component<MessageListProps> = (props) => {
   // Memoize whether we're currently generating to avoid expensive array iteration
   const isCurrentlyGenerating = createMemo(() => {
     if (props.isLoading) return true
-    // Only check the last message for efficiency
-    const messages = displayMessages()
-    const lastMessage = messages[messages.length - 1]
-    return !!(lastMessage?.content && !lastMessage.tokensPerSecond)
+    return generationStore.state.messageId !== null
   })
 
-  // Also handle when content is being streamed (message content updates)
+  // Also handle when content is being streamed (the progress panel grows as words arrive)
   createEffect(() => {
     const generating = isCurrentlyGenerating()
+    // Depend on the streaming word count so this effect re-runs as content arrives
+    void generationStore.state.wordCount
 
     // Reset flag when generation starts
     if (generating && !wasGenerating) {

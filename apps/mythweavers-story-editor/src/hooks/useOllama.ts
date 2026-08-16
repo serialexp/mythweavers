@@ -2,6 +2,7 @@ import { generateMessageId } from '../utils/id'
 import { cacheStore } from '../stores/cacheStore'
 import { charactersStore } from '../stores/charactersStore'
 import { currentStoryStore } from '../stores/currentStoryStore'
+import { generationStore } from '../stores/generationStore'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
@@ -35,6 +36,19 @@ export const useOllama = () => {
   const pingCache = async () => {
     // Cache ping no longer needed - using 1-hour TTL
   }
+
+  // Split raw generated text into the Paragraph[] structure the editor renders from
+  const buildParagraphs = (text: string) =>
+    text
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0)
+      .map((body) => ({
+        id: generateMessageId(),
+        body,
+        state: 'ai' as const,
+        comments: [],
+      })) as import('@mythweavers/shared').Paragraph[]
 
   // Extract think tags from content and return cleaned content + think content
   const extractThinkTags = (content: string): { cleanedContent: string; thinkContent: string | undefined } => {
@@ -121,6 +135,70 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
     currentAbortController = new AbortController()
     const signal = currentAbortController.signal
 
+    // Streamed text is kept out of messagesStore (and therefore out of the editor) until the
+    // turn is complete — the UI shows a progress panel driven by generationStore instead.
+    generationStore.start(assistantMessageId)
+    let lastProgressFlush = 0
+
+    /**
+     * Hand the finished (or aborted/failed) text to the message: store it as content +
+     * paragraphs, bump the content version so the editor accepts it, and persist it.
+     */
+    const commitContent = (text: string, options: { persist?: boolean } = {}) => {
+      if (!text.trim()) return
+      const { persist = true } = options
+
+      const localParagraphs = buildParagraphs(text)
+      const finalMessage = messagesStore.messages.find((msg) => msg.id === assistantMessageId)
+
+      // Update store with paragraphs immediately (synchronous) and bump content version
+      // so the editor accepts this as authoritative content
+      messagesStore.updateMessageNoSave(assistantMessageId, {
+        content: text,
+        paragraphs: localParagraphs,
+      })
+      messagesStore.bumpContentVersion(assistantMessageId)
+
+      if (!persist) return
+
+      // Fire-and-forget: persist to backend
+      import('../services/saveService').then(({ saveService }) => {
+        if (isRegeneration) {
+          // Regeneration: create a new revision with the content
+          saveService
+            .createMessageRevision(assistantMessageId, text, {
+              model: finalMessage?.model,
+              tokensPerSecond: finalMessage?.tokensPerSecond,
+              totalTokens: finalMessage?.totalTokens,
+              promptTokens: finalMessage?.promptTokens,
+              cacheCreationTokens: finalMessage?.cacheCreationTokens,
+              cacheReadTokens: finalMessage?.cacheReadTokens,
+              think: finalMessage?.think,
+              showThink: finalMessage?.showThink,
+            })
+            .then(({ revisionId, paragraphs }) => {
+              // Update local state with server revision ID and paragraph IDs
+              messagesStore.updateMessageNoSave(assistantMessageId, {
+                currentMessageRevisionId: revisionId,
+                paragraphs,
+              })
+              messagesStore.bumpContentVersion(assistantMessageId)
+            })
+            .catch((error) => {
+              console.error('Failed to save generated content (regeneration):', error)
+            })
+        } else {
+          // Initial generation: save paragraphs to existing revision
+          const revisionId = finalMessage?.currentMessageRevisionId
+          if (revisionId) {
+            saveService.saveParagraphs(revisionId, [], localParagraphs).catch((error) => {
+              console.error('Failed to save generated content (initial):', error)
+            })
+          }
+        }
+      })
+    }
+
     try {
       // Convert string prompt to messages if needed
       const messages: LLMMessage[] =
@@ -160,8 +238,13 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
         if (event.type === 'chunk') {
           accumulatedContent += event.text
           tokenCount++
-          // Use NoSave variant during streaming - content is saved via saveParagraphs after generation
-          messagesStore.updateMessageNoSave(assistantMessageId, { content: accumulatedContent })
+          // Flush to the progress store at most ~10x/second; the message itself is only
+          // updated once generation finishes (or is aborted).
+          const now = Date.now()
+          if (now - lastProgressFlush > 100) {
+            lastProgressFlush = now
+            generationStore.setText(accumulatedContent)
+          }
         }
 
         // Accumulate usage data from usage events
@@ -228,9 +311,7 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
           // Run cliche refinement if enabled and this is a story message
           if (shouldSummarize && cleanedContent.trim() && settingsStore.refineClichés) {
             try {
-              messagesStore.updateMessage(assistantMessageId, {
-                content: `${cleanedContent}\n\n[Refining clichés...]`,
-              })
+              generationStore.setPhase('refining')
 
               const refinementResult = await refineClichés(cleanedContent)
 
@@ -313,69 +394,17 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
 
           // Parse paragraphs synchronously so they're in the store BEFORE isGenerating goes false.
           // This ensures the editor picks up the new content during the editable transition.
-          const finalMessage = messagesStore.messages.find((msg) => msg.id === assistantMessageId)
-          if (cleanedContent.trim()) {
-            const localParagraphs = cleanedContent
-              .split(/\n\n+/)
-              .map((p) => p.trim())
-              .filter((p) => p.length > 0)
-              .map((body) => ({
-                id: generateMessageId(),
-                body,
-                state: 'ai' as const,
-                comments: [],
-              })) as import('@mythweavers/shared').Paragraph[]
-
-            // Update store with paragraphs immediately (synchronous) and bump content version
-            // so the editor accepts this as authoritative content
-            messagesStore.updateMessageNoSave(assistantMessageId, {
-              content: cleanedContent,
-              paragraphs: localParagraphs,
-            })
-            messagesStore.bumpContentVersion(assistantMessageId)
-
-            // Fire-and-forget: persist to backend
-            import('../services/saveService').then(({ saveService }) => {
-              if (isRegeneration) {
-                // Regeneration: create a new revision with the content
-                saveService
-                  .createMessageRevision(assistantMessageId, cleanedContent, {
-                    model: finalMessage?.model,
-                    tokensPerSecond: finalMessage?.tokensPerSecond,
-                    totalTokens: finalMessage?.totalTokens,
-                    promptTokens: finalMessage?.promptTokens,
-                    cacheCreationTokens: finalMessage?.cacheCreationTokens,
-                    cacheReadTokens: finalMessage?.cacheReadTokens,
-                    think: finalMessage?.think,
-                    showThink: finalMessage?.showThink,
-                  })
-                  .then(({ revisionId, paragraphs }) => {
-                    // Update local state with server revision ID and paragraph IDs
-                    messagesStore.updateMessageNoSave(assistantMessageId, {
-                      currentMessageRevisionId: revisionId,
-                      paragraphs,
-                    })
-                    messagesStore.bumpContentVersion(assistantMessageId)
-                  })
-                  .catch((error) => {
-                    console.error('Failed to save generated content (regeneration):', error)
-                  })
-              } else {
-                // Initial generation: save paragraphs to existing revision
-                const revisionId = finalMessage?.currentMessageRevisionId
-                if (revisionId) {
-                  saveService.saveParagraphs(revisionId, [], localParagraphs).catch((error) => {
-                    console.error('Failed to save generated content (initial):', error)
-                  })
-                }
-              }
-            })
-          }
+          commitContent(cleanedContent)
         }
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        messagesStore.updateMessage(assistantMessageId, { content: `${accumulatedContent}\n\n[Generation aborted]` })
+        // Commit whatever was generated so far, including paragraphs — otherwise the partial
+        // text would never reach the editor (it reads paragraphs, not raw content).
+        const { cleanedContent } = extractThinkTags(accumulatedContent)
+        const abortedContent = `${cleanedContent}\n\n[Generation aborted]`
+        messagesStore.updateMessage(assistantMessageId, { content: abortedContent })
+        commitContent(abortedContent)
       } else {
         let errorMessage = 'Unknown error'
         if (error instanceof Error) {
@@ -394,12 +423,15 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
         }
         const errorContent = `Error: ${errorMessage}`
         messagesStore.updateMessage(assistantMessageId, { content: errorContent })
+        // Show the error in the editor, but don't persist it as a revision/paragraphs
+        commitContent(errorContent, { persist: false })
         console.error('Generation error details:', error)
       }
       // Error message is already saved via messagesStore.updateMessage
       throw error
     } finally {
       currentAbortController = null
+      generationStore.end()
     }
   }
 
