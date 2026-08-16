@@ -1,0 +1,2 @@
+-- AddForeignKey
+ALTER TABLE "Map" ADD CONSTRAINT "Map_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "File"("id") ON DELETE SET NULL ON UPDATE CASCADE;
