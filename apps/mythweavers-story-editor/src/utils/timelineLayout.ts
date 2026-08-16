@@ -153,6 +153,47 @@ export function generateTicks(viewport: Viewport, step: number, maxTicks = 200):
   return ticks
 }
 
+/** One labellable item on a track: where it sits, and how wide its label is. */
+export interface LabelCandidate {
+  id: string
+  time: number
+  /** Rendered width of the label in pixels, including any surrounding chrome. */
+  widthPx: number
+}
+
+/**
+ * Choose which items can show their label without running into the next one.
+ *
+ * Walks left to right keeping the right-hand edge of the last label that was
+ * granted, and skips anything that would start before it. Measuring each label
+ * matters because they are not uniform: spacing by a fixed distance either lets
+ * a long label overrun its neighbour or hides a short one that had room.
+ *
+ * `gapPx` is the clear space demanded after each label.
+ */
+export function pickLabelledItems(
+  candidates: LabelCandidate[],
+  viewport: Viewport,
+  widthPx: number,
+  gapPx: number,
+): Set<string> {
+  const allowed = new Set<string>()
+  const span = viewport.end - viewport.start
+  if (span <= 0 || widthPx <= 0) return allowed
+
+  const sorted = [...candidates].sort((a, b) => a.time - b.time)
+  let lastLabelEnd = Number.NEGATIVE_INFINITY
+
+  for (const candidate of sorted) {
+    const x = ((candidate.time - viewport.start) / span) * widthPx
+    if (x < lastLabelEnd) continue
+    allowed.add(candidate.id)
+    lastLabelEnd = x + candidate.widthPx + gapPx
+  }
+
+  return allowed
+}
+
 // ---------------------------------------------------------------------------
 // Inferred positions for scenes without a storyTime
 // ---------------------------------------------------------------------------

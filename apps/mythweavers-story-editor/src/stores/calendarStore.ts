@@ -153,6 +153,22 @@ export const calendarStore = {
   },
 
   /**
+   * Format only the time of day, as `HH:MM`.
+   *
+   * Separate from {@link formatStoryTime} because that renders one EJS template
+   * covering date and time together, which cannot be split apart afterwards.
+   * The timeline ruler needs the two halves on separate lines.
+   */
+  formatTimeOfDay(storyTime: number | null | undefined): string | undefined {
+    if (storyTime === null || storyTime === undefined) {
+      return undefined
+    }
+
+    const date = this.getEngine().storyTimeToDate(storyTime)
+    return `${date.hour.toString().padStart(2, '0')}:${date.minute.toString().padStart(2, '0')}`
+  },
+
+  /**
    * Calculate age in years using the current calendar
    */
   calculateAge(birthdate: number, currentTime: number): number {

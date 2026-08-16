@@ -112,17 +112,42 @@ export const rulerInner = style({
   marginLeft: 'var(--timeline-gutter)',
 })
 
+/**
+ * Taller variant for when ticks are finer than a day and each one carries a
+ * time of day under its date.
+ */
+export const rulerTall = style({
+  height: '52px',
+})
+
 export const rulerTick = style({
   position: 'absolute',
   top: 0,
   bottom: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  gap: '1px',
   borderLeft: `1px solid ${tokens.color.border.subtle}`,
   paddingLeft: tokens.space['1'],
   fontSize: '0.65rem',
-  lineHeight: '38px',
+  lineHeight: 1.3,
   color: tokens.color.text.muted,
   whiteSpace: 'nowrap',
   pointerEvents: 'none',
+})
+
+/**
+ * Printed only on ticks that start a new day, so a date never has another date
+ * beside it to collide with.
+ */
+export const tickDate = style({
+  minHeight: '1em',
+})
+
+export const tickTime = style({
+  opacity: 0.75,
+  fontVariantNumeric: 'tabular-nums',
 })
 
 /** Vertical gridlines continuing the ruler ticks down through the lanes. */

@@ -15,6 +15,7 @@ import { timelineViewStore } from '../stores/timelineViewStore'
 import { Node } from '../types/core'
 import { getCharacterDisplayName } from '../utils/character'
 import { getScenesInStoryOrder } from '../utils/nodeTraversal'
+import { measureTextWidth } from '../utils/textWidth'
 import {
   ResolvedSceneTime,
   Viewport,
@@ -23,6 +24,7 @@ import {
   generateTicks,
   hasStoryTime,
   panViewport,
+  pickLabelledItems,
   pickSnapStep,
   pixelDeltaToMinutes,
   rectFromPoints,
@@ -42,8 +44,21 @@ const GUTTER_PX = 170
  */
 const GUTTER_COMPACT_PX = 96
 const COMPACT_WIDTH_PX = 640
-/** Chips closer together than this collapse to dots so the lane stays readable. */
-const LABEL_MIN_GAP_PX = 96
+/**
+ * Clear space demanded between one chip's label and the next chip. The label's
+ * own width is measured, so this is only the breathing room around it.
+ */
+const LABEL_GAP_PX = 12
+/**
+ * Chip chrome that sits around the text: horizontal padding plus borders. Added
+ * to the measured label so the *chip* is what gets spaced, not just its text.
+ */
+const CHIP_CHROME_PX = 18
+/** `chipLabel` ellipsises past this, so a longer title costs no more room. */
+const CHIP_LABEL_MAX_PX = 220
+/** Matches `chipLabel`: `tokens.font.size.xs` on the app's default family. */
+const CHIP_LABEL_FONT_SIZE_PX = 12
+const CHIP_LABEL_FONT = `${CHIP_LABEL_FONT_SIZE_PX}px system-ui, -apple-system, sans-serif`
 /** Keep a little DOM either side of the viewport so panning doesn't flicker. */
 const CULL_MARGIN = 0.25
 /**
@@ -230,22 +245,54 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
   // --- Tick labels -----------------------------------------------------------
 
   // formatDate compiles an EJS template on every call, so labels are cached by
-  // tick time and the cache is dropped whenever the step changes.
+  // tick time. The date no longer depends on the step, but dropping the cache
+  // when the step changes still bounds it -- otherwise panning across a long
+  // story accumulates an entry per tick visited, forever.
   let labelCache = new Map<number, string>()
   let labelCacheStep = -1
 
-  const formatTick = (time: number, step: number): string => {
+  const formatTickDate = (time: number, step: number): string => {
     if (step !== labelCacheStep) {
       labelCache = new Map()
       labelCacheStep = step
     }
     const cached = labelCache.get(time)
     if (cached !== undefined) return cached
-    const withTime = step < (calendarConfig().minutesPerDay || 1440)
-    const label = (withTime ? calendarStore.formatStoryTime(time) : calendarStore.formatStoryTimeShort(time)) ?? ''
+    const label = calendarStore.formatStoryTimeShort(time) ?? ''
     labelCache.set(time, label)
     return label
   }
+
+  /** True once ticks are finer than a day, when the time of day starts mattering. */
+  const rulerShowsTime = () => snapStep() * tickMultiple() < (calendarConfig().minutesPerDay || 1440)
+
+  /**
+   * One row per tick: the date, whether to print it, and the time of day.
+   *
+   * The date is printed only when it differs from the previous tick. Zoomed in
+   * past a day, every tick used to repeat the full date *and* the time on one
+   * nowrap line -- roughly 44 characters where the spacing budget allows about
+   * 17 -- so each label ran straight over its neighbour. Splitting the two
+   * across lines also separates the collision: dates only ever contend with
+   * other dates, which are now a day apart.
+   */
+  const tickRows = createMemo(() => {
+    const step = snapStep() * tickMultiple()
+    const withTime = rulerShowsTime()
+    let previousDate: string | null = null
+
+    return ticks().map((time) => {
+      const date = formatTickDate(time, step)
+      const showDate = date !== previousDate
+      previousDate = date
+      return {
+        time,
+        date,
+        showDate,
+        timeOfDay: withTime ? (calendarStore.formatTimeOfDay(time) ?? '') : '',
+      }
+    })
+  })
 
   /**
    * Widen the tick spacing until labels have room to breathe. Declared before
@@ -309,6 +356,15 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
     return prefix ? `${prefix} · ${scene.title}` : scene.title
   }
 
+  /**
+   * How much horizontal room a chip needs once labelled: its text, clamped to
+   * the CSS ellipsis width, plus the chip's own padding and borders.
+   */
+  const chipWidthPx = (scene: Node): number => {
+    const text = measureTextWidth(fullSceneLabel(scene), CHIP_LABEL_FONT, CHIP_LABEL_FONT_SIZE_PX)
+    return Math.min(text, CHIP_LABEL_MAX_PX) + CHIP_CHROME_PX
+  }
+
   const chapterMarks = createMemo(() =>
     nodeStore.nodesArray.filter((n) => n.type === 'chapter' && hasStoryTime(n)).map((n) => n.storyTime as number),
   )
@@ -324,17 +380,19 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
     const vp = viewport()
     const width = trackWidth()
     const span = vp.end - vp.start
-    const minGapMinutes = span <= 0 || width <= 0 ? 0 : (LABEL_MIN_GAP_PX / width) * span
+    if (span <= 0 || width <= 0) return new Set<string>()
 
+    // Each lane is packed independently: chips only ever collide with others on
+    // their own row.
     const allowed = new Set<string>()
     for (const [, scenes] of scenesByLane()) {
-      const sorted = scenes.map((s) => ({ id: s.id, t: times.get(s.id)?.time ?? 0 })).sort((a, b) => a.t - b.t)
-      let lastLabelled = Number.NEGATIVE_INFINITY
-      for (const entry of sorted) {
-        if (entry.t - lastLabelled >= minGapMinutes) {
-          allowed.add(entry.id)
-          lastLabelled = entry.t
-        }
+      const candidates = scenes.map((scene) => ({
+        id: scene.id,
+        time: times.get(scene.id)?.time ?? 0,
+        widthPx: chipWidthPx(scene),
+      }))
+      for (const id of pickLabelledItems(candidates, vp, width, LABEL_GAP_PX)) {
+        allowed.add(id)
       }
     }
     return allowed
@@ -885,14 +943,19 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
             </div>
           }
         >
-          <div class={styles.ruler}>
+          <div class={`${styles.ruler} ${rulerShowsTime() ? styles.rulerTall : ''}`}>
             <div class={styles.rulerInner}>
-              <For each={ticks()}>
-                {(tick) => {
-                  const left = () => timeToFraction(tick, viewport()) * 100
+              <For each={tickRows()}>
+                {(row) => {
+                  const left = () => timeToFraction(row.time, viewport()) * 100
                   return (
                     <div class={styles.rulerTick} style={{ left: `${left()}%` }}>
-                      {formatTick(tick, snapStep() * tickMultiple())}
+                      {/* Rendered even when blank so the time stays on the
+                          second row and lines up across ticks. */}
+                      <span class={styles.tickDate}>{row.showDate ? row.date : ''}</span>
+                      <Show when={row.timeOfDay}>
+                        <span class={styles.tickTime}>{row.timeOfDay}</span>
+                      </Show>
                     </div>
                   )
                 }}

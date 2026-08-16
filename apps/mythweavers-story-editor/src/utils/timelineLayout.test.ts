@@ -8,6 +8,7 @@ import {
   generateTicks,
   hasStoryTime,
   panViewport,
+  pickLabelledItems,
   pickSnapStep,
   pixelDeltaToMinutes,
   rectFromPoints,
@@ -290,5 +291,127 @@ describe('marquee helpers', () => {
     expect(exceedsDragThreshold(1, 1)).toBe(false)
     expect(exceedsDragThreshold(5, 0)).toBe(true)
     expect(exceedsDragThreshold(0, -5)).toBe(true)
+  })
+})
+
+describe('pickLabelledItems', () => {
+  // 1000px wide, 1000 minutes across: one minute is one pixel, so widths and
+  // times can be read as the same units.
+  const track: Viewport = { start: 0, end: 1000 }
+  const WIDTH = 1000
+
+  it('hides a label that its neighbour would overrun', () => {
+    const chosen = pickLabelledItems(
+      [
+        { id: 'wide', time: 0, widthPx: 200 },
+        { id: 'shadowed', time: 100, widthPx: 40 },
+      ],
+      track,
+      WIDTH,
+      0,
+    )
+
+    expect(chosen.has('wide')).toBe(true)
+    expect(chosen.has('shadowed')).toBe(false)
+  })
+
+  it('keeps a label that starts exactly where the previous one ends', () => {
+    const chosen = pickLabelledItems(
+      [
+        { id: 'first', time: 0, widthPx: 100 },
+        { id: 'second', time: 100, widthPx: 100 },
+      ],
+      track,
+      WIDTH,
+      0,
+    )
+
+    expect(chosen.size).toBe(2)
+  })
+
+  it('respects the requested gap', () => {
+    // Same positions as above, but now 12px of clear space is demanded after
+    // each label, which the second one no longer has.
+    const chosen = pickLabelledItems(
+      [
+        { id: 'first', time: 0, widthPx: 100 },
+        { id: 'second', time: 100, widthPx: 100 },
+      ],
+      track,
+      WIDTH,
+      12,
+    )
+
+    expect(chosen.has('first')).toBe(true)
+    expect(chosen.has('second')).toBe(false)
+  })
+
+  it('gives a narrow label room a fixed spacing would have denied', () => {
+    // Three short labels 40px apart: the old fixed 96px gap would have dropped
+    // two of them even though they never touch.
+    const chosen = pickLabelledItems(
+      [
+        { id: 'a', time: 0, widthPx: 30 },
+        { id: 'b', time: 40, widthPx: 30 },
+        { id: 'c', time: 80, widthPx: 30 },
+      ],
+      track,
+      WIDTH,
+      0,
+    )
+
+    expect(chosen.size).toBe(3)
+  })
+
+  it('resumes labelling once past a wide label', () => {
+    const chosen = pickLabelledItems(
+      [
+        { id: 'wide', time: 0, widthPx: 200 },
+        { id: 'shadowed', time: 100, widthPx: 40 },
+        { id: 'clear', time: 300, widthPx: 40 },
+      ],
+      track,
+      WIDTH,
+      0,
+    )
+
+    expect([...chosen].sort()).toEqual(['clear', 'wide'])
+  })
+
+  it('considers items in time order regardless of input order', () => {
+    const chosen = pickLabelledItems(
+      [
+        { id: 'later', time: 500, widthPx: 40 },
+        { id: 'earlier', time: 0, widthPx: 40 },
+      ],
+      track,
+      WIDTH,
+      0,
+    )
+
+    expect(chosen.size).toBe(2)
+  })
+
+  it('labels nothing when the track has no width or no span', () => {
+    const items = [{ id: 'a', time: 0, widthPx: 40 }]
+    expect(pickLabelledItems(items, track, 0, 0).size).toBe(0)
+    expect(pickLabelledItems(items, { start: 5, end: 5 }, WIDTH, 0).size).toBe(0)
+  })
+
+  it('labels an item sitting left of the viewport without swallowing the track', () => {
+    // Off-screen chips are still candidates; a large negative x must not leave
+    // lastLabelEnd far enough left to grant every later label unconditionally.
+    const chosen = pickLabelledItems(
+      [
+        { id: 'offscreen', time: -1000, widthPx: 40 },
+        { id: 'onscreen', time: 0, widthPx: 40 },
+      ],
+      track,
+      WIDTH,
+      0,
+    )
+
+    expect(chosen.has('offscreen')).toBe(true)
+    expect(chosen.has('onscreen')).toBe(true)
   })
 })
