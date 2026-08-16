@@ -18,7 +18,10 @@ import { prisma } from '../../lib/prisma.js'
 
 const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
-  content: z.string().max(200_000),
+  // No length cap: the upstream provider owns the context limit and will say so
+  // if we exceed it. Payload size is bounded by Fastify's bodyLimit, and spend
+  // by the credit reservation below.
+  content: z.string(),
   cache_control: z
     .object({
       type: z.literal('ephemeral'),
@@ -44,7 +47,7 @@ const toolChoiceSchema = z.union([
   z.object({ name: z.string() }),
 ])
 
-const generateBodySchema = z.object({
+export const generateBodySchema = z.object({
   model: z.string().meta({ description: 'Model name from the server allowed list' }),
   messages: z.array(messageSchema).min(1),
   temperature: z.number().min(0).max(2).optional(),
