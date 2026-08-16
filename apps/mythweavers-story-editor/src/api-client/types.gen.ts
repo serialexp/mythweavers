@@ -13893,6 +13893,10 @@ export type GetMyStoriesByStoryIdMapsResponse = GetMyStoriesByStoryIdMapsRespons
 export type PostMyStoriesByStoryIdMapsData = {
     body: {
         /**
+         * Optional client-provided ID (generated if omitted)
+         */
+        id?: string;
+        /**
          * Map name
          */
         name: string;
@@ -14765,6 +14769,10 @@ export type GetMyMapsByMapIdLandmarksResponse = GetMyMapsByMapIdLandmarksRespons
 export type PostMyMapsByMapIdLandmarksData = {
     body: {
         /**
+         * Optional client-provided ID (generated if omitted)
+         */
+        id?: string;
+        /**
          * X coordinate (0-1 normalized)
          */
         x: number;
@@ -14810,6 +14818,19 @@ export type PostMyMapsByMapIdLandmarksData = {
 };
 
 export type PostMyMapsByMapIdLandmarksErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
     /**
      * Default Response
      */
@@ -15929,6 +15950,10 @@ export type GetMyMapsByMapIdPawnsResponse = GetMyMapsByMapIdPawnsResponses[keyof
 export type PostMyMapsByMapIdPawnsData = {
     body: {
         /**
+         * Optional client-provided ID (generated if omitted)
+         */
+        id?: string;
+        /**
          * Pawn name
          */
         name: string;
@@ -15972,6 +15997,19 @@ export type PostMyMapsByMapIdPawnsData = {
 };
 
 export type PostMyMapsByMapIdPawnsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
     /**
      * Default Response
      */
@@ -16437,6 +16475,819 @@ export type PutMyPawnsByIdResponses = {
 
 export type PutMyPawnsByIdResponse = PutMyPawnsByIdResponses[keyof PutMyPawnsByIdResponses];
 
+export type GetMyPawnsByPawnIdMovementsData = {
+    body?: never;
+    path: {
+        /**
+         * Pawn ID
+         */
+        pawnId: string;
+    };
+    query?: never;
+    url: '/my/pawns/{pawnId}/movements';
+};
+
+export type GetMyPawnsByPawnIdMovementsErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyPawnsByPawnIdMovementsError = GetMyPawnsByPawnIdMovementsErrors[keyof GetMyPawnsByPawnIdMovementsErrors];
+
+export type GetMyPawnsByPawnIdMovementsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Pawn movements (sorted by start time)
+         */
+        movements: Array<{
+            /**
+             * Movement ID
+             */
+            id: string;
+            /**
+             * Story ID (derived from the pawn)
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Pawn ID
+             */
+            pawnId: string;
+            /**
+             * Departure time in story minutes
+             */
+            startStoryTime: number;
+            /**
+             * Arrival time in story minutes
+             */
+            endStoryTime: number;
+            /**
+             * Start X coordinate (0-1 normalized)
+             */
+            startX: number;
+            /**
+             * Start Y coordinate (0-1 normalized)
+             */
+            startY: number;
+            /**
+             * End X coordinate (0-1 normalized)
+             */
+            endX: number;
+            /**
+             * End Y coordinate (0-1 normalized)
+             */
+            endY: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetMyPawnsByPawnIdMovementsResponse = GetMyPawnsByPawnIdMovementsResponses[keyof GetMyPawnsByPawnIdMovementsResponses];
+
+export type PostMyPawnsByPawnIdMovementsData = {
+    body: {
+        /**
+         * Optional client-provided ID (generated if omitted)
+         */
+        id?: string;
+        /**
+         * Departure time in story minutes
+         */
+        startStoryTime: number;
+        /**
+         * Arrival time in story minutes
+         */
+        endStoryTime: number;
+        /**
+         * Start X coordinate (0-1 normalized)
+         */
+        startX: number;
+        /**
+         * Start Y coordinate (0-1 normalized)
+         */
+        startY: number;
+        /**
+         * End X coordinate (0-1 normalized)
+         */
+        endX: number;
+        /**
+         * End Y coordinate (0-1 normalized)
+         */
+        endY: number;
+    };
+    path: {
+        /**
+         * Pawn ID
+         */
+        pawnId: string;
+    };
+    query?: never;
+    url: '/my/pawns/{pawnId}/movements';
+};
+
+export type PostMyPawnsByPawnIdMovementsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PostMyPawnsByPawnIdMovementsError = PostMyPawnsByPawnIdMovementsErrors[keyof PostMyPawnsByPawnIdMovementsErrors];
+
+export type PostMyPawnsByPawnIdMovementsResponses = {
+    /**
+     * Default Response
+     */
+    201: {
+        success: true;
+        movement: {
+            /**
+             * Movement ID
+             */
+            id: string;
+            /**
+             * Story ID (derived from the pawn)
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Pawn ID
+             */
+            pawnId: string;
+            /**
+             * Departure time in story minutes
+             */
+            startStoryTime: number;
+            /**
+             * Arrival time in story minutes
+             */
+            endStoryTime: number;
+            /**
+             * Start X coordinate (0-1 normalized)
+             */
+            startX: number;
+            /**
+             * Start Y coordinate (0-1 normalized)
+             */
+            startY: number;
+            /**
+             * End X coordinate (0-1 normalized)
+             */
+            endX: number;
+            /**
+             * End Y coordinate (0-1 normalized)
+             */
+            endY: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+    };
+};
+
+export type PostMyPawnsByPawnIdMovementsResponse = PostMyPawnsByPawnIdMovementsResponses[keyof PostMyPawnsByPawnIdMovementsResponses];
+
+export type GetMyMapsByMapIdPawnMovementsData = {
+    body?: never;
+    path: {
+        /**
+         * Map ID
+         */
+        mapId: string;
+    };
+    query?: never;
+    url: '/my/maps/{mapId}/pawn-movements';
+};
+
+export type GetMyMapsByMapIdPawnMovementsErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyMapsByMapIdPawnMovementsError = GetMyMapsByMapIdPawnMovementsErrors[keyof GetMyMapsByMapIdPawnMovementsErrors];
+
+export type GetMyMapsByMapIdPawnMovementsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        /**
+         * Pawn movements (sorted by start time)
+         */
+        movements: Array<{
+            /**
+             * Movement ID
+             */
+            id: string;
+            /**
+             * Story ID (derived from the pawn)
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Pawn ID
+             */
+            pawnId: string;
+            /**
+             * Departure time in story minutes
+             */
+            startStoryTime: number;
+            /**
+             * Arrival time in story minutes
+             */
+            endStoryTime: number;
+            /**
+             * Start X coordinate (0-1 normalized)
+             */
+            startX: number;
+            /**
+             * Start Y coordinate (0-1 normalized)
+             */
+            startY: number;
+            /**
+             * End X coordinate (0-1 normalized)
+             */
+            endX: number;
+            /**
+             * End Y coordinate (0-1 normalized)
+             */
+            endY: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type GetMyMapsByMapIdPawnMovementsResponse = GetMyMapsByMapIdPawnMovementsResponses[keyof GetMyMapsByMapIdPawnMovementsResponses];
+
+export type DeleteMyPawnMovementsByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Pawn movement ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/pawn-movements/{id}';
+};
+
+export type DeleteMyPawnMovementsByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type DeleteMyPawnMovementsByIdError = DeleteMyPawnMovementsByIdErrors[keyof DeleteMyPawnMovementsByIdErrors];
+
+export type DeleteMyPawnMovementsByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+    };
+};
+
+export type DeleteMyPawnMovementsByIdResponse = DeleteMyPawnMovementsByIdResponses[keyof DeleteMyPawnMovementsByIdResponses];
+
+export type GetMyPawnMovementsByIdData = {
+    body?: never;
+    path: {
+        /**
+         * Pawn movement ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/pawn-movements/{id}';
+};
+
+export type GetMyPawnMovementsByIdErrors = {
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type GetMyPawnMovementsByIdError = GetMyPawnMovementsByIdErrors[keyof GetMyPawnMovementsByIdErrors];
+
+export type GetMyPawnMovementsByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        movement: {
+            /**
+             * Movement ID
+             */
+            id: string;
+            /**
+             * Story ID (derived from the pawn)
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Pawn ID
+             */
+            pawnId: string;
+            /**
+             * Departure time in story minutes
+             */
+            startStoryTime: number;
+            /**
+             * Arrival time in story minutes
+             */
+            endStoryTime: number;
+            /**
+             * Start X coordinate (0-1 normalized)
+             */
+            startX: number;
+            /**
+             * Start Y coordinate (0-1 normalized)
+             */
+            startY: number;
+            /**
+             * End X coordinate (0-1 normalized)
+             */
+            endX: number;
+            /**
+             * End Y coordinate (0-1 normalized)
+             */
+            endY: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+    };
+};
+
+export type GetMyPawnMovementsByIdResponse = GetMyPawnMovementsByIdResponses[keyof GetMyPawnMovementsByIdResponses];
+
+export type PutMyPawnMovementsByIdData = {
+    body: {
+        /**
+         * Departure time in story minutes
+         */
+        startStoryTime?: number;
+        /**
+         * Arrival time in story minutes
+         */
+        endStoryTime?: number;
+        /**
+         * Start X coordinate (0-1 normalized)
+         */
+        startX?: number;
+        /**
+         * Start Y coordinate (0-1 normalized)
+         */
+        startY?: number;
+        /**
+         * End X coordinate (0-1 normalized)
+         */
+        endX?: number;
+        /**
+         * End Y coordinate (0-1 normalized)
+         */
+        endY?: number;
+    };
+    path: {
+        /**
+         * Pawn movement ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/my/pawn-movements/{id}';
+};
+
+export type PutMyPawnMovementsByIdErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PutMyPawnMovementsByIdError = PutMyPawnMovementsByIdErrors[keyof PutMyPawnMovementsByIdErrors];
+
+export type PutMyPawnMovementsByIdResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        movement: {
+            /**
+             * Movement ID
+             */
+            id: string;
+            /**
+             * Story ID (derived from the pawn)
+             */
+            storyId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Pawn ID
+             */
+            pawnId: string;
+            /**
+             * Departure time in story minutes
+             */
+            startStoryTime: number;
+            /**
+             * Arrival time in story minutes
+             */
+            endStoryTime: number;
+            /**
+             * Start X coordinate (0-1 normalized)
+             */
+            startX: number;
+            /**
+             * Start Y coordinate (0-1 normalized)
+             */
+            startY: number;
+            /**
+             * End X coordinate (0-1 normalized)
+             */
+            endX: number;
+            /**
+             * End Y coordinate (0-1 normalized)
+             */
+            endY: number;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        };
+    };
+};
+
+export type PutMyPawnMovementsByIdResponse = PutMyPawnMovementsByIdResponses[keyof PutMyPawnMovementsByIdResponses];
+
 export type GetMyMapsByMapIdPathsData = {
     body?: never;
     path: {
@@ -16594,6 +17445,10 @@ export type GetMyMapsByMapIdPathsResponse = GetMyMapsByMapIdPathsResponses[keyof
 export type PostMyMapsByMapIdPathsData = {
     body: {
         /**
+         * Optional client-provided ID (generated if omitted)
+         */
+        id?: string;
+        /**
          * Speed multiplier for travel along this path
          */
         speedMultiplier?: number;
@@ -16609,6 +17464,19 @@ export type PostMyMapsByMapIdPathsData = {
 };
 
 export type PostMyMapsByMapIdPathsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
     /**
      * Default Response
      */
@@ -17121,6 +17989,10 @@ export type GetMyPathsByPathIdSegmentsResponse = GetMyPathsByPathIdSegmentsRespo
 export type PostMyPathsByPathIdSegmentsData = {
     body: {
         /**
+         * Optional client-provided ID (generated if omitted)
+         */
+        id?: string;
+        /**
          * Segment order in path
          */
         order: number;
@@ -17289,6 +18161,190 @@ export type PostMyPathsByPathIdSegmentsResponses = {
 };
 
 export type PostMyPathsByPathIdSegmentsResponse = PostMyPathsByPathIdSegmentsResponses[keyof PostMyPathsByPathIdSegmentsResponses];
+
+export type PutMyPathsByPathIdSegmentsData = {
+    body: {
+        /**
+         * The complete segment list for this path; anything omitted is deleted
+         */
+        segments: Array<{
+            /**
+             * Segment ID; existing segments keep theirs, new ones may supply one
+             */
+            id?: string;
+            /**
+             * Segment order in path
+             */
+            order: number;
+            /**
+             * Start X coordinate
+             */
+            startX: number;
+            /**
+             * Start Y coordinate
+             */
+            startY: number;
+            /**
+             * End X coordinate
+             */
+            endX: number;
+            /**
+             * End Y coordinate
+             */
+            endY: number;
+            /**
+             * Start landmark ID (optional)
+             */
+            startLandmarkId?: string | null;
+            /**
+             * End landmark ID (optional)
+             */
+            endLandmarkId?: string | null;
+        }>;
+    };
+    path: {
+        /**
+         * Path ID
+         */
+        pathId: string;
+    };
+    query?: never;
+    url: '/my/paths/{pathId}/segments';
+};
+
+export type PutMyPathsByPathIdSegmentsErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        /**
+         * Error message
+         */
+        error: string;
+        validation?: unknown;
+        zodIssues?: unknown;
+        stack?: string;
+        debug?: unknown;
+    };
+};
+
+export type PutMyPathsByPathIdSegmentsError = PutMyPathsByPathIdSegmentsErrors[keyof PutMyPathsByPathIdSegmentsErrors];
+
+export type PutMyPathsByPathIdSegmentsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        success: true;
+        /**
+         * The reconciled segment list (sorted by order)
+         */
+        segments: Array<{
+            /**
+             * Segment ID
+             */
+            id: string;
+            /**
+             * Path ID
+             */
+            pathId: string;
+            /**
+             * Map ID
+             */
+            mapId: string;
+            /**
+             * Segment order
+             */
+            order: number;
+            /**
+             * Start X coordinate
+             */
+            startX: number;
+            /**
+             * Start Y coordinate
+             */
+            startY: number;
+            /**
+             * End X coordinate
+             */
+            endX: number;
+            /**
+             * End Y coordinate
+             */
+            endY: number;
+            /**
+             * Start landmark ID
+             */
+            startLandmarkId: string | null;
+            /**
+             * End landmark ID
+             */
+            endLandmarkId: string | null;
+            /**
+             * Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Last update timestamp
+             */
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type PutMyPathsByPathIdSegmentsResponse = PutMyPathsByPathIdSegmentsResponses[keyof PutMyPathsByPathIdSegmentsResponses];
 
 export type DeleteMyPathSegmentsByIdData = {
     body?: never;
