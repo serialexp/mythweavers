@@ -266,40 +266,53 @@ try {
   process.exit(1)
 }
 
-// Graceful shutdown
-const SHUTDOWN_TIMEOUT_MS = 5000
-const signals = ['SIGINT', 'SIGTERM']
-let shuttingDown = false
-signals.forEach((signal) => {
-  process.on(signal, async () => {
-    if (shuttingDown) return
-    shuttingDown = true
-    server.log.info(`Received ${signal}, closing server...`)
-    stopCostSyncScheduler()
-    stopOAuthCleanupScheduler()
-    stopRoyalRoadWorker()
+// Development restarts must release the listener immediately. `server.close()`
+// waits for every HTTP/WebSocket peer and can leave the watcher racing an old
+// process that still owns port 3201. In production we retain the bounded,
+// graceful drain below.
+const signals = ['SIGINT', 'SIGTERM'] as const
 
-    // Backstop: server.close() can stall indefinitely on connections whose
-    // peer never finishes closing (suspended laptop, killed browser), so
-    // force-exit if graceful shutdown doesn't complete in time.
-    const forceExitTimer = setTimeout(() => {
-      server.log.warn('Graceful shutdown timed out, forcing exit')
+if (process.env.NODE_ENV === 'development') {
+  for (const signal of signals) {
+    process.once(signal, () => {
       process.exit(0)
-    }, SHUTDOWN_TIMEOUT_MS)
-    forceExitTimer.unref()
+    })
+  }
+} else {
+  const SHUTDOWN_TIMEOUT_MS = 5000
+  let shuttingDown = false
 
-    // Close WebSocket connections up front: their close handshake depends on
-    // the peer responding, which can keep server.close() pending forever.
-    // terminate() destroys the underlying socket immediately.
-    for (const client of server.websocketServer.clients) {
-      client.terminate()
-    }
+  for (const signal of signals) {
+    process.on(signal, async () => {
+      if (shuttingDown) return
+      shuttingDown = true
+      server.log.info(`Received ${signal}, closing server...`)
+      stopCostSyncScheduler()
+      stopOAuthCleanupScheduler()
+      stopRoyalRoadWorker()
 
-    await server.close()
-    clearTimeout(forceExitTimer)
-    process.exit(0)
-  })
-})
+      // Backstop: server.close() can stall indefinitely on connections whose
+      // peer never finishes closing (suspended laptop, killed browser), so
+      // force-exit if graceful shutdown doesn't complete in time.
+      const forceExitTimer = setTimeout(() => {
+        server.log.warn('Graceful shutdown timed out, forcing exit')
+        process.exit(0)
+      }, SHUTDOWN_TIMEOUT_MS)
+      forceExitTimer.unref()
+
+      // Close WebSocket connections up front: their close handshake depends on
+      // the peer responding, which can keep server.close() pending forever.
+      // terminate() destroys the underlying socket immediately.
+      for (const client of server.websocketServer.clients) {
+        client.terminate()
+      }
+
+      await server.close()
+      clearTimeout(forceExitTimer)
+      process.exit(0)
+    })
+  }
+}
 
 // Type augmentation for custom request properties
 declare module 'fastify' {

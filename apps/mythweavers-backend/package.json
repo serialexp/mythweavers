@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "bun --env-file=../../.env.local --watch src/index.ts",
+    "dev": "NODE_ENV=development bun --env-file=../../.env.local --watch src/index.ts",
     "build": "tsc",
     "start": "bun src/index.ts",
     "test": "bun --env-file=.env.test prisma migrate reset --force && bun test --env-file=.env.test",
