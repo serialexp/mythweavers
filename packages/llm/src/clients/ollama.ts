@@ -151,11 +151,6 @@ export class OllamaClient implements LLMClient {
   async *generate(
     options: LLMGenerateOptions,
   ): AsyncGenerator<LLMStreamEvent> {
-    if (options.tools && options.tools.length > 0) {
-      throw new Error(
-        "Tool calls are not yet supported by the Ollama client. Switch to an OpenAI-compatible model for this call.",
-      )
-    }
     const messages = options.messages.map((m) => ({
       role: m.role,
       content: m.content,
@@ -172,6 +167,18 @@ export class OllamaClient implements LLMClient {
         repeat_last_n: 256,
         ...options.providerOptions,
       },
+      ...(options.tools?.length
+        ? {
+            tools: options.tools.map((tool) => ({
+              type: 'function',
+              function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.parameters,
+              },
+            })),
+          }
+        : {}),
     }
 
     // Ollama's reasoning toggle is a top-level `think` field. There's no
@@ -207,7 +214,12 @@ export class OllamaClient implements LLMClient {
 
     for await (const raw of parseNDJSONStream(response.body)) {
       const chunk = raw as {
-        message?: { content?: string }
+        message?: {
+          content?: string
+          tool_calls?: Array<{
+            function?: { name?: string; arguments?: unknown }
+          }>
+        }
         done?: boolean
         prompt_eval_count?: number
         eval_count?: number
@@ -217,6 +229,17 @@ export class OllamaClient implements LLMClient {
       const text = chunk.message?.content
       if (text) {
         yield { type: "chunk", text }
+      }
+
+      for (const [index, toolCall] of (chunk.message?.tool_calls ?? []).entries()) {
+        if (toolCall.function?.name) {
+          yield {
+            type: 'tool_call',
+            id: `${index}`,
+            name: toolCall.function.name,
+            arguments: toolCall.function.arguments ?? {},
+          }
+        }
       }
 
       // On done, emit usage then done

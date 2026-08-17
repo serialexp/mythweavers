@@ -4,9 +4,9 @@ import { For, Show, createMemo, createSignal } from 'solid-js'
 import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { Message } from '../types/core'
-import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { LLMClientFactory } from '../utils/llm'
+import { generateReplacementRewrite } from '../utils/llm/replacementRewriter'
 import { resolveModel } from '../utils/llm/resolveModel'
-import { buildDiffRewritePrompt, processLLMDiffResponse } from '@mythweavers/shared'
 import * as styles from './MessageRewriter.css'
 import { PhCheckIcon, PhXIcon } from 'solidjs-phosphor'
 
@@ -16,6 +16,7 @@ interface RewriteResult {
   originalContent: string
   proposedContent: string | null
   error: string | null
+  failures: string[]
   accepted: boolean
 }
 
@@ -90,74 +91,34 @@ export function MessageRewriter(props: MessageRewriterProps) {
       const modelInfo = modelsStore.availableModels.find((m) => m.name === resolved.model)
       const client = LLMClientFactory.getClient(resolved.provider)
 
-      let processedCount = 0
+      const selectedMessages = props.messages.filter((message) => selected.has(message.id))
+      const replacementResult = await generateReplacementRewrite({
+        client,
+        model: resolved.model,
+        messages: selectedMessages.map((message) => ({ id: message.id, content: message.content })),
+        instruction: rewriteInstruction(),
+        providerOptions: resolved.provider === 'ollama' ? { num_ctx: modelInfo?.context_length || 4096 } : undefined,
+        metadata: { callType: 'rewrite:message' },
+      })
 
-      for (const messageId of selected) {
-        const message = props.messages.find((m) => m.id === messageId)
-        if (!message) continue
-
-        const messagePreview = message.content.slice(0, 100) + (message.content.length > 100 ? '...' : '')
-
-        try {
-          // Use the unified diff approach - LLM returns only the changes, not the whole text
-          const prompt = buildDiffRewritePrompt(message.content, rewriteInstruction())
-
-          const llmMessages: LLMMessage[] = [{ role: 'user', content: prompt }]
-
-          const response = client.generate({
-            model: resolved.model,
-            messages: llmMessages,
-            providerOptions:
-              resolved.provider === 'ollama'
-                ? {
-                    num_ctx: modelInfo?.context_length || 4096,
-                  }
-                : undefined,
-            metadata: { callType: 'rewrite:message' },
-          })
-
-          let llmResponse = ''
-          for await (const event of response) {
-            if (event.type === 'chunk') {
-              llmResponse += event.text
-            }
-          }
-
-          // Process the diff response and apply it to get the result
-          const diffResult = processLLMDiffResponse(message.content, llmResponse.trim())
-
-          // Store the result for preview (skip if no changes)
-          if (!diffResult.noChanges) {
-            setResults((prev) => [
-              ...prev,
-              {
-                messageId,
-                messagePreview,
-                originalContent: message.content,
-                proposedContent: diffResult.resultContent,
-                error: null,
-                accepted: false,
-              },
-            ])
-          }
-        } catch (error) {
-          // Store error result
-          setResults((prev) => [
-            ...prev,
+      setProgress({ current: selectedMessages.length, total: selected.size })
+      setResults(
+        selectedMessages.flatMap((message) => {
+          const proposedContent = replacementResult.messages.get(message.id)!
+          if (proposedContent === message.content && replacementResult.failures.length === 0) return []
+          return [
             {
-              messageId,
-              messagePreview,
+              messageId: message.id,
+              messagePreview: message.content.slice(0, 100) + (message.content.length > 100 ? '...' : ''),
               originalContent: message.content,
-              proposedContent: null,
-              error: error instanceof Error ? error.message : 'Failed to generate rewrite',
+              proposedContent,
+              error: null,
+              failures: replacementResult.failures,
               accepted: false,
             },
-          ])
-        }
-
-        processedCount++
-        setProgress({ current: processedCount, total: selected.size })
-      }
+          ]
+        }),
+      )
     } catch (error) {
       console.error('Error rewriting messages:', error)
       alert(`Error rewriting messages: ${error instanceof Error ? error.message : String(error)}`)
@@ -199,7 +160,10 @@ export function MessageRewriter(props: MessageRewriterProps) {
 
     for (const result of pendingResults) {
       try {
-        const { revisionId, paragraphs } = await saveService.createMessageRevision(result.messageId, result.proposedContent!)
+        const { revisionId, paragraphs } = await saveService.createMessageRevision(
+          result.messageId,
+          result.proposedContent!,
+        )
         messagesStore.updateMessage(result.messageId, {
           content: result.proposedContent!,
           currentMessageRevisionId: revisionId,
@@ -220,12 +184,7 @@ export function MessageRewriter(props: MessageRewriterProps) {
   }
 
   return (
-    <Modal
-      open={true}
-      onClose={props.onClose}
-      title={hasResults() ? 'Review Rewrites' : 'Rewrite Messages'}
-      size="lg"
-    >
+    <Modal open={true} onClose={props.onClose} title={hasResults() ? 'Review Rewrites' : 'Rewrite Messages'} size="lg">
       {/* Results Preview Phase */}
       <Show when={hasResults() && !isRewriting()}>
         <Stack gap="md" style={{ padding: '1rem' }}>
@@ -265,6 +224,16 @@ export function MessageRewriter(props: MessageRewriterProps) {
 
                   <Show when={result.error}>
                     <div style={{ color: '#ef4444', 'font-size': '0.875rem' }}>{result.error}</div>
+                  </Show>
+
+                  <Show when={result.failures.length > 0}>
+                    <div role="alert" class={styles.errorBadge}>
+                      <strong>Some replacements could not be applied</strong>
+                      <ul>
+                        <For each={result.failures}>{(failure) => <li>{failure}</li>}</For>
+                      </ul>
+                      <span>Review the valid changes below before accepting them.</span>
+                    </div>
                   </Show>
 
                   <Show when={result.proposedContent && !result.error}>
@@ -329,7 +298,9 @@ export function MessageRewriter(props: MessageRewriterProps) {
           <Show when={isRewriting()}>
             <div class={styles.loadingContainer}>
               <Spinner size="md" />
-              <span>Rewriting message {progress().current} of {progress().total}...</span>
+              <span>
+                Rewriting message {progress().current} of {progress().total}...
+              </span>
             </div>
           </Show>
 
@@ -362,7 +333,8 @@ export function MessageRewriter(props: MessageRewriterProps) {
                 Deselect All
               </Button>
               <span class={styles.selectionInfo}>
-                {selectedMessageIds().size} selected / {filteredMessages().length} visible / {props.messages.length} total
+                {selectedMessageIds().size} selected / {filteredMessages().length} visible / {props.messages.length}{' '}
+                total
               </span>
             </div>
 
@@ -372,7 +344,9 @@ export function MessageRewriter(props: MessageRewriterProps) {
                   <Card
                     interactive
                     onClick={() => toggleMessageSelection(message.id)}
-                    class={selectedMessageIds().has(message.id) ? styles.messageCardSelected : styles.messageCardUnselected}
+                    class={
+                      selectedMessageIds().has(message.id) ? styles.messageCardSelected : styles.messageCardUnselected
+                    }
                   >
                     <CardBody padding="sm">
                       <div style={{ display: 'flex', gap: '0.5rem', 'align-items': 'flex-start' }}>

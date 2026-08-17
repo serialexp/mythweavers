@@ -1,247 +1,195 @@
 /**
- * Utilities for generating and applying unified diffs for LLM-based rewrites.
+ * Strict, tool-call based text replacement utilities for LLM rewrites.
  *
- * This approach is more efficient than asking the LLM to output the entire rewritten text
- * because the LLM only outputs the changes, not the unchanged content.
+ * Each operation names the exact source text it expects to change. Unlike a
+ * unified diff, a replacement cannot silently drift when the model's context
+ * or line numbers are wrong: an operation either finds its exact target or is
+ * reported as invalid and leaves the source unchanged.
  */
 
-/**
- * Format content with line numbers for LLM input.
- * Example output: "1| First line\n2| Second line\n3| Third line"
- */
-export function formatWithLineNumbers(content: string): string {
-  const lines = content.split('\n')
-  return lines.map((line, i) => `${i + 1}| ${line}`).join('\n')
+export interface TextReplacement {
+  /** Stable ID of the message containing the text to edit. */
+  messageId: string
+  /** Exact source text to replace. Must be non-empty. */
+  find: string
+  /** Text to insert in place of `find`. An empty string deletes it. */
+  replace: string
+  /** Replace every exact occurrence rather than only the first occurrence. */
+  replaceAll: boolean
+}
+
+export interface RewriteMessage {
+  id: string
+  content: string
+}
+
+export interface ReplacementOutcome {
+  operation: TextReplacement
+  status: 'applied' | 'noop' | 'failed'
+  replacements: number
+  error?: string
+}
+
+export interface ReplacementApplicationResult {
+  messages: Map<string, string>
+  outcomes: ReplacementOutcome[]
+  appliedCount: number
 }
 
 /**
- * Statistics about a diff
+ * OpenAI-compatible function definition. Anthropic and Ollama accept the same
+ * JSON Schema through their respective tool APIs.
  */
-export interface DiffStats {
-  added: number
-  removed: number
-}
+export const REPLACE_TEXT_TOOL = {
+  name: 'replace_text',
+  description:
+    'Replace exact text in one selected message. The find value must be copied verbatim from the supplied message. Set replaceAll only when every identical occurrence in that message should change.',
+  parameters: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      messageId: {
+        type: 'string',
+        description: 'The exact message ID from the editable messages list.',
+      },
+      find: {
+        type: 'string',
+        description: 'Non-empty exact text to replace, copied verbatim from the current message.',
+      },
+      replace: {
+        type: 'string',
+        description: 'Replacement text. Use an empty string to delete find.',
+      },
+      replaceAll: {
+        type: 'boolean',
+        description: 'True only to replace every exact occurrence of find in this message.',
+      },
+    },
+    required: ['messageId', 'find', 'replace', 'replaceAll'],
+  },
+} as const
 
-/**
- * Calculate statistics for a unified diff
- */
-export function calculateDiffStats(diffText: string): DiffStats {
-  const lines = diffText.split('\n')
-  let added = 0
-  let removed = 0
-
-  for (const line of lines) {
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      added++
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
-      removed++
-    }
+/** Convert untrusted tool-call arguments into a replacement operation. */
+export function parseTextReplacement(arguments_: unknown): TextReplacement {
+  if (!arguments_ || typeof arguments_ !== 'object' || Array.isArray(arguments_)) {
+    throw new Error('Replacement arguments must be an object')
   }
 
-  return { added, removed }
+  const value = arguments_ as Record<string, unknown>
+  if (typeof value.messageId !== 'string' || !value.messageId) {
+    throw new Error('Replacement messageId must be a non-empty string')
+  }
+  if (typeof value.find !== 'string' || !value.find) {
+    throw new Error('Replacement find text must be a non-empty string')
+  }
+  if (typeof value.replace !== 'string') {
+    throw new Error('Replacement text must be a string')
+  }
+  if (typeof value.replaceAll !== 'boolean') {
+    throw new Error('Replacement replaceAll must be a boolean')
+  }
+
+  return {
+    messageId: value.messageId,
+    find: value.find,
+    replace: value.replace,
+    replaceAll: value.replaceAll,
+  }
 }
 
 /**
- * Apply a unified diff to the original content.
- *
- * Supports standard unified diff format with @@ hunks:
- * @@ -<old_line>,<old_count> +<new_line>,<new_count> @@
- *
- * - Lines starting with '-' are removed from original
- * - Lines starting with '+' are added to result
- * - Lines starting with ' ' (space) are context (unchanged)
+ * Applies operations in order. Every operation is matched against the current
+ * text, so later operations may deliberately build on prior replacements.
+ * Failed operations never mutate a message and are retained in the outcome
+ * list for the caller to show the user.
  */
-export function applyUnifiedDiff(originalContent: string, diffText: string): string {
-  const originalLines = originalContent.split('\n')
-  const diffLines = diffText.trim().split('\n')
+export function applyTextReplacements(
+  sourceMessages: readonly RewriteMessage[],
+  operations: readonly TextReplacement[],
+): ReplacementApplicationResult {
+  const messages = new Map(sourceMessages.map((message) => [message.id, message.content]))
+  const outcomes: ReplacementOutcome[] = []
+  let appliedCount = 0
 
-  const result: string[] = []
-  let originalIndex = 0
-  let i = 0
-
-  while (i < diffLines.length) {
-    const line = diffLines[i]
-
-    // Parse hunk header: @@ -start,count +start,count @@
-    if (line.startsWith('@@')) {
-      const match = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/)
-      if (match) {
-        const oldStart = parseInt(match[1]) - 1 // Convert to 0-indexed
-
-        // Copy any lines before this hunk that weren't touched
-        while (originalIndex < oldStart) {
-          result.push(originalLines[originalIndex])
-          originalIndex++
-        }
-      }
-      i++
+  for (const operation of operations) {
+    const current = messages.get(operation.messageId)
+    if (current === undefined) {
+      outcomes.push({
+        operation,
+        status: 'failed',
+        replacements: 0,
+        error: `Unknown message ID: ${operation.messageId}`,
+      })
+      continue
+    }
+    if (!operation.find) {
+      outcomes.push({
+        operation,
+        status: 'failed',
+        replacements: 0,
+        error: 'Replacement find text must be non-empty',
+      })
       continue
     }
 
-    // Handle diff content lines
-    if (line.startsWith('-')) {
-      // Skip this line in original (it's being deleted)
-      originalIndex++
-      i++
-    } else if (line.startsWith('+')) {
-      // Add new line to result
-      result.push(line.substring(1)) // Remove '+'
-      i++
-    } else if (line.startsWith(' ')) {
-      // Context line - copy from original
-      result.push(originalLines[originalIndex])
-      originalIndex++
-      i++
-    } else {
-      // Unrecognized line (diff header, etc.) - skip
-      i++
+    const occurrences = current.split(operation.find).length - 1
+    if (occurrences === 0) {
+      outcomes.push({
+        operation,
+        status: 'failed',
+        replacements: 0,
+        error: 'Exact replacement target was not found in the current message text',
+      })
+      continue
     }
-  }
 
-  // Copy any remaining lines from original that weren't part of hunks
-  while (originalIndex < originalLines.length) {
-    result.push(originalLines[originalIndex])
-    originalIndex++
-  }
-
-  return result.join('\n')
-}
-
-/**
- * Strip markdown code blocks and line-number pipe prefixes from diff output.
- * LLMs sometimes wrap their output in ```diff blocks, and when the input
- * was formatted with `formatWithLineNumbers` ("1| line"), models often
- * reproduce the "| " prefix in their diff lines.
- */
-export function cleanDiffOutput(response: string): string {
-  let cleaned = response.trim()
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```(?:diff)?\n/, '').replace(/\n```$/, '')
-  }
-
-  // Strip "| " pipe prefixes that LLMs copy from line-numbered input.
-  // Diff content lines start with +, -, or space — the pipe appears right after:
-  //   "+| added line"  → "+added line"
-  //   "-| removed line" → "-removed line"
-  //   " | context line" → " context line"
-  cleaned = cleaned.replace(/^([+ -])\| /gm, '$1')
-
-  return cleaned
-}
-
-/**
- * Check if the response indicates no changes are needed
- */
-export function isNoChangesResponse(response: string): boolean {
-  const trimmed = response.trim()
-  return trimmed === 'NO_CHANGES' || trimmed.startsWith('NO_CHANGES')
-}
-
-/**
- * Result of processing a diff response from the LLM
- */
-export interface ProcessedDiffResult {
-  /** The resulting content after applying the diff (or original if no changes) */
-  resultContent: string
-  /** The raw diff text for display purposes */
-  diffText: string
-  /** Statistics about the diff */
-  stats: DiffStats
-  /** Whether no changes were needed */
-  noChanges: boolean
-}
-
-/**
- * Process an LLM response containing a unified diff.
- * Handles NO_CHANGES, markdown code blocks, and applies the diff.
- */
-export function processLLMDiffResponse(
-  originalContent: string,
-  llmResponse: string,
-): ProcessedDiffResult {
-  if (isNoChangesResponse(llmResponse)) {
-    return {
-      resultContent: originalContent,
-      diffText: 'NO_CHANGES',
-      stats: { added: 0, removed: 0 },
-      noChanges: true,
+    if (!operation.replaceAll && occurrences > 1) {
+      outcomes.push({
+        operation,
+        status: 'failed',
+        replacements: 0,
+        error: `Replacement target appears ${occurrences} times in message ${operation.messageId}. Provide more surrounding context in find, or set replaceAll: true only when every occurrence should change.`,
+      })
+      continue
     }
+
+    const replacements = operation.replaceAll ? occurrences : 1
+    const updated = operation.replaceAll
+      ? current.split(operation.find).join(operation.replace)
+      : current.replace(operation.find, operation.replace)
+
+    if (updated === current) {
+      outcomes.push({ operation, status: 'noop', replacements })
+      continue
+    }
+
+    messages.set(operation.messageId, updated)
+    outcomes.push({ operation, status: 'applied', replacements })
+    appliedCount += replacements
   }
 
-  const cleanedDiff = cleanDiffOutput(llmResponse)
-  const resultContent = applyUnifiedDiff(originalContent, cleanedDiff)
-  const stats = calculateDiffStats(cleanedDiff)
-
-  return {
-    resultContent,
-    diffText: cleanedDiff,
-    stats,
-    noChanges: false,
-  }
+  return { messages, outcomes, appliedCount }
 }
 
-/**
- * Build the rewrite prompt that asks for a unified diff.
- *
- * @param originalContent The original text to rewrite
- * @param instruction The user's rewrite instruction
- * @param contextSection Optional additional context to include
- */
-export function buildDiffRewritePrompt(
-  originalContent: string,
+/** Builds the text prompt used with `REPLACE_TEXT_TOOL`. */
+export function buildReplacementRewritePrompt(
+  messages: readonly RewriteMessage[],
   instruction: string,
   contextSection?: string,
 ): string {
-  const numberedContent = formatWithLineNumbers(originalContent)
+  const editableMessages = messages
+    .map((message) => `<message id="${message.id}">\n${message.content}\n</message>`)
+    .join('\n\n')
 
-  return `${contextSection || ''}Rewrite the following text according to these instructions: "${instruction}"
+  return `${contextSection || ''}Rewrite the editable messages according to this instruction:
 
-Output a standard UNIFIED DIFF to update the text. Use this exact format:
+${instruction}
 
-@@ -<old_line>,<old_count> +<new_line>,<new_count> @@
- context line (unchanged, prefix with space)
--line to remove (prefix with minus)
-+line to add (prefix with plus)
- context line (unchanged)
+Use the replace_text tool for every change. Each call must copy the exact existing text into find and provide only its replacement in replace. Use replaceAll: true only when every exact occurrence of find in that one message must be changed. You may make multiple calls, and later calls operate on the text produced by earlier calls.
 
-Example to replace line 5:
-@@ -5,1 +5,1 @@
--Has a sword
-+Has a magic sword and a shield
+Do not call the tool for text that should remain unchanged. If no changes are needed, make no tool calls. Do not return rewritten prose, a diff, explanations, markdown, or any other text.
 
-Example to add lines after line 10:
-@@ -10,0 +11,3 @@
-+New line one
-+New line two
-+New line three
+Editable messages:
 
-Example to delete lines 7-9:
-@@ -7,3 +7,0 @@
--Line to delete
--Another line to delete
--Third line to delete
-
-Rules:
-- Line numbers are 1-indexed (first line is 1)
-- Include minimal context (1-2 lines before/after changes)
-- Prefix unchanged lines with a space
-- Prefix removed lines with -
-- Prefix added lines with +
-- You can have multiple @@ hunks for different sections
-- If no changes needed, output exactly: NO_CHANGES
-
-Important guidelines:
-- You may make larger changes around the specific instruction to ensure smooth narrative flow
-- Make sure transitions between sentences and paragraphs remain natural
-- If changing a specific detail, adjust surrounding context as needed so everything makes sense
-- Preserve the overall story, tone, style, and narrative perspective
-- Ensure the rewritten section reads as a cohesive whole
-
-CRITICAL: Return ONLY the unified diff. No preamble, no explanation, no markdown code blocks.
-
-Original text (with line numbers):
-
-${numberedContent}
-
-Unified diff:`
+${editableMessages}`
 }

@@ -6,15 +6,16 @@ import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
 import { singleRewriteDialogStore } from '../stores/singleRewriteDialogStore'
 import type { Node } from '../types/core'
-import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { LLMClientFactory } from '../utils/llm'
+import { generateReplacementRewrite } from '../utils/llm/replacementRewriter'
 import { resolveModel } from '../utils/llm/resolveModel'
-import { buildDiffRewritePrompt, processLLMDiffResponse } from '@mythweavers/shared'
 import * as styles from './SingleRewriteDialog.css'
 import { PhCaretDownIcon, PhCaretRightIcon } from 'solidjs-phosphor'
 
 interface RewriteResult {
   originalContent: string
   proposedContent: string
+  failures: string[]
 }
 
 interface SceneWithContent {
@@ -186,7 +187,7 @@ export function SingleRewriteDialog() {
 
       for (const sceneId of selectedIds) {
         const scene = availableScenes().find((s) => s.node.id === sceneId)
-        if (scene && scene.content) {
+        if (scene?.content) {
           contextParts.push(`=== ${scene.node.title} (${scene.path}) ===\n${scene.content}`)
         }
       }
@@ -196,42 +197,25 @@ export function SingleRewriteDialog() {
           ? `For reference, here is relevant earlier story content that you should keep in mind:\n\n${contextParts.join('\n\n')}\n\n---\n\n`
           : ''
 
-      // Use the unified diff approach - LLM returns only the changes, not the whole text
-      const prompt = buildDiffRewritePrompt(msg.content, rewriteInstruction(), contextSection)
-
-      const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
-
-      const response = client.generate({
+      const replacementResult = await generateReplacementRewrite({
+        client,
         model: resolved.model,
-        messages,
-        providerOptions:
-          resolved.provider === 'ollama'
-            ? {
-                num_ctx: modelInfo?.context_length || 4096,
-              }
-            : undefined,
+        messages: [{ id: msg.id, content: msg.content }],
+        instruction: rewriteInstruction(),
+        contextSection,
+        providerOptions: resolved.provider === 'ollama' ? { num_ctx: modelInfo?.context_length || 4096 } : undefined,
         metadata: { callType: 'rewrite:single' },
       })
 
-      let llmResponse = ''
-      for await (const event of response) {
-        if (event.type === 'chunk') {
-          llmResponse += event.text
-        }
-      }
-
-      // Process the diff response and apply it to get the result
-      const diffResult = processLLMDiffResponse(msg.content, llmResponse.trim())
-
-      if (diffResult.noChanges) {
+      if (replacementResult.appliedCount === 0 && replacementResult.failures.length === 0) {
         alert('The AI determined no changes were needed for this content.')
         return
       }
 
-      // Store the result for preview instead of applying directly
       setRewriteResult({
         originalContent: msg.content,
-        proposedContent: diffResult.resultContent,
+        proposedContent: replacementResult.messages.get(msg.id)!,
+        failures: replacementResult.failures,
       })
     } catch (error) {
       console.error('Error rewriting message:', error)
@@ -303,11 +287,7 @@ export function SingleRewriteDialog() {
                     <Button variant="secondary" onClick={handleClose} disabled={isRewriting()}>
                       Cancel
                     </Button>
-                    <Button
-                      variant="primary"
-                      onClick={handleRewrite}
-                      disabled={isRewriting() || !rewriteInstruction()}
-                    >
+                    <Button variant="primary" onClick={handleRewrite} disabled={isRewriting() || !rewriteInstruction()}>
                       {isRewriting() ? (
                         <>
                           <Spinner size="sm" /> Rewriting...
@@ -336,6 +316,15 @@ export function SingleRewriteDialog() {
         {/* Preview Phase - Show diff with Accept/Reject */}
         <Show when={hasResult()}>
           <div class={styles.phaseWrapper}>
+            <Show when={rewriteResult()!.failures.length > 0}>
+              <div role="alert" class={styles.tokenBudget}>
+                <strong>Some replacements could not be applied</strong>
+                <ul>
+                  <For each={rewriteResult()!.failures}>{(failure) => <li>{failure}</li>}</For>
+                </ul>
+                <span>Review the valid changes below before accepting them.</span>
+              </div>
+            </Show>
             <div class={styles.previewContainer}>
               <div class={styles.diffContainer}>
                 {/* Original Content */}
@@ -404,7 +393,8 @@ export function SingleRewriteDialog() {
                 >
                   Context Scenes
                   <Show when={singleRewriteDialogStore.selectedSceneIds.size > 0}>
-                    {' '}({singleRewriteDialogStore.selectedSceneIds.size})
+                    {' '}
+                    ({singleRewriteDialogStore.selectedSceneIds.size})
                   </Show>
                 </button>
               </div>
@@ -476,9 +466,7 @@ export function SingleRewriteDialog() {
                               </div>
 
                               <Show when={isExpanded()}>
-                                <div class={styles.sceneContent}>
-                                  {scene.content || <em>No content</em>}
-                                </div>
+                                <div class={styles.sceneContent}>{scene.content || <em>No content</em>}</div>
                               </Show>
                             </div>
                           )
@@ -503,9 +491,7 @@ export function SingleRewriteDialog() {
                   </div>
 
                   <label class={styles.label}>Original Message</label>
-                  <div class={styles.messagePreview}>
-                    {targetMessage()?.content || 'No message selected'}
-                  </div>
+                  <div class={styles.messagePreview}>{targetMessage()?.content || 'No message selected'}</div>
 
                   <Show when={singleRewriteDialogStore.selectedSceneIds.size > 0 || targetMessage()}>
                     <div class={styles.tokenBudget}>

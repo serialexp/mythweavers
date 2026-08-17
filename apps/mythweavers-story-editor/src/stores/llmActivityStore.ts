@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import type { TokenUsage } from '../types/core'
-import type { LLMMessage, TokenUsage as RawTokenUsage } from '@mythweavers/llm'
+import type { LLMMessage, TokenUsage as RawTokenUsage, ToolDefinition } from '@mythweavers/llm'
 
 export interface LlmActivityEntry {
   id: string
@@ -10,6 +10,8 @@ export interface LlmActivityEntry {
   provider?: string
   durationMs?: number
   requestMessages: LLMMessage[]
+  requestedTools?: ToolDefinition[]
+  toolCalls: Array<{ id: string; name: string; arguments: unknown }>
   response: string
   usage?: TokenUsage
   rawUsage?: RawTokenUsage

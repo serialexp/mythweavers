@@ -74,10 +74,15 @@ export const LlmActivityPanel: Component = () => {
                         <Show when={entry.requestMessages.filter((msg) => msg.cache_control).length > 0}>
                           <span>cached inputs: {entry.requestMessages.filter((msg) => msg.cache_control).length}</span>
                         </Show>
+                        <Show when={entry.toolCalls.length > 0}>
+                          <Badge variant="info">
+                            {entry.toolCalls.length} tool call{entry.toolCalls.length === 1 ? '' : 's'}
+                          </Badge>
+                        </Show>
                         <Show when={entry.error}>
                           <Badge variant="error">error</Badge>
                         </Show>
-                        <Show when={!entry.error && !entry.response}>
+                        <Show when={!entry.error && !entry.response && entry.toolCalls.length === 0}>
                           <Badge variant="warning">empty</Badge>
                         </Show>
                       </div>
@@ -119,7 +124,9 @@ export const LlmActivityPanel: Component = () => {
                         )}
                       </Show>
 
-                      <Show when={entry.rawUsage?.cache_creation_input_tokens || entry.rawUsage?.cache_read_input_tokens}>
+                      <Show
+                        when={entry.rawUsage?.cache_creation_input_tokens || entry.rawUsage?.cache_read_input_tokens}
+                      >
                         <div>
                           <div class={styles.sectionLabel}>Cache Tokens</div>
                           <Stack gap="xs">
@@ -138,6 +145,32 @@ export const LlmActivityPanel: Component = () => {
                           </Stack>
                         </div>
                       </Show>
+
+                      <details class={styles.collapsibleSection}>
+                        <summary class={styles.collapsibleSummary}>Tool Calls ({entry.toolCalls.length})</summary>
+                        <Show
+                          when={entry.toolCalls.length > 0}
+                          fallback={<pre class={styles.outputBox}>{'<no tool calls>'}</pre>}
+                        >
+                          <Stack gap="sm">
+                            <For each={entry.toolCalls}>
+                              {(toolCall, index) => (
+                                <div class={styles.messageBox}>
+                                  <div class={styles.messageHeader}>
+                                    #{index() + 1} · {toolCall.name}
+                                    <Show when={toolCall.id}>
+                                      <Badge variant="info" size="sm">
+                                        {toolCall.id}
+                                      </Badge>
+                                    </Show>
+                                  </div>
+                                  <pre class={styles.preformatted}>{JSON.stringify(toolCall.arguments, null, 2)}</pre>
+                                </div>
+                              )}
+                            </For>
+                          </Stack>
+                        </Show>
+                      </details>
 
                       <details class={styles.collapsibleSection}>
                         <summary class={styles.collapsibleSummary}>

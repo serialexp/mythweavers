@@ -75,6 +75,8 @@ class LoggedLLMClient implements LLMClient {
     const id = generateMessageId()
     const metadata = (options.metadata ?? {}) as LlmMetadata
     const requestMessages = options.messages.map((message) => ({ ...message }))
+    const requestedTools = options.tools?.map((tool) => ({ ...tool }))
+    const toolCalls: Array<{ id: string; name: string; arguments: unknown }> = []
     let aggregatedUsage: TokenUsage | undefined
     let combinedResponse = ''
     let error: Error | undefined
@@ -94,6 +96,9 @@ class LoggedLLMClient implements LLMClient {
         }
         if (event.type === 'usage') {
           aggregatedUsage = mergeUsage(aggregatedUsage, event.usage)
+        }
+        if (event.type === 'tool_call') {
+          toolCalls.push({ id: event.id, name: event.name, arguments: event.arguments })
         }
         if (event.type === 'error') {
           streamErrors.push((event as { type: 'error'; error: string }).error)
@@ -123,6 +128,8 @@ class LoggedLLMClient implements LLMClient {
         provider: this.provider,
         durationMs,
         requestMessages,
+        requestedTools,
+        toolCalls,
         response: combinedResponse,
         usage,
         rawUsage,

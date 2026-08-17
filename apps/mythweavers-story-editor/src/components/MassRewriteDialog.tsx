@@ -6,15 +6,16 @@ import { messagesStore } from '../stores/messagesStore'
 import { modelsStore } from '../stores/modelsStore'
 import { nodeStore } from '../stores/nodeStore'
 import type { Message, Node } from '../types/core'
-import { LLMClientFactory, type LLMMessage } from '../utils/llm'
+import { LLMClientFactory } from '../utils/llm'
+import { generateReplacementRewrite } from '../utils/llm/replacementRewriter'
 import { resolveModel } from '../utils/llm/resolveModel'
-import { buildDiffRewritePrompt, processLLMDiffResponse } from '@mythweavers/shared'
 import * as styles from './MassRewriteDialog.css'
 
 interface RewriteResult {
   messageId: string
   originalContent: string
   proposedContent: string
+  failures: string[]
   status: 'pending' | 'accepted' | 'rejected' | 'skipped'
 }
 
@@ -32,7 +33,6 @@ export function MassRewriteDialog() {
   const [filterText, setFilterText] = createSignal('')
   const [phase, setPhase] = createSignal<Phase>('selection')
   const [isProcessing, setIsProcessing] = createSignal(false)
-  const [currentProcessingIndex, setCurrentProcessingIndex] = createSignal(0)
   const [results, setResults] = createSignal<RewriteResult[]>([])
   const [currentReviewIndex, setCurrentReviewIndex] = createSignal(0)
 
@@ -122,9 +122,7 @@ export function MassRewriteDialog() {
     if (!filter) return availableContextScenes()
 
     return availableContextScenes().filter(
-      (scene) =>
-        scene.node.title.toLowerCase().includes(filter) ||
-        scene.path.toLowerCase().includes(filter),
+      (scene) => scene.node.title.toLowerCase().includes(filter) || scene.path.toLowerCase().includes(filter),
     )
   })
 
@@ -200,7 +198,6 @@ export function MassRewriteDialog() {
     setPhase('processing')
     setIsProcessing(true)
     setResults([])
-    setCurrentProcessingIndex(0)
 
     try {
       const resolved = resolveModel('rewrite:mass')
@@ -213,7 +210,7 @@ export function MassRewriteDialog() {
 
       for (const sceneId of selectedContextIds) {
         const scene = availableContextScenes().find((s) => s.node.id === sceneId)
-        if (scene && scene.content) {
+        if (scene?.content) {
           contextParts.push(`=== ${scene.node.title} (${scene.path}) ===\n${scene.content}`)
         }
       }
@@ -223,65 +220,29 @@ export function MassRewriteDialog() {
           ? `For reference, here is relevant earlier story content that you should keep in mind:\n\n${contextParts.join('\n\n')}\n\n---\n\n`
           : ''
 
-      // Process messages in order
-      const orderedMessages = nodeMessages().filter((m) => selectedIds.includes(m.id))
-      const newResults: RewriteResult[] = []
+      // One batch enables cross-message consistency and explicit replaceAll edits.
+      const orderedMessages = nodeMessages().filter((message) => selectedIds.includes(message.id))
+      const replacementResult = await generateReplacementRewrite({
+        client,
+        model: resolved.model,
+        messages: orderedMessages.map((message) => ({ id: message.id, content: message.content })),
+        instruction: rewriteInstruction(),
+        contextSection: `${contextSection}${contextParts.length > 0 ? 'Keep the rewrite consistent with the earlier story content provided above.\n' : ''}`,
+        providerOptions: resolved.provider === 'ollama' ? { num_ctx: modelInfo?.context_length || 4096 } : undefined,
+        metadata: { callType: 'rewrite:mass' },
+      })
 
-      for (let i = 0; i < orderedMessages.length; i++) {
-        setCurrentProcessingIndex(i)
-        const msg = orderedMessages[i]
-
-        // Build accumulated context from already processed messages
-        // Include skipped (unchanged) and pending/accepted messages, exclude rejected
-        const processedContext = newResults
-          .filter((r) => r.status !== 'rejected')
-          .map((r) => r.status === 'skipped' ? r.originalContent : r.proposedContent)
-          .join('\n\n')
-
-        const accumulatedContextSection = processedContext
-          ? `\n\nHere is the updated content from messages you've already rewritten in this batch:\n\n${processedContext}\n\n---\n\n`
-          : ''
-
-        // Build the full context for the diff prompt
-        const fullContext = `${contextSection}${accumulatedContextSection}${contextParts.length > 0 ? 'Keep the rewrite consistent with the earlier story content provided above.\n' : ''}${processedContext ? 'Ensure consistency with the already-rewritten messages in this batch.\n' : ''}`
-
-        // Use the unified diff approach - LLM returns only the changes, not the whole text
-        const prompt = buildDiffRewritePrompt(msg.content, rewriteInstruction(), fullContext)
-
-        const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
-
-        const response = client.generate({
-          model: resolved.model,
-          messages,
-          providerOptions:
-            resolved.provider === 'ollama'
-              ? {
-                  num_ctx: modelInfo?.context_length || 4096,
-                }
-              : undefined,
-          metadata: { callType: 'rewrite:mass' },
-        })
-
-        let llmResponse = ''
-        for await (const event of response) {
-          if (event.type === 'chunk') {
-            llmResponse += event.text
-          }
+      const newResults = orderedMessages.map((message) => {
+        const proposedContent = replacementResult.messages.get(message.id)!
+        return {
+          messageId: message.id,
+          originalContent: message.content,
+          proposedContent,
+          failures: replacementResult.failures,
+          status: proposedContent === message.content ? ('skipped' as const) : ('pending' as const),
         }
-
-        // Process the diff response and apply it to get the result
-        const diffResult = processLLMDiffResponse(msg.content, llmResponse.trim())
-
-        newResults.push({
-          messageId: msg.id,
-          originalContent: msg.content,
-          proposedContent: diffResult.noChanges ? msg.content : diffResult.resultContent,
-          status: diffResult.noChanges ? 'skipped' : 'pending',
-        })
-
-        setResults([...newResults])
-      }
-
+      })
+      setResults(newResults)
       setPhase('review')
       // Find the first pending result (skip over NO_CHANGE results)
       const firstPendingIndex = newResults.findIndex((r) => r.status === 'pending')
@@ -356,7 +317,10 @@ export function MassRewriteDialog() {
 
     for (const result of accepted) {
       try {
-        const { revisionId, paragraphs } = await saveService.createMessageRevision(result.messageId, result.proposedContent)
+        const { revisionId, paragraphs } = await saveService.createMessageRevision(
+          result.messageId,
+          result.proposedContent,
+        )
         messagesStore.updateMessage(result.messageId, {
           content: result.proposedContent,
           currentMessageRevisionId: revisionId,
@@ -494,8 +458,7 @@ export function MassRewriteDialog() {
                   >
                     <For each={filteredContextScenes()}>
                       {(scene) => {
-                        const isSelected = () =>
-                          massRewriteDialogStore.selectedContextSceneIds.has(scene.node.id)
+                        const isSelected = () => massRewriteDialogStore.selectedContextSceneIds.has(scene.node.id)
 
                         return (
                           <div
@@ -507,9 +470,7 @@ export function MassRewriteDialog() {
                                 type="checkbox"
                                 class={styles.sceneCheckbox}
                                 checked={isSelected()}
-                                onChange={() =>
-                                  massRewriteDialogStore.toggleContextSceneSelection(scene.node.id)
-                                }
+                                onChange={() => massRewriteDialogStore.toggleContextSceneSelection(scene.node.id)}
                                 onClick={(e) => e.stopPropagation()}
                               />
                               <div style={{ flex: 1 }}>
@@ -549,11 +510,19 @@ export function MassRewriteDialog() {
                   <div class={styles.tokenBudget}>
                     <span>Estimated tokens per message:</span>
                     <span class={styles.tokenCount}>
-                      ~{contextTokenEstimate() + Math.round(selectedMessagesTokens() / Math.max(1, massRewriteDialogStore.selectedMessageIds.size)) + 200}
+                      ~
+                      {contextTokenEstimate() +
+                        Math.round(
+                          selectedMessagesTokens() / Math.max(1, massRewriteDialogStore.selectedMessageIds.size),
+                        ) +
+                        200}
                     </span>
                     <span style={{ width: '100%', 'font-size': '0.7rem' }}>
                       (context: {contextTokenEstimate()}, avg message:{' '}
-                      {Math.round(selectedMessagesTokens() / Math.max(1, massRewriteDialogStore.selectedMessageIds.size))}, prompt: ~200)
+                      {Math.round(
+                        selectedMessagesTokens() / Math.max(1, massRewriteDialogStore.selectedMessageIds.size),
+                      )}
+                      , prompt: ~200)
                     </span>
                   </div>
                 </Show>
@@ -587,16 +556,10 @@ export function MassRewriteDialog() {
             <div class={styles.processingContainer}>
               <div class={styles.processingHeader}>
                 <span class={styles.progressText}>
-                  Processing message {currentProcessingIndex() + 1} of{' '}
-                  {massRewriteDialogStore.selectedMessageIds.size}
+                  Processing {massRewriteDialogStore.selectedMessageIds.size} selected message(s) as one rewrite batch
                 </span>
                 <div class={styles.progressBar}>
-                  <div
-                    class={styles.progressFill}
-                    style={{
-                      width: `${((currentProcessingIndex() + 1) / massRewriteDialogStore.selectedMessageIds.size) * 100}%`,
-                    }}
-                  />
+                  <div class={styles.progressFill} style={{ width: '100%' }} />
                 </div>
               </div>
 
@@ -646,6 +609,15 @@ export function MassRewriteDialog() {
               </div>
 
               <Show when={currentResult()}>
+                <Show when={currentResult()!.failures.length > 0}>
+                  <div role="alert" class={styles.tokenBudget}>
+                    <strong>Some replacements could not be applied</strong>
+                    <ul>
+                      <For each={currentResult()!.failures}>{(failure) => <li>{failure}</li>}</For>
+                    </ul>
+                    <span>Review the valid changes below and accept the ones you want to keep.</span>
+                  </div>
+                </Show>
                 <div class={styles.diffContainer}>
                   <div class={styles.diffPane}>
                     <div class={styles.diffHeader}>Original (Message #{currentReviewIndex() + 1})</div>

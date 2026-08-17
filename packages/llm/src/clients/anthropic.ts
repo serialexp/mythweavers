@@ -149,7 +149,16 @@ function lookupPricing(modelId: string): ModelPricing | undefined {
 }
 
 /** Map a raw Anthropic SSE event to zero or more LLMStreamEvents. */
-function parseStreamEvent(event: any): LLMStreamEvent[] {
+interface AnthropicToolCallAccumulator {
+  id: string
+  name: string
+  inputJson: string
+}
+
+function parseStreamEvent(
+  event: any,
+  toolCallsByIndex: Map<number, AnthropicToolCallAccumulator>,
+): LLMStreamEvent[] {
   const events: LLMStreamEvent[] = []
 
   switch (event.type) {
@@ -170,10 +179,29 @@ function parseStreamEvent(event: any): LLMStreamEvent[] {
       }
       break
     }
+    case "content_block_start": {
+      const block = event.content_block
+      if (block?.type === "tool_use") {
+        toolCallsByIndex.set(event.index ?? 0, {
+          id: block.id ?? "",
+          name: block.name ?? "",
+          // Anthropic streams input via input_json_delta after the start block.
+          // Do not seed this with `{}` or it would corrupt the concatenated JSON.
+          inputJson: "",
+        })
+      }
+      break
+    }
     case "content_block_delta": {
       const text = event.delta?.text
       if (text) {
         events.push({ type: "chunk", text })
+      }
+      if (event.delta?.type === "input_json_delta") {
+        const existing = toolCallsByIndex.get(event.index ?? 0)
+        if (existing && typeof event.delta.partial_json === "string") {
+          existing.inputJson += event.delta.partial_json
+        }
       }
       break
     }
@@ -222,11 +250,11 @@ interface AnthropicFormattedMessage {
 function usesAdaptiveThinking(model: string): boolean {
   const match = model.match(/claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/);
   if (!match) return false;
-  const major = parseInt(match[1], 10);
+  const major = Number.parseInt(match[1], 10);
   const minorStr = match[2];
   // Date suffixes (e.g., 20250514) are not minor versions
   if (minorStr.length >= 6) return false;
-  const minor = parseInt(minorStr, 10);
+  const minor = Number.parseInt(minorStr, 10);
   return major >= 5 || (major === 4 && minor >= 1);
 }
 
@@ -285,11 +313,6 @@ export class AnthropicClient implements LLMClient {
   async *generate(
     options: LLMGenerateOptions,
   ): AsyncGenerator<LLMStreamEvent> {
-    if (options.tools && options.tools.length > 0) {
-      throw new Error(
-        "Tool calls are not yet supported by the Anthropic client. Switch to an OpenAI-compatible model for this call.",
-      )
-    }
     const apiKey = resolve(this.config.apiKey)
     if (!apiKey) throw new Error("Anthropic API key not configured")
 
@@ -314,6 +337,19 @@ export class AnthropicClient implements LLMClient {
       max_tokens: options.max_tokens || 4096,
       temperature: options.temperature ?? 1,
       stream: true,
+    }
+
+    if (options.tools?.length) {
+      requestBody.tools = options.tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.parameters,
+      }))
+      if (options.tool_choice === "required") {
+        requestBody.tool_choice = { type: "any" }
+      } else if (typeof options.tool_choice === "object") {
+        requestBody.tool_choice = { type: "tool", name: options.tool_choice.name }
+      }
     }
 
     if (options.thinking_budget && options.thinking_budget > 0) {
@@ -357,9 +393,25 @@ export class AnthropicClient implements LLMClient {
       return
     }
 
+    const toolCallsByIndex = new Map<number, AnthropicToolCallAccumulator>()
     for await (const raw of parseSSEStream(response.body)) {
-      for (const event of parseStreamEvent(raw)) {
+      for (const event of parseStreamEvent(raw, toolCallsByIndex)) {
         yield event
+      }
+    }
+
+    for (const [, toolCall] of [...toolCallsByIndex.entries()].sort(([a], [b]) => a - b)) {
+      let arguments_: unknown = toolCall.inputJson
+      try {
+        arguments_ = toolCall.inputJson ? JSON.parse(toolCall.inputJson) : {}
+      } catch {
+        // Preserve malformed arguments so callers can present a useful error.
+      }
+      yield {
+        type: "tool_call",
+        id: toolCall.id,
+        name: toolCall.name,
+        arguments: arguments_,
       }
     }
 
