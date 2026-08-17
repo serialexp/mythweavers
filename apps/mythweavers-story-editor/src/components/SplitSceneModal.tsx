@@ -1,17 +1,19 @@
 import { Button, Modal, Spinner } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
+import { PhBookIcon, PhFileTextIcon, PhWarningIcon } from 'solidjs-phosphor'
 import { nodeStore } from '../stores/nodeStore'
-import { generateSceneSplit, type ProposedStructure } from '../utils/llm/splitScene'
+import { type ProposedStructure, generateSceneSplit } from '../utils/llm/splitScene'
 import type { AggregatedMessageContent } from '../utils/llm/splitScenePrompt'
 import {
   aggregateNodeContent,
   applyProposedStructure,
   getNodeContentStats,
   validateProposedStructure,
+  validateProposedStructureTargets,
+  validateSplitTargets,
 } from '../utils/sceneSplitUtils'
 import { estimateTokensFromText } from '../utils/templateAI'
 import * as styles from './SplitSceneModal.css'
-import { PhBookIcon, PhFileTextIcon, PhWarningIcon } from 'solidjs-phosphor'
 
 type SplitPointType = 'none' | 'scene' | 'chapter'
 
@@ -38,7 +40,7 @@ function buildStructureFromSplitPoints(
   // Start with one chapter containing one scene
   chapters.push({
     type: 'chapter',
-    title: titles.get(`chapter-0`) || 'Chapter 1',
+    title: titles.get('chapter-0') || 'Chapter 1',
     scenes: [{ title: titles.get('scene-0-0') || 'Scene 1', messageAssignments: [] }],
   })
 
@@ -59,13 +61,10 @@ function buildStructureFromSplitPoints(
         currentSceneIndex = 0
         chapters.push({
           type: 'chapter',
-          title:
-            titles.get(`chapter-${currentChapterIndex}`) || `Chapter ${currentChapterIndex + 1}`,
+          title: titles.get(`chapter-${currentChapterIndex}`) || `Chapter ${currentChapterIndex + 1}`,
           scenes: [
             {
-              title:
-                titles.get(`scene-${currentChapterIndex}-0`) ||
-                `Scene 1`,
+              title: titles.get(`scene-${currentChapterIndex}-0`) || 'Scene 1',
               messageAssignments: [],
             },
           ],
@@ -74,9 +73,7 @@ function buildStructureFromSplitPoints(
         // New scene in current chapter
         currentSceneIndex++
         chapters[currentChapterIndex].scenes.push({
-          title:
-            titles.get(`scene-${currentChapterIndex}-${currentSceneIndex}`) ||
-            `Scene ${currentSceneIndex + 1}`,
+          title: titles.get(`scene-${currentChapterIndex}-${currentSceneIndex}`) || `Scene ${currentSceneIndex + 1}`,
           messageAssignments: [],
         })
       }
@@ -87,13 +84,13 @@ function buildStructureFromSplitPoints(
 }
 
 export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
-  const [step, setStep] = createSignal<'configure' | 'generating' | 'preview' | 'manual'>(
-    'configure',
-  )
+  const [step, setStep] = createSignal<'configure' | 'generating' | 'preview' | 'manual'>('configure')
   const [error, setError] = createSignal<string | null>(null)
   const [proposedStructure, setProposedStructure] = createSignal<ProposedStructure | null>(null)
   const [generationProgress, setGenerationProgress] = createSignal('')
   const [isApplying, setIsApplying] = createSignal(false)
+  const [targetChapterCount, setTargetChapterCount] = createSignal('')
+  const [targetSceneCount, setTargetSceneCount] = createSignal('')
 
   // Manual split state
   // splitPoints[i] = type of break AFTER message index i
@@ -165,6 +162,8 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
           setProposedStructure(null)
           setGenerationProgress('')
           setIsApplying(false)
+          setTargetChapterCount('')
+          setTargetSceneCount('')
           setSplitPoints([])
           setTitles(new Map())
         }
@@ -176,6 +175,16 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
     const nodeId = props.targetNodeId
     if (!nodeId) return
 
+    const targets = {
+      chapterCount: Number(targetChapterCount()),
+      sceneCount: Number(targetSceneCount()),
+    }
+    const targetValidation = validateSplitTargets(targets)
+    if (!targetValidation.valid) {
+      setError(targetValidation.error || 'Enter valid split targets')
+      return
+    }
+
     setError(null)
     setStep('generating')
     setGenerationProgress('')
@@ -184,9 +193,10 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
       const { messages, context } = aggregateNodeContent(nodeId)
 
       const result = await generateSceneSplit(messages, context, {
+        targets,
         onProgress: (text) => {
           // Show a snippet of the progress
-          const preview = text.length > 100 ? '...' + text.slice(-100) : text
+          const preview = text.length > 100 ? `...${text.slice(-100)}` : text
           setGenerationProgress(preview)
         },
       })
@@ -195,6 +205,11 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
       const validation = validateProposedStructure(result, messages)
       if (!validation.valid) {
         throw new Error(validation.error || 'Invalid structure returned by AI')
+      }
+
+      const targetValidation = validateProposedStructureTargets(result, targets)
+      if (!targetValidation.valid) {
+        throw new Error(targetValidation.error || 'AI response did not match the requested split')
       }
 
       setProposedStructure(result)
@@ -286,6 +301,8 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
     setError(null)
     setProposedStructure(null)
     setGenerationProgress('')
+    setTargetChapterCount('')
+    setTargetSceneCount('')
     setSplitPoints([])
     setTitles(new Map())
   }
@@ -296,6 +313,8 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
     setProposedStructure(null)
     setGenerationProgress('')
     setIsApplying(false)
+    setTargetChapterCount('')
+    setTargetSceneCount('')
     props.onClose()
   }
 
@@ -332,10 +351,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
             >
               Manual Split
             </Button>
-            <Button
-              onClick={handleGenerate}
-              disabled={!contentStats() || contentStats()!.messageCount === 0}
-            >
+            <Button onClick={handleGenerate} disabled={!contentStats() || contentStats()!.messageCount === 0}>
               AI Split
             </Button>
           </Show>
@@ -421,10 +437,47 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
             </div>
           </Show>
 
+          <div class={styles.targetInputs}>
+            <div class={styles.targetInputGroup}>
+              <label class={styles.targetInputLabel} for="split-target-chapters">
+                Target chapters
+              </label>
+              <input
+                id="split-target-chapters"
+                class={styles.targetInput}
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                value={targetChapterCount()}
+                onInput={(event) => setTargetChapterCount(event.currentTarget.value)}
+              />
+            </div>
+            <div class={styles.targetInputGroup}>
+              <label class={styles.targetInputLabel} for="split-target-scenes">
+                Total scenes
+              </label>
+              <input
+                id="split-target-scenes"
+                class={styles.targetInput}
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                value={targetSceneCount()}
+                onInput={(event) => setTargetSceneCount(event.currentTarget.value)}
+              />
+            </div>
+          </div>
+          <div class={styles.targetInputHint}>
+            Choose the structure you want. Total scenes are shared across all chapters and must be at least the chapter
+            count.
+          </div>
+
           {/* Description */}
           <div style={{ 'font-size': '0.875rem', color: 'var(--color-text-secondary)' }}>
-            This will analyze the scene content and suggest how to split it into logical chapters and
-            scenes based on natural narrative breaks (location changes, time jumps, POV shifts, etc.).
+            The AI will divide the content into your requested structure using natural narrative breaks (location
+            changes, time jumps, POV shifts, and similar transitions).
           </div>
         </Show>
 
@@ -446,9 +499,11 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
             <div class={styles.sourceInfo}>
               <span class={styles.sourceInfoLabel}>Result:</span>
               <span class={styles.sourceInfoValue}>
-                {structureSummary()!.chapterCount} chapter
-                {structureSummary()!.chapterCount !== 1 ? 's' : ''},{' '}
-                {structureSummary()!.sceneCount} scene{structureSummary()!.sceneCount !== 1 ? 's' : ''}
+                Requested {targetChapterCount()} chapter{targetChapterCount() !== '1' ? 's' : ''}, {targetSceneCount()}{' '}
+                total scene{targetSceneCount() !== '1' ? 's' : ''} · Generated {structureSummary()!.chapterCount}{' '}
+                chapter
+                {structureSummary()!.chapterCount !== 1 ? 's' : ''}, {structureSummary()!.sceneCount} scene
+                {structureSummary()!.sceneCount !== 1 ? 's' : ''}
               </span>
             </div>
           </Show>
@@ -514,9 +569,11 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
             Click between messages to cycle through: no break → scene break → chapter break.
             {splitPointCount().chapters + splitPointCount().scenes > 0 && (
               <span>
-                {' '}Current: {splitPointCount().chapters > 0 && `${splitPointCount().chapters + 1} chapters`}
+                {' '}
+                Current: {splitPointCount().chapters > 0 && `${splitPointCount().chapters + 1} chapters`}
                 {splitPointCount().chapters > 0 && splitPointCount().scenes > 0 && ', '}
-                {splitPointCount().scenes > 0 && `${splitPointCount().scenes} scene break${splitPointCount().scenes !== 1 ? 's' : ''}`}
+                {splitPointCount().scenes > 0 &&
+                  `${splitPointCount().scenes} scene break${splitPointCount().scenes !== 1 ? 's' : ''}`}
               </span>
             )}
           </div>
@@ -528,7 +585,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
                 const isLastMessage = () => msgIndex() === aggregatedMessages().length - 1
                 const preview = () => {
                   const text = msg.content.replace(/\n+/g, ' ').trim()
-                  return text.length > 120 ? text.slice(0, 120) + '...' : text
+                  return text.length > 120 ? `${text.slice(0, 120)}...` : text
                 }
 
                 // Compute the chapter/scene indices for title inputs at this split point
@@ -568,16 +625,11 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
                     <div class={styles.messageItem}>
                       <span class={styles.messageNumber}>#{msg.messageNumber}</span>
                       <span class={styles.messagePreview}>{preview()}</span>
-                      <span class={styles.messageWordCount}>
-                        {msg.wordCount.toLocaleString()} words
-                      </span>
+                      <span class={styles.messageWordCount}>{msg.wordCount.toLocaleString()} words</span>
                     </div>
 
                     <Show when={!isLastMessage()}>
-                      <div
-                        class={styles.splitPointArea}
-                        onClick={() => toggleSplitPoint(msgIndex())}
-                      >
+                      <div class={styles.splitPointArea} onClick={() => toggleSplitPoint(msgIndex())}>
                         <div class={styles.splitPointLine} />
                         <span
                           class={`${styles.splitPointButton} ${
@@ -607,10 +659,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
                                   placeholder={(label() as { chapterDefault: string }).chapterDefault}
                                   value={titles().get((label() as { chapterKey: string }).chapterKey) || ''}
                                   onInput={(e) =>
-                                    updateTitle(
-                                      (label() as { chapterKey: string }).chapterKey,
-                                      e.currentTarget.value,
-                                    )
+                                    updateTitle((label() as { chapterKey: string }).chapterKey, e.currentTarget.value)
                                   }
                                   onClick={(e) => e.stopPropagation()}
                                 />
@@ -623,9 +672,7 @@ export const SplitSceneModal: Component<SplitSceneModalProps> = (props) => {
                                 type="text"
                                 placeholder={label().sceneDefault}
                                 value={titles().get(label().sceneKey) || ''}
-                                onInput={(e) =>
-                                  updateTitle(label().sceneKey, e.currentTarget.value)
-                                }
+                                onInput={(e) => updateTitle(label().sceneKey, e.currentTarget.value)}
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>

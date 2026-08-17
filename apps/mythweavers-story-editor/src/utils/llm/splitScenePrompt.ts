@@ -36,8 +36,8 @@ export function parseMessageRange(mn: number | string): number[] {
 
   const rangeMatch = mn.match(/^(\d+)-(\d+)$/)
   if (rangeMatch) {
-    const start = parseInt(rangeMatch[1], 10)
-    const end = parseInt(rangeMatch[2], 10)
+    const start = Number.parseInt(rangeMatch[1], 10)
+    const end = Number.parseInt(rangeMatch[2], 10)
     const result: number[] = []
     for (let i = start; i <= end; i++) {
       result.push(i)
@@ -46,8 +46,8 @@ export function parseMessageRange(mn: number | string): number[] {
   }
 
   // Single number as string
-  const num = parseInt(mn, 10)
-  if (!isNaN(num)) {
+  const num = Number.parseInt(mn, 10)
+  if (!Number.isNaN(num)) {
     return [num]
   }
 
@@ -64,9 +64,15 @@ export interface ProposedStructure {
   structure: ProposedChapter[]
 }
 
+export interface SplitTargets {
+  chapterCount: number
+  sceneCount: number
+}
+
 export function createSplitScenePrompt(
   aggregatedContent: AggregatedMessageContent[],
   nodeContext: NodeContext,
+  targets: SplitTargets,
 ): string {
   const totalWords = aggregatedContent.reduce((sum, m) => sum + m.wordCount, 0)
 
@@ -93,6 +99,13 @@ ${contentSection}
 
 <instructions>
 Your task is to analyze this content and propose a logical split into chapters and scenes.
+
+<split_targets>
+  <target_chapters>${targets.chapterCount}</target_chapters>
+  <target_total_scenes>${targets.sceneCount}</target_total_scenes>
+</split_targets>
+
+You MUST produce exactly ${targets.chapterCount} chapter${targets.chapterCount === 1 ? '' : 's'} and exactly ${targets.sceneCount} scene${targets.sceneCount === 1 ? '' : 's'} total across all chapters. These are targets chosen by the author; distribute the scenes among chapters based on the natural narrative breaks in the content. Do not create extra scenes for individual paragraphs unless a paragraph boundary is necessary to satisfy the requested structure.
 
 ANALYSIS GUIDELINES:
 1. Look for natural break points (setting changes, time jumps, POV shifts, narrative beats)

@@ -1,5 +1,5 @@
-import { style } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
+import { style } from '@vanilla-extract/css'
 
 export const modalContent = style({
   display: 'flex',
@@ -80,6 +80,46 @@ export const tokenEstimate = style({
   color: tokens.color.text.muted,
   backgroundColor: tokens.color.bg.raised,
   borderRadius: tokens.radius.default,
+})
+
+export const targetInputs = style({
+  display: 'flex',
+  gap: tokens.space['3'],
+})
+
+export const targetInputGroup = style({
+  display: 'flex',
+  flex: 1,
+  flexDirection: 'column',
+  gap: tokens.space['1'],
+})
+
+export const targetInputLabel = style({
+  color: tokens.color.text.secondary,
+  fontSize: tokens.font.size.sm,
+  fontWeight: tokens.font.weight.medium,
+})
+
+export const targetInput = style({
+  width: '100%',
+  padding: `${tokens.space['2']} ${tokens.space['3']}`,
+  border: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
+  borderRadius: tokens.radius.default,
+  backgroundColor: tokens.color.bg.base,
+  color: tokens.color.text.primary,
+  fontSize: tokens.font.size.sm,
+  outline: 'none',
+  selectors: {
+    '&:focus': {
+      borderColor: tokens.color.accent.primary,
+    },
+  },
+})
+
+export const targetInputHint = style({
+  marginTop: `-${tokens.space['2']}`,
+  color: tokens.color.text.muted,
+  fontSize: tokens.font.size.xs,
 })
 
 export const actions = style({

@@ -4,6 +4,7 @@ import {
   type AggregatedMessageContent,
   type NodeContext,
   type ProposedStructure,
+  type SplitTargets,
   createSplitScenePrompt,
   parseMessageRange,
 } from './splitScenePrompt'
@@ -14,6 +15,7 @@ export { createSplitScenePrompt }
 export interface GenerateSceneSplitOptions {
   onProgress?: (text: string) => void
   signal?: AbortSignal
+  targets: SplitTargets
 }
 
 /**
@@ -22,7 +24,7 @@ export interface GenerateSceneSplitOptions {
 export async function generateSceneSplit(
   aggregatedContent: AggregatedMessageContent[],
   nodeContext: NodeContext,
-  options: GenerateSceneSplitOptions = {},
+  options: GenerateSceneSplitOptions,
 ): Promise<ProposedStructure> {
   const resolved = resolveModel('scene-split')
 
@@ -31,7 +33,7 @@ export async function generateSceneSplit(
   }
 
   const client = LLMClientFactory.getClient(resolved.provider)
-  const prompt = createSplitScenePrompt(aggregatedContent, nodeContext)
+  const prompt = createSplitScenePrompt(aggregatedContent, nodeContext, options.targets)
 
   let responseText = ''
 
@@ -67,8 +69,7 @@ export async function generateSceneSplit(
 function parseSceneSplitResponse(responseText: string): ProposedStructure {
   try {
     // Try to extract JSON from potential markdown code blocks
-    const jsonMatch =
-      responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || responseText.match(/(\{[\s\S]*\})/)
+    const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || responseText.match(/(\{[\s\S]*\})/)
 
     if (!jsonMatch) {
       console.error('[splitScene] No valid JSON found in response:', responseText)
@@ -113,28 +114,17 @@ function parseSceneSplitResponse(responseText: string): ProposedStructure {
           // mn can be a number or a range string like "1-5"
           const messageNumbers = parseMessageRange(assignment.mn)
           if (messageNumbers.length === 0) {
-            throw new Error(
-              `Invalid assignment in scene "${scene.title}": mn must be a number or range like "1-5"`,
-            )
+            throw new Error(`Invalid assignment in scene "${scene.title}": mn must be a number or range like "1-5"`)
           }
           if (!['full', 'splitBefore', 'splitAfter'].includes(assignment.sb)) {
-            throw new Error(
-              `Invalid assignment in scene "${scene.title}": invalid sb "${assignment.sb}"`,
-            )
+            throw new Error(`Invalid assignment in scene "${scene.title}": invalid sb "${assignment.sb}"`)
           }
           // Ranges can only be used with 'full'
           if (messageNumbers.length > 1 && assignment.sb !== 'full') {
-            throw new Error(
-              `Invalid assignment in scene "${scene.title}": ranges can only be used with sb:"full"`,
-            )
+            throw new Error(`Invalid assignment in scene "${scene.title}": ranges can only be used with sb:"full"`)
           }
-          if (
-            (assignment.sb === 'splitBefore' || assignment.sb === 'splitAfter') &&
-            typeof assignment.p !== 'number'
-          ) {
-            throw new Error(
-              `Invalid assignment in scene "${scene.title}": splitBefore/splitAfter requires p`,
-            )
+          if ((assignment.sb === 'splitBefore' || assignment.sb === 'splitAfter') && typeof assignment.p !== 'number') {
+            throw new Error(`Invalid assignment in scene "${scene.title}": splitBefore/splitAfter requires p`)
           }
         }
       }

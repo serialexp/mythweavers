@@ -8,6 +8,7 @@ import {
   type AggregatedMessageContent,
   type NodeContext,
   type ProposedStructure,
+  type SplitTargets,
   parseMessageRange,
 } from './llm/splitScenePrompt'
 
@@ -28,9 +29,7 @@ export function aggregateNodeContent(nodeId: string): AggregationResult {
   }
 
   // Get all messages for this node, sorted by order
-  const nodeMessages = messagesStore.messages
-    .filter((msg) => msg.sceneId === nodeId)
-    .sort((a, b) => a.order - b.order)
+  const nodeMessages = messagesStore.messages.filter((msg) => msg.sceneId === nodeId).sort((a, b) => a.order - b.order)
 
   if (nodeMessages.length === 0) {
     throw new Error(`Node "${node.title}" has no messages to split`)
@@ -71,6 +70,50 @@ export function aggregateNodeContent(nodeId: string): AggregationResult {
 export interface ValidationResult {
   valid: boolean
   error?: string
+}
+
+/**
+ * Validate the author's requested chapter and total-scene counts.
+ */
+export function validateSplitTargets(targets: SplitTargets): ValidationResult {
+  if (!Number.isInteger(targets.chapterCount) || targets.chapterCount < 1) {
+    return { valid: false, error: 'Target chapters must be a whole number of at least 1' }
+  }
+
+  if (!Number.isInteger(targets.sceneCount) || targets.sceneCount < 1) {
+    return { valid: false, error: 'Total scenes must be a whole number of at least 1' }
+  }
+
+  if (targets.sceneCount < targets.chapterCount) {
+    return {
+      valid: false,
+      error: 'Total scenes must be at least the target chapter count',
+    }
+  }
+
+  return { valid: true }
+}
+
+/**
+ * Validate that an AI proposal matches the author's requested chapter and total-scene counts.
+ */
+export function validateProposedStructureTargets(proposed: ProposedStructure, targets: SplitTargets): ValidationResult {
+  const targetValidation = validateSplitTargets(targets)
+  if (!targetValidation.valid) {
+    return targetValidation
+  }
+
+  const actualChapterCount = proposed.structure.length
+  const actualSceneCount = proposed.structure.reduce((count, chapter) => count + chapter.scenes.length, 0)
+
+  if (actualChapterCount !== targets.chapterCount || actualSceneCount !== targets.sceneCount) {
+    return {
+      valid: false,
+      error: `AI proposed ${actualChapterCount} chapter${actualChapterCount === 1 ? '' : 's'} and ${actualSceneCount} scene${actualSceneCount === 1 ? '' : 's'}, but you requested ${targets.chapterCount} chapter${targets.chapterCount === 1 ? '' : 's'} and ${targets.sceneCount} total scene${targets.sceneCount === 1 ? '' : 's'}`,
+    }
+  }
+
+  return { valid: true }
 }
 
 /**
@@ -252,10 +295,7 @@ export function validateProposedStructure(
 /**
  * Apply the proposed structure to create new nodes and reassign messages
  */
-export async function applyProposedStructure(
-  nodeId: string,
-  proposed: ProposedStructure,
-): Promise<void> {
+export async function applyProposedStructure(nodeId: string, proposed: ProposedStructure): Promise<void> {
   const { messages: aggregatedMessages, context } = aggregateNodeContent(nodeId)
 
   // Validate before applying
@@ -264,11 +304,15 @@ export async function applyProposedStructure(
     throw new Error(`Invalid structure: ${validation.error}`)
   }
 
-  // Get the parent of the scene's parent (chapters go under arc/book, not under chapter)
-  // Scene -> Chapter -> Arc/Book
-  const sceneParentId = context.parentId // This is the chapter
-  const chapterNode = sceneParentId ? nodeStore.getNode(sceneParentId) : null
-  const chapterParentId = chapterNode?.parentId ?? null // This is the arc/book
+  // The source scene belongs to a chapter. Reuse that chapter when the requested
+  // structure has one chapter; otherwise, create sibling chapters under its parent.
+  const sourceChapterId = context.parentId
+  const sourceChapter = sourceChapterId ? nodeStore.getNode(sourceChapterId) : null
+  if (!sourceChapter || sourceChapter.type !== 'chapter') {
+    throw new Error('The source scene must belong to a chapter before it can be split')
+  }
+  const chapterParentId = sourceChapter.parentId ?? null // This is the arc/book
+  const reuseSourceChapter = proposed.structure.length === 1
 
   // Build message lookup by number (1-indexed)
   const messageByNumber = new Map<number, AggregatedMessageContent>()
@@ -293,13 +337,14 @@ export async function applyProposedStructure(
 
   // Process structure - create nodes and assign messages
   for (const chapter of proposed.structure) {
-    // Create chapter node using addNode (handles store + saveService)
-    // Chapters go under the arc/book (parent of the original chapter)
-    const newChapterNode = nodeStore.addNode(chapterParentId, 'chapter', chapter.title)
+    const targetChapter = reuseSourceChapter
+      ? sourceChapter
+      : nodeStore.addNode(chapterParentId, 'chapter', chapter.title)
 
     for (const scene of chapter.scenes) {
-      // Create scene node under the new chapter
-      const sceneNode = nodeStore.addNode(newChapterNode.id, 'scene', scene.title)
+      // Create scene node under the existing chapter for one-chapter splits,
+      // otherwise under the newly created chapter.
+      const sceneNode = nodeStore.addNode(targetChapter.id, 'scene', scene.title)
 
       let messageOrder = 0
 
@@ -397,9 +442,7 @@ export function getNodeContentStats(nodeId: string): {
   wordCount: number
   paragraphCount: number
 } {
-  const nodeMessages = messagesStore.messages
-    .filter((msg) => msg.sceneId === nodeId)
-    .sort((a, b) => a.order - b.order)
+  const nodeMessages = messagesStore.messages.filter((msg) => msg.sceneId === nodeId).sort((a, b) => a.order - b.order)
 
   let wordCount = 0
   let paragraphCount = 0
