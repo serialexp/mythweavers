@@ -1,4 +1,4 @@
-import { SIMPLE_365_CALENDAR, type CalendarConfig, CalendarEngine } from '@mythweavers/shared'
+import { SIMPLE_365_CALENDAR, type CalendarConfig, CalendarEngine, normalizeCalendarConfigFormats } from '@mythweavers/shared'
 import { createStore } from 'solid-js/store'
 import { getMyCalendarsById, getMyStoriesByStoryIdCalendars } from '../client/config'
 import { currentStoryStore } from './currentStoryStore'
@@ -44,7 +44,7 @@ async function fetchStoryCalendar(storyId: string): Promise<void> {
         })
 
         if (calendarResponse.data?.calendar?.config) {
-          const config = calendarResponse.data.calendar.config as CalendarConfig
+          const config = normalizeCalendarConfigFormats(calendarResponse.data.calendar.config as CalendarConfig)
           const engine = new CalendarEngine(config)
 
           setCalendarState({
@@ -201,10 +201,11 @@ export const calendarStore = {
     const defaultCalendar = calendars.find((cal) => cal.isDefault)
 
     if (defaultCalendar) {
-      const engine = new CalendarEngine(defaultCalendar.config as CalendarConfig)
+      const config = normalizeCalendarConfigFormats(defaultCalendar.config as CalendarConfig)
+      const engine = new CalendarEngine(config)
       setCalendarState({
         calendarId: defaultCalendar.id,
-        config: defaultCalendar.config as CalendarConfig,
+        config,
         engine,
         isLoading: false,
         error: null,

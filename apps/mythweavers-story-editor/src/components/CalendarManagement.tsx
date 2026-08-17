@@ -1,4 +1,4 @@
-import { CalendarConfig } from '@mythweavers/shared'
+import { type CalendarConfig, normalizeCalendarConfigFormats } from '@mythweavers/shared'
 import { Badge, Button, Card, CardBody, Select, Stack } from '@mythweavers/ui'
 import { Component, For, Show, createEffect, createResource, createSignal } from 'solid-js'
 import {
@@ -59,7 +59,9 @@ export const CalendarManagement: Component = () => {
               return {
                 id: fullCal.id,
                 storyId: fullCal.storyId,
-                config: typeof config === 'string' ? JSON.parse(config) : config,
+                config: normalizeCalendarConfigFormats(
+                  (typeof config === 'string' ? JSON.parse(config) : config) as CalendarConfig,
+                ),
                 createdAt: fullCal.createdAt,
                 updatedAt: fullCal.updatedAt,
                 // Preserve isDefault from list response since full response doesn't include it

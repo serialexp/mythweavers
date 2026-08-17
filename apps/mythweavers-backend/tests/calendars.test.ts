@@ -46,8 +46,8 @@ const SAMPLE_CALENDAR_CONFIG = {
   subdivisions: [],
   eras: { positive: 'CE', negative: 'BCE' },
   display: {
-    defaultFormat: 'Day {dayOfYear}, Year {year} {era}',
-    shortFormat: 'Day {dayOfYear}, Year {year}',
+    defaultFormat: 'Day <%= dayOfYear %>, Year <%= year %> <%= era %>',
+    shortFormat: 'Day <%= dayOfYear %>, Year <%= year %>',
     includeTimeByDefault: false,
     hourFormat: '24' as const,
   },

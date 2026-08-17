@@ -31,6 +31,7 @@ export * from './maps/pathfinding.js'
 // Calendars
 export * from './calendars/types.js'
 export { CalendarEngine } from './calendars/engine.js'
+export { normalizeCalendarConfigFormats } from './calendars/format-migration.js'
 export * from './calendars/presets.js'
 export * from './calendars/subdivision-presets.js'
 
