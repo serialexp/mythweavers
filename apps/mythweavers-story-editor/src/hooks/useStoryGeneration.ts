@@ -256,6 +256,9 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
           targetMessageId: assistantMessageId,
           includeQueryHistory: true,
           maxQueryHistory: 5,
+          // Queries are read-only and should always be allowed to use the available context.
+          // Missing scene summaries only reduce context quality; they must not block a query.
+          forceMissingSummaries: true,
         })
 
         await props.generateResponse(queryMessages, assistantMessageId, false, maxTokens)
@@ -571,6 +574,8 @@ export const useStoryGeneration = (props: UseStoryGenerationProps) => {
         targetMessageId: messageId,
         includeQueryHistory: true,
         maxQueryHistory: 5,
+        // Queries are read-only and should not be blocked by missing scene summaries.
+        forceMissingSummaries: true,
       })
 
       await props.generateResponse(queryMessages, messageId, false, maxTokens, true)

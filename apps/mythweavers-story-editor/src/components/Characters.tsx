@@ -3,7 +3,9 @@ import { type Component, Show, batch, createMemo, createSignal } from 'solid-js'
 import {
   PhArrowLeftIcon,
   PhCalendarIcon,
+  PhCheckCircleIcon,
   PhCheckIcon,
+  PhCircleHalfIcon,
   PhPencilSimpleIcon,
   PhPlusIcon,
   PhStarIcon,
@@ -11,11 +13,13 @@ import {
 } from 'solidjs-phosphor'
 import { calendarStore } from '../stores/calendarStore'
 import { charactersStore } from '../stores/charactersStore'
+import { nodeStore } from '../stores/nodeStore'
 import type { Character } from '../types/core'
 import { getCharacterDisplayName, parseCharacterName } from '../utils/character'
 import { generateMessageId } from '../utils/id'
 import { resolveStoryImageUrl } from '../utils/uploadStoryImage'
 import * as styles from './Characters.css'
+import * as storyNavigationStyles from './StoryNavigation.css'
 import { EJSCodeEditor } from './EJSCodeEditor'
 import { EJSRenderer } from './EJSRenderer'
 import { FilePicker } from './FilePicker'
@@ -380,6 +384,28 @@ export const Characters: Component<CharactersProps> = (props) => {
                     <PhStarIcon weight="fill" />
                   </Show>
                   {char.isMainCharacter ? 'Protagonist' : 'Mark as Protagonist'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  class={styles.characterContextButton}
+                  title="Clear all other story context and include scenes where this character is active as summaries"
+                  onClick={() => nodeStore.setContextForCharacter(char.id, 1)}
+                >
+                  <span class={`${storyNavigationStyles.indicatorIcon} ${styles.characterContextIndicator}`}>
+                    <PhCircleHalfIcon weight="fill" />
+                  </span>
+                  Context summaries
+                </Button>
+                <Button
+                  variant="secondary"
+                  class={styles.characterContextButton}
+                  title="Clear all other story context and include scenes where this character is active in full"
+                  onClick={() => nodeStore.setContextForCharacter(char.id, 2)}
+                >
+                  <span class={`${storyNavigationStyles.indicatorIcon} ${styles.characterContextIndicator}`}>
+                    <PhCheckCircleIcon weight="fill" />
+                  </span>
+                  Full context
                 </Button>
                 <Button variant="secondary" onClick={() => startEditing(char)}>
                   <PhPencilSimpleIcon /> Edit

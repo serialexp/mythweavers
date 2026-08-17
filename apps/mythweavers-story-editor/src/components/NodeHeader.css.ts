@@ -236,14 +236,15 @@ export const viewpointLabel = style({
 
 export const summarySection = style({
   padding: `0 ${tokens.space['4']}`,
-  marginTop: `calc(-1 * ${tokens.space['1']})`,
-  marginBottom: tokens.space['2'],
+  maxWidth: '60rem',
+  margin: `calc(-1 * ${tokens.space['1']}) auto ${tokens.space['2']}`,
 })
 
 export const summaryText = style({
   fontSize: '0.875rem',
   color: tokens.color.text.secondary,
   lineHeight: 1.5,
+  whiteSpace: 'pre-line',
   padding: tokens.space['2'],
   backgroundColor: tokens.color.bg.elevated,
   borderRadius: tokens.radius.sm,

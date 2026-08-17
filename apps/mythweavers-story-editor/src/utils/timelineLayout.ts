@@ -194,6 +194,59 @@ export function pickLabelledItems(
   return allowed
 }
 
+/** One chip to assign a collision-free vertical stack row within a POV lane. */
+export interface StackCandidate {
+  id: string
+  time: number
+  /** Full horizontal footprint, including the chip's visible label and hit area. */
+  widthPx: number
+}
+
+export interface StackLayout {
+  /** Zero-based vertical row for each scene id. */
+  rows: Map<string, number>
+  /** Chips that belong to an overlapping group and therefore have their own row. */
+  stackedIds: Set<string>
+  /** Number of rows needed to render every candidate without overlap. */
+  rowCount: number
+}
+
+/**
+ * Assign chips to the lowest vertical row whose preceding chip no longer
+ * overlaps horizontally. Input order breaks equal-time ties, which preserves
+ * narrative order and keeps the result stable across renders.
+ */
+export function assignStackLanes(candidates: StackCandidate[], viewport: Viewport, widthPx: number): StackLayout {
+  const rows = new Map<string, number>()
+  const stackedIds = new Set<string>()
+  const span = viewport.end - viewport.start
+  if (span <= 0 || widthPx <= 0) return { rows, stackedIds, rowCount: 1 }
+
+  const sorted = candidates
+    .map((candidate, order) => ({ ...candidate, order, left: ((candidate.time - viewport.start) / span) * widthPx }))
+    .sort((a, b) => a.left - b.left || a.order - b.order)
+  const rowEnds: number[] = []
+  const rowIds: string[][] = []
+
+  for (const candidate of sorted) {
+    const row = rowEnds.findIndex((end) => end <= candidate.left)
+    const assignedRow = row === -1 ? rowEnds.length : row
+    if (assignedRow > 0) {
+      stackedIds.add(candidate.id)
+      for (let index = 0; index < rowEnds.length; index++) {
+        if (rowEnds[index] > candidate.left) {
+          for (const id of rowIds[index] ?? []) stackedIds.add(id)
+        }
+      }
+    }
+    rowEnds[assignedRow] = candidate.left + candidate.widthPx
+    ;(rowIds[assignedRow] ??= []).push(candidate.id)
+    rows.set(candidate.id, assignedRow)
+  }
+
+  return { rows, stackedIds, rowCount: Math.max(1, rowEnds.length) }
+}
+
 // ---------------------------------------------------------------------------
 // Inferred positions for scenes without a storyTime
 // ---------------------------------------------------------------------------

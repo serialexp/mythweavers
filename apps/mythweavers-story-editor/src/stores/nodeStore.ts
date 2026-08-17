@@ -941,6 +941,34 @@ export const nodeStore = {
       }
     }
   },
+
+  /**
+   * Replace the story context with scenes in which a character is active.
+   * Context inclusion is meaningful only on scene nodes; parent nodes are
+   * structural and never contribute content to generation.
+   */
+  setContextForCharacter(characterId: string, includeValue: 1 | 2) {
+    const affectedNodeIds = new Set<string>()
+
+    batch(() => {
+      Object.values(nodeState.nodes).forEach((node) => {
+        if (node.type !== 'scene') return
+
+        const nextIncludeValue = node.activeCharacterIds?.includes(characterId) ? includeValue : 0
+        if (node.includeInFull === nextIncludeValue) return
+
+        setNodeState('nodes', node.id, 'includeInFull', nextIncludeValue)
+        affectedNodeIds.add(node.id)
+      })
+    })
+
+    // Persist the replacement as one bulk update, rather than saving each scene
+    // individually while the context selection is being changed.
+    if (currentStoryStore.isInitialized && affectedNodeIds.size > 0) {
+      const nodesToSave = Object.values(nodeState.nodes).filter((node) => affectedNodeIds.has(node.id))
+      saveService.saveNodesBulk(currentStoryStore.id, nodesToSave)
+    }
+  },
 }
 
 // Subscribe to WebSocket node events via the event bus

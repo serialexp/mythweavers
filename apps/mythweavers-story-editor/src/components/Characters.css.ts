@@ -211,6 +211,22 @@ export const detailActions = style({
   borderTop: `${tokens.borderWidth.default} solid ${tokens.color.border.default}`,
 })
 
+// Matches the compact context-state affordance used by Story Navigation.
+export const characterContextButton = style({})
+
+export const characterContextIndicator = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  fontSize: '0.9em',
+  opacity: 0.8,
+  selectors: {
+    [`${characterContextButton}:hover &`]: {
+      opacity: 1,
+      transform: 'scale(1.08)',
+    },
+  },
+})
+
 export const birthdateButton = style({
   width: '100%',
   textAlign: 'left',

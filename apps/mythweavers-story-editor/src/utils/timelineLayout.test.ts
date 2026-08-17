@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Node } from '../types/core'
 import {
   Viewport,
+  assignStackLanes,
   buildUnitLadder,
   exceedsDragThreshold,
   fractionToTime,
@@ -291,6 +292,47 @@ describe('marquee helpers', () => {
     expect(exceedsDragThreshold(1, 1)).toBe(false)
     expect(exceedsDragThreshold(5, 0)).toBe(true)
     expect(exceedsDragThreshold(0, -5)).toBe(true)
+  })
+})
+
+describe('assignStackLanes', () => {
+  const viewport: Viewport = { start: 0, end: 1000 }
+
+  it('stacks same-time chips in stable input order', () => {
+    const layout = assignStackLanes(
+      [
+        { id: 'first', time: 500, widthPx: 100 },
+        { id: 'second', time: 500, widthPx: 100 },
+        { id: 'third', time: 500, widthPx: 100 },
+      ],
+      viewport,
+      1000,
+    )
+
+    expect(layout.rowCount).toBe(3)
+    expect([...layout.rows.entries()]).toEqual([
+      ['first', 0],
+      ['second', 1],
+      ['third', 2],
+    ])
+    expect([...layout.stackedIds]).toEqual(['second', 'first', 'third'])
+  })
+
+  it('reuses a row when chips meet but do not overlap', () => {
+    const layout = assignStackLanes(
+      [
+        { id: 'first', time: 100, widthPx: 100 },
+        { id: 'second', time: 200, widthPx: 100 },
+        { id: 'overlap', time: 250, widthPx: 100 },
+      ],
+      viewport,
+      1000,
+    )
+
+    expect(layout.rowCount).toBe(2)
+    expect(layout.rows.get('first')).toBe(0)
+    expect(layout.rows.get('second')).toBe(0)
+    expect(layout.rows.get('overlap')).toBe(1)
   })
 })
 

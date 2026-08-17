@@ -19,6 +19,7 @@ import { measureTextWidth } from '../utils/textWidth'
 import {
   ResolvedSceneTime,
   Viewport,
+  assignStackLanes,
   buildUnitLadder,
   exceedsDragThreshold,
   generateTicks,
@@ -59,6 +60,8 @@ const CHIP_LABEL_MAX_PX = 220
 /** Matches `chipLabel`: `tokens.font.size.xs` on the app's default family. */
 const CHIP_LABEL_FONT_SIZE_PX = 12
 const CHIP_LABEL_FONT = `${CHIP_LABEL_FONT_SIZE_PX}px system-ui, -apple-system, sans-serif`
+/** Chip height plus enough breathing room for its expanded hit target. */
+const STACK_ROW_HEIGHT_PX = 44
 /** Keep a little DOM either side of the viewport so panning doesn't flicker. */
 const CULL_MARGIN = 0.25
 /**
@@ -263,6 +266,22 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
     return label
   }
 
+  /**
+   * Widen the tick spacing until labels have room to breathe.
+   *
+   * This must precede every eager memo that reads it. Solid evaluates a
+   * `createMemo` body while registering the memo, so declaring this accessor
+   * later would access its `const` binding while it is still in the temporal
+   * dead zone when the timeline mounts.
+   */
+  const tickMultiple = () => {
+    const stepPx = (snapStep() / (viewport().end - viewport().start)) * trackWidth()
+    if (stepPx <= 0) return 1
+    return Math.max(1, Math.ceil(110 / stepPx))
+  }
+
+  const ticks = createMemo(() => generateTicks(viewport(), snapStep() * tickMultiple()))
+
   /** True once ticks are finer than a day, when the time of day starts mattering. */
   const rulerShowsTime = () => snapStep() * tickMultiple() < (calendarConfig().minutesPerDay || 1440)
 
@@ -293,20 +312,6 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
       }
     })
   })
-
-  /**
-   * Widen the tick spacing until labels have room to breathe. Declared before
-   * `ticks`: createMemo runs its body eagerly on creation, so a memo reading a
-   * `const` arrow declared below it would hit the temporal dead zone and throw
-   * the moment the panel mounts.
-   */
-  const tickMultiple = () => {
-    const stepPx = (snapStep() / (viewport().end - viewport().start)) * trackWidth()
-    if (stepPx <= 0) return 1
-    return Math.max(1, Math.ceil(110 / stepPx))
-  }
-
-  const ticks = createMemo(() => generateTicks(viewport(), snapStep() * tickMultiple()))
 
   /** Legacy chapter story times, drawn as orientation marks only. */
   /**
@@ -369,7 +374,42 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
     nodeStore.nodesArray.filter((n) => n.type === 'chapter' && hasStoryTime(n)).map((n) => n.storyTime as number),
   )
 
-  // --- Label density ---------------------------------------------------------
+  // --- Stacking and label density --------------------------------------------
+
+  /**
+   * Chips in the same POV lane get vertically stacked whenever their maximum
+   * label/hit footprints would collide. This makes equal or near-equal story
+   * times individually visible and targetable without moving their time axis.
+   */
+  const stackLayouts = createMemo(() => {
+    const times = effectiveTimes()
+    const vp = viewport()
+    const width = trackWidth()
+    const layouts = new Map<string, ReturnType<typeof assignStackLanes>>()
+    for (const [laneId, scenes] of scenesByLane()) {
+      // Only the scenes currently in view can require a stack row. Off-screen
+      // scenes must not leave empty vertical space after zooming into one moment.
+      const visibleScenes = scenes.filter((scene) => {
+        const time = times.get(scene.id)?.time ?? 0
+        const fraction = timeToFraction(time, vp)
+        return fraction >= -CULL_MARGIN && fraction <= 1 + CULL_MARGIN
+      })
+      layouts.set(
+        laneId,
+        assignStackLanes(
+          visibleScenes.map((scene) => ({
+            id: scene.id,
+            time: times.get(scene.id)?.time ?? 0,
+            // Include the horizontal hit expansion on both sides as well.
+            widthPx: chipWidthPx(scene) + 16,
+          })),
+          vp,
+          width,
+        ),
+      )
+    }
+    return layouts
+  })
 
   /**
    * Ids of scenes with enough clear space to show their title. Recomputed on
@@ -975,7 +1015,10 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
                     <span class={styles.laneCount}>{scenesByLane().get(laneId)?.length ?? 0}</span>
                   </div>
 
-                  <div class={styles.laneTrack}>
+                  <div
+                    class={styles.laneTrack}
+                    style={{ height: `${(stackLayouts().get(laneId)?.rowCount ?? 1) * STACK_ROW_HEIGHT_PX}px` }}
+                  >
                     <For each={chapterMarks()}>
                       {(time) => {
                         const left = () => timeToFraction(time, viewport()) * 100
@@ -1002,7 +1045,13 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
                         const fraction = () => timeToFraction(time(), viewport())
                         const visible = () => fraction() >= -CULL_MARGIN && fraction() <= 1 + CULL_MARGIN
                         const confidence = () => resolved()?.confidence ?? 'unknown'
-                        const showLabel = () => labelledScenes().has(scene.id) || isSelected()
+                        const stackLayout = () => stackLayouts().get(laneId)
+                        const stackRow = () => stackLayout()?.rows.get(scene.id) ?? 0
+                        // A stacked group has its own vertical room, so every
+                        // visible member can remain a full, independently
+                        // selectable tile instead of collapsing to a dot.
+                        const isStacked = () => stackLayout()?.stackedIds.has(scene.id) ?? false
+                        const showLabel = () => labelledScenes().has(scene.id) || isSelected() || isStacked()
                         const classes = () => {
                           const parts = [styles.chip[confidence()]]
                           if (!showLabel()) parts.push(styles.chipDot)
@@ -1020,7 +1069,10 @@ export const TimelineView: Component<TimelineViewProps> = (props) => {
                             <div
                               data-scene-id={scene.id}
                               class={classes()}
-                              style={{ left: `${fraction() * 100}%` }}
+                              style={{
+                                left: `${fraction() * 100}%`,
+                                top: `${stackRow() * STACK_ROW_HEIGHT_PX + STACK_ROW_HEIGHT_PX / 2}px`,
+                              }}
                               onDblClick={() => openScene(scene.id)}
                               // Carries the label for chips collapsed to dots too,
                               // which is where the density makes it hardest to tell
