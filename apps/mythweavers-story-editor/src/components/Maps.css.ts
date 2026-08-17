@@ -808,6 +808,15 @@ export const timelineSpacer = style({
   flex: 1,
 })
 
+export const timelineRangeSummary = style({
+  minWidth: 0,
+  color: tokens.color.text.secondary,
+  fontSize: '0.65rem',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+})
+
 export const zoomControls = style({
   display: 'flex',
   alignItems: 'center',
@@ -926,6 +935,7 @@ export const timelineSliderContainer = style({
   position: 'relative',
   display: 'flex',
   alignItems: 'center',
+  cursor: 'pointer',
 })
 
 export const timelineSlider = style({
@@ -1168,6 +1178,33 @@ export const chapterMarker = style({
     opacity: 1,
     boxShadow: `0 0 8px ${tokens.color.accent.primary}`,
   },
+})
+
+export const chapterMarkerHovered = style({
+  opacity: 1,
+  width: '4px',
+  boxShadow: `0 0 8px ${tokens.color.accent.primary}`,
+})
+
+export const timelineHoverGaps = style({
+  position: 'absolute',
+  top: '-18px',
+  transform: 'translateX(-50%)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.35rem',
+  padding: '0.1rem 0.3rem',
+  color: tokens.color.text.secondary,
+  fontSize: '0.6rem',
+  lineHeight: 1,
+  whiteSpace: 'nowrap',
+  pointerEvents: 'none',
+  zIndex: 3,
+})
+
+export const timelineHoverCurrent = style({
+  color: tokens.color.accent.primary,
+  fontWeight: 600,
 })
 
 export const timelineRangeLabels = style({

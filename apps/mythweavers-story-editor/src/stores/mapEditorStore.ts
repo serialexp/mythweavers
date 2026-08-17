@@ -1,9 +1,9 @@
 import { createStore } from 'solid-js/store'
+import type { Fleet, Hyperlane, HyperlaneSegment, Landmark } from '../types/core'
+import { getActiveMovement } from '../utils/fleetUtils'
 import { currentStoryStore } from './currentStoryStore'
 import { landmarkStatesStore } from './landmarkStatesStore'
 import { mapsStore } from './mapsStore'
-import type { Fleet, Hyperlane, HyperlaneSegment, Landmark } from '../types/core'
-import { getActiveMovement } from '../utils/fleetUtils'
 
 // =============================================================================
 // TYPES
@@ -69,8 +69,10 @@ export type PawnVariant = 'military' | 'transport' | 'scout'
 
 interface MapEditorState {
   // === SELECTION ===
+  // The single source of truth for what is selected on the map. Everything else
+  // that talks about "the selected pawn/landmark/path" derives from this, so the
+  // canvas, the side panel and the movement tooling cannot drift apart.
   selection: Selection
-  selectedFleetForMovement: Fleet | null
 
   // === UI MODE ===
   creationMode: CreationMode
@@ -141,7 +143,6 @@ const loadPreference = <T>(key: string, fallback: T): T => {
 const [state, setState] = createStore<MapEditorState>({
   // Selection
   selection: { type: 'none' },
-  selectedFleetForMovement: null,
 
   // UI Mode
   creationMode: 'select',
@@ -202,8 +203,20 @@ export const mapEditorStore = {
     return state.selection
   },
 
+  /**
+   * The pawn that right-click movement orders apply to.
+   *
+   * This is the same thing as `selectedPawn` -- it is kept as a separate name
+   * because the movement tooling reads better that way, but it is derived rather
+   * than stored so that clearing the selection always clears the movement target
+   * too. Not doing so used to leave a deselected pawn wearing its blue ring.
+   *
+   * Deliberately does not use `this`, so it survives being destructured.
+   */
   get selectedFleetForMovement(): Fleet | null {
-    return state.selectedFleetForMovement
+    const sel = state.selection
+    if (sel.type !== 'pawn') return null
+    return mapsStore.selectedMap?.fleets?.find((f) => f.id === sel.id) || null
   },
 
   /**
@@ -403,6 +416,17 @@ export const mapEditorStore = {
   // ---------------------------------------------------------------------------
 
   /**
+   * Replace the selection wholesale.
+   *
+   * Useful when the caller has already worked out what should be selected (for
+   * example the click resolver cycling through overlapping items) and does not
+   * want to branch on the type first.
+   */
+  setSelection(next: Selection): void {
+    setState('selection', next)
+  },
+
+  /**
    * Select a landmark by ID.
    */
   selectLandmark(id: string): void {
@@ -446,9 +470,17 @@ export const mapEditorStore = {
 
   /**
    * Set the fleet to use for movement commands.
+   *
+   * Movement selection is just pawn selection, so this writes through to
+   * `selection`. Passing null only clears the selection when a pawn is what is
+   * currently selected -- it must not wipe out an unrelated landmark or path.
    */
   setSelectedFleetForMovement(fleet: Fleet | null): void {
-    setState('selectedFleetForMovement', fleet)
+    if (fleet) {
+      setState('selection', { type: 'pawn', id: fleet.id })
+    } else if (state.selection.type === 'pawn') {
+      setState('selection', { type: 'none' })
+    }
   },
 
   /**
@@ -773,7 +805,6 @@ export const mapEditorStore = {
    */
   reset(): void {
     setState('selection', { type: 'none' })
-    setState('selectedFleetForMovement', null)
     setState('creationMode', 'select')
     setState('isEditing', false)
     setState('isCreatingPath', false)

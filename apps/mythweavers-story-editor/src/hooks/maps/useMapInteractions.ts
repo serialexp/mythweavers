@@ -19,6 +19,15 @@ export interface UseMapInteractionsOptions {
   canvasContainer: Accessor<HTMLDivElement | undefined>
   // Callbacks that need Maps.tsx context
   onMapClick?: (position: MapClickPosition) => void
+  /**
+   * A left click on the canvas that landed outside the map image.
+   *
+   * Creation and painting need in-bounds normalized coordinates, so those paths
+   * still bail on an out-of-bounds click. Deselecting does not need coordinates
+   * at all, though, and a click on the empty area around the artwork is still a
+   * click on nothing -- so it gets its own callback.
+   */
+  onOutOfBoundsClick?: () => void
   onMapRightClick?: (position: MapClickPosition) => void
   onPaintClick?: (screenX: number, screenY: number, faction: string | null) => Promise<void>
   // Local UI state not in stores
@@ -48,6 +57,7 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
     mapSprite,
     canvasContainer,
     onMapClick,
+    onOutOfBoundsClick,
     onMapRightClick,
     onPaintClick,
     isShiftHeld,
@@ -292,8 +302,10 @@ export function useMapInteractions(options: UseMapInteractionsOptions): UseMapIn
         const normalizedX = worldPos.x / sprite.width
         const normalizedY = worldPos.y / sprite.height
 
-        // Check bounds
+        // Check bounds. Outside the artwork there is nothing to create or paint
+        // on, but the click still counts as "clicked on nothing" for selection.
         if (normalizedX < 0 || normalizedX > 1 || normalizedY < 0 || normalizedY > 1) {
+          onOutOfBoundsClick?.()
           return
         }
 

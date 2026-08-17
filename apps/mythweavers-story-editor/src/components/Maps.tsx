@@ -11,15 +11,17 @@ import { usePathfinding } from '../hooks/maps/usePathfinding'
 import { usePixiMap } from '../hooks/maps/usePixiMap'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { landmarkStatesStore } from '../stores/landmarkStatesStore'
-import { mapEditorStore } from '../stores/mapEditorStore'
+import { type Selection, mapEditorStore } from '../stores/mapEditorStore'
 import { mapsStore } from '../stores/mapsStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
 import type { Fleet, Hyperlane, HyperlaneSegment, Landmark, StoryMap } from '../types/core'
+import { getFleetPositionAtTime } from '../utils/fleetUtils'
 import { generateMessageId } from '../utils/id'
 import { searchLandmarkInfo } from '../utils/landmarkSearch'
 import { ColoredLandmark, parseColorToHex } from '../utils/maps/colorUtils'
+import { type CandidatePoint, type CandidateRef, collectCandidatesAt, nextInCycle } from '../utils/maps/hitCandidates'
 import { LandmarkSprite } from '../utils/maps/landmarkRenderer'
 import {
   AnimationHandle,
@@ -69,38 +71,20 @@ export const Maps: Component = () => {
     previewUrl: null,
   })
   const [showMapSettings, setShowMapSettings] = createSignal(false)
-  // Unified selection state
-  type Selection =
-    | { type: 'none' }
-    | { type: 'landmark'; id: string }
-    | { type: 'pawn'; id: string }
-    | { type: 'path'; id: string }
-    | { type: 'new-landmark' }
-    | { type: 'new-pawn' }
+  // Selection lives in mapEditorStore, which is the single source of truth. These
+  // are thin accessors over it so call sites below read the same as before; they
+  // are not a second copy of the state. Anything that used to be kept in sync by
+  // hand (the pawn's movement target, the side panel, the blue ring) now falls
+  // out of the same value.
+  const selection = () => mapEditorStore.selection
+  const setSelection = (next: Selection) => mapEditorStore.setSelection(next)
 
-  const [selection, setSelection] = createSignal<Selection>({ type: 'none' })
+  const selectedLandmark = () => mapEditorStore.selectedLandmark
+  const selectedFleet = () => mapEditorStore.selectedPawn
+  const selectedHyperlane = () => mapEditorStore.selectedPath
 
-  // Helper memos to get the actual selected objects from stores
-  const selectedLandmark = createMemo(() => {
-    const sel = selection()
-    if (sel.type !== 'landmark') return null
-    return mapsStore.selectedMap?.landmarks.find((lm) => lm.id === sel.id) || null
-  })
-
-  const selectedFleet = createMemo(() => {
-    const sel = selection()
-    if (sel.type !== 'pawn') return null
-    return mapsStore.selectedMap?.fleets?.find((f) => f.id === sel.id) || null
-  })
-
-  const selectedHyperlane = createMemo(() => {
-    const sel = selection()
-    if (sel.type !== 'path') return null
-    return mapsStore.selectedMap?.hyperlanes?.find((h) => h.id === sel.id) || null
-  })
-
-  const isAddingNew = createMemo(() => selection().type === 'new-landmark')
-  const isAddingFleet = createMemo(() => selection().type === 'new-pawn')
+  const isAddingNew = () => mapEditorStore.isAddingLandmark
+  const isAddingFleet = () => mapEditorStore.isAddingPawn
 
   // Wrapper functions for selection updates (for backwards compatibility during refactor)
   const setSelectedLandmark = (lm: Landmark | null) => {
@@ -143,8 +127,9 @@ export const Maps: Component = () => {
     }
   }
 
-  // Helper to clear all selection
-  const clearSelection = () => setSelection({ type: 'none' })
+  // Helper to clear all selection. Because the movement target is derived from
+  // `selection`, this is all that is needed to fully deselect a pawn.
+  const clearSelection = () => mapEditorStore.clearSelection()
 
   const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 })
 
@@ -270,15 +255,15 @@ export const Maps: Component = () => {
     mapSprite,
     canvasContainer,
     evaluateBorderColor: evaluateLandmarkBorderColor,
-    onLandmarkClick: (lm, _screenPos, button) => {
+    onLandmarkClick: (lm, screenPos, button) => {
       // Only handle left clicks in select mode
       if (button !== 0) return
       if (mapEditorStore.creationMode !== 'select') return
       if (mapEditorStore.paintModeEnabled) return
 
-      // Select the landmark
-      setSelection({ type: 'landmark', id: lm.id })
-      mapEditorStore.cancelEditing()
+      // Route through the resolver rather than selecting directly, so pawns
+      // sitting on this landmark stay reachable by clicking again.
+      selectAtScreenPoint(screenPos.x, screenPos.y, { type: 'landmark', id: lm.id })
     },
   })
 
@@ -289,15 +274,15 @@ export const Maps: Component = () => {
     containers,
     mapSprite,
     canvasContainer,
-    onFleetClick: (fleet, _screenPos, button) => {
+    onFleetClick: (fleet, screenPos, button) => {
       // Only handle left clicks in select mode
       if (button !== 0) return
       if (mapEditorStore.creationMode !== 'select') return
 
-      // Select the pawn
-      mapEditorStore.setSelectedFleetForMovement(fleet)
-      setSelection({ type: 'pawn', id: fleet.id })
-      mapEditorStore.cancelEditing()
+      // Route through the resolver so a stack of pawns on one landmark can be
+      // stepped through. Setting the selection is enough to make this pawn the
+      // movement target too -- that is derived from the selection now.
+      selectAtScreenPoint(screenPos.x, screenPos.y, { type: 'pawn', id: fleet.id })
     },
   })
 
@@ -337,6 +322,75 @@ export const Maps: Component = () => {
     // Count existing junctions
     const junctionCount = map.landmarks.filter((l) => l.type === 'junction').length
     return `Junction ${junctionCount + 1}`
+  }
+
+  /**
+   * Every selectable pawn and landmark, with the screen position it currently
+   * occupies. Pawn positions are time-dependent, so they come from the same
+   * helper the renderer uses rather than from the stored default position.
+   */
+  const collectSelectablePoints = (): CandidatePoint[] => {
+    const map = mapsStore.selectedMap
+    const sprite = mapSprite()
+    const vp = viewport()
+    if (!map || !sprite || !vp) return []
+
+    const container = canvasContainer()
+    const offsetX = container?.offsetLeft || 0
+    const offsetY = container?.offsetTop || 0
+
+    const toScreen = (normalizedX: number, normalizedY: number) => {
+      const screen = vp.toScreen(normalizedX * sprite.width, normalizedY * sprite.height)
+      return { x: screen.x + offsetX, y: screen.y + offsetY }
+    }
+
+    const points: CandidatePoint[] = []
+
+    for (const fleet of map.fleets || []) {
+      const position = getFleetPositionAtTime(fleet, currentStoryTime())
+      const screen = toScreen(position.x, position.y)
+      points.push({ type: 'pawn', id: fleet.id, screenX: screen.x, screenY: screen.y })
+    }
+
+    for (const landmark of map.landmarks) {
+      const screen = toScreen(landmark.x, landmark.y)
+      points.push({ type: 'landmark', id: landmark.id, screenX: screen.x, screenY: screen.y })
+    }
+
+    return points
+  }
+
+  /**
+   * Resolve a left click in select mode into a selection.
+   *
+   * Pawns render above landmarks and swallow the pointer event, so we cannot let
+   * PIXI's topmost-wins hit test have the last word: a pawn parked on a landmark
+   * would make that landmark permanently unreachable. Instead every sprite click
+   * routes through here, which gathers everything under the cursor and steps to
+   * the next one, so repeated clicks walk the stack.
+   *
+   * `hit` is whichever sprite PIXI reported, so the first click still selects the
+   * thing the user actually aimed at.
+   */
+  const selectAtScreenPoint = (screenX: number, screenY: number, hit: CandidateRef | null) => {
+    const candidates = collectCandidatesAt(collectSelectablePoints(), screenX, screenY)
+    const current = selection()
+    const currentRef: CandidateRef | null =
+      current.type === 'pawn' || current.type === 'landmark' ? { type: current.type, id: current.id } : null
+
+    // Fall back to whatever PIXI reported when we cannot resolve candidates --
+    // the viewport or sprite may not be ready. A click that demonstrably hit a
+    // sprite must never be treated as a click on empty space.
+    const next = nextInCycle(candidates, currentRef, hit) ?? hit
+
+    if (!next) {
+      clearSelection()
+      mapEditorStore.cancelEditing()
+      return
+    }
+
+    setSelection({ type: next.type, id: next.id })
+    mapEditorStore.cancelEditing()
   }
 
   // Helper function to check if clicking near a landmark and return it if so
@@ -534,6 +588,13 @@ export const Maps: Component = () => {
     canvasContainer,
     isShiftHeld,
     onPaintClick: (screenX, screenY, faction) => applyAllegianceToBrush(screenX, screenY, faction),
+    onOutOfBoundsClick: () => {
+      // Clicking the empty area around the map image is still clicking nothing.
+      if (mapEditorStore.creationMode !== 'select') return
+      if (mapEditorStore.paintModeEnabled) return
+      clearSelection()
+      mapEditorStore.cancelEditing()
+    },
     onMapClick: (position) => {
       const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
       const mode = mapEditorStore.creationMode

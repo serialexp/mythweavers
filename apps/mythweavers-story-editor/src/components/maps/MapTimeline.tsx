@@ -1,4 +1,4 @@
-import { Component, Show, createMemo, createSignal } from 'solid-js'
+import { Component, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import { calendarStore } from '../../stores/calendarStore'
 import { currentStoryStore } from '../../stores/currentStoryStore'
 import { landmarkStatesStore } from '../../stores/landmarkStatesStore'
@@ -16,16 +16,20 @@ import {
 import * as styles from '../Maps.css'
 import { PhCaretLeftIcon, PhCaretRightIcon, PhMagnifyingGlassMinusIcon, PhMagnifyingGlassPlusIcon } from 'solidjs-phosphor'
 
-type ZoomLevel = 'full' | 'year' | 'month' | 'week'
-
 /**
  * Timeline controls for navigating through story time and viewing map state at different points.
  * Reads all state directly from stores - no props needed.
  */
 export const MapTimeline: Component = () => {
-  const [zoomLevel, setZoomLevel] = createSignal<ZoomLevel>('full')
   const [zoomWindowStart, setZoomWindowStart] = createSignal<number | null>(null)
   const [zoomWindowEnd, setZoomWindowEnd] = createSignal<number | null>(null)
+  const [hoveredMarkerId, setHoveredMarkerId] = createSignal<string | null>(null)
+  let timelineSection: HTMLDivElement | undefined
+  let timelineSliderContainer: HTMLDivElement | undefined
+  // A range input updates itself on pointer-down, before its click handler runs.
+  // Keep that native update from briefly selecting the raw pointer time when this
+  // gesture is intended to select the closest chapter marker instead.
+  let selectingClosestMarker = false
 
   // Get current story time from mapsStore
   const currentStoryTime = () => mapsStore.currentStoryTime
@@ -61,98 +65,15 @@ export const MapTimeline: Component = () => {
     return getTimelineRange(currentStoryStore, nodeStore.nodesArray)
   })
 
-  // Calculate window size based on zoom level
-  const getWindowSize = (zoom: ZoomLevel): number | null => {
-    switch (zoom) {
-      case 'full':
-        return null
-      case 'year':
-        return 368 * 1440 // 368 days
-      case 'month':
-        return 92 * 1440 // 1 quarter (92 days)
-      case 'week':
-        return 7 * 1440 // 7 days
-    }
-  }
-
-  // Calculate zoomed timeline range
+  // The viewport is either the full story range or an explicit window created
+  // by continuous zooming. Keep an explicit window even when the selected time
+  // sits outside it, so pointer-anchored zoom remains stable.
   const timelineRange = createMemo(() => {
     const full = fullTimelineRange()
-    const zoom = zoomLevel()
-    const curTime = currentStoryTime()
-
-    if (zoom === 'full') {
-      return full
-    }
-
-    // Check if we have a stored zoom window
-    const storedStart = zoomWindowStart()
-    const storedEnd = zoomWindowEnd()
-
-    if (storedStart !== null && storedEnd !== null) {
-      // Use stored window, but check if current time is outside it
-      if (curTime !== null && (curTime < storedStart || curTime > storedEnd)) {
-        // Current time is outside window, recenter
-        const windowSize = getWindowSize(zoom)!
-        const halfWindow = windowSize / 2
-        let start = curTime - halfWindow
-        let end = curTime + halfWindow
-
-        // Clamp to full range
-        if (start < full.start) {
-          const shift = full.start - start
-          start = full.start
-          end = Math.min(end + shift, full.end)
-        }
-        if (end > full.end) {
-          const shift = end - full.end
-          end = full.end
-          start = Math.max(start - shift, full.start)
-        }
-
-        // Update stored window
-        setZoomWindowStart(start)
-        setZoomWindowEnd(end)
-
-        return { start, end, granularity: full.granularity }
-      }
-
-      // Use stored window
-      return {
-        start: storedStart,
-        end: storedEnd,
-        granularity: full.granularity,
-      }
-    }
-
-    // No stored window, create new one centered on current time
-    const centerTime = curTime ?? full.start
-    const windowSize = getWindowSize(zoom)!
-    const halfWindow = windowSize / 2
-    let start = centerTime - halfWindow
-    let end = centerTime + halfWindow
-
-    // Clamp to full range
-    if (start < full.start) {
-      const shift = full.start - start
-      start = full.start
-      end = Math.min(end + shift, full.end)
-    }
-    if (end > full.end) {
-      const shift = end - full.end
-      end = full.end
-      start = Math.max(start - shift, full.start)
-    }
-
-    // Store the window
-    setZoomWindowStart(start)
-    setZoomWindowEnd(end)
-
-    return {
-      start,
-      end,
-      granularity: full.granularity,
-    }
+    const start = zoomWindowStart()
+    const end = zoomWindowEnd()
+    if (start === null || end === null) return full
+    return { start, end, granularity: full.granularity }
   })
 
   // Calculate slider configuration
@@ -170,8 +91,12 @@ export const MapTimeline: Component = () => {
     return storyTimeToSliderPosition(time, range.start, range.granularity)
   })
 
-  // Active chapter at current time
+  // While the pointer is over the timeline, show the chapter that clicking
+  // would select; otherwise show the chapter active at the current map time.
   const activeChapter = createMemo(() => {
+    const hoveredId = hoveredMarkerId()
+    if (hoveredId) return nodeStore.nodesArray.find((node) => node.id === hoveredId) ?? null
+
     const time = currentStoryTime()
     if (time === null) return null
     return getChapterAtStoryTime(time, nodeStore.nodesArray)
@@ -228,6 +153,52 @@ export const MapTimeline: Component = () => {
     }
   })
 
+  const formatTimelineDuration = (span: number) => {
+    const config = calendarStore.getEngine().config
+    const duration = Math.max(0, span)
+    const years = Math.floor(duration / config.minutesPerYear)
+    const days = Math.floor((duration % config.minutesPerYear) / config.minutesPerDay)
+    const hours = Math.floor((duration % config.minutesPerDay) / config.minutesPerHour)
+    const minutes = duration % config.minutesPerHour
+    return [
+      years > 0 ? `${years}y` : '',
+      days > 0 ? `${days}d` : '',
+      hours > 0 ? `${hours}h` : '',
+      minutes > 0 ? `${minutes}m` : '',
+    ].filter(Boolean).join(' ') || '0m'
+  }
+
+  const visibleRangeSummary = createMemo(() => {
+    const range = timelineRange()
+    return {
+      start: calendarStore.formatStoryTimeShort(range.start) || '',
+      end: calendarStore.formatStoryTimeShort(range.end) || '',
+      duration: formatTimelineDuration(range.end - range.start),
+    }
+  })
+
+  const hoveredMarkerRangeSummary = createMemo(() => {
+    const hoveredId = hoveredMarkerId()
+    if (!hoveredId) return null
+
+    const markers = chapterMarkers()
+      .filter((marker) => marker.chapter.storyTime !== null && marker.chapter.storyTime !== undefined)
+      .sort((a, b) => a.chapter.storyTime! - b.chapter.storyTime!)
+    const index = markers.findIndex((marker) => marker.chapter.id === hoveredId)
+    if (index === -1) return null
+
+    const current = markers[index]
+    const previous = markers[index - 1]
+    const next = markers[index + 1]
+    return {
+      previousTitle: previous?.chapter.title ?? 'Start',
+      previousGap: previous ? formatTimelineDuration(current.chapter.storyTime! - previous.chapter.storyTime!) : null,
+      currentTitle: current.chapter.title,
+      nextGap: next ? formatTimelineDuration(next.chapter.storyTime! - current.chapter.storyTime!) : null,
+      nextTitle: next?.chapter.title ?? 'End',
+    }
+  })
+
   // State change indicators (convert story times to percentages, similar to chapter markers)
   const stateIndicatorPositions = createMemo(() => {
     const range = timelineRange()
@@ -261,23 +232,6 @@ export const MapTimeline: Component = () => {
       })
       .filter((pos): pos is number => pos !== null)
   })
-
-  // Handle slider drag (for visual feedback)
-  const handleSliderInput = (position: number) => {
-    const range = timelineRange()
-    const newStoryTime = sliderPositionToStoryTime(position, range.start, range.granularity)
-    mapEditorStore.setPendingStoryTime(newStoryTime)
-  }
-
-  // Handle slider release (commit the change)
-  const handleSliderChange = (position: number) => {
-    const range = timelineRange()
-    const newStoryTime = sliderPositionToStoryTime(position, range.start, range.granularity)
-    // Clear any pending state
-    mapEditorStore.setPendingStoryTime(null)
-    // Update the actual story time
-    mapsStore.setCurrentStoryTime(newStoryTime)
-  }
 
   // Step forward/back in timeline (by granularity)
   const handleStep = (direction: 'forward' | 'back') => {
@@ -322,63 +276,113 @@ export const MapTimeline: Component = () => {
     return range.end > range.start
   })
 
-  // Zoom controls
-  const handleZoomIn = () => {
-    const current = zoomLevel()
-    // Clear stored window so it recenters on current time
-    setZoomWindowStart(null)
-    setZoomWindowEnd(null)
+  const getPointerFraction = (clientX: number) => {
+    if (!timelineSliderContainer) return null
+    const bounds = timelineSliderContainer.getBoundingClientRect()
+    if (bounds.width === 0) return null
+    return Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width))
+  }
 
-    switch (current) {
-      case 'full':
-        setZoomLevel('year')
-        break
-      case 'year':
-        setZoomLevel('month')
-        break
-      case 'month':
-        setZoomLevel('week')
-        break
-      // Already at maximum zoom
+  const closestMarkerAtFraction = (fraction: number) => {
+    const markers = chapterMarkers()
+    if (markers.length === 0) return null
+
+    const pointerPosition = fraction * 100
+    return markers.reduce((closest, marker) =>
+      Math.abs(marker.position - pointerPosition) < Math.abs(closest.position - pointerPosition) ? marker : closest,
+    )
+  }
+
+  const selectMarker = (marker: ReturnType<typeof closestMarkerAtFraction>) => {
+    if (!marker || marker.chapter.storyTime === null || marker.chapter.storyTime === undefined) return
+    mapEditorStore.setPendingStoryTime(null)
+    mapsStore.setCurrentStoryTime(marker.chapter.storyTime)
+  }
+
+  const handleTimelinePointerMove = (event: PointerEvent) => {
+    const fraction = getPointerFraction(event.clientX)
+    const marker = fraction === null ? null : closestMarkerAtFraction(fraction)
+    setHoveredMarkerId(marker?.chapter.id ?? null)
+  }
+
+  const handleTimelinePointerDown = (event: PointerEvent) => {
+    if (event.target instanceof HTMLInputElement) {
+      // Prevent the range control from committing its raw pointer position. The
+      // click handler below will commit the marker already highlighted here.
+      selectingClosestMarker = true
+      event.preventDefault()
     }
   }
 
-  const handleZoomOut = () => {
-    const current = zoomLevel()
-    // Clear stored window so it recenters on current time
-    setZoomWindowStart(null)
-    setZoomWindowEnd(null)
+  const handleTimelineClick = (event: MouseEvent) => {
+    const fraction = getPointerFraction(event.clientX)
+    if (fraction === null) return
 
-    switch (current) {
-      case 'week':
-        setZoomLevel('month')
-        break
-      case 'month':
-        setZoomLevel('year')
-        break
-      case 'year':
-        setZoomLevel('full')
-        break
-      // Already at minimum zoom
-    }
+    const marker = closestMarkerAtFraction(fraction)
+    setHoveredMarkerId(marker?.chapter.id ?? null)
+    selectMarker(marker)
+    selectingClosestMarker = false
   }
 
-  const zoomLabel = createMemo(() => {
-    switch (zoomLevel()) {
-      case 'full':
-        return 'Full'
-      case 'year':
-        return '1 Year'
-      case 'month':
-        return '1 Quarter'
-      case 'week':
-        return '1 Week'
+  const handleSliderInput = (position: number) => {
+    if (selectingClosestMarker) return
+    const range = timelineRange()
+    const newStoryTime = sliderPositionToStoryTime(position, range.start, range.granularity)
+    mapEditorStore.setPendingStoryTime(newStoryTime)
+  }
+
+  const handleSliderChange = (position: number) => {
+    if (selectingClosestMarker) return
+    const range = timelineRange()
+    const newStoryTime = sliderPositionToStoryTime(position, range.start, range.granularity)
+    mapEditorStore.setPendingStoryTime(null)
+    mapsStore.setCurrentStoryTime(newStoryTime)
+  }
+
+  const minimumZoomSpan = createMemo(() => (fullTimelineRange().granularity === 'hour' ? 60 : 1440))
+
+  const setZoomedViewport = (factor: number, anchorFraction: number) => {
+    const full = fullTimelineRange()
+    const current = timelineRange()
+    const fullSpan = full.end - full.start
+    const minSpan = Math.min(minimumZoomSpan(), fullSpan)
+    const nextSpan = Math.max(minSpan, Math.min(fullSpan, (current.end - current.start) * factor))
+    const anchorTime = current.start + anchorFraction * (current.end - current.start)
+    const maxStart = full.end - nextSpan
+    const start = Math.max(full.start, Math.min(anchorTime - anchorFraction * nextSpan, maxStart))
+
+    if (nextSpan === fullSpan) {
+      setZoomWindowStart(null)
+      setZoomWindowEnd(null)
+      return
     }
+
+    setZoomWindowStart(start)
+    setZoomWindowEnd(start + nextSpan)
+  }
+
+  const zoomBy = (factor: number) => setZoomedViewport(factor, 0.5)
+
+  const handleWheel = (event: WheelEvent) => {
+    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 400 : 1
+    const deltaY = event.deltaY * unit
+    if (deltaY === 0) return
+
+    event.preventDefault()
+    const fraction = getPointerFraction(event.clientX)
+    if (fraction !== null) setZoomedViewport(deltaY > 0 ? 1.15 : 1 / 1.15, fraction)
+  }
+
+  onMount(() => {
+    // The complete timeline section is the zoom target, including its controls
+    // and readout. The slider still supplies the horizontal anchor when present.
+    timelineSection?.addEventListener('wheel', handleWheel, { passive: false })
+    onCleanup(() => timelineSection?.removeEventListener('wheel', handleWheel))
   })
 
   return (
     <Show when={hasValidTimeline()}>
-      <div class={styles.timelineSection}>
+      <div ref={timelineSection} class={styles.timelineSection}>
         {/* Row 1: Full-width timeline slider */}
         <div class={styles.timelineSliderRow}>
           <button
@@ -390,7 +394,14 @@ export const MapTimeline: Component = () => {
             <PhCaretLeftIcon />
           </button>
 
-          <div class={styles.timelineSliderContainer}>
+          <div
+            ref={timelineSliderContainer}
+            class={styles.timelineSliderContainer}
+            onPointerMove={handleTimelinePointerMove}
+            onPointerDown={handleTimelinePointerDown}
+            onPointerLeave={() => setHoveredMarkerId(null)}
+            onClick={handleTimelineClick}
+          >
             <input
               type="range"
               class={styles.timelineSlider}
@@ -416,20 +427,32 @@ export const MapTimeline: Component = () => {
             <div class={styles.chapterMarkers}>
               {chapterMarkers().map((marker) => (
                 <div
-                  class={styles.chapterMarker}
+                  class={`${styles.chapterMarker} ${hoveredMarkerId() === marker.chapter.id ? styles.chapterMarkerHovered : ''}`}
                   style={{ left: `${marker.position}%` }}
                   title={`${marker.chapter.title}`}
-                  onClick={() => {
-                    if (marker.chapter.storyTime) {
-                      mapEditorStore.setPendingStoryTime(null)
-                      mapsStore.setCurrentStoryTime(marker.chapter.storyTime)
-                    }
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    selectMarker(marker)
                   }}
                 />
               ))}
             </div>
+            <Show when={hoveredMarkerRangeSummary()}>
+              {(gaps) => {
+                const marker = chapterMarkers().find((item) => item.chapter.id === hoveredMarkerId())
+                return (
+                  <Show when={marker}>
+                    <div class={styles.timelineHoverGaps} style={{ left: `${marker?.position ?? 0}%` }}>
+                      <span>{gaps().previousGap ?? 'Start'}</span>
+                      <span class={styles.timelineHoverCurrent}>{gaps().currentTitle}</span>
+                      <span>{gaps().nextGap ?? 'End'}</span>
+                    </div>
+                  </Show>
+                )
+              }}
+            </Show>
             {/* Range labels when zoomed */}
-            <Show when={zoomLevel() !== 'full'}>
+            <Show when={zoomWindowStart() !== null}>
               <div class={styles.timelineRangeLabels}>
                 <span class={styles.rangeLabel}>{timelineInfo().rangeStart}</span>
                 <span class={styles.rangeLabel}>{timelineInfo().rangeEnd}</span>
@@ -462,24 +485,21 @@ export const MapTimeline: Component = () => {
             </div>
           </Show>
 
+          <div
+            class={styles.timelineRangeSummary}
+            title={`Visible timeline: ${visibleRangeSummary().start} to ${visibleRangeSummary().end} (${visibleRangeSummary().duration})`}
+          >
+            {visibleRangeSummary().start} – {visibleRangeSummary().end} · {visibleRangeSummary().duration}
+          </div>
+
           <div class={styles.timelineSpacer} />
 
           <div class={styles.zoomControls}>
-            <button
-              class={styles.zoomButton}
-              onClick={handleZoomOut}
-              disabled={zoomLevel() === 'full'}
-              title="Zoom out"
-            >
+            <button class={styles.zoomButton} onClick={() => zoomBy(1.6)} title="Zoom out">
               <PhMagnifyingGlassMinusIcon />
             </button>
-            <span class={styles.zoomLabel}>{zoomLabel()}</span>
-            <button
-              class={styles.zoomButton}
-              onClick={handleZoomIn}
-              disabled={zoomLevel() === 'week'}
-              title="Zoom in"
-            >
+            <span class={styles.zoomLabel}>Zoom</span>
+            <button class={styles.zoomButton} onClick={() => zoomBy(1 / 1.6)} title="Zoom in">
               <PhMagnifyingGlassPlusIcon />
             </button>
           </div>
