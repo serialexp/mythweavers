@@ -1,20 +1,21 @@
 import {
   AnthropicClient,
   CloudflareClient,
-  OllamaClient,
-  OpenAICompatibleClient,
   type LLMClient,
   type LLMGenerateOptions,
   type LLMStreamEvent,
+  OllamaClient,
+  OpenAICompatibleClient,
   type TokenUsage,
   normalizeTokenUsage,
 } from '@mythweavers/llm'
-import { llmActivityStore } from '../../stores/llmActivityStore'
 import { currentStoryStore } from '../../stores/currentStoryStore'
+import { llmActivityStore } from '../../stores/llmActivityStore'
 import { settingsStore } from '../../stores/settingsStore'
 import type { LLMProvider } from '../../types/llm'
 import { generateMessageId } from '../id'
 import { ServerLLMClient } from './ServerLLMClient'
+import { LOCAL_PROVIDER_ENDPOINTS } from './localProviders'
 
 interface LlmMetadata {
   callType?: string
@@ -149,7 +150,7 @@ export class LLMClientFactory {
     }
 
     // Validate built-in provider
-    if (!['ollama', 'anthropic', 'openrouter', 'openai', 'cloudflare', 'server'].includes(provider)) {
+    if (!['ollama', 'llamacpp', 'anthropic', 'openrouter', 'openai', 'cloudflare', 'server'].includes(provider)) {
       console.warn(`Unknown provider "${provider}", defaulting to ollama`)
       return LLMClientFactory.getClient('ollama')
     }
@@ -166,7 +167,14 @@ export class LLMClientFactory {
     switch (provider) {
       case 'ollama':
         client = new OllamaClient({
-          host: `${window.location.origin}/ollama`,
+          host: LOCAL_PROVIDER_ENDPOINTS.ollama,
+        })
+        break
+      case 'llamacpp':
+        client = new OpenAICompatibleClient({
+          apiKey: () => settingsStore.llamaCppApiKey || 'local',
+          endpoint: `${LOCAL_PROVIDER_ENDPOINTS.llamacpp}/v1`,
+          unfiltered: true,
         })
         break
       case 'anthropic':
@@ -202,7 +210,7 @@ export class LLMClientFactory {
         break
       default:
         client = new OllamaClient({
-          host: `${window.location.origin}/ollama`,
+          host: LOCAL_PROVIDER_ENDPOINTS.ollama,
         })
     }
 

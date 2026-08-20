@@ -6,6 +6,8 @@ import { getMyBalance, getMyLlmModels, postMyBalanceTopup } from '../client/conf
 import { authStore } from '../stores/authStore'
 import { modelsStore } from '../stores/modelsStore'
 import { settingsStore } from '../stores/settingsStore'
+import type { LocalProvider, LocalProviderStatus } from '../utils/llm/localProviders'
+import { probeLocalProviders } from '../utils/llm/localProviders'
 import { ModelSelector } from './ModelSelector'
 import { PasswordForEncryptionDialog } from './PasswordForEncryptionDialog'
 import * as styles from './ProviderModelSelector.css'
@@ -32,7 +34,7 @@ interface ProviderSelectorProps {
 /** Check whether a given provider value has credentials configured. */
 const isProviderAvailable = (value: string): boolean => {
   // These don't need API keys
-  if (value === 'ollama' || value === 'server') return true
+  if (value === 'ollama' || value === 'llamacpp' || value === 'server') return true
 
   if (value === 'cloudflare') {
     return !!settingsStore.cloudflareApiKey && !!settingsStore.cloudflareEndpoint
@@ -59,6 +61,14 @@ const isProviderAvailable = (value: string): boolean => {
 export const ProviderSelector: Component<ProviderSelectorProps> = (props) => {
   const currentProvider = () => props.provider ?? settingsStore.provider
   const setCurrentProvider = (v: string) => (props.setProvider ?? settingsStore.setProvider)(v)
+  const [localProviderStatus, setLocalProviderStatus] = createSignal<Record<LocalProvider, LocalProviderStatus>>({
+    ollama: 'checking',
+    llamacpp: 'checking',
+  })
+
+  void probeLocalProviders().then((results) => {
+    setLocalProviderStatus({ ollama: results.ollama.status, llamacpp: results.llamacpp.status })
+  })
 
   // Auto-fetch models when provider changes (if enabled)
   if (props.autoFetchModels) {
@@ -74,8 +84,11 @@ export const ProviderSelector: Component<ProviderSelectorProps> = (props) => {
       <div class={styles.settingRow}>
         <label class={styles.label}>Provider</label>
         <select value={currentProvider()} onChange={(e) => setCurrentProvider(e.target.value)} class={styles.select}>
-          <option value="ollama" disabled={!isProviderAvailable('ollama')}>
-            Ollama
+          <option value="ollama" disabled={localProviderStatus().ollama !== 'reachable'}>
+            Ollama {localProviderStatus().ollama === 'reachable' ? '(local)' : '(not reachable)'}
+          </option>
+          <option value="llamacpp" disabled={localProviderStatus().llamacpp !== 'reachable'}>
+            llama.cpp {localProviderStatus().llamacpp === 'reachable' ? '(local)' : '(not reachable)'}
           </option>
           <option value="openrouter" disabled={!isProviderAvailable('openrouter')}>
             OpenRouter
@@ -512,6 +525,17 @@ export const ApiKeys: Component = () => {
           </Show>
         </div>
       </Modal>
+
+      <Fieldset legend="llama.cpp (optional)">
+        <div class={styles.settingRow}>
+          <label class={styles.label}>API Key</label>
+          <SecretInput
+            value={settingsStore.llamaCppApiKey}
+            onChange={settingsStore.setLlamaCppApiKey}
+            placeholder="Only needed when llama-server uses --api-key"
+          />
+        </div>
+      </Fieldset>
 
       <Fieldset legend="OpenRouter">
         <div class={styles.settingRow}>

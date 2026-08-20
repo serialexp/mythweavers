@@ -1,16 +1,18 @@
 import { ListDetailPanel, type ListDetailPanelRef } from '@mythweavers/ui'
-import { type Component, type JSX, For, Show, createSignal, onMount } from 'solid-js'
+import { type Component, For, type JSX, Show, createSignal, onMount } from 'solid-js'
+import { PhKeyIcon, PhPlugIcon, PhStackIcon } from 'solidjs-phosphor'
+import { currentStoryStore } from '../stores/currentStoryStore'
 import { modelsStore } from '../stores/modelsStore'
 import { settingsStore } from '../stores/settingsStore'
-import { currentStoryStore } from '../stores/currentStoryStore'
+import type { LocalProvider, LocalProviderStatus } from '../utils/llm/localProviders'
+import { probeLocalProviders } from '../utils/llm/localProviders'
+import * as aiStyles from './AISettingsPanel.css'
 import { CategoryModelOverrides } from './CategoryModelOverrides'
 import { CustomProviders } from './CustomProviders'
 import { ModelSelector } from './ModelSelector'
-import { ApiKeys } from './ProviderModelSelector'
 import { OverlayPanel } from './OverlayPanel'
+import { ApiKeys } from './ProviderModelSelector'
 import * as styles from './Settings.css'
-import * as aiStyles from './AISettingsPanel.css'
-import { PhKeyIcon, PhPlugIcon, PhStackIcon } from 'solidjs-phosphor'
 
 interface SettingsSection {
   id: string
@@ -29,6 +31,19 @@ type SettingsScope = 'global' | 'story'
 const AISettingsContent: Component = () => {
   let panelRef: ListDetailPanelRef | undefined
   const [scope, setScope] = createSignal<SettingsScope>('global')
+  const [localProviderStatus, setLocalProviderStatus] = createSignal<Record<LocalProvider, LocalProviderStatus>>({
+    ollama: 'checking',
+    llamacpp: 'checking',
+  })
+
+  const refreshLocalProviders = async () => {
+    setLocalProviderStatus({ ollama: 'checking', llamacpp: 'checking' })
+    const results = await probeLocalProviders()
+    setLocalProviderStatus({
+      ollama: results.ollama.status,
+      llamacpp: results.llamacpp.status,
+    })
+  }
 
   onMount(() => {
     // Auto-select first section on desktop; on mobile, show the sidebar list first
@@ -39,6 +54,7 @@ const AISettingsContent: Component = () => {
     if (currentStoryStore.isInitialized) {
       setScope('story')
     }
+    void refreshLocalProviders()
   })
 
   const isStoryScope = () => scope() === 'story' && currentStoryStore.isInitialized
@@ -149,8 +165,8 @@ const AISettingsContent: Component = () => {
       </div>
       <Show when={isStoryScope()}>
         <p class={aiStyles.scopeHint}>
-          Settings here only apply to <strong>{currentStoryStore.name || 'this story'}</strong>.
-          Unset fields inherit from your global defaults.
+          Settings here only apply to <strong>{currentStoryStore.name || 'this story'}</strong>. Unset fields inherit
+          from your global defaults.
         </p>
       </Show>
     </Show>
@@ -169,12 +185,13 @@ const AISettingsContent: Component = () => {
             </button>
           </Show>
         </label>
-        <select
-          value={displayProvider()}
-          onChange={(e) => handleProviderChange(e.target.value)}
-          class={styles.select}
-        >
-          <option value="ollama">Ollama</option>
+        <select value={displayProvider()} onChange={(e) => handleProviderChange(e.target.value)} class={styles.select}>
+          <option value="ollama" disabled={localProviderStatus().ollama !== 'reachable'}>
+            Ollama {localProviderStatus().ollama === 'reachable' ? '(local)' : '(not reachable)'}
+          </option>
+          <option value="llamacpp" disabled={localProviderStatus().llamacpp !== 'reachable'}>
+            llama.cpp {localProviderStatus().llamacpp === 'reachable' ? '(local)' : '(not reachable)'}
+          </option>
           <option value="openrouter">OpenRouter</option>
           <option value="anthropic">Anthropic</option>
           <option value="openai">OpenAI</option>
@@ -184,6 +201,12 @@ const AISettingsContent: Component = () => {
             <option value={`custom:${p.id}`}>{p.name}</option>
           ))}
         </select>
+        <div class={aiStyles.localProviderStatus}>
+          Local providers are detected on this device.{' '}
+          <button type="button" class={aiStyles.refreshProvidersButton} onClick={() => void refreshLocalProviders()}>
+            Check again
+          </button>
+        </div>
         <Show when={isStoryScope() && !storyProvider()}>
           <span class={aiStyles.inheritHint}>Inherited from global: {settingsStore.provider}</span>
         </Show>
@@ -224,9 +247,7 @@ const AISettingsContent: Component = () => {
           onChange={(e) => handleMaxTokensChange(Number(e.target.value))}
           class={styles.select}
         >
-          <For each={[512, 1024, 2048, 4096, 8192]}>
-            {(value) => <option value={value}>{value} tokens</option>}
-          </For>
+          <For each={[512, 1024, 2048, 4096, 8192]}>{(value) => <option value={value}>{value} tokens</option>}</For>
         </select>
         <Show when={isStoryScope() && storyMaxTokens() === null}>
           <span class={aiStyles.inheritHint}>Inherited from global: {settingsStore.maxTokens}</span>
@@ -255,7 +276,10 @@ const AISettingsContent: Component = () => {
           <option value={16384}>16384 tokens</option>
         </select>
         <Show when={isStoryScope() && storyThinkingBudget() === null}>
-          <span class={aiStyles.inheritHint}>Inherited from global: {settingsStore.thinkingBudget === 0 ? 'Off' : `${settingsStore.thinkingBudget} tokens`}</span>
+          <span class={aiStyles.inheritHint}>
+            Inherited from global:{' '}
+            {settingsStore.thinkingBudget === 0 ? 'Off' : `${settingsStore.thinkingBudget} tokens`}
+          </span>
         </Show>
       </div>
 

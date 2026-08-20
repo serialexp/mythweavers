@@ -1,5 +1,5 @@
-import { style } from '@vanilla-extract/css'
 import { tokens } from '@mythweavers/ui/tokens'
+import { style } from '@vanilla-extract/css'
 
 export const scopeToggle = style({
   display: 'flex',
@@ -48,6 +48,21 @@ export const inheritHint = style({
   fontSize: '0.7rem',
   color: tokens.color.text.muted,
   fontStyle: 'italic',
+})
+
+export const localProviderStatus = style({
+  fontSize: '0.7rem',
+  color: tokens.color.text.muted,
+})
+
+export const refreshProvidersButton = style({
+  border: 'none',
+  background: 'none',
+  color: tokens.color.accent.primary,
+  font: 'inherit',
+  cursor: 'pointer',
+  padding: 0,
+  textDecoration: 'underline',
 })
 
 export const clearOverrideButton = style({

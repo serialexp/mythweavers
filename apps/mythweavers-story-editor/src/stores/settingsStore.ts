@@ -65,6 +65,7 @@ const [settingsState, setSettingsState] = createStore({
   openaiApiKey: localStorage.getItem('story-openai-api-key') || '',
   cloudflareApiKey: localStorage.getItem('story-cloudflare-api-key') || '',
   cloudflareEndpoint: localStorage.getItem('story-cloudflare-endpoint') || '',
+  llamaCppApiKey: localStorage.getItem('story-llamacpp-api-key') || '',
   person: localStorage.getItem('story-person') || 'third',
   tense: localStorage.getItem('story-tense') || 'past',
   autoGenerate: localStorage.getItem('story-auto-generate') === 'true',
@@ -119,6 +120,10 @@ createEffect(() => {
 
 createEffect(() => {
   localStorage.setItem('story-cloudflare-endpoint', settingsState.cloudflareEndpoint)
+})
+
+createEffect(() => {
+  localStorage.setItem('story-llamacpp-api-key', settingsState.llamaCppApiKey)
 })
 
 createEffect(() => {
@@ -370,6 +375,9 @@ export const settingsStore = {
   get customProviders() {
     return settingsState.customProviders
   },
+  get llamaCppApiKey() {
+    return settingsState.llamaCppApiKey
+  },
 
   // Actions
   setModel: (model: string) => {
@@ -390,6 +398,12 @@ export const settingsStore = {
   setOpenaiApiKey: (key: string) => setSettingsState('openaiApiKey', key),
   setCloudflareApiKey: (key: string) => setSettingsState('cloudflareApiKey', key),
   setCloudflareEndpoint: (endpoint: string) => setSettingsState('cloudflareEndpoint', endpoint),
+  setLlamaCppApiKey: (key: string) => {
+    setSettingsState('llamaCppApiKey', key)
+    import('../utils/llm/LLMClientFactory').then(({ LLMClientFactory }) => {
+      LLMClientFactory.clearClientCache('llamacpp')
+    })
+  },
   setPerson: (person: string) => setSettingsState('person', person),
   setTense: (tense: string) => setSettingsState('tense', tense),
   setAutoGenerate: (enabled: boolean) => setSettingsState('autoGenerate', enabled),
