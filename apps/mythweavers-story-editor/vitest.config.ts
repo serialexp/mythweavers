@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
     // Keep solid-js out of Vitest's prod dep pre-bundling so it is resolved with
     // the `development` condition below. Otherwise `solid-js/store` loads its dev
     // build while `solid-js` core loads prod (DEV === undefined), and createStore
