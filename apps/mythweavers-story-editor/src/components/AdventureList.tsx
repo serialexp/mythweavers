@@ -4,10 +4,6 @@ import { Component, For, Show, createEffect, createSignal, onMount } from 'solid
 import { PhPencilSimpleIcon, PhTrashIcon } from 'solidjs-phosphor'
 import { deleteMyAdventuresById, getMyAdventures, postMyAdventures, putMyAdventuresById } from '../client/config'
 import type { PersistedState } from '../hooks/useAdventurePersistence'
-import { effectiveSettings } from '../stores/effectiveSettingsStore'
-import type { LLMMessage } from '../types/llm'
-import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
-import { resolveModel } from '../utils/llm/resolveModel'
 import * as styles from './AdventureList.css'
 import { NewAdventureForm, type NewAdventureResult } from './NewAdventureForm'
 
@@ -26,43 +22,6 @@ function formatDate(iso: string): string {
   if (diff < 604_800_000) return `${Math.floor(diff / 86_400_000)}d ago`
 
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-async function generateAdventureTitle(settingDescription: string): Promise<string> {
-  const resolved = resolveModel('adventure-title')
-  const client = LLMClientFactory.getClient(resolved.provider)
-
-  const prompt = `Here is the setting description for an interactive adventure:
-
-${settingDescription.substring(0, 1000)}
-
-Based on the above, generate a short, evocative title (2-5 words) that captures the essence of this adventure's setting. Be creative — don't just restate the location or era. Only respond with the title, nothing else.`
-
-  const messages: LLMMessage[] = [{ role: 'user', content: prompt }]
-
-  let title = ''
-  const response = client.generate({
-    model: resolved.model,
-    messages,
-    max_tokens: 20,
-    metadata: { callType: 'adventure-title' },
-  })
-
-  for await (const event of response) {
-    if (event.type === 'chunk') {
-      title += event.text
-    }
-  }
-
-  return (
-    title
-      .trim()
-      .replace(/<think>[\s\S]*?<\/think>/g, '')
-      .trim()
-      .replace(/^["']|["']$/g, '')
-      .replace(/^Title:?\s*/i, '')
-      .substring(0, 60) || 'Untitled Adventure'
-  )
 }
 
 interface AdventureListProps {
@@ -217,20 +176,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
       ...result.settings,
     }
 
-    // Generate an adventure-specific title from the opening and a little world context.
-    let name: string
-    if (effectiveSettings.model && effectiveSettings.provider) {
-      try {
-        name = await generateAdventureTitle(`${startPrompt}\n\nWorld: ${worldSetting.slice(0, 700)}`)
-      } catch (err) {
-        console.error('Failed to generate adventure title:', err)
-        const firstLine = startPrompt.split('\n')[0].trim()
-        name = firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 57)}...`
-      }
-    } else {
-      const firstLine = startPrompt.split('\n')[0].trim()
-      name = firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 57)}...`
-    }
+    const name = result.title.trim()
 
     try {
       const { data } = await postMyAdventures({

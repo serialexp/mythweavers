@@ -4,6 +4,7 @@ import { getMyAdventuresById } from '../client/config'
 import * as styles from '../pages/AdventurePage.css'
 import { SETTING_KNOBS, buildSettingGenerationMessages, pickRandom } from '../pages/adventure/prompts'
 import { effectiveSettings } from '../stores/effectiveSettingsStore'
+import { buildAdventureTitleMessages, cleanAdventureTitle } from '../utils/adventureTitle'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
 import { ADVENTURE_SETTING_DEFAULTS, AdventureSettings, type AdventureSettingsValues } from './AdventureSettings'
@@ -15,6 +16,7 @@ export interface ReusableAdventureSetting {
 }
 
 export interface NewAdventureResult {
+  title: string
   worldSetting: string
   startPrompt: string
   protagonistInput: string
@@ -32,6 +34,7 @@ interface NewAdventureFormProps {
 }
 
 export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
+  const [title, setTitle] = createSignal('')
   const [worldSetting, setWorldSetting] = createSignal('')
   const [modifyInstruction, setModifyInstruction] = createSignal('')
   const [startPrompt, setStartPrompt] = createSignal('')
@@ -47,6 +50,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
     ...ADVENTURE_SETTING_DEFAULTS,
   })
   const [isGeneratingSetting, setIsGeneratingSetting] = createSignal(false)
+  const [isGeneratingTitle, setIsGeneratingTitle] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [settingGenFailed, setSettingGenFailed] = createSignal(false)
   const [knobValues, setKnobValues] = createSignal<Record<string, string>>(
@@ -141,6 +145,45 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
     }
   }
 
+  async function handleGenerateTitle() {
+    const setting = worldSetting().trim()
+    const opening = startPrompt().trim()
+    if (!setting || !opening) {
+      setError('Enter both a World Setting and Adventure Start before generating a title.')
+      return
+    }
+    if (!effectiveSettings.model || !effectiveSettings.provider) {
+      setError('Please configure your AI provider and model first.')
+      return
+    }
+
+    setIsGeneratingTitle(true)
+    setError(null)
+    try {
+      const resolved = resolveModel('adventure-title')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      let accumulated = ''
+      const response = client.generate({
+        model: resolved.model,
+        messages: buildAdventureTitleMessages(setting, opening),
+        max_tokens: 30,
+        metadata: { callType: 'adventure-title' },
+      })
+
+      for await (const event of response) {
+        if (event.type === 'chunk') accumulated += event.text
+      }
+
+      const generated = cleanAdventureTitle(accumulated)
+      if (!generated) throw new Error('The model returned an empty title.')
+      setTitle(generated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate title')
+    } finally {
+      setIsGeneratingTitle(false)
+    }
+  }
+
   async function handleImportSetting() {
     const id = importAdventureId()
     if (!id) return
@@ -167,6 +210,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
 
   function handleStart() {
     props.onStart({
+      title: title().trim(),
       worldSetting: worldSetting().trim(),
       startPrompt: startPrompt().trim(),
       protagonistInput: protagonistInput(),
@@ -314,6 +358,38 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
       </div>
 
       <div class={styles.formGroup}>
+        <label class={styles.formLabel}>Adventure Title</label>
+        <div class={styles.generateRow}>
+          <input
+            class={styles.formInput}
+            type="text"
+            value={title()}
+            onInput={(event) => setTitle(event.currentTarget.value.slice(0, 60))}
+            placeholder="Generate a title or enter your own"
+            maxlength={60}
+            disabled={isGeneratingTitle() || props.isCreating}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleGenerateTitle}
+            disabled={
+              !worldSetting().trim() ||
+              !startPrompt().trim() ||
+              !effectiveSettings.model ||
+              isGeneratingTitle() ||
+              props.isCreating
+            }
+          >
+            {isGeneratingTitle() ? 'Generating…' : title().trim() ? 'Regenerate' : 'Generate Title'}
+          </Button>
+        </div>
+        <div class={styles.directiveHint}>
+          Generated from both the World Setting and Adventure Start. You can edit it.
+        </div>
+      </div>
+
+      <div class={styles.formGroup}>
         <label class={styles.formLabel}>Protagonist (optional)</label>
         <input
           class={styles.formInput}
@@ -375,10 +451,12 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
           variant="primary"
           onClick={handleStart}
           disabled={
+            !title().trim() ||
             !worldSetting().trim() ||
             !startPrompt().trim() ||
             !effectiveSettings.model ||
             isGeneratingSetting() ||
+            isGeneratingTitle() ||
             props.isCreating
           }
           style={{ flex: '1' }}
