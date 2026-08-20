@@ -1,7 +1,7 @@
 // Core domain types
 
-import type { Paragraph } from '@mythweavers/shared'
 import type { NormalizedTokenUsage } from '@mythweavers/llm'
+import type { Paragraph } from '@mythweavers/shared'
 import type { MapError } from '../utils/maps/mapDiagnostics'
 import { ModelPricing } from './llm'
 
@@ -183,6 +183,8 @@ export interface Node {
 
   // Chapter-specific fields (organizational level)
   includeInFull?: number // 0=not included, 1=summary only, 2=full content
+  /** Lightweight outline metadata: scene has one or more branch messages. */
+  hasBranches?: boolean
   status?: NodeStatus // Track the status of the node
 
   // Scene-specific fields (POV/context boundary)

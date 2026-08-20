@@ -176,6 +176,12 @@ export const nodeStore = {
   get loading() {
     return nodeState.loading
   },
+  /** Sum top-level book totals. These are server-cached aggregates for a lazy server story. */
+  get totalWordCount() {
+    return Object.values(nodeState.nodes)
+      .filter((node) => node.type === 'book' && !node.parentId)
+      .reduce((total, node) => total + (node.wordCount ?? 0), 0)
+  },
 
   // Get selected node
   getSelectedNode(): Node | null {
@@ -281,6 +287,36 @@ export const nodeStore = {
       })
     } else {
       // Deselecting node
+    }
+  },
+
+  /**
+   * Set one node's word count and, when both old and new values are known,
+   * apply only the delta to every ancestor. Server outlines seed aggregate
+   * book/arc/chapter counts; a scene's first lazy hydration must not be added
+   * again to those already-authoritative totals.
+   */
+  setWordCount(nodeId: string, wordCount: number, messageWordCounts?: Record<string, number>, propagate = true) {
+    const node = nodeState.nodes[nodeId]
+    if (!node) return
+
+    const previous = node.wordCount
+    setNodeState('nodes', nodeId, 'wordCount', wordCount)
+    if (messageWordCounts !== undefined) setNodeState('nodes', nodeId, 'messageWordCounts', messageWordCounts)
+
+    if (!propagate || previous === undefined) return
+    const delta = wordCount - previous
+    if (delta === 0) return
+
+    let parentId = node.parentId
+    while (parentId) {
+      const parent = nodeState.nodes[parentId]
+      if (!parent) break
+      // A missing aggregate means this tree came from a local/legacy source;
+      // do not invent a partial total from one child.
+      if (parent.wordCount === undefined) break
+      setNodeState('nodes', parentId, 'wordCount', parent.wordCount + delta)
+      parentId = parent.parentId
     }
   },
 

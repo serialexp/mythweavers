@@ -49,6 +49,7 @@ import { modelsStore } from './stores/modelsStore'
 import { nodeStore } from './stores/nodeStore'
 import { plotPointsStore } from './stores/plotPointsStore'
 import { rewriteDialogStore } from './stores/rewriteDialogStore'
+import { serverSceneContentStore } from './stores/serverSceneContentStore'
 import { serverStore } from './stores/serverStore'
 import { settingsStore } from './stores/settingsStore'
 import { ApiStory } from './types/api'
@@ -62,6 +63,42 @@ type StoryLoadResult =
   | { type: 'loaded' }
   | { type: 'not-found' }
   | { type: 'error'; message: string; details?: unknown; status?: number }
+
+/** Convert the flat outline API back to the temporary nested bridge consumed by loadServerStoryData. */
+function outlineToExportBooks(outlineNodes: any[], storyId: string, fallbackDate: string) {
+  const childrenOf = (parentId: string, kind: string) =>
+    outlineNodes
+      .filter((node) => node.parentId === parentId && node.kind === kind)
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+  const dateFields = (node: any) => ({
+    createdAt: node.createdAt ?? fallbackDate,
+    updatedAt: node.updatedAt ?? fallbackDate,
+  })
+
+  return outlineNodes
+    .filter((node) => node.kind === 'book')
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((book) => ({
+      ...book,
+      ...dateFields(book),
+      storyId,
+      arcs: childrenOf(book.id, 'arc').map((arc) => ({
+        ...arc,
+        ...dateFields(arc),
+        chapters: childrenOf(arc.id, 'chapter').map((chapter) => ({
+          ...chapter,
+          ...dateFields(chapter),
+          scenes: childrenOf(chapter.id, 'scene').map((scene) => ({
+            ...scene,
+            ...dateFields(scene),
+            activeCharacterIds: scene.activeCharacterIds ?? [],
+            activeContextItemIds: scene.activeContextItemIds ?? [],
+            messages: [],
+          })),
+        })),
+      })),
+    }))
+}
 
 function getStoryLoadError(error: unknown, status?: number): Omit<Extract<StoryLoadResult, { type: 'error' }>, 'type'> {
   const errorData = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
@@ -352,6 +389,7 @@ const App: Component = () => {
           sentenceSummary: book.sentenceSummary,
           paragraphSummary: book.paragraphSummary,
           summary: book.summary,
+          wordCount: book.wordCount,
           order: book.sortOrder ?? bookIndex,
           coverArtFileId: book.coverArtFileId ?? null,
           coverArtUrl: book.coverArtUrl ?? null,
@@ -374,6 +412,7 @@ const App: Component = () => {
             sentenceSummary: arc.sentenceSummary,
             paragraphSummary: arc.paragraphSummary,
             summary: arc.summary,
+            wordCount: arc.wordCount,
             order: arc.sortOrder ?? arcIndex,
             defaultBackgroundFileId: arc.defaultBackgroundFileId ?? null,
             defaultBackgroundUrl: arc.defaultBackgroundUrl ?? null,
@@ -394,6 +433,7 @@ const App: Component = () => {
               sentenceSummary: chapter.sentenceSummary,
               paragraphSummary: chapter.paragraphSummary,
               summary: chapter.summary,
+              wordCount: chapter.wordCount,
               order: chapter.sortOrder ?? chapterIndex,
               nodeType: chapter.nodeType || 'story',
               status: chapter.status,
@@ -432,6 +472,7 @@ const App: Component = () => {
                 storyTime: scene.storyTime,
                 status: scene.status,
                 includeInFull: scene.includeInFull,
+                hasBranches: scene.hasBranches ?? false,
                 defaultBackgroundFileId: scene.defaultBackgroundFileId ?? null,
                 defaultBackgroundUrl: scene.defaultBackgroundUrl ?? null,
                 expanded: true,
@@ -534,8 +575,21 @@ const App: Component = () => {
     }
   }
 
+  // Selection is intentionally separate from nodeStore.selectNode: that method
+  // also persists the selection, while this effect merely hydrates prose for a
+  // scene selected by any UI path (tree, search, timeline, or branch).
+  createEffect(() => {
+    const selectedNodeId = nodeStore.selectedNodeId
+    const selectedNode = selectedNodeId ? nodeStore.getNode(selectedNodeId) : null
+    if (currentStoryStore.storageMode !== 'server' || selectedNode?.type !== 'scene') return
+    void serverSceneContentStore.load(selectedNode.id).catch((error) => {
+      console.error('[scene-content] Failed to load selected scene:', error)
+    })
+  })
+
   const resetStoryState = async () => {
     console.log('[resetStoryState] Clearing previous story data before loading new story')
+    serverSceneContentStore.clear()
     setServerDataConflict(null)
     messagesStore.setShowConflictDialog(false)
     messagesStore.setMessages([])
@@ -577,51 +631,72 @@ const App: Component = () => {
       return { type: 'not-found' }
     }
 
-    // Try server first (server stories take priority)
+    // Server stories load their structural outline first. Prose is fetched only
+    // for the selected scene below, avoiding a full-novel response at startup.
     try {
-      const { getMyStoriesByIdLoadStory } = await import('./client/config')
-      const result = await getMyStoriesByIdLoadStory({ path: { id: storyId } })
-      const exportData = result.data
-      console.log('[loadStoryById] Received exported story data:', {
-        hasStory: !!exportData?.story,
-        bookCount: exportData?.books?.length || 0,
-        characterCount: exportData?.characters?.length || 0,
-        contextItemCount: exportData?.contextItems?.length || 0,
-        calendarCount: exportData?.calendars?.length || 0,
-        mapCount: exportData?.maps?.length || 0,
-      })
-      if (exportData?.story) {
-        // Found server story
+      const {
+        getMyStoriesById,
+        getMyStoriesByStoryIdOutline,
+        getMyCalendarsById,
+        getMyLanguagesById,
+        getMyStoriesByStoryIdCharacters,
+        getMyStoriesByStoryIdContextItems,
+        getMyStoriesByStoryIdMaps,
+      } = await import('./client/config')
+      const [storyResult, outlineResult, charactersResult, contextItemsResult, mapsResult] = await Promise.all([
+        getMyStoriesById({ path: { id: storyId } }),
+        getMyStoriesByStoryIdOutline({
+          path: { storyId },
+          query: { depth: 'scene', includeSummaries: true, includeSceneDetail: true },
+        }),
+        getMyStoriesByStoryIdCharacters({ path: { storyId } }),
+        getMyStoriesByStoryIdContextItems({ path: { storyId } }),
+        getMyStoriesByStoryIdMaps({ path: { storyId } }),
+      ])
+      const story = storyResult.data?.story
+      const outline = outlineResult.data
+      const [calendars, languages] = await Promise.all([
+        story?.defaultCalendarId
+          ? getMyCalendarsById({ path: { id: story.defaultCalendarId } }).then((result) => [result.data?.calendar])
+          : [],
+        story?.defaultLanguageId
+          ? getMyLanguagesById({ path: { id: story.defaultLanguageId } }).then((result) => [result.data?.language])
+          : [],
+      ])
+      if (story && outline) {
+        if (currentStoryStore.id !== storyId) await resetStoryState()
 
-        // For now, skip conflict detection with the new format
-        // TODO: Implement conflict detection for the new hierarchical format
-        const isSameStory = currentStoryStore.id === storyId
-        if (!isSameStory) {
-          await resetStoryState()
+        const exportData = {
+          story,
+          books: outlineToExportBooks(outline.nodes, storyId, story.createdAt),
+          characters: charactersResult.data?.characters ?? [],
+          contextItems: contextItemsResult.data?.contextItems ?? [],
+          calendars: calendars.filter(Boolean),
+          languages: languages.filter(Boolean),
+          maps: mapsResult.data?.maps ?? [],
         }
-
-        // Load the exported story data
+        serverSceneContentStore.beginStory(storyId)
         await loadServerStoryData(exportData, storyId)
+        const selectedSceneId = nodeStore.getSelectedNode()?.type === 'scene' ? nodeStore.selectedNodeId : null
+        if (selectedSceneId) await serverSceneContentStore.load(selectedSceneId)
+        // The outline carries cached chapter totals, while prose is deliberately
+        // lazy. Retain those totals after the selected scene is merged so the
+        // header and navigation still describe the whole story.
+        for (const node of outline.nodes) {
+          if (typeof node.wordCount === 'number') nodeStore.updateNodeNoSave(node.id, { wordCount: node.wordCount })
+        }
         return { type: 'loaded' }
       }
 
-      if (result.error) {
-        const status = result.response?.status
-        if (status !== 404) {
-          const loadError = getStoryLoadError(result.error, status)
-          console.error('[loadStoryById] Error loading story:', { status, ...loadError })
-          return { type: 'error', ...loadError }
-        }
-      } else {
-        const status = result.response?.status
-        const loadError = getStoryLoadError('The server returned an invalid story response', status)
-        console.error('[loadStoryById] Export succeeded but no story in response data:', exportData)
+      const status = storyResult.response?.status ?? outlineResult.response?.status
+      if (status !== 404) {
+        const loadError = getStoryLoadError(storyResult.error ?? outlineResult.error, status)
+        console.error('[loadStoryById] Error loading story:', { status, ...loadError })
         return { type: 'error', ...loadError }
       }
-
       console.log('[loadStoryById] Story was not found on the server; checking local storage')
     } catch (error: any) {
-      console.log('[loadStoryById] Export endpoint failed:', error)
+      console.log('[loadStoryById] Outline-first load failed:', error)
       const status = error?.response?.status || error?.status
       if (status !== 404) {
         const errorData = error?.response?.data || error?.data || error
@@ -879,8 +954,9 @@ const App: Component = () => {
       nodeStore.setNodes(nodes)
 
       // Select the saved node or auto-select first scene if none selected
-      if (selectedNodeId) {
-        nodeStore.selectNode(selectedNodeId)
+      const selectedNode = selectedNodeId ? nodes.find((node) => node.id === selectedNodeId) : undefined
+      if (selectedNode?.type === 'scene') {
+        nodeStore.selectNode(selectedNode.id)
       } else {
         const sceneNodes = nodes.filter((n) => n.type === 'scene')
         if (sceneNodes.length > 0 && !nodeStore.selectedNodeId) {

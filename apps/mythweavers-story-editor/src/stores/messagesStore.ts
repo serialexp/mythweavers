@@ -1,6 +1,5 @@
 import { batch, createMemo } from 'solid-js'
 import { createStore } from 'solid-js/store'
-import { getMyStoriesByIdLoadStory } from '../client/config'
 import { saveService } from '../services/saveService'
 import type { Message } from '../types/core'
 import type { SavedStory } from '../types/store'
@@ -8,13 +7,13 @@ import { generateMessageId } from '../utils/id'
 import { calculateActivePath } from '../utils/nodeTraversal'
 import { createSavePayload } from '../utils/savePayload'
 import { storage } from '../utils/storage'
-import { messagesFromStoryExport } from '../utils/storyExport'
 import { storyManager } from '../utils/storyManager'
 import { getStoryStats } from '../utils/storyUtils'
 import { currentStoryStore } from './currentStoryStore'
 import { errorStore } from './errorStore'
 import { mapsStore } from './mapsStore'
 import { nodeStore } from './nodeStore'
+import { serverSceneContentStore } from './serverSceneContentStore'
 import { settingsStore } from './settingsStore'
 import { on } from './storeEvents'
 
@@ -42,6 +41,8 @@ const [messagesState, setMessagesState] = createStore({
 
 let localSavePromise: Promise<void> | null = null
 let localSaveRequested = false
+
+const countWords = (content: string): number => content.split(/\s+/).filter(Boolean).length
 
 const saveLocalStory = (): Promise<void> => {
   localSaveRequested = true
@@ -532,10 +533,11 @@ export const messagesStore = {
     })
 
     for (const nodeId in nodeMessages) {
-      nodeStore.updateNodeNoSave(nodeId, {
-        messageWordCounts: nodeMessages[nodeId],
-        wordCount: Object.values(nodeMessages[nodeId]).reduce((acc, val) => acc + val, 0),
-      })
+      nodeStore.setWordCount(
+        nodeId,
+        Object.values(nodeMessages[nodeId]).reduce((acc, val) => acc + val, 0),
+        nodeMessages[nodeId],
+      )
     }
   },
 
@@ -561,10 +563,11 @@ export const messagesStore = {
 
     // Update each node's word count
     for (const nodeId in nodeMessages) {
-      nodeStore.updateNodeNoSave(nodeId, {
-        messageWordCounts: nodeMessages[nodeId],
-        wordCount: Object.values(nodeMessages[nodeId]).reduce((acc, val) => acc + val, 0),
-      })
+      nodeStore.setWordCount(
+        nodeId,
+        Object.values(nodeMessages[nodeId]).reduce((acc, val) => acc + val, 0),
+        nodeMessages[nodeId],
+      )
     }
 
     // If specific nodeIds were requested, also handle nodes that now have 0 messages
@@ -573,10 +576,7 @@ export const messagesStore = {
       for (const nodeId of nodeIds) {
         if (!nodeMessages[nodeId]) {
           // No messages for this node - set word count to 0
-          nodeStore.updateNodeNoSave(nodeId, {
-            messageWordCounts: {},
-            wordCount: 0,
-          })
+          nodeStore.setWordCount(nodeId, 0, {})
         }
       }
     }
@@ -658,6 +658,24 @@ export const messagesStore = {
   // Version for WebSocket updates that doesn't trigger save
   appendMessageNoSave: (message: Message) => {
     setMessagesState('messages', (prev) => [...prev, message])
+  },
+
+  /** Replace one lazily hydrated scene without discarding already visited scenes. */
+  replaceSceneMessages: (sceneId: string, messages: Message[]) => {
+    setMessagesState('messages', (previous) => [
+      ...previous.filter((message) => message.sceneId !== sceneId),
+      ...messages.sort((left, right) => left.order - right.order),
+    ])
+    // The first lazy load seeds a scene that had no local count; tree-level
+    // aggregates already came from the outline, so do not propagate this load.
+    const sceneHadCount = nodeStore.getNode(sceneId)?.wordCount !== undefined
+    const nodeMessages = Object.fromEntries(messages.map((message) => [message.id, countWords(message.content)]))
+    nodeStore.setWordCount(
+      sceneId,
+      Object.values(nodeMessages).reduce((sum, count) => sum + count, 0),
+      nodeMessages,
+      sceneHadCount,
+    )
   },
 
   insertMessage: (afterMessageId: string | null, message: Message) => {
@@ -846,7 +864,6 @@ export const messagesStore = {
   },
 
   clearMessages: async () => {
-
     const storyId = currentStoryStore.id
 
     setMessagesState('messages', [])
@@ -1329,8 +1346,6 @@ export const messagesStore = {
 
   // Force save after conflict
   forceSave: async () => {
-
-
     // Don't save if we're already saving or loading
     if (messagesState.isSaving || messagesState.isLoading) return
 
@@ -1557,11 +1572,7 @@ export const messagesStore = {
 
   // Create a background-image message that the reader app crossfades to.
   // The file must already be uploaded via POST /my/files; pass its id + path.
-  createBackgroundMessage: (
-    afterMessageId: string | null,
-    file: { id: string; path: string },
-    nodeId?: string,
-  ) => {
+  createBackgroundMessage: (afterMessageId: string | null, file: { id: string; path: string }, nodeId?: string) => {
     let targetNodeId: string | undefined = nodeId
     if (!targetNodeId && afterMessageId) {
       const afterMessage = messagesState.messages.find((m) => m.id === afterMessageId)
@@ -1593,11 +1604,7 @@ export const messagesStore = {
   // id + path. Unlike background, the reader doesn't carry audio forward —
   // each embed plays only when the user explicitly hits play on its inline
   // controls — so there is no extra carry-forward bookkeeping here.
-  createAudioMessage: (
-    afterMessageId: string | null,
-    file: { id: string; path: string },
-    nodeId?: string,
-  ) => {
+  createAudioMessage: (afterMessageId: string | null, file: { id: string; path: string }, nodeId?: string) => {
     let targetNodeId: string | undefined = nodeId
     if (!targetNodeId && afterMessageId) {
       const afterMessage = messagesState.messages.find((m) => m.id === afterMessageId)
@@ -1630,15 +1637,16 @@ export const messagesStore = {
 
     if (!storyId) return
 
-    // For server stories, reload from server
+    // Server stories keep a scene cache; refreshing the selected scene must not
+    // pull every paragraph in the story back over the network.
     if (currentStoryStore.storageMode === 'server') {
-      try {
-        const result = await getMyStoriesByIdLoadStory({ path: { id: storyId } })
-        if (result.data) {
-          messagesStore.setMessages(messagesFromStoryExport(result.data))
+      const selectedNode = nodeStore.getSelectedNode()
+      if (selectedNode?.type === 'scene') {
+        try {
+          await serverSceneContentStore.load(selectedNode.id, true)
+        } catch (error) {
+          console.error('Failed to refresh selected scene from server:', error)
         }
-      } catch (error) {
-        console.error('Failed to refresh messages from server:', error)
       }
     } else {
       // For local stories, reload from storyManager
