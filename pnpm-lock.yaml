@@ -422,7 +422,7 @@ importers:
         specifier: '>=20.0.0'
         version: 20.0.11
       playwright:
-        specifier: 1.57.0
+        specifier: '>=1.55.1'
         version: 1.57.0
       rollup-plugin-visualizer:
         specifier: ^7.0.1
