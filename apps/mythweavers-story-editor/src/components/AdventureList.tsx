@@ -41,7 +41,7 @@ interface AdventureListProps {
 export const AdventureList: Component<AdventureListProps> = (props) => {
   const navigate = useNavigate()
   const [deletingId, setDeletingId] = createSignal<string | null>(null)
-  const [regeneratingTitleId, setRegeneratingTitleId] = createSignal<string | null>(null)
+  const [regeneratingTitleIds, setRegeneratingTitleIds] = createSignal<Set<string>>(new Set())
   const [showNewAdventure, setShowNewAdventure] = createSignal(false)
   const [isCreatingAdventure, setIsCreatingAdventure] = createSignal(false)
   const [createError, setCreateError] = createSignal<string | null>(null)
@@ -160,7 +160,8 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
       return
     }
 
-    setRegeneratingTitleId(id)
+    if (regeneratingTitleIds().has(id)) return
+    setRegeneratingTitleIds((current) => new Set(current).add(id))
     try {
       const { data } = await getMyAdventuresById({ path: { id } })
       const state = data?.adventure.data as Record<string, unknown> | undefined
@@ -197,7 +198,11 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
       console.error('Failed to regenerate adventure title:', err)
       alert(err instanceof Error ? err.message : 'Failed to regenerate adventure title')
     } finally {
-      setRegeneratingTitleId(null)
+      setRegeneratingTitleIds((current) => {
+        const next = new Set(current)
+        next.delete(id)
+        return next
+      })
     }
   }
 
@@ -328,9 +333,9 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
                           variant="ghost"
                           size="sm"
                           onClick={() => void regenerateTitle(adventure.id)}
-                          disabled={regeneratingTitleId() !== null}
+                          disabled={regeneratingTitleIds().has(adventure.id)}
                         >
-                          {regeneratingTitleId() === adventure.id ? <Spinner size="sm" /> : <PhArrowsClockwiseIcon />}
+                          {regeneratingTitleIds().has(adventure.id) ? <Spinner size="sm" /> : <PhArrowsClockwiseIcon />}
                         </IconButton>
                         <IconButton
                           aria-label="Rename adventure"
