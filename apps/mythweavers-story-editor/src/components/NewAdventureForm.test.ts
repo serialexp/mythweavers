@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildAdventureTitleMessages, cleanAdventureTitle } from '../utils/adventureTitle'
+import { reusableSettingLabel } from '../utils/reusableSettingLabel'
 
 describe('adventure title generation', () => {
   it('includes the world setting and opening prompt as distinct inputs', () => {
@@ -20,5 +21,22 @@ describe('adventure title generation', () => {
 
   it('bounds titles to the backend name limit used by the form', () => {
     expect(cleanAdventureTitle('x'.repeat(100))).toHaveLength(60)
+  })
+})
+
+describe('reusable setting labels', () => {
+  it('shows only the existing adventure title when one exists', () => {
+    expect(reusableSettingLabel({ name: 'The Fallen Accord', settingPreview: 'A very long first message.' })).toBe(
+      'The Fallen Accord',
+    )
+  })
+
+  it('falls back to at most 30 characters of the concept for an untitled adventure', () => {
+    const label = reusableSettingLabel({
+      name: 'Untitled Adventure',
+      settingPreview: 'A brass city at the edge of endless night.',
+    })
+    expect(label).toBe('A brass city at the edge of…')
+    expect(label.length).toBeLessThanOrEqual(30)
   })
 })

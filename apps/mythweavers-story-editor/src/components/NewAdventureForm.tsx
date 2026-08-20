@@ -7,6 +7,7 @@ import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { buildAdventureTitleMessages, cleanAdventureTitle } from '../utils/adventureTitle'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
+import { reusableSettingLabel } from '../utils/reusableSettingLabel'
 import { ADVENTURE_SETTING_DEFAULTS, AdventureSettings, type AdventureSettingsValues } from './AdventureSettings'
 
 export interface ReusableAdventureSetting {
@@ -307,12 +308,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
             >
               <option value="">Choose an adventure…</option>
               <For each={props.reusableSettings}>
-                {(adventure) => (
-                  <option value={adventure.id}>
-                    {adventure.name}
-                    {adventure.settingPreview ? ` — ${adventure.settingPreview}` : ''}
-                  </option>
-                )}
+                {(adventure) => <option value={adventure.id}>{reusableSettingLabel(adventure)}</option>}
               </For>
             </select>
             <Button
