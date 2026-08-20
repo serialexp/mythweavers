@@ -1,15 +1,15 @@
-import { Component, For, Show, createEffect, createSignal, onMount } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
 import { ActionRow, Button, IconButton, Input, Modal, Spinner, Text } from '@mythweavers/ui'
+import { useNavigate } from '@solidjs/router'
+import { Component, For, Show, createEffect, createSignal, onMount } from 'solid-js'
+import { PhPencilSimpleIcon, PhTrashIcon } from 'solidjs-phosphor'
 import { deleteMyAdventuresById, getMyAdventures, postMyAdventures, putMyAdventuresById } from '../client/config'
-import { NewAdventureForm, type NewAdventureResult } from './NewAdventureForm'
 import type { PersistedState } from '../hooks/useAdventurePersistence'
 import { effectiveSettings } from '../stores/effectiveSettingsStore'
+import type { LLMMessage } from '../types/llm'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
-import type { LLMMessage } from '../types/llm'
 import * as styles from './AdventureList.css'
-import { PhPencilSimpleIcon, PhTrashIcon } from 'solidjs-phosphor'
+import { NewAdventureForm, type NewAdventureResult } from './NewAdventureForm'
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -54,13 +54,15 @@ Based on the above, generate a short, evocative title (2-5 words) that captures 
     }
   }
 
-  return title
-    .trim()
-    .replace(/<think>[\s\S]*?<\/think>/g, '')
-    .trim()
-    .replace(/^["']|["']$/g, '')
-    .replace(/^Title:?\s*/i, '')
-    .substring(0, 60) || 'Untitled Adventure'
+  return (
+    title
+      .trim()
+      .replace(/<think>[\s\S]*?<\/think>/g, '')
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .replace(/^Title:?\s*/i, '')
+      .substring(0, 60) || 'Untitled Adventure'
+  )
 }
 
 interface AdventureListProps {
@@ -71,14 +73,20 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
   const navigate = useNavigate()
   const [deletingId, setDeletingId] = createSignal<string | null>(null)
   const [showNewAdventure, setShowNewAdventure] = createSignal(false)
+  const [isCreatingAdventure, setIsCreatingAdventure] = createSignal(false)
+  const [createError, setCreateError] = createSignal<string | null>(null)
   const [editingId, setEditingId] = createSignal<string | null>(null)
   const [editingName, setEditingName] = createSignal('')
-  const [adventures, setAdventures] = createSignal<Array<{
-    id: string
-    name: string
-    createdAt: string
-    updatedAt: string
-  }>>([])
+  const [adventures, setAdventures] = createSignal<
+    Array<{
+      id: string
+      name: string
+      createdAt: string
+      updatedAt: string
+      hasSetting: boolean
+      settingPreview?: string
+    }>
+  >([])
   const [loading, setLoading] = createSignal(true)
   const [adventurePage, setAdventurePage] = createSignal(1)
   const [adventureTotalPages, setAdventureTotalPages] = createSignal(1)
@@ -191,32 +199,36 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
   }
 
   const handleNewAdventure = async (result: NewAdventureResult) => {
-    // Build the initial state
-    const settingDescription = result.settingInput.trim()
+    setIsCreatingAdventure(true)
+    setCreateError(null)
+    const worldSetting = result.worldSetting.trim()
+    const startPrompt = result.startPrompt.trim()
 
     const initialState: PersistedState = {
       phase: 'playing',
-      settingInput: result.settingInput,
+      settingInput: worldSetting,
       protagonistInput: result.protagonistInput,
       deuteragonistInput: result.deuteragonistInput || undefined,
-      settingDescription,
+      settingDescription: startPrompt,
+      startPrompt,
+      worldBible: worldSetting,
       turns: [],
       directive: result.directive,
       ...result.settings,
     }
 
-    // Generate a title via LLM, fall back to truncated setting text
+    // Generate an adventure-specific title from the opening and a little world context.
     let name: string
     if (effectiveSettings.model && effectiveSettings.provider) {
       try {
-        name = await generateAdventureTitle(settingDescription)
+        name = await generateAdventureTitle(`${startPrompt}\n\nWorld: ${worldSetting.slice(0, 700)}`)
       } catch (err) {
         console.error('Failed to generate adventure title:', err)
-        const firstLine = result.settingInput.split('\n')[0].trim()
+        const firstLine = startPrompt.split('\n')[0].trim()
         name = firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 57)}...`
       }
     } else {
-      const firstLine = result.settingInput.split('\n')[0].trim()
+      const firstLine = startPrompt.split('\n')[0].trim()
       name = firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 57)}...`
     }
 
@@ -228,31 +240,39 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
         },
       })
 
-      if (data?.adventure) {
-        setShowNewAdventure(false)
-        navigate(`/adventure/${data.adventure.id}`)
-      }
+      if (!data?.adventure) throw new Error('The server returned no adventure.')
+      setShowNewAdventure(false)
+      navigate(`/adventure/${data.adventure.id}`)
     } catch (err) {
       console.error('Failed to create adventure:', err)
-      // Fall back to client-side navigation
-      setShowNewAdventure(false)
-      navigate('/adventure/new')
+      setCreateError(err instanceof Error ? err.message : 'Failed to create adventure')
+    } finally {
+      setIsCreatingAdventure(false)
     }
   }
 
   return (
     <div>
       <div class={styles.newButton}>
-        <Button variant="primary" onClick={() => setShowNewAdventure(true)}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            setCreateError(null)
+            setShowNewAdventure(true)
+          }}
+        >
           New Adventure
         </Button>
       </div>
 
-      <Show when={!loading()} fallback={
-        <div style={{ display: 'flex', 'justify-content': 'center', padding: '2rem' }}>
-          <Spinner size="sm" />
-        </div>
-      }>
+      <Show
+        when={!loading()}
+        fallback={
+          <div style={{ display: 'flex', 'justify-content': 'center', padding: '2rem' }}>
+            <Spinner size="sm" />
+          </div>
+        }
+      >
         <Show
           when={adventures().length > 0}
           fallback={
@@ -286,9 +306,7 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
                         />
                       }
                     >
-                      <span onDblClick={() => startEditing(adventure.id, adventure.name)}>
-                        {adventure.name}
-                      </span>
+                      <span onDblClick={() => startEditing(adventure.id, adventure.name)}>{adventure.name}</span>
                     </Show>
                   }
                   description={
@@ -337,15 +355,15 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
         </Show>
       </Show>
 
-      <Modal
-        open={showNewAdventure()}
-        onClose={() => setShowNewAdventure(false)}
-        title="New Adventure"
-        size="lg"
-      >
+      <Modal open={showNewAdventure()} onClose={() => setShowNewAdventure(false)} title="New Adventure" size="lg">
         <NewAdventureForm
           onStart={handleNewAdventure}
           onCancel={() => setShowNewAdventure(false)}
+          reusableSettings={adventures()
+            .filter((adventure) => adventure.hasSetting)
+            .map(({ id, name, settingPreview }) => ({ id, name, settingPreview }))}
+          isCreating={isCreatingAdventure()}
+          createError={createError()}
         />
       </Modal>
     </div>

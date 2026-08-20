@@ -1,68 +1,22 @@
-import { Component, For, Show, createSignal } from 'solid-js'
 import { Button } from '@mythweavers/ui'
+import { Component, For, Show, createSignal } from 'solid-js'
+import { getMyAdventuresById } from '../client/config'
+import * as styles from '../pages/AdventurePage.css'
+import { SETTING_KNOBS, buildSettingGenerationMessages, pickRandom } from '../pages/adventure/prompts'
 import { effectiveSettings } from '../stores/effectiveSettingsStore'
 import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
 import { resolveModel } from '../utils/llm/resolveModel'
-import type { LLMMessage } from '../types/llm'
-import {
-  AdventureSettings,
-  ADVENTURE_SETTING_DEFAULTS,
-  type AdventureSettingsValues,
-} from './AdventureSettings'
-import * as styles from '../pages/AdventurePage.css'
+import { ADVENTURE_SETTING_DEFAULTS, AdventureSettings, type AdventureSettingsValues } from './AdventureSettings'
 
-// --- Setting generation knobs ---
-
-interface SettingKnob {
+export interface ReusableAdventureSetting {
   id: string
-  label: string
-  options: string[]
+  name: string
+  settingPreview?: string
 }
-
-const SETTING_KNOBS: SettingKnob[] = [
-  {
-    id: 'era',
-    label: 'Era',
-    options: ['Antiquity', 'Medieval', 'Renaissance', 'Victorian', 'Modern', 'Near Future', 'Far Future', 'Stone Age', 'Mythic'],
-  },
-  {
-    id: 'location',
-    label: 'Start',
-    options: ['City', 'Village', 'Wilderness', 'Underground', 'Coastal', 'Space', 'Desert', 'Mountains', 'Island', 'Floating'],
-  },
-  {
-    id: 'tone',
-    label: 'Tone',
-    options: ['Dark', 'Whimsical', 'Gritty', 'Heroic', 'Horror', 'Mystery', 'Comedic', 'Melancholic', 'Surreal'],
-  },
-  {
-    id: 'magictech',
-    label: 'Power',
-    options: ['No magic', 'Low magic', 'High magic', 'Steampunk', 'Sci-fi tech', 'Post-apocalyptic', 'Biopunk', 'Divine'],
-  },
-  {
-    id: 'scale',
-    label: 'Scale',
-    options: ['Intimate', 'Local', 'Regional', 'Epic', 'Cosmic'],
-  },
-]
-
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
-
-const SETTING_GEN_PROMPT = `You are a world-builder creating a setting for an interactive adventure. Given the following parameters, craft a vivid, specific setting description in 2-4 sentences. Describe the world and the immediate situation — do NOT describe or mention the protagonist. Focus on atmosphere, sensory details, and an interesting situation that invites exploration.
-
-The "Location" parameter describes the STARTING LOCATION where the adventure begins, not a constraint on the entire world. A cosmic-scale adventure can absolutely start in a village — the village just happens to be where the protagonist is when things kick off.
-
-Be creative and specific — don't just restate the parameters. Invent names, places, and details that make the setting feel alive.
-
-If the user provides a base concept or rough idea, use it as the foundation and flesh it out into a rich setting using the parameters as guidance. The parameters should complement and enhance the base idea, not override it.
-
-Respond with ONLY the setting description, no other text.`
 
 export interface NewAdventureResult {
-  settingInput: string
+  worldSetting: string
+  startPrompt: string
   protagonistInput: string
   deuteragonistInput: string
   directive: string
@@ -70,12 +24,19 @@ export interface NewAdventureResult {
 }
 
 interface NewAdventureFormProps {
-  onStart: (result: NewAdventureResult) => void
+  onStart: (result: NewAdventureResult) => void | Promise<void>
   onCancel?: () => void
+  reusableSettings?: ReusableAdventureSetting[]
+  isCreating?: boolean
+  createError?: string | null
 }
 
 export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
-  const [settingInput, setSettingInput] = createSignal('')
+  const [worldSetting, setWorldSetting] = createSignal('')
+  const [modifyInstruction, setModifyInstruction] = createSignal('')
+  const [startPrompt, setStartPrompt] = createSignal('')
+  const [importAdventureId, setImportAdventureId] = createSignal('')
+  const [isImporting, setIsImporting] = createSignal(false)
   const [protagonistInput, setProtagonistInput] = createSignal('')
   const [deuteragonistInput, setDeuteragonistInput] = createSignal('')
   const [directive, setDirective] = createSignal('')
@@ -123,25 +84,19 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
     }
     setKnobValues(values)
 
-    const paramLines = SETTING_KNOBS.map(
-      (knob) => `- ${knob.label}: ${values[knob.id]}`,
-    ).join('\n')
-
-    const existingText = settingInput().trim()
+    const existingText = worldSetting().trim()
+    const modification = modifyInstruction().trim()
 
     try {
       const settingResolved = resolveModel('adventure-setting')
       const client = LLMClientFactory.getClient(settingResolved.provider)
 
-      let userContent = `Parameters:\n${paramLines}`
-      if (existingText) {
-        userContent += `\n\nBase concept:\n${existingText}`
-      }
-
-      const messages: LLMMessage[] = [
-        { role: 'system', content: SETTING_GEN_PROMPT },
-        { role: 'user', content: userContent },
-      ]
+      const messages = buildSettingGenerationMessages({
+        parameters: values,
+        ...(existingText && modification
+          ? { currentSetting: existingText, modification }
+          : { baseConcept: existingText }),
+      })
 
       let accumulated = ''
       let doneThinking = false
@@ -162,22 +117,19 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
             doneThinking = true
           }
           if (doneThinking || !accumulated.includes('<think>')) {
-            const display = accumulated
-              .replace(/<think>[\s\S]*?<\/think>/g, '')
-              .trim()
+            const display = accumulated.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
             if (display) {
-              setSettingInput(display)
+              setWorldSetting(display)
             }
           }
         }
       }
 
-      const cleaned = accumulated
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        .trim()
+      const cleaned = accumulated.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
 
       if (cleaned) {
-        setSettingInput(cleaned)
+        setWorldSetting(cleaned)
+        if (modification) setModifyInstruction('')
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to generate setting'
@@ -189,9 +141,34 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
     }
   }
 
+  async function handleImportSetting() {
+    const id = importAdventureId()
+    if (!id) return
+    if (worldSetting().trim() && !confirm('Replace the current world setting with the imported setting?')) return
+
+    setIsImporting(true)
+    setError(null)
+    try {
+      const { data } = await getMyAdventuresById({ path: { id } })
+      const state = data?.adventure.data as Record<string, unknown> | undefined
+      const imported =
+        (typeof state?.worldBible === 'string' && state.worldBible.trim()) ||
+        (typeof state?.settingDescription === 'string' && state.settingDescription.trim()) ||
+        ''
+      if (!imported) throw new Error('That adventure has no reusable world setting.')
+      setWorldSetting(imported)
+      setModifyInstruction('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import setting')
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   function handleStart() {
     props.onStart({
-      settingInput: settingInput(),
+      worldSetting: worldSetting().trim(),
+      startPrompt: startPrompt().trim(),
       protagonistInput: protagonistInput(),
       deuteragonistInput: deuteragonistInput(),
       directive: directive(),
@@ -201,9 +178,9 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
 
   return (
     <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.75rem' }}>
-      <Show when={error()}>
+      <Show when={error() || props.createError}>
         <div class={styles.errorRow}>
-          <div class={styles.errorText}>{error()}</div>
+          <div class={styles.errorText}>{error() || props.createError}</div>
           <Show when={settingGenFailed()}>
             <Button variant="secondary" size="sm" onClick={handleGenerateSetting}>
               Retry
@@ -213,24 +190,24 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
       </Show>
 
       <div class={styles.settingGenerator}>
-        <label class={styles.formLabel}>Story Setting</label>
+        <label class={styles.formLabel}>World Setting</label>
+        <div class={styles.directiveHint}>
+          Persistent world lore and rules. This is kept in the World Bible throughout the adventure.
+        </div>
         <div class={styles.generateRow}>
           <Button
             variant="secondary"
             size="sm"
             onClick={handleGenerateSetting}
-            disabled={!effectiveSettings.model || isGeneratingSetting()}
+            disabled={!effectiveSettings.model || isGeneratingSetting() || props.isCreating}
           >
             {isGeneratingSetting()
               ? 'Generating...'
-              : settingInput().trim()
-                ? 'Refine Setting'
+              : worldSetting().trim() && modifyInstruction().trim()
+                ? 'Modify Setting'
                 : 'Generate Setting'}
           </Button>
-          <button
-            class={styles.knobsToggle}
-            onClick={() => setShowKnobs(!showKnobs())}
-          >
+          <button class={styles.knobsToggle} onClick={() => setShowKnobs(!showKnobs())}>
             {showKnobs() ? '▾ Parameters' : '▸ Parameters'}
           </button>
         </div>
@@ -247,9 +224,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
                     onChange={(e) => setKnobValue(knob.id, e.target.value)}
                   >
                     <option value="">Random</option>
-                    <For each={knob.options}>
-                      {(opt) => <option value={opt}>{opt}</option>}
-                    </For>
+                    <For each={knob.options}>{(opt) => <option value={opt}>{opt}</option>}</For>
                   </select>
                   <button
                     class={`${styles.lockButton} ${knobLocks()[knob.id] ? styles.lockButtonLocked : ''}`}
@@ -268,11 +243,74 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
       <div class={styles.formGroup}>
         <textarea
           class={styles.formTextarea}
-          value={settingInput()}
-          onInput={(e) => setSettingInput(e.currentTarget.value)}
-          placeholder="Describe the world and starting situation, write a rough idea and hit Generate to refine it, or use Generate Setting above for a fully random setting..."
-          rows={4}
+          value={worldSetting()}
+          onInput={(e) => setWorldSetting(e.currentTarget.value)}
+          placeholder="Describe the world, its places, cultures, technology or magic, and stable rules—or enter a rough world idea and generate it..."
+          rows={5}
+          disabled={isGeneratingSetting() || props.isCreating}
         />
+      </div>
+
+      <Show when={(props.reusableSettings?.length ?? 0) > 0}>
+        <div class={styles.formGroup}>
+          <label class={styles.formLabel}>Import setting from an existing adventure</label>
+          <div class={styles.generateRow}>
+            <select
+              class={styles.formInput}
+              value={importAdventureId()}
+              onChange={(event) => setImportAdventureId(event.currentTarget.value)}
+              disabled={isImporting() || props.isCreating}
+            >
+              <option value="">Choose an adventure…</option>
+              <For each={props.reusableSettings}>
+                {(adventure) => (
+                  <option value={adventure.id}>
+                    {adventure.name}
+                    {adventure.settingPreview ? ` — ${adventure.settingPreview}` : ''}
+                  </option>
+                )}
+              </For>
+            </select>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleImportSetting}
+              disabled={!importAdventureId() || isImporting() || props.isCreating}
+            >
+              {isImporting() ? 'Importing…' : 'Import'}
+            </Button>
+          </div>
+        </div>
+      </Show>
+
+      <div class={styles.formGroup}>
+        <label class={styles.formLabel}>Modify (optional)</label>
+        <input
+          class={styles.formInput}
+          type="text"
+          value={modifyInstruction()}
+          onInput={(event) => setModifyInstruction(event.currentTarget.value)}
+          placeholder="e.g., Remove magic, add political tension, and focus on floating cities"
+          disabled={!worldSetting().trim() || isGeneratingSetting() || props.isCreating}
+        />
+        <div class={styles.directiveHint}>
+          Describe changes, then choose Modify Setting. This instruction is not saved as lore.
+        </div>
+      </div>
+
+      <div class={styles.formGroup}>
+        <label class={styles.formLabel}>Adventure Start</label>
+        <textarea
+          class={styles.formTextarea}
+          value={startPrompt()}
+          onInput={(event) => setStartPrompt(event.currentTarget.value)}
+          placeholder="What happens to begin this adventure? e.g., During the midsummer treaty ceremony, the sky-city's engines suddenly stop."
+          rows={4}
+          disabled={props.isCreating}
+        />
+        <div class={styles.directiveHint}>
+          The immediate situation for this adventure's opening. It is separate from the persistent world setting.
+        </div>
       </div>
 
       <div class={styles.formGroup}>
@@ -301,10 +339,7 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
       </div>
 
       <div>
-        <button
-          class={styles.directiveToggle}
-          onClick={() => setShowDirective(!showDirective())}
-        >
+        <button class={styles.directiveToggle} onClick={() => setShowDirective(!showDirective())}>
           {showDirective() ? '▾ Per-Turn Directive' : '▸ Per-Turn Directive'}
         </button>
         <Show when={showDirective()}>
@@ -316,27 +351,20 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
               placeholder="Instructions repeated with every story turn..."
               rows={3}
             />
-            <div class={styles.directiveHint}>
-              This instruction is injected into the system prompt on every turn.
-            </div>
+            <div class={styles.directiveHint}>This instruction is injected into the system prompt on every turn.</div>
           </div>
         </Show>
       </div>
 
       <div>
-        <button
-          class={styles.directiveToggle}
-          onClick={() => setShowSettings(!showSettings())}
-        >
+        <button class={styles.directiveToggle} onClick={() => setShowSettings(!showSettings())}>
           {showSettings() ? '▾ Adventure Settings' : '▸ Adventure Settings'}
         </button>
         <Show when={showSettings()}>
           <div class={styles.directivePanel}>
             <AdventureSettings
               values={advSettings()}
-              onChange={(key, value) =>
-                setAdvSettings((prev) => ({ ...prev, [key]: value }))
-              }
+              onChange={(key, value) => setAdvSettings((prev) => ({ ...prev, [key]: value }))}
             />
           </div>
         </Show>
@@ -346,10 +374,16 @@ export const NewAdventureForm: Component<NewAdventureFormProps> = (props) => {
         <Button
           variant="primary"
           onClick={handleStart}
-          disabled={!settingInput().trim() || !effectiveSettings.model}
+          disabled={
+            !worldSetting().trim() ||
+            !startPrompt().trim() ||
+            !effectiveSettings.model ||
+            isGeneratingSetting() ||
+            props.isCreating
+          }
           style={{ flex: '1' }}
         >
-          Begin Adventure
+          {props.isCreating ? 'Creating…' : 'Begin Adventure'}
         </Button>
         <Show when={props.onCancel}>
           <Button variant="ghost" onClick={props.onCancel}>

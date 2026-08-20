@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildConditionsMessages,
   buildDirectorMessages,
+  buildSettingGenerationMessages,
   buildResolutionMessages,
   buildRevisionMessages,
   buildSharedHistory,
@@ -22,6 +23,36 @@ import type {
 } from '../../hooks/useAdventurePersistence'
 
 const protag = 'Maren, a young field medic with steady hands.'
+
+const settingParameters = {
+  era: 'Far Future',
+  location: 'Floating',
+  tone: 'Mystery',
+  magictech: 'Sci-fi tech',
+  scale: 'Regional',
+}
+
+describe('setting generation', () => {
+  it('keeps a rough world concept separate from the world-only instruction', () => {
+    const messages = buildSettingGenerationMessages({
+      parameters: settingParameters,
+      baseConcept: 'A civilization living above a permanent storm.',
+    })
+    expect(messages[0].content).toContain('Do NOT invent an inciting incident')
+    expect(messages[1].content).toContain('Rough world concept:')
+    expect(messages[1].content).not.toContain('Modification request:')
+  })
+
+  it('sends the current setting and modification as distinct fields', () => {
+    const messages = buildSettingGenerationMessages({
+      parameters: settingParameters,
+      currentSetting: 'Sky-cities trade between the clouds.',
+      modification: 'Remove advanced weapons and add political tension.',
+    })
+    expect(messages[1].content).toContain('Current world setting:\nSky-cities')
+    expect(messages[1].content).toContain('Modification request:\nRemove advanced weapons')
+  })
+})
 
 const rosterChar: CharacterCard = {
   id: 'c1',
@@ -343,6 +374,24 @@ describe('response length', () => {
   })
 
   describe('buildResolutionMessages', () => {
+    it('separates persistent world lore from the one-time opening prompt', () => {
+      const messages = buildResolutionMessages(
+        [],
+        'The treaty ceremony begins when every engine stops.',
+        null,
+        undefined,
+        undefined,
+        undefined,
+        'Sky-cities drift above a permanent storm.',
+      )
+      const openingMessage = messages[messages.length - 1]
+      expect(messages[0].content).toContain('[WORLD BIBLE')
+      expect(messages[0].content).toContain('Sky-cities drift')
+      expect(openingMessage.content).toContain('Adventure start:')
+      expect(openingMessage.content).toContain('treaty ceremony')
+      expect(openingMessage.content).not.toContain('Sky-cities drift')
+    })
+
     const build = (action: string | null, options?: { unboundedLength: boolean }) =>
       systemContents(
         buildResolutionMessages(
@@ -529,6 +578,20 @@ describe('response length', () => {
         expect(text).not.toContain('paragraphs.')
       })
     }
+  })
+})
+
+describe('buildSharedHistory opening context', () => {
+  it('reconstructs the start prompt once while keeping world lore in the system prefix', () => {
+    const messages = buildSharedHistory(
+      [{ playerAction: null, narrative: 'The engines fall silent.' }],
+      undefined,
+      'A treaty ceremony is interrupted.',
+      'Sky-cities drift above a permanent storm.',
+    )
+    expect(messages[0].content).toContain('Sky-cities drift')
+    expect(messages.filter((message) => message.content.includes('treaty ceremony'))).toHaveLength(1)
+    expect(messages[1].content).toBe('Begin the adventure.\n\nA treaty ceremony is interrupted.')
   })
 })
 

@@ -21,6 +21,7 @@ interface AdventureState {
   protagonistInput: string
   deuteragonistInput: string
   settingDescription: string
+  startPrompt: string
   turns: AdventureTurn[]
   compactions: Record<string, AdventureCompaction>
   directive: string
@@ -193,6 +194,7 @@ const [state, setState] = createStore<AdventureState>({
   protagonistInput: '',
   deuteragonistInput: '',
   settingDescription: '',
+  startPrompt: '',
   turns: [],
   compactions: {},
   directive: '',
@@ -263,6 +265,9 @@ export const adventureStore = {
   },
   get settingDescription() {
     return state.settingDescription
+  },
+  get startPrompt() {
+    return state.startPrompt
   },
   get turns() {
     return state.turns
@@ -424,6 +429,10 @@ export const adventureStore = {
     setState('deuteragonistInput', v)
   },
   setSettingDescription(v: string) {
+    setState('settingDescription', v)
+  },
+  setStartPrompt(v: string) {
+    setState('startPrompt', v)
     setState('settingDescription', v)
   },
   setCompaction(key: string, compaction: AdventureCompaction) {
@@ -687,6 +696,7 @@ export const adventureStore = {
       protagonistInput: state.protagonistInput,
       deuteragonistInput: state.deuteragonistInput || undefined,
       settingDescription: state.settingDescription,
+      startPrompt: state.startPrompt,
       turns: [...state.turns],
       compactions: { ...state.compactions },
       directive: state.directive,
@@ -751,7 +761,8 @@ export const adventureStore = {
         settingInput: saved?.settingInput ?? '',
         protagonistInput: saved?.protagonistInput ?? '',
         deuteragonistInput: saved?.deuteragonistInput ?? '',
-        settingDescription: saved?.settingDescription ?? '',
+        settingDescription: saved?.settingDescription ?? saved?.settingInput ?? '',
+        startPrompt: saved?.startPrompt ?? saved?.settingDescription ?? saved?.settingInput ?? '',
         directive: saved?.directive ?? '',
         worldBible: saved?.worldBible ?? '',
         autoAdvanceWorld: saved?.autoAdvanceWorld ?? false,
@@ -816,6 +827,7 @@ export const adventureStore = {
         protagonistInput: '',
         deuteragonistInput: '',
         settingDescription: '',
+        startPrompt: '',
         directive: '',
         worldBible: '',
         autoAdvanceWorld: false,

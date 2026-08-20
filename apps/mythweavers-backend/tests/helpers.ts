@@ -116,6 +116,7 @@ export async function cleanDatabase() {
     prisma.oAuthAuthorizationRequest.deleteMany(),
     prisma.oAuthClient.deleteMany(),
     prisma.deviceCode.deleteMany(),
+    prisma.adventure.deleteMany(),
     prisma.file.deleteMany(),
     prisma.story.deleteMany(),
     prisma.tag.deleteMany(),

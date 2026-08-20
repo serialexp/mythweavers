@@ -1,24 +1,28 @@
-import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import type { Prisma } from '@prisma/client'
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuth } from '../../lib/auth.js'
 import { prisma } from '../../lib/prisma.js'
 
 // Schemas
-const adventureDataSchema = z.object({
-  messages: z.array(z.object({
-    role: z.enum(['user', 'assistant']),
-    content: z.string(),
-  })).optional(),
-  memory: z.string().optional(),
-  compactions: z.record(z.string(), z.any()).optional(),
-  protagonist: z.string().optional(),
-  alwaysInstructions: z.string().optional(),
-  pitch: z.string().optional(),
-  messagesSinceUpdate: z.number().optional(),
-}).passthrough() // Allow additional fields
-
-type AdventureData = z.infer<typeof adventureDataSchema>
+const adventureDataSchema = z
+  .object({
+    messages: z
+      .array(
+        z.object({
+          role: z.enum(['user', 'assistant']),
+          content: z.string(),
+        }),
+      )
+      .optional(),
+    memory: z.string().optional(),
+    compactions: z.record(z.string(), z.any()).optional(),
+    protagonist: z.string().optional(),
+    alwaysInstructions: z.string().optional(),
+    pitch: z.string().optional(),
+    messagesSinceUpdate: z.number().optional(),
+  })
+  .passthrough() // Allow additional fields
 
 const adventureSchema = z.object({
   id: z.string().meta({ example: 'clx1234567890' }),
@@ -31,9 +35,23 @@ const adventureSchema = z.object({
 const adventureListItemSchema = z.object({
   id: z.string(),
   name: z.string(),
+  hasSetting: z.boolean(),
+  settingPreview: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
+
+const SETTING_PREVIEW_LENGTH = 240
+
+function settingListMetadata(value: string | null): { hasSetting: boolean; settingPreview?: string } {
+  const setting = value?.trim() ?? ''
+  if (!setting) return { hasSetting: false }
+  return {
+    hasSetting: true,
+    settingPreview:
+      setting.length <= SETTING_PREVIEW_LENGTH ? setting : `${setting.slice(0, SETTING_PREVIEW_LENGTH - 1).trimEnd()}…`,
+  }
+}
 
 const createAdventureBodySchema = z.object({
   name: z.string().max(200).optional().meta({
@@ -103,29 +121,34 @@ const adventuresRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       const skip = (page - 1) * pageSize
 
+      // Extract only reusable-setting text in PostgreSQL. Adventure.data can
+      // contain an entire long-running game, so listing must not transfer every
+      // opaque JSON blob into the application just to build a short preview.
       const [adventures, total] = await Promise.all([
-        prisma.adventure.findMany({
-          where: { userId },
-          select: {
-            id: true,
-            name: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-          orderBy: { updatedAt: 'desc' },
-          take: pageSize,
-          skip,
-        }),
+        prisma.$queryRaw<Array<{ id: string; name: string; setting: string | null; createdAt: Date; updatedAt: Date }>>`
+          SELECT
+            "id",
+            "name",
+            COALESCE(NULLIF(BTRIM("data"->>'worldBible'), ''), NULLIF(BTRIM("data"->>'settingDescription'), '')) AS "setting",
+            "createdAt",
+            "updatedAt"
+          FROM "Adventure"
+          WHERE "userId" = ${userId}
+          ORDER BY "updatedAt" DESC
+          LIMIT ${pageSize} OFFSET ${skip}
+        `,
         prisma.adventure.count({ where: { userId } }),
       ])
 
       const totalPages = Math.ceil(total / pageSize)
 
       return {
-        adventures: adventures.map((a) => ({
-          ...a,
-          createdAt: a.createdAt.toISOString(),
-          updatedAt: a.updatedAt.toISOString(),
+        adventures: adventures.map((adventure) => ({
+          id: adventure.id,
+          name: adventure.name,
+          ...settingListMetadata(adventure.setting),
+          createdAt: adventure.createdAt.toISOString(),
+          updatedAt: adventure.updatedAt.toISOString(),
         })),
         pagination: { page, pageSize, total, totalPages },
       }

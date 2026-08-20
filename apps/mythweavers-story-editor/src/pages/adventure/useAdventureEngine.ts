@@ -146,7 +146,7 @@ export function createAdventureEngine(
     if (
       adventureStore.phase === 'playing' &&
       adventureStore.turns.length === 0 &&
-      adventureStore.settingDescription &&
+      adventureStore.startPrompt &&
       !saved?.pendingAction
     ) {
       generate(null)
@@ -567,7 +567,7 @@ export function createAdventureEngine(
       // --- Pass 1: resolution ---
       const resolutionMessages = buildResolutionMessages(
         adventureStore.turns,
-        adventureStore.settingDescription,
+        adventureStore.startPrompt,
         playerAction,
         steering,
         adventureStore.directive,
@@ -1547,7 +1547,7 @@ export function createAdventureEngine(
     }
 
     const description = adventureStore.settingInput.trim()
-    adventureStore.setSettingDescription(description)
+    adventureStore.setStartPrompt(description)
     adventureStore.setPhase('playing')
     persist()
 
@@ -1671,7 +1671,7 @@ export function createAdventureEngine(
     if (adventureStore.isGenerating) return
     const trimmed = newSetting.trim()
     if (!trimmed) return
-    adventureStore.setSettingDescription(trimmed)
+    adventureStore.setStartPrompt(trimmed)
     // If there's exactly one turn (the opening turn), regenerate it with
     // the updated setting so the prose reflects the changes.
     if (adventureStore.turns.length === 1) {

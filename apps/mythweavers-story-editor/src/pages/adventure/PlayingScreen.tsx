@@ -553,7 +553,7 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
 }
 
 /**
- * Inline-editable setting description block, displayed above the first turn.
+ * Inline-editable adventure start prompt, displayed above the first turn.
  * Editing and saving regenerates the opening turn when there's only one turn.
  */
 function EditableSetting(props: { engine: ReturnType<typeof useEngine> }) {
@@ -564,7 +564,7 @@ function EditableSetting(props: { engine: ReturnType<typeof useEngine> }) {
   const canRegenerate = () => adventureStore.turns.length === 1
 
   function startEditing() {
-    setEditText(adventureStore.settingDescription)
+    setEditText(adventureStore.startPrompt)
     setEditing(true)
     requestAnimationFrame(() => {
       textareaRef?.focus()
@@ -574,7 +574,7 @@ function EditableSetting(props: { engine: ReturnType<typeof useEngine> }) {
 
   function save() {
     const trimmed = editText().trim()
-    if (!trimmed || trimmed === adventureStore.settingDescription) {
+    if (!trimmed || trimmed === adventureStore.startPrompt) {
       setEditing(false)
       return
     }
@@ -601,7 +601,7 @@ function EditableSetting(props: { engine: ReturnType<typeof useEngine> }) {
       fallback={
         <div class={styles.settingBlock}>
           <div class={styles.settingText}>
-            {adventureStore.settingDescription.split('\n').map((line) => (
+            {adventureStore.startPrompt.split('\n').map((line) => (
               <>{line}<br /></>
             ))}
           </div>

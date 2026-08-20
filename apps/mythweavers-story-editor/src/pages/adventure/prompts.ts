@@ -54,7 +54,7 @@ export const SETTING_KNOBS: SettingKnob[] = [
   },
   {
     id: "location",
-    label: "Start",
+    label: "Environment",
     options: [
       "City",
       "Village",
@@ -199,13 +199,37 @@ The disaster comes from the protagonist, not the world. Stay inside the world's 
 
 // --- Prompt constants ---
 
-export const SETTING_GEN_PROMPT = `You are a world-builder creating a setting for an interactive adventure. Given the following parameters, craft a vivid, specific setting description in 2-4 sentences. Describe the world and the immediate situation — do NOT describe or mention the protagonist. Focus on atmosphere, sensory details, and an interesting situation that invites exploration.
+export const SETTING_GEN_PROMPT = `You are a world-builder creating persistent world lore for interactive adventures. Write a vivid, specific world setting in 2-4 sentences. Describe places, atmosphere, history, cultures, technology or magic, and stable rules of the world.
 
-The "Location" parameter describes the STARTING LOCATION where the adventure begins, not a constraint on the entire world. A cosmic-scale adventure can absolutely start in a village — the village just happens to be where the protagonist is when things kick off.
+Do NOT describe the protagonist. Do NOT invent an inciting incident, immediate crisis, quest, or opening scene; those belong to a separate adventure start prompt. The Environment parameter is inspiration for the kind of place this world contains, not necessarily where every adventure begins.
 
-Be creative and specific — don't just restate the parameters. Invent names, places, and details that make the setting feel alive.
+Be creative and specific—don't merely restate the parameters. Respond with ONLY the world setting, no headings or commentary.`;
 
-Respond with ONLY the setting description, no other text.`;
+export interface SettingGenerationInput {
+  parameters: Record<string, string>;
+  baseConcept?: string;
+  currentSetting?: string;
+  modification?: string;
+}
+
+export function buildSettingGenerationMessages(input: SettingGenerationInput): LLMMessage[] {
+  const parameterLines = SETTING_KNOBS.map(
+    (knob) => `- ${knob.label}: ${input.parameters[knob.id] || "Unspecified"}`,
+  ).join("\n");
+  const currentSetting = input.currentSetting?.trim();
+  const modification = input.modification?.trim();
+  const baseConcept = input.baseConcept?.trim();
+  let userContent = `Parameters:\n${parameterLines}`;
+  if (currentSetting && modification) {
+    userContent += `\n\nCurrent world setting:\n${currentSetting}\n\nModification request:\n${modification}`;
+  } else if (baseConcept) {
+    userContent += `\n\nRough world concept:\n${baseConcept}`;
+  }
+  return [
+    { role: "system", content: SETTING_GEN_PROMPT },
+    { role: "user", content: userContent },
+  ];
+}
 
 // Shared system prompt — identical first message for all calls enables provider-side caching
 export const BASE_SYSTEM_PROMPT = `You are a collaborative storyteller running an interactive adventure. You create vivid, engaging fiction that responds to the player's choices. The world is alive — NPCs have their own personalities and motivations — but the story follows the player, not its own independent agenda.
@@ -874,13 +898,12 @@ ${trimmed}`,
  * Older turns beyond VERBATIM_TURN_COUNT are replaced by compaction summaries
  * when available, dramatically reducing context size for long adventures.
  *
- * @param settingDescription - The adventure's world/setting prompt. Included in
- *   the opening turn so downstream consumers see it.
+ * @param startPrompt - The one-time situation that began this adventure.
  */
 export function buildSharedHistory(
   turns: AdventureTurn[],
   compactions?: Record<string, AdventureCompaction>,
-  settingDescription?: string,
+  startPrompt?: string,
   worldBible?: string,
   /** When true, prefer the deuteragonist's narrative for split turns. */
   forDeuteragonist?: boolean,
@@ -918,7 +941,7 @@ export function buildSharedHistory(
     } else {
       // Not yet compacted: include original turns
       for (let i = range.start; i <= range.end; i++) {
-        addTurnToMessages(messages, turns, i, false, settingDescription);
+        addTurnToMessages(messages, turns, i, false, startPrompt);
       }
     }
   }
@@ -928,7 +951,7 @@ export function buildSharedHistory(
   const compactedEnd =
     ranges.length > 0 ? ranges[ranges.length - 1].end + 1 : 0;
   for (let i = compactedEnd; i < recentStart; i++) {
-    addTurnToMessages(messages, turns, i, false, settingDescription, forDeuteragonist);
+    addTurnToMessages(messages, turns, i, false, startPrompt, forDeuteragonist);
   }
 
   // Recent turns: always verbatim. Mark a cache breakpoint on the last TWO
@@ -946,7 +969,7 @@ export function buildSharedHistory(
   // breakpoint stays within its 4-breakpoint limit.
   for (let i = recentStart; i < turns.length; i++) {
     const withinLastTwo = i >= turns.length - 2;
-    addTurnToMessages(messages, turns, i, withinLastTwo, settingDescription, forDeuteragonist);
+    addTurnToMessages(messages, turns, i, withinLastTwo, startPrompt, forDeuteragonist);
   }
 
   return messages;
@@ -966,7 +989,7 @@ function addTurnToMessages(
   turns: AdventureTurn[],
   i: number,
   addCacheBreakpoint: boolean,
-  settingDescription?: string,
+  startPrompt?: string,
   forDeuteragonist?: boolean,
 ): void {
   const turn = turns[i];
@@ -978,10 +1001,10 @@ function addTurnToMessages(
   if (turn.playerAction && !useDeuteragonistView) {
     messages.push({ role: "user", content: turn.playerAction });
   } else if (i === 0) {
-    // Include the setting description in the opening turn so all consumers
-    // see the world context.
-    const openingContent = settingDescription
-      ? `Begin the adventure.\n\n${settingDescription}`
+    // Reconstruct the one-time opening situation. World lore is already in
+    // the world-bible system message and must not be duplicated here.
+    const openingContent = startPrompt
+      ? `Begin the adventure.\n\n${startPrompt}`
       : "Begin the adventure.";
     messages.push({
       role: "user",
@@ -1067,7 +1090,7 @@ export function buildPartnerActionMessages(
  */
 export function buildResolutionMessages(
   turns: AdventureTurn[],
-  settingDescription: string,
+  startPrompt: string,
   playerAction: string | null,
   steering: SteeringBucket | undefined,
   turnDirective?: string,
@@ -1090,7 +1113,7 @@ export function buildResolutionMessages(
   const messages = buildSharedHistory(
     turns,
     compactions,
-    settingDescription,
+    startPrompt,
     worldBible,
   );
 
@@ -1193,11 +1216,11 @@ Each section must be a complete, self-contained narrative. Do NOT add any text o
   } else if (isOpeningTurn) {
     messages.push({
       role: "user",
-      content: `Begin the adventure. Here is the setting — use it as a springboard, expand on it with your own details, and establish the protagonist in the world.
+      content: `Begin the adventure using the following immediate situation. Establish the protagonist in the world described by the world bible, but treat this start prompt as the inciting situation—not as permanent world lore.
 
-The opening should introduce the protagonist through action and detail — show what they look like, how they carry themselves, and hint at their personality through their behavior or inner thoughts. Don't state traits outright; reveal them through the scene.
+The opening should introduce the protagonist through action and detail—show what they look like, how they carry themselves, and hint at their personality through their behavior or inner thoughts. Don't state traits outright; reveal them through the scene.
 
-${settingDescription}`,
+Adventure start:\n${startPrompt}`,
     });
   }
 

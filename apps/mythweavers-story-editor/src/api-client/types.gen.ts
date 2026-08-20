@@ -1314,6 +1314,8 @@ export type GetMyAdventuresResponses = {
         adventures: Array<{
             id: string;
             name: string;
+            hasSetting: boolean;
+            settingPreview?: string;
             createdAt: string;
             updatedAt: string;
         }>;

@@ -206,6 +206,8 @@ export interface PersistedState {
   protagonistInput: string
   deuteragonistInput?: string
   settingDescription: string
+  /** One-time situation used to generate and reconstruct the opening turn. */
+  startPrompt?: string
   turns: AdventureTurn[]
   compactions?: Record<string, AdventureCompaction>
   directive?: string
