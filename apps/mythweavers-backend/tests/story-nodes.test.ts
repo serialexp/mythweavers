@@ -437,15 +437,30 @@ describe('Unified node endpoints', () => {
       expect(body.words).toBeGreaterThan(0)
     })
 
-    test('reads a single scene', async () => {
+    test('reads a single scene with its editable current revision state', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: `/my/nodes/${sceneId}/content`,
+        url: `/my/nodes/${sceneId}/content?includeAllMessages=true`,
         cookies: auth(),
       })
 
       expect(response.statusCode).toBe(200)
-      expect(response.json().root).toMatchObject({ kind: 'scene', id: sceneId })
+      const body = response.json()
+      expect(body.root).toMatchObject({ kind: 'scene', id: sceneId })
+      const message = body.chapters[0].scenes[0].messages[0]
+      expect(message).toMatchObject({
+        sortOrder: 0,
+        currentMessageRevisionId: expect.any(String),
+        revision: { id: expect.any(String) },
+      })
+      expect(message.paragraphs[0]).toMatchObject({
+        messageRevisionId: message.currentMessageRevisionId,
+        sortOrder: 0,
+        currentParagraphRevisionId: expect.any(String),
+        contentSchema: null,
+        plotPointActions: [],
+        inventoryActions: [],
+      })
     })
 
     test('refuses a read over maxWords with a per-chapter breakdown', async () => {

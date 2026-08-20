@@ -7256,6 +7256,10 @@ export type GetMyNodesByIdContentData = {
          * Refuse the read rather than return more than this many words (default 6000).
          */
         maxWords?: number;
+        /**
+         * Include normal generation messages as well as structural messages. Required when hydrating an editor scene.
+         */
+        includeAllMessages?: boolean;
     };
     url: '/my/nodes/{id}/content';
 };
@@ -7346,22 +7350,54 @@ export type GetMyNodesByIdContentResponses = {
                 words: number;
                 messages: Array<{
                     id: string;
+                    sortOrder: number;
+                    instruction: string | null;
+                    script: string | null;
+                    currentMessageRevisionId: string | null;
+                    createdAt: string;
                     /**
                      * null for normal prose; branch / event / background / audio for structural messages
                      */
                     type: string | null;
                     isQuery: boolean;
                     options: unknown | null;
+                    backgroundFileId: string | null;
+                    backgroundFile: {
+                        id: string;
+                        path: string;
+                    } | null;
+                    audioFileId: string | null;
+                    audioFile: {
+                        id: string;
+                        path: string;
+                    } | null;
+                    revision: {
+                        id: string;
+                        model: string | null;
+                        tokensPerSecond: number | null;
+                        totalTokens: number | null;
+                        promptTokens: number | null;
+                        cacheCreationTokens: number | null;
+                        cacheReadTokens: number | null;
+                        think: string | null;
+                        showThink: boolean;
+                    } | null;
                     paragraphs: Array<{
                         /**
                          * Paragraph ID — use this to edit it
                          */
                         id: string;
+                        messageRevisionId: string;
+                        sortOrder: number;
+                        currentParagraphRevisionId: string | null;
                         /**
                          * Paragraph text as stored. Mostly plain text; may contain inline HTML such as <em> or <strong>.
                          */
                         body: string;
+                        contentSchema: string | null;
                         state: string | null;
+                        plotPointActions: Array<unknown>;
+                        inventoryActions: Array<unknown>;
                         words: number;
                     }>;
                 }>;
@@ -7524,6 +7560,10 @@ export type GetMyStoriesByStoryIdOutlineResponses = {
              * 0 = excluded from context, 1 = summary only, 2 = full content
              */
             includeInFull?: number;
+            /**
+             * True when a scene contains at least one non-deleted branch message.
+             */
+            hasBranches?: boolean;
         }>;
     };
 };

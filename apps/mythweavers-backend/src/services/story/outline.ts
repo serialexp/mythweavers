@@ -48,6 +48,8 @@ export interface OutlineNode {
   viewpointCharacterId?: string | null
   goal?: string | null
   includeInFull?: number
+  /** True when a scene contains at least one current branch message. */
+  hasBranches?: boolean
   publishedAt?: string | null
   children?: OutlineNode[]
 }
@@ -187,6 +189,7 @@ export async function getOutline(
                   viewpointCharacterId: true,
                   goal: true,
                   includeInFull: true,
+                  _count: { select: { messages: { where: { deleted: false, type: 'branch' } } } },
                 }
               : {}),
             ...summaryCols,
@@ -217,6 +220,7 @@ export async function getOutline(
             viewpointCharacterId: scene.viewpointCharacterId,
             goal: scene.goal,
             includeInFull: scene.includeInFull,
+            hasBranches: scene._count.messages > 0,
           }
         : {}),
     }

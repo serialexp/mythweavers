@@ -107,10 +107,23 @@ describe('Outline and search endpoints', () => {
       expect(body.counts.scene).toBe(1)
     })
 
-    test('includes scene detail alongside depth=scene', async () => {
+    test('includes scene detail and branch metadata alongside depth=scene', async () => {
       const body = (await outline('?depth=scene&includeSceneDetail=true')).json()
       const scene = body.nodes.find((node: { kind: string }) => node.kind === 'scene')
       expect(scene.perspective).toBe('THIRD')
+      expect(scene.hasBranches).toBe(false)
+
+      const message = await app.inject({
+        method: 'POST',
+        url: `/my/scenes/${sceneId}/messages`,
+        cookies: auth(),
+        payload: { type: 'branch', options: [] },
+      })
+      expect(message.statusCode).toBe(201)
+
+      const withBranch = (await outline('?depth=scene&includeSceneDetail=true')).json()
+      const sceneWithBranch = withBranch.nodes.find((node: { kind: string }) => node.kind === 'scene')
+      expect(sceneWithBranch.hasBranches).toBe(true)
     })
 
     test('omits summaries unless requested', async () => {

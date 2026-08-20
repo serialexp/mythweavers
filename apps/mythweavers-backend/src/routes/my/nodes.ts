@@ -72,24 +72,57 @@ const contentQuerySchema = z.strictObject({
     description: 'Refuse the read rather than return more than this many words (default 6000).',
     example: 6000,
   }),
+  includeAllMessages: z.coerce.boolean().optional().meta({
+    description:
+      'Include normal generation messages as well as structural messages. Required when hydrating an editor scene.',
+    example: true,
+  }),
 })
 
 const contentParagraphSchema = z.strictObject({
   id: z.string().meta({ description: 'Paragraph ID — use this to edit it' }),
+  messageRevisionId: z.string(),
+  sortOrder: z.number().int(),
+  currentParagraphRevisionId: z.string().nullable(),
   body: z.string().meta({
     description: 'Paragraph text as stored. Mostly plain text; may contain inline HTML such as <em> or <strong>.',
   }),
+  contentSchema: z.string().nullable(),
   state: z.string().nullable(),
+  plotPointActions: z.array(z.any()),
+  inventoryActions: z.array(z.any()),
   words: z.number().int(),
 })
 
 const contentMessageSchema = z.strictObject({
   id: z.string(),
+  sortOrder: z.number().int(),
+  instruction: z.string().nullable(),
+  script: z.string().nullable(),
+  currentMessageRevisionId: z.string().nullable(),
+  createdAt: z.string().datetime(),
   type: z.string().nullable().meta({
     description: 'null for normal prose; branch / event / background / audio for structural messages',
   }),
   isQuery: z.boolean(),
   options: z.any().nullable(),
+  backgroundFileId: z.string().nullable(),
+  backgroundFile: z.strictObject({ id: z.string(), path: z.string() }).nullable(),
+  audioFileId: z.string().nullable(),
+  audioFile: z.strictObject({ id: z.string(), path: z.string() }).nullable(),
+  revision: z
+    .strictObject({
+      id: z.string(),
+      model: z.string().nullable(),
+      tokensPerSecond: z.number().nullable(),
+      totalTokens: z.number().nullable(),
+      promptTokens: z.number().nullable(),
+      cacheCreationTokens: z.number().nullable(),
+      cacheReadTokens: z.number().nullable(),
+      think: z.string().nullable(),
+      showThink: z.boolean(),
+    })
+    .nullable(),
   paragraphs: z.array(contentParagraphSchema),
 })
 
@@ -217,6 +250,7 @@ const nodesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     async (request) => {
       return await readContent(request.user!.id, request.params.id, {
         maxWords: request.query.maxWords,
+        includeAllMessages: request.query.includeAllMessages,
       })
     },
   )

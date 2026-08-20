@@ -37,17 +37,43 @@ export interface ReadContentOptions {
 
 export interface ContentParagraph {
   id: string
+  messageRevisionId: string
+  sortOrder: number
+  currentParagraphRevisionId: string | null
   body: string
+  contentSchema: string | null
   state: string | null
+  plotPointActions: unknown[]
+  inventoryActions: unknown[]
   words: number
 }
 
 export interface ContentMessage {
   id: string
+  sortOrder: number
+  instruction: string | null
+  script: string | null
+  currentMessageRevisionId: string | null
+  createdAt: string
   /** null for normal prose; 'branch' | 'event' | 'background' | 'audio' etc. */
   type: string | null
   isQuery: boolean
   options: unknown
+  backgroundFileId: string | null
+  backgroundFile: { id: string; path: string } | null
+  audioFileId: string | null
+  audioFile: { id: string; path: string } | null
+  revision: {
+    id: string
+    model: string | null
+    tokensPerSecond: number | null
+    totalTokens: number | null
+    promptTokens: number | null
+    cacheCreationTokens: number | null
+    cacheReadTokens: number | null
+    think: string | null
+    showThink: boolean
+  } | null
   paragraphs: ContentParagraph[]
 }
 
@@ -174,16 +200,45 @@ export async function readContent(
         orderBy: { sortOrder: 'asc' },
         select: {
           id: true,
+          sortOrder: true,
+          instruction: true,
+          script: true,
+          currentMessageRevisionId: true,
+          createdAt: true,
           type: true,
           isQuery: true,
           options: true,
+          backgroundFileId: true,
+          backgroundFile: { select: { id: true, path: true } },
+          audioFileId: true,
+          audioFile: { select: { id: true, path: true } },
           currentMessageRevision: {
             select: {
+              id: true,
+              model: true,
+              tokensPerSecond: true,
+              totalTokens: true,
+              promptTokens: true,
+              cacheCreationTokens: true,
+              cacheReadTokens: true,
+              think: true,
+              showThink: true,
               paragraphs: {
                 orderBy: { sortOrder: 'asc' },
                 select: {
                   id: true,
-                  currentParagraphRevision: { select: { body: true, state: true } },
+                  messageRevisionId: true,
+                  sortOrder: true,
+                  currentParagraphRevisionId: true,
+                  currentParagraphRevision: {
+                    select: {
+                      body: true,
+                      contentSchema: true,
+                      state: true,
+                      plotPointActions: true,
+                      inventoryActions: true,
+                    },
+                  },
                 },
               },
             },
@@ -221,8 +276,14 @@ export async function readContent(
         sceneWords += words
         paragraphs.push({
           id: paragraph.id,
+          messageRevisionId: paragraph.messageRevisionId,
+          sortOrder: paragraph.sortOrder,
+          currentParagraphRevisionId: paragraph.currentParagraphRevisionId,
           body,
+          contentSchema: paragraph.currentParagraphRevision?.contentSchema ?? null,
           state: paragraph.currentParagraphRevision?.state ?? null,
+          plotPointActions: (paragraph.currentParagraphRevision?.plotPointActions as unknown[]) ?? [],
+          inventoryActions: (paragraph.currentParagraphRevision?.inventoryActions as unknown[]) ?? [],
           words,
         })
       }
@@ -234,9 +295,31 @@ export async function readContent(
 
       messages.push({
         id: message.id,
+        sortOrder: message.sortOrder,
+        instruction: message.instruction,
+        script: message.script,
+        currentMessageRevisionId: message.currentMessageRevisionId,
+        createdAt: message.createdAt.toISOString(),
         type: message.type,
         isQuery: message.isQuery,
         options: message.options,
+        backgroundFileId: message.backgroundFileId,
+        backgroundFile: message.backgroundFile,
+        audioFileId: message.audioFileId,
+        audioFile: message.audioFile,
+        revision: message.currentMessageRevision
+          ? {
+              id: message.currentMessageRevision.id,
+              model: message.currentMessageRevision.model,
+              tokensPerSecond: message.currentMessageRevision.tokensPerSecond,
+              totalTokens: message.currentMessageRevision.totalTokens,
+              promptTokens: message.currentMessageRevision.promptTokens,
+              cacheCreationTokens: message.currentMessageRevision.cacheCreationTokens,
+              cacheReadTokens: message.currentMessageRevision.cacheReadTokens,
+              think: message.currentMessageRevision.think,
+              showThink: message.currentMessageRevision.showThink,
+            }
+          : null,
         paragraphs,
       })
     }
