@@ -1,9 +1,19 @@
 import { ActionRow, Button, IconButton, Input, Modal, Spinner, Text } from '@mythweavers/ui'
 import { useNavigate } from '@solidjs/router'
 import { Component, For, Show, createEffect, createSignal, onMount } from 'solid-js'
-import { PhPencilSimpleIcon, PhTrashIcon } from 'solidjs-phosphor'
-import { deleteMyAdventuresById, getMyAdventures, postMyAdventures, putMyAdventuresById } from '../client/config'
+import { PhArrowsClockwiseIcon, PhPencilSimpleIcon, PhTrashIcon } from 'solidjs-phosphor'
+import {
+  deleteMyAdventuresById,
+  getMyAdventures,
+  getMyAdventuresById,
+  postMyAdventures,
+  putMyAdventuresById,
+} from '../client/config'
 import type { PersistedState } from '../hooks/useAdventurePersistence'
+import { effectiveSettings } from '../stores/effectiveSettingsStore'
+import { buildAdventureTitleMessages, cleanAdventureTitle } from '../utils/adventureTitle'
+import { LLMClientFactory } from '../utils/llm/LLMClientFactory'
+import { resolveModel } from '../utils/llm/resolveModel'
 import * as styles from './AdventureList.css'
 import { NewAdventureForm, type NewAdventureResult } from './NewAdventureForm'
 
@@ -31,6 +41,7 @@ interface AdventureListProps {
 export const AdventureList: Component<AdventureListProps> = (props) => {
   const navigate = useNavigate()
   const [deletingId, setDeletingId] = createSignal<string | null>(null)
+  const [regeneratingTitleId, setRegeneratingTitleId] = createSignal<string | null>(null)
   const [showNewAdventure, setShowNewAdventure] = createSignal(false)
   const [isCreatingAdventure, setIsCreatingAdventure] = createSignal(false)
   const [createError, setCreateError] = createSignal<string | null>(null)
@@ -141,6 +152,53 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
   function cancelEdit() {
     setEditingId(null)
     setEditingName('')
+  }
+
+  async function regenerateTitle(id: string) {
+    if (!effectiveSettings.model || !effectiveSettings.provider) {
+      alert('Configure an AI provider and model before regenerating a title.')
+      return
+    }
+
+    setRegeneratingTitleId(id)
+    try {
+      const { data } = await getMyAdventuresById({ path: { id } })
+      const state = data?.adventure.data as Record<string, unknown> | undefined
+      const worldSetting =
+        (typeof state?.worldBible === 'string' && state.worldBible.trim()) ||
+        (typeof state?.settingInput === 'string' && state.settingInput.trim()) ||
+        ''
+      const startPrompt =
+        (typeof state?.startPrompt === 'string' && state.startPrompt.trim()) ||
+        (typeof state?.settingDescription === 'string' && state.settingDescription.trim()) ||
+        ''
+      if (!worldSetting || !startPrompt) throw new Error('This adventure needs both a world setting and start prompt.')
+
+      const resolved = resolveModel('adventure-title')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      let accumulated = ''
+      const response = client.generate({
+        model: resolved.model,
+        messages: buildAdventureTitleMessages(worldSetting, startPrompt),
+        max_tokens: 30,
+        metadata: { callType: 'adventure-title' },
+      })
+      for await (const event of response) {
+        if (event.type === 'chunk') accumulated += event.text
+      }
+
+      const title = cleanAdventureTitle(accumulated)
+      if (!title) throw new Error('The model returned an empty title.')
+      await putMyAdventuresById({ path: { id }, body: { name: title } })
+      setAdventures((current) =>
+        current.map((adventure) => (adventure.id === id ? { ...adventure, name: title } : adventure)),
+      )
+    } catch (err) {
+      console.error('Failed to regenerate adventure title:', err)
+      alert(err instanceof Error ? err.message : 'Failed to regenerate adventure title')
+    } finally {
+      setRegeneratingTitleId(null)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -265,7 +323,18 @@ export const AdventureList: Component<AdventureListProps> = (props) => {
                     <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: '0.25rem' }}>
                       <Show when={editingId() !== adventure.id}>
                         <IconButton
+                          aria-label="Regenerate adventure title"
+                          title="Regenerate title from the world setting and adventure start"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void regenerateTitle(adventure.id)}
+                          disabled={regeneratingTitleId() !== null}
+                        >
+                          {regeneratingTitleId() === adventure.id ? <Spinner size="sm" /> : <PhArrowsClockwiseIcon />}
+                        </IconButton>
+                        <IconButton
                           aria-label="Rename adventure"
+                          title="Change title"
                           variant="ghost"
                           size="sm"
                           onClick={() => startEditing(adventure.id, adventure.name)}
