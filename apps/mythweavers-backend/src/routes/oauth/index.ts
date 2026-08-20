@@ -611,9 +611,9 @@ const oauthRoutes: FastifyPluginAsyncZod<{ rootAlias?: boolean }> = async (fasti
           },
         })
 
-        // Build verification URI
-        const editorUrl = process.env.EDITOR_URL || 'http://localhost:3203'
-        const verificationUri = `${editorUrl}/device`
+        // Build verification URI from the public editor origin. This must
+        // never fall back to localhost when API_URL identifies a deployed API.
+        const verificationUri = `${editorBase()}/device`
 
         return {
           device_code: deviceCode,

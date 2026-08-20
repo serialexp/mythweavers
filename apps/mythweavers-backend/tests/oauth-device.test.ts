@@ -58,7 +58,7 @@ describe('OAuth device flow', () => {
   }
 
   describe('POST /oauth/device', () => {
-    test('issues a device code, a formatted user code and a verification URI', async () => {
+    test('issues a device code, a formatted user code and a local verification URI by default', async () => {
       const body = await startDeviceFlow()
 
       expect(body.device_code).toMatch(/^[0-9a-f]{64}$/)
@@ -66,6 +66,21 @@ describe('OAuth device flow', () => {
       expect(body.verification_uri).toBe('http://localhost:3203/device')
       expect(body.expires_in).toBe(900)
       expect(body.interval).toBe(5)
+    })
+
+    test('derives the public write host from API_URL when EDITOR_URL is unset', async () => {
+      const originalApiUrl = process.env.API_URL
+      const originalEditorUrl = process.env.EDITOR_URL
+      process.env.API_URL = 'https://api.example.com'
+      process.env.EDITOR_URL = undefined
+
+      try {
+        const body = await startDeviceFlow()
+        expect(body.verification_uri).toBe('https://write.example.com/device')
+      } finally {
+        process.env.API_URL = originalApiUrl
+        process.env.EDITOR_URL = originalEditorUrl
+      }
     })
 
     test('persists an unapproved, unowned device code', async () => {

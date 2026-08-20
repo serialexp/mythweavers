@@ -18,9 +18,23 @@ export function apiBase(): string {
   return (process.env.API_URL || `http://localhost:${process.env.PORT || 3201}`).replace(/\/+$/, '')
 }
 
-/** Origin of the story-editor, which hosts the consent screen. */
+/**
+ * Origin of the story editor, which hosts consent and device-approval pages.
+ *
+ * Production deployments normally set EDITOR_URL explicitly. When they do not,
+ * derive the conventional `write.` host from the public API origin rather than
+ * issuing an unusable localhost verification URL to a remote OAuth client.
+ * Local development deliberately retains its existing editor port fallback.
+ */
 export function editorBase(): string {
-  return (process.env.EDITOR_URL || 'http://localhost:3203').replace(/\/+$/, '')
+  if (process.env.EDITOR_URL) return process.env.EDITOR_URL.replace(/\/+$/, '')
+  if (!process.env.API_URL) return 'http://localhost:3203'
+
+  const api = new URL(apiBase())
+  const editorHostname = api.hostname.startsWith('api.')
+    ? api.hostname.replace(/^api\./, 'write.')
+    : `write.${api.hostname}`
+  return `https://${editorHostname}${api.port ? `:${api.port}` : ''}`
 }
 
 /** OAuth issuer identifier. The AS lives at the root origin so clients never path-insert its lookup. */
