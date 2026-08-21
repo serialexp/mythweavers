@@ -41,6 +41,7 @@ import { charactersStore } from './stores/charactersStore'
 import { contextItemsStore } from './stores/contextItemsStore'
 import { currentStoryStore } from './stores/currentStoryStore'
 import { effectiveSettings } from './stores/effectiveSettingsStore'
+import { globalOperationStore } from './stores/globalOperationStore'
 import { headerStore } from './stores/headerStore'
 import { languageStore } from './stores/languageStore'
 import { mapsStore } from './stores/mapsStore'
@@ -575,16 +576,57 @@ const App: Component = () => {
     }
   }
 
-  // Selection is intentionally separate from nodeStore.selectNode: that method
-  // also persists the selection, while this effect merely hydrates prose for a
-  // scene selected by any UI path (tree, search, timeline, or branch).
+  // Script state is cumulative. Hydrate selected prose and all preceding script
+  // metadata in two requests rather than paying one network round trip per scene.
+  let scriptContextLoadGeneration = 0
+  let activeScriptContextHydration: { sceneId: string; promise: Promise<void> } | null = null
+  const hydrateScriptContext = (selectedScene: Node): Promise<void> => {
+    if (activeScriptContextHydration?.sceneId === selectedScene.id) return activeScriptContextHydration.promise
+
+    const requestGeneration = ++scriptContextLoadGeneration
+    const needsContent = !serverSceneContentStore.isLoaded(selectedScene.id)
+    const needsPrecedingScripts = nodeStore
+      .getPrecedingScenes(selectedScene.id)
+      .some((scene) => !serverSceneContentStore.isScriptLoaded(scene.id))
+    const requestCount = Number(needsContent) + Number(needsPrecedingScripts)
+    if (requestCount === 0) return Promise.resolve()
+
+    const promise = (async () => {
+      globalOperationStore.startOperation('load-script-context', requestCount, 'Loading scripts before this scene')
+      let completed = 0
+      const requests: Promise<void>[] = []
+      if (needsContent) requests.push(serverSceneContentStore.load(selectedScene.id))
+      if (needsPrecedingScripts) requests.push(serverSceneContentStore.load(selectedScene.id, false, true, true))
+
+      const results = await Promise.allSettled(
+        requests.map((request) =>
+          request.finally(() => {
+            completed += 1
+            if (scriptContextLoadGeneration === requestGeneration) {
+              globalOperationStore.updateProgress(completed, 'Loading scripts before this scene')
+            }
+          }),
+        ),
+      )
+      if (scriptContextLoadGeneration !== requestGeneration) return
+      globalOperationStore.completeOperation()
+      const failed = results.filter((result) => result.status === 'rejected').length
+      if (failed > 0) {
+        console.error(`[scene-content] Failed to load ${failed} request(s) required for script context.`)
+      }
+    })()
+    activeScriptContextHydration = { sceneId: selectedScene.id, promise }
+    void promise.finally(() => {
+      if (activeScriptContextHydration?.promise === promise) activeScriptContextHydration = null
+    })
+    return promise
+  }
+
   createEffect(() => {
     const selectedNodeId = nodeStore.selectedNodeId
     const selectedNode = selectedNodeId ? nodeStore.getNode(selectedNodeId) : null
     if (currentStoryStore.storageMode !== 'server' || selectedNode?.type !== 'scene') return
-    void serverSceneContentStore.load(selectedNode.id).catch((error) => {
-      console.error('[scene-content] Failed to load selected scene:', error)
-    })
+    void hydrateScriptContext(selectedNode)
   })
 
   const resetStoryState = async () => {
@@ -677,8 +719,8 @@ const App: Component = () => {
         }
         serverSceneContentStore.beginStory(storyId)
         await loadServerStoryData(exportData, storyId)
-        const selectedSceneId = nodeStore.getSelectedNode()?.type === 'scene' ? nodeStore.selectedNodeId : null
-        if (selectedSceneId) await serverSceneContentStore.load(selectedSceneId)
+        const selectedScene = nodeStore.getSelectedNode()?.type === 'scene' ? nodeStore.getSelectedNode() : null
+        if (selectedScene) await hydrateScriptContext(selectedScene)
         // The outline carries cached chapter totals, while prose is deliberately
         // lazy. Retain those totals after the selected scene is merged so the
         // header and navigation still describe the whole story.

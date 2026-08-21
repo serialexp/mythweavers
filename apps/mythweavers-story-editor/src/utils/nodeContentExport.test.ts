@@ -179,10 +179,10 @@ describe('buildPrecedingContextMarkdown', () => {
     expect(result).toContain('- Cosmic War (global): Galaxy-spanning conflict between rival factions.')
     expect(result).toContain('- Hidden Temple: Ancient ruins soaked by relentless rain.')
 
-    expect(result).toContain('## Opening')
+    expect(result).toContain('## Chapter One — Opening')
     expect(result).toContain('Opening summary')
 
-    expect(result).toContain('## Second Act')
+    expect(result).toContain('## Chapter Two — Second Act')
     expect(result).toContain('Second act moment one.')
     expect(result).not.toContain('Climax')
   })

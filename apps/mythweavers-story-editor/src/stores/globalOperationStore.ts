@@ -5,6 +5,7 @@ export type GlobalOperationType =
   | 'migrate-instructions'
   | 'remove-user-messages'
   | 'cleanup-think-tags'
+  | 'load-script-context'
   | null
 
 export interface GlobalOperation {

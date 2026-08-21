@@ -40,6 +40,9 @@ const outlineNodeSchema = z.strictObject({
   includeInFull: z.number().int().optional().meta({
     description: '0 = excluded from context, 1 = summary only, 2 = full content',
   }),
+  storyTime: z.number().int().nullable().optional().meta({
+    description: 'Timeline position in story minutes (scenes only)',
+  }),
   hasBranches: z.boolean().optional().meta({
     description: 'True when a scene contains at least one non-deleted branch message.',
   }),

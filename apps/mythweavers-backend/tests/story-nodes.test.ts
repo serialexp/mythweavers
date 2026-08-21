@@ -437,6 +437,33 @@ describe('Unified node endpoints', () => {
       expect(body.words).toBeGreaterThan(0)
     })
 
+    test('returns preceding scripts in one request', async () => {
+      const laterScene = (await createNode({ parentId: chapterId, name: 'Later' })).json().node.id
+      const response = await app.inject({
+        method: 'GET',
+        url: `/my/nodes/${laterScene}/content?includeAllMessages=true&scriptsOnly=true&includePreceding=true`,
+        cookies: auth(),
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json().chapters[0].scenes.map((scene: { id: string }) => scene.id)).toEqual([sceneId])
+      expect(response.json().chapters[0].scenes[0].messages[0].paragraphs[0].body).toBe('')
+    })
+
+    test('returns scripts without prose bodies for script-only hydration', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/my/nodes/${sceneId}/content?includeAllMessages=true&scriptsOnly=true`,
+        cookies: auth(),
+      })
+
+      expect(response.statusCode).toBe(200)
+      const paragraph = response.json().chapters[0].scenes[0].messages[0].paragraphs[0]
+      expect(paragraph.body).toBe('')
+      expect(paragraph.script).toBeNull()
+      expect(paragraph.words).toBe(0)
+    })
+
     test('reads a single scene with its editable current revision state', async () => {
       const response = await app.inject({
         method: 'GET',
@@ -460,6 +487,7 @@ describe('Unified node endpoints', () => {
         contentSchema: null,
         plotPointActions: [],
         inventoryActions: [],
+        script: null,
       })
     })
 

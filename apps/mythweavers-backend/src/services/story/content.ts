@@ -33,6 +33,10 @@ export interface ReadContentOptions {
    * surfaced, since normal messages are just generation units and add noise.
    */
   includeAllMessages?: boolean
+  /** Return script metadata without paragraph prose bodies. */
+  scriptsOnly?: boolean
+  /** For a scene script read, include every scene preceding it in story order. */
+  includePreceding?: boolean
 }
 
 export interface ContentParagraph {
@@ -45,6 +49,7 @@ export interface ContentParagraph {
   state: string | null
   plotPointActions: unknown[]
   inventoryActions: unknown[]
+  script: string | null
   words: number
 }
 
@@ -177,14 +182,54 @@ export async function readContent(
     })
   }
 
-  const sceneWhere: Record<string, unknown> =
-    node.kind === 'scene'
-      ? { id: node.id, deleted: false }
-      : { deleted: false, chapter: { ...chapterFilter, deleted: false } }
+  let sceneWhere: Record<string, unknown>
+  if (options.includePreceding) {
+    if (node.kind !== 'scene' || !options.scriptsOnly) {
+      throw badRequest('includePreceding is only supported for scriptsOnly reads rooted at a scene.')
+    }
+    const target = await prisma.scene.findUniqueOrThrow({
+      where: { id: node.id },
+      select: {
+        sortOrder: true,
+        chapterId: true,
+        chapter: {
+          select: {
+            sortOrder: true,
+            arcId: true,
+            arc: { select: { sortOrder: true, bookId: true, book: { select: { sortOrder: true } } } },
+          },
+        },
+      },
+    })
+    sceneWhere = {
+      deleted: false,
+      chapter: { arc: { book: { storyId: node.storyId } } },
+      OR: [
+        { chapter: { arc: { book: { sortOrder: { lt: target.chapter.arc.book.sortOrder } } } } },
+        {
+          chapter: {
+            arc: { bookId: target.chapter.arc.bookId, sortOrder: { lt: target.chapter.arc.sortOrder } },
+          },
+        },
+        { chapter: { arcId: target.chapter.arcId, sortOrder: { lt: target.chapter.sortOrder } } },
+        { chapterId: target.chapterId, sortOrder: { lt: target.sortOrder } },
+      ],
+    }
+  } else {
+    sceneWhere =
+      node.kind === 'scene'
+        ? { id: node.id, deleted: false }
+        : { deleted: false, chapter: { ...chapterFilter, deleted: false } }
+  }
 
   const scenes = await prisma.scene.findMany({
     where: sceneWhere,
-    orderBy: [{ chapter: { sortOrder: 'asc' } }, { sortOrder: 'asc' }],
+    orderBy: [
+      { chapter: { arc: { book: { sortOrder: 'asc' } } } },
+      { chapter: { arc: { sortOrder: 'asc' } } },
+      { chapter: { sortOrder: 'asc' } },
+      { sortOrder: 'asc' },
+    ],
     select: {
       id: true,
       name: true,
@@ -237,6 +282,7 @@ export async function readContent(
                       state: true,
                       plotPointActions: true,
                       inventoryActions: true,
+                      script: true,
                     },
                   },
                 },
@@ -270,9 +316,10 @@ export async function readContent(
     for (const message of scene.messages) {
       const paragraphs: ContentParagraph[] = []
       for (const paragraph of message.currentMessageRevision?.paragraphs ?? []) {
-        const body = paragraph.currentParagraphRevision?.body
-        if (body === undefined || body === null) continue
-        const words = countWordsInHtml(body)
+        const storedBody = paragraph.currentParagraphRevision?.body
+        if (storedBody === undefined || storedBody === null) continue
+        const body = options.scriptsOnly ? '' : storedBody
+        const words = options.scriptsOnly ? 0 : countWordsInHtml(body)
         sceneWords += words
         paragraphs.push({
           id: paragraph.id,
@@ -284,14 +331,16 @@ export async function readContent(
           state: paragraph.currentParagraphRevision?.state ?? null,
           plotPointActions: (paragraph.currentParagraphRevision?.plotPointActions as unknown[]) ?? [],
           inventoryActions: (paragraph.currentParagraphRevision?.inventoryActions as unknown[]) ?? [],
+          script: paragraph.currentParagraphRevision?.script ?? null,
           words,
         })
       }
 
       // Skip empty normal messages entirely; keep structural ones even when
-      // they carry no prose, because they change how the scene reads.
+      // they carry no prose, because they change how the scene reads. Script-only
+      // reads also retain message shells so message scripts execute in order.
       const structural = message.type !== null || message.isQuery
-      if (paragraphs.length === 0 && !structural) continue
+      if (paragraphs.length === 0 && !structural && !options.scriptsOnly) continue
 
       messages.push({
         id: message.id,

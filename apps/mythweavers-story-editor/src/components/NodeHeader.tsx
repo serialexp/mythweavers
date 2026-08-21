@@ -9,8 +9,10 @@ import { copyPreviewStore } from '../stores/copyPreviewStore'
 import { massRewriteDialogStore } from '../stores/massRewriteDialogStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
+import { serverSceneContentStore } from '../stores/serverSceneContentStore'
 import { Node as StoryNode } from '../types/core'
 import { getAvatarInitial, getCharacterDisplayName, resolveViewpointCharacter } from '../utils/character'
+import { runWithConcurrency } from '../utils/concurrentTasks'
 import { buildNodeMarkdown, buildPrecedingContextMarkdown } from '../utils/nodeContentExport'
 import { getScenesInStoryOrder } from '../utils/nodeTraversal'
 import { CharacterSelect } from './CharacterSelect'
@@ -41,6 +43,7 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
   const [isEditingTime, setIsEditingTime] = createSignal(false)
   const [isContextManagerOpen, setIsContextManagerOpen] = createSignal(false)
   const [isSelectingStorylines, setIsSelectingStorylines] = createSignal(false)
+  const [copyContextProgress, setCopyContextProgress] = createSignal<{ completed: number; total: number } | null>(null)
   const [isEditingGoal, setIsEditingGoal] = createSignal(false)
   const [editGoal, setEditGoal] = createSignal(props.node.goal || '')
 
@@ -305,18 +308,44 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
 
   const handleCopyPreviousContext = async (e: MouseEvent) => {
     e.stopPropagation()
-    const summary = buildPrecedingContextMarkdown(props.node.id, {
-      includeCurrentNode: false,
-      mode: 'summary',
-    })
+    if (copyContextProgress()) return
 
-    if (!summary) {
-      alert('No previous chapters with content were found to copy.')
-      return
+    const precedingScenes = nodeStore.getPrecedingScenes(props.node.id)
+    const scenesToLoad = precedingScenes.filter((scene) => !serverSceneContentStore.isLoaded(scene.id))
+    if (scenesToLoad.length > 0) {
+      setCopyContextProgress({ completed: 0, total: scenesToLoad.length })
+      copyPreviewStore.beginContextPreparation(scenesToLoad.length)
     }
+    try {
+      const loads = await runWithConcurrency(
+        scenesToLoad,
+        5,
+        (scene) => serverSceneContentStore.load(scene.id),
+        (progress) => {
+          setCopyContextProgress(progress)
+          copyPreviewStore.updateContextPreparation(progress.completed, progress.total)
+        },
+      )
+      if (loads.some((result) => result.status === 'rejected')) {
+        console.warn('Some preceding scenes could not be loaded before copying context.')
+      }
 
-    setShowDropdown(false)
-    await copyPreviewStore.requestCopy(summary)
+      const summary = buildPrecedingContextMarkdown(props.node.id, {
+        includeCurrentNode: false,
+        mode: 'summary',
+      })
+
+      if (!summary) {
+        alert('No previous chapters with content were found to copy.')
+        return
+      }
+
+      setShowDropdown(false)
+      await copyPreviewStore.requestCopy(summary)
+    } finally {
+      setCopyContextProgress(null)
+      copyPreviewStore.finishContextPreparation()
+    }
   }
 
   const handleMassRewrite = (e: MouseEvent) => {
@@ -729,8 +758,15 @@ export const NodeHeader: Component<NodeHeaderProps> = (props) => {
               </Show>
 
               <Show when={props.node.type === 'scene'}>
-                <button class={styles.dropdownButton} onClick={handleCopyPreviousContext}>
-                  <PhFileTextIcon weight="fill" /> Copy Previous Context
+                <button
+                  class={styles.dropdownButton}
+                  onClick={handleCopyPreviousContext}
+                  disabled={copyContextProgress() !== null}
+                >
+                  <PhFileTextIcon weight="fill" />{' '}
+                  {copyContextProgress()
+                    ? `Loading context ${copyContextProgress()!.completed}/${copyContextProgress()!.total}…`
+                    : 'Copy Previous Context'}
                 </button>
                 <button class={styles.dropdownButton} onClick={handleCopyAsMarkdown}>
                   <PhFileTextIcon /> Copy as Markdown

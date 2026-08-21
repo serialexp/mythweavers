@@ -77,6 +77,14 @@ const contentQuerySchema = z.strictObject({
       'Include normal generation messages as well as structural messages. Required when hydrating an editor scene.',
     example: true,
   }),
+  scriptsOnly: z.coerce.boolean().optional().meta({
+    description: 'Return message/paragraph scripts and actions without prose bodies.',
+    example: true,
+  }),
+  includePreceding: z.coerce.boolean().optional().meta({
+    description: 'For a scene script read, include all scenes preceding it in story order.',
+    example: true,
+  }),
 })
 
 const contentParagraphSchema = z.strictObject({
@@ -91,6 +99,7 @@ const contentParagraphSchema = z.strictObject({
   state: z.string().nullable(),
   plotPointActions: z.array(z.any()),
   inventoryActions: z.array(z.any()),
+  script: z.string().nullable(),
   words: z.number().int(),
 })
 

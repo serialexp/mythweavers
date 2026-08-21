@@ -398,7 +398,9 @@ export function buildPrecedingContextMarkdown(nodeId: string, options: Preceding
       continue
     }
 
-    sections.push(`${headingPrefix} ${scene.title}\n\n${sectionBody}`)
+    const chapter = scene.parentId ? nodeStore.nodes[scene.parentId] : undefined
+    const sectionTitle = chapter?.type === 'chapter' ? `${chapter.title} — ${scene.title}` : scene.title
+    sections.push(`${headingPrefix} ${sectionTitle}\n\n${sectionBody}`)
   }
 
   return sections.join('\n\n')

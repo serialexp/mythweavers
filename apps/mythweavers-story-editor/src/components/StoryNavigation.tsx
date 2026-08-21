@@ -41,11 +41,13 @@ import { modelsStore } from '../stores/modelsStore'
 import { navigationStore } from '../stores/navigationStore'
 import { TreeNode, nodeStore } from '../stores/nodeStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
+import { serverSceneContentStore } from '../stores/serverSceneContentStore'
 import { settingsStore } from '../stores/settingsStore'
 import { statsStore } from '../stores/statsStore'
 import { Node, NodeType } from '../types/core'
 import { createAnthropicClient } from '../utils/anthropicClient'
 import { getCharacterDisplayName, resolveViewpointCharacter } from '../utils/character'
+import { runWithConcurrency } from '../utils/concurrentTasks'
 import { buildNodeMarkdown, buildPrecedingContextMarkdown, buildTreeMarkdown } from '../utils/nodeContentExport'
 import { getContextNodesFingerprint } from '../utils/storyFingerprint'
 import { estimateTokensFromText } from '../utils/templateAI'
@@ -201,6 +203,7 @@ const NodeItem: Component<NodeItemProps> = (props) => {
   // Get the Ollama hook for summary and title generation
   const { generateNodeSummary, generateNodeTitle } = useOllama()
   const [isGeneratingTitle, setIsGeneratingTitle] = createSignal(false)
+  const [copyContextProgress, setCopyContextProgress] = createSignal<{ completed: number; total: number } | null>(null)
 
   // Get the reactive node directly from store hash map
   const node = () => nodeStore.nodes[props.treeNode.id]
@@ -576,17 +579,43 @@ const NodeItem: Component<NodeItemProps> = (props) => {
     const n = node()
     if (!n) return
 
-    const summary = buildPrecedingContextMarkdown(n.id, {
-      includeCurrentNode: false,
-      mode: 'summary',
-    })
+    if (copyContextProgress()) return
 
-    if (!summary) {
-      alert('No previous chapters with content were found to copy.')
-      return
+    const precedingScenes = nodeStore.getPrecedingScenes(n.id)
+    const scenesToLoad = precedingScenes.filter((scene) => !serverSceneContentStore.isLoaded(scene.id))
+    if (scenesToLoad.length > 0) {
+      setCopyContextProgress({ completed: 0, total: scenesToLoad.length })
+      copyPreviewStore.beginContextPreparation(scenesToLoad.length)
     }
+    try {
+      const loads = await runWithConcurrency(
+        scenesToLoad,
+        5,
+        (scene) => serverSceneContentStore.load(scene.id),
+        (progress) => {
+          setCopyContextProgress(progress)
+          copyPreviewStore.updateContextPreparation(progress.completed, progress.total)
+        },
+      )
+      if (loads.some((result) => result.status === 'rejected')) {
+        console.warn('Some preceding scenes could not be loaded before copying context.')
+      }
 
-    await copyPreviewStore.requestCopy(summary)
+      const summary = buildPrecedingContextMarkdown(n.id, {
+        includeCurrentNode: false,
+        mode: 'summary',
+      })
+
+      if (!summary) {
+        alert('No previous chapters with content were found to copy.')
+        return
+      }
+
+      await copyPreviewStore.requestCopy(summary)
+    } finally {
+      setCopyContextProgress(null)
+      copyPreviewStore.finishContextPreparation()
+    }
   }
 
   const handleSaveEdit = () => {
@@ -1237,8 +1266,14 @@ const NodeItem: Component<NodeItemProps> = (props) => {
                       ? 'Regenerate Summary'
                       : 'Generate Summary'}
                 </DropdownItem>
-                <DropdownItem icon={<PhFileTextIcon weight="fill" />} onClick={handleCopyPreviousContext}>
-                  Copy Previous Context
+                <DropdownItem
+                  icon={<PhFileTextIcon weight="fill" />}
+                  onClick={handleCopyPreviousContext}
+                  disabled={copyContextProgress() !== null}
+                >
+                  {copyContextProgress()
+                    ? `Loading context ${copyContextProgress()!.completed}/${copyContextProgress()!.total}…`
+                    : 'Copy Previous Context'}
                 </DropdownItem>
               </Show>
               <Show when={node()?.type === 'chapter'}>

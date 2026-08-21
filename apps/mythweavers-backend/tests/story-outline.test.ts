@@ -48,7 +48,9 @@ describe('Outline and search endpoints', () => {
     arcId = (await createNode({ parentId: bookId, name: 'Arc One' })).json().node.id
     chapterId = (await createNode({ parentId: arcId, name: 'The Crossing', summary: 'They cross the river.' })).json()
       .node.id
-    sceneId = (await createNode({ parentId: chapterId, name: 'Riverbank', perspective: 'THIRD' })).json().node.id
+    sceneId = (
+      await createNode({ parentId: chapterId, name: 'Riverbank', perspective: 'THIRD', storyTime: 1234 })
+    ).json().node.id
 
     await app.inject({
       method: 'POST',
@@ -111,6 +113,7 @@ describe('Outline and search endpoints', () => {
       const body = (await outline('?depth=scene&includeSceneDetail=true')).json()
       const scene = body.nodes.find((node: { kind: string }) => node.kind === 'scene')
       expect(scene.perspective).toBe('THIRD')
+      expect(scene.storyTime).toBe(1234)
       expect(scene.hasBranches).toBe(false)
 
       const message = await app.inject({

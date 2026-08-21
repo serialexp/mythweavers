@@ -30,7 +30,9 @@ export const CopyTokenModal: Component = () => {
     <Modal
       open={state.isOpen}
       onClose={() => copyPreviewStore.cancel()}
-      title={state.showFallback ? 'Copy Text' : 'Token Count Preview'}
+      title={
+        state.contextProgress ? 'Preparing Previous Context' : state.showFallback ? 'Copy Text' : 'Token Count Preview'
+      }
       size="md"
       footer={
         <Stack direction="horizontal" gap="sm" justify="end">
@@ -49,6 +51,16 @@ export const CopyTokenModal: Component = () => {
       }
     >
       <div style={{ 'line-height': '1.5', 'white-space': 'pre-wrap' }}>
+        <Show when={state.contextProgress}>
+          {(progress) => (
+            <div>
+              <p>
+                Loading scene {progress().completed} of {progress().total}…
+              </p>
+              <progress value={progress().completed} max={Math.max(1, progress().total)} style={{ width: '100%' }} />
+            </div>
+          )}
+        </Show>
         <Show when={state.showFallback}>
           <p>Copy the text below manually:</p>
           <Textarea
@@ -62,7 +74,7 @@ export const CopyTokenModal: Component = () => {
             <Alert variant="success">Copied to clipboard!</Alert>
           </Show>
         </Show>
-        <Show when={!state.showFallback}>
+        <Show when={!state.showFallback && !state.contextProgress}>
           <Show when={state.isLoading}>
             <p>Calculating token usage…</p>
           </Show>

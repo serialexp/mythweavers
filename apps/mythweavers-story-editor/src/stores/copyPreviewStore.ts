@@ -9,6 +9,7 @@ interface CopyPreviewState {
   error: string | null
   text: string
   showFallback: boolean
+  contextProgress: { completed: number; total: number } | null
 }
 
 const [copyPreviewState, setCopyPreviewState] = createStore<CopyPreviewState>({
@@ -18,6 +19,7 @@ const [copyPreviewState, setCopyPreviewState] = createStore<CopyPreviewState>({
   error: null,
   text: '',
   showFallback: false,
+  contextProgress: null,
 })
 
 const resetState = () => {
@@ -28,6 +30,7 @@ const resetState = () => {
     error: null,
     text: '',
     showFallback: false,
+    contextProgress: null,
   })
 }
 
@@ -41,6 +44,26 @@ const copyTextToClipboard = async (text: string) => {
 export const copyPreviewStore = {
   get state() {
     return copyPreviewState
+  },
+
+  beginContextPreparation(total: number) {
+    setCopyPreviewState({
+      isOpen: true,
+      isLoading: true,
+      tokens: null,
+      error: null,
+      text: '',
+      showFallback: false,
+      contextProgress: { completed: 0, total },
+    })
+  },
+
+  updateContextPreparation(completed: number, total: number) {
+    setCopyPreviewState('contextProgress', { completed, total })
+  },
+
+  finishContextPreparation() {
+    if (copyPreviewState.contextProgress) resetState()
   },
 
   async requestCopy(text: string): Promise<boolean> {
@@ -66,6 +89,7 @@ export const copyPreviewStore = {
       tokens: null,
       error: null,
       text: trimmed,
+      contextProgress: null,
     })
 
     try {
@@ -115,6 +139,7 @@ export const copyPreviewStore = {
       error: null,
       text,
       showFallback: true,
+      contextProgress: null,
     })
   },
 

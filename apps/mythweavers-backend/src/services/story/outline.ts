@@ -48,6 +48,8 @@ export interface OutlineNode {
   viewpointCharacterId?: string | null
   goal?: string | null
   includeInFull?: number
+  /** Timeline position in story minutes (scenes only). */
+  storyTime?: number | null
   /** True when a scene contains at least one current branch message. */
   hasBranches?: boolean
   publishedAt?: string | null
@@ -189,6 +191,7 @@ export async function getOutline(
                   viewpointCharacterId: true,
                   goal: true,
                   includeInFull: true,
+                  storyTime: true,
                   _count: { select: { messages: { where: { deleted: false, type: 'branch' } } } },
                 }
               : {}),
@@ -220,6 +223,7 @@ export async function getOutline(
             viewpointCharacterId: scene.viewpointCharacterId,
             goal: scene.goal,
             includeInFull: scene.includeInFull,
+            storyTime: scene.storyTime,
             hasBranches: scene._count.messages > 0,
           }
         : {}),

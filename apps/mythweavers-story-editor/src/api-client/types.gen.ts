@@ -7262,6 +7262,14 @@ export type GetMyNodesByIdContentData = {
          * Include normal generation messages as well as structural messages. Required when hydrating an editor scene.
          */
         includeAllMessages?: boolean;
+        /**
+         * Return message/paragraph scripts and actions without prose bodies.
+         */
+        scriptsOnly?: boolean;
+        /**
+         * For a scene script read, include all scenes preceding it in story order.
+         */
+        includePreceding?: boolean;
     };
     url: '/my/nodes/{id}/content';
 };
@@ -7400,6 +7408,7 @@ export type GetMyNodesByIdContentResponses = {
                         state: string | null;
                         plotPointActions: Array<unknown>;
                         inventoryActions: Array<unknown>;
+                        script: string | null;
                         words: number;
                     }>;
                 }>;
@@ -7562,6 +7571,10 @@ export type GetMyStoriesByStoryIdOutlineResponses = {
              * 0 = excluded from context, 1 = summary only, 2 = full content
              */
             includeInFull?: number;
+            /**
+             * Timeline position in story minutes (scenes only)
+             */
+            storyTime?: number | null;
             /**
              * True when a scene contains at least one non-deleted branch message.
              */

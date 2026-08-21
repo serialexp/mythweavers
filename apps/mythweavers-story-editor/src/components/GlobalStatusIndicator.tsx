@@ -15,6 +15,8 @@ export const GlobalStatusIndicator: Component = () => {
         return 'Removing user messages'
       case 'cleanup-think-tags':
         return 'Cleaning up think tags'
+      case 'load-script-context':
+        return 'Loading story context'
       default:
         return 'Processing'
     }

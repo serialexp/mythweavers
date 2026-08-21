@@ -661,11 +661,12 @@ export const messagesStore = {
   },
 
   /** Replace one lazily hydrated scene without discarding already visited scenes. */
-  replaceSceneMessages: (sceneId: string, messages: Message[]) => {
+  replaceSceneMessages: (sceneId: string, messages: Message[], recalculateWordCount = true) => {
     setMessagesState('messages', (previous) => [
       ...previous.filter((message) => message.sceneId !== sceneId),
       ...messages.sort((left, right) => left.order - right.order),
     ])
+    if (!recalculateWordCount) return
     // The first lazy load seeds a scene that had no local count; tree-level
     // aggregates already came from the outline, so do not propagate this load.
     const sceneHadCount = nodeStore.getNode(sceneId)?.wordCount !== undefined
