@@ -30,6 +30,9 @@ import {
   type SteeringBucket,
 } from './prompts'
 import { applyAnalysisToolCall } from './applyAnalysisToolCall'
+import { previousStoryTime } from './storyTime'
+import { analyzeStoryTime } from './storyTimeAnalysis'
+import { runWriterToolLoop } from './writerToolLoop'
 
 // --- Engine interface & context ---
 
@@ -58,6 +61,8 @@ export interface AdventureEngine {
   handleEditNarrative: (newNarrative: string, field?: 'narrative' | 'deuteragonistNarrative') => void
   /** Edit the setting description and optionally regenerate the opening turn. */
   handleEditSetting: (newSetting: string) => void
+  /** Update the world bible and re-estimate setting-dependent story times. */
+  handleWorldBibleChange: (newWorldBible: string) => void
   handleReviseNarrative: () => void
   handleRewindTo: (turnIndex: number) => void
   handleReset: () => void
@@ -308,41 +313,44 @@ export function createAdventureEngine(
   async function streamPass(
     messages: LLMMessage[],
     callType: string,
-  ): Promise<{ narrative: string; raw: string; streamErrors: string[] }> {
+  ): Promise<{ narrative: string; raw: string; streamErrors: string[]; conversationSearchCount: number }> {
     const resolved = resolveModel('adventure')
     const client = LLMClientFactory.getClient(resolved.provider)
 
-    let accumulated = ''
-    const streamErrors: string[] = []
-    const response = client.generate({
-      model: resolved.model,
+    const { raw, streamErrors, searchCount } = await runWriterToolLoop({
+      client,
+      generateOptions: {
+        model: resolved.model,
+        max_tokens: resolved.maxTokens,
+        thinking_budget: resolved.thinkingBudget
+          ? Math.min(
+              resolved.thinkingBudget,
+              Math.floor(resolved.maxTokens / 2),
+            )
+          : undefined,
+        signal: abortController!.signal,
+        metadata: { callType },
+      },
       messages,
-      max_tokens: resolved.maxTokens,
-      thinking_budget: resolved.thinkingBudget
-        ? Math.min(
-            resolved.thinkingBudget,
-            Math.floor(resolved.maxTokens / 2),
-          )
-        : undefined,
-      signal: abortController!.signal,
-      metadata: { callType },
-    })
-
-    for await (const event of response) {
-      if (event.type === 'chunk') {
-        accumulated += event.text
+      turns: adventureStore.turns,
+      compactions: adventureStore.compactions,
+      onText: (accumulated) => {
         const displayContent = accumulated
           .replace(/<think>[\s\S]*?<\/think>/g, '')
           .replace(/<\/?(?:narrative|protagonist|deuteragonist)>/g, '')
           .trim()
         adventureStore.setStreamingContent(displayContent)
-      }
-      if (event.type === 'error') {
-        streamErrors.push((event as { type: 'error'; error: string }).error)
-      }
-    }
+      },
+      onResetText: () => adventureStore.setStreamingContent(''),
+      onSearchCount: (count) => adventureStore.setStreamingConversationSearchCount(count),
+    })
 
-    return { narrative: cleanNarrative(accumulated), raw: accumulated, streamErrors }
+    return {
+      narrative: cleanNarrative(raw),
+      raw,
+      streamErrors,
+      conversationSearchCount: searchCount,
+    }
   }
 
   /**
@@ -357,10 +365,56 @@ export function createAdventureEngine(
    * Steering is intentionally NOT applied here — it scopes only to the
    * quality of the protagonist's action in pass 1.
    */
+  async function analyzeTurnStoryTime(index: number): Promise<void> {
+    const target = adventureStore.turns[index]
+    if (!target) return
+    const previousCurrentTime = previousStoryTime(adventureStore.turns, index)
+
+    adventureStore.setStoryTimeAnalyzingIndex(index)
+    adventureStore.clearStoryTimeFailure(index)
+    try {
+      const resolved = resolveModel('adventure-time-analysis')
+      const client = LLMClientFactory.getClient(resolved.provider)
+      const storyTime = await analyzeStoryTime({
+        client,
+        generateOptions: {
+          model: resolved.model,
+          max_tokens: resolved.maxTokens,
+          thinking_budget: resolved.thinkingBudget || undefined,
+          signal: abortController?.signal,
+          metadata: { callType: 'adventure-time-analysis' },
+        },
+        worldBible: adventureStore.worldBible,
+        targetTurn: target,
+        previousCurrentTime,
+      })
+      if (adventureStore.turns[index] === target) {
+        adventureStore.setTurnStoryTime(index, storyTime)
+        persist()
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError') && adventureStore.turns[index] === target) {
+        console.warn('[StoryTime] Analysis failed:', error)
+        adventureStore.markStoryTimeFailed(index)
+      }
+    } finally {
+      if (adventureStore.storyTimeAnalyzingIndex === index) adventureStore.setStoryTimeAnalyzingIndex(null)
+    }
+  }
+
+  async function reanalyzeStoryTimeFrom(startIndex: number): Promise<void> {
+    adventureStore.invalidateStoryTimeFrom(startIndex)
+    persist()
+    for (let index = startIndex; index < adventureStore.turns.length; index++) {
+      await analyzeTurnStoryTime(index)
+    }
+  }
+
   async function runAutoTurn(mode: 'world-step' | 'continue') {
     const label = mode === 'continue' ? 'Continue story' : 'World step'
     adventureStore.setStreamingContent('')
     adventureStore.setStreamingKind(mode)
+    adventureStore.setStreamingConversationSearchCount(0)
 
     // Storyline gate — independently filtered for this beat (no player
     // action; the gate sees the just-finalized turn as the most recent in
@@ -392,7 +446,7 @@ export function createAdventureEngine(
       narrativeOptions(),
     )
 
-    const { narrative, streamErrors } = await streamPass(
+    const { narrative, streamErrors, conversationSearchCount } = await streamPass(
       messages,
       mode === 'continue' ? 'adventure-continue' : 'adventure-world-step',
     )
@@ -416,8 +470,11 @@ export function createAdventureEngine(
       narrative,
       kind: mode,
       ...(directorBrief ? { directorBrief } : {}),
+      ...(conversationSearchCount > 0 ? { conversationSearchCount } : {}),
     })
     persist()
+    adventureStore.setIsGenerating(true)
+    await analyzeTurnStoryTime(adventureStore.turns.length - 1)
   }
 
   /**
@@ -498,6 +555,7 @@ export function createAdventureEngine(
     adventureStore.setIsGenerating(true)
     adventureStore.setStreamingContent('')
     adventureStore.setStreamingKind('resolution')
+    adventureStore.setStreamingConversationSearchCount(0)
     adventureStore.setPendingAction(playerAction)
     persistNow()
 
@@ -530,6 +588,7 @@ export function createAdventureEngine(
     let partnerAction: string | undefined
     let deuteragonistNarrative: string | undefined
     let resolutionNarrative: string | undefined
+    let resolutionConversationSearchCount = 0
 
     try {
       // --- Deuteragonist action (pre-resolution) ---
@@ -584,10 +643,11 @@ export function createAdventureEngine(
         narrativeOptions(),
       )
 
-      const { narrative, raw, streamErrors } = await streamPass(
+      const { narrative, raw, streamErrors, conversationSearchCount } = await streamPass(
         resolutionMessages,
         'adventure',
       )
+      resolutionConversationSearchCount = conversationSearchCount
 
       if (streamErrors.length > 0 && !narrative) {
         adventureStore.setStreamingContent('')
@@ -637,8 +697,14 @@ export function createAdventureEngine(
         ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
         ...(partnerAction ? { partnerAction } : {}),
         ...(deuteragonistNarrative ? { deuteragonistNarrative } : {}),
+        ...(resolutionConversationSearchCount > 0
+          ? { conversationSearchCount: resolutionConversationSearchCount }
+          : {}),
       })
       persist()
+      adventureStore.setIsGenerating(true)
+      await analyzeTurnStoryTime(adventureStore.turns.length - 1)
+      if (abortController.signal.aborted) return
 
       // --- Consistency check (nonsense) — optional, gated by user toggle ---
       // Runs after finalize so the narrative is already saved. Failures or
@@ -669,17 +735,22 @@ export function createAdventureEngine(
         // runAutoTurn handles its own error surfacing; don't crash pass 1
         // if pass 2 misbehaves.
         adventureStore.setIsGenerating(true)
+        let worldStepConversationSearchCount = 0
         try {
           await runAutoTurn('world-step')
         } catch (worldErr: unknown) {
           if (worldErr instanceof DOMException && worldErr.name === 'AbortError') {
             const partial = adventureStore.streamingContent
+            worldStepConversationSearchCount = adventureStore.streamingConversationSearchCount
             const wsNarrative = partial ? cleanNarrative(partial) : ''
             if (wsNarrative && !wsNarrative.startsWith('⏳')) {
               adventureStore.finalizeAbort({
                 playerAction: null,
                 narrative: wsNarrative,
                 kind: 'world-step',
+                ...(worldStepConversationSearchCount > 0
+                  ? { conversationSearchCount: worldStepConversationSearchCount }
+                  : {}),
               })
               persist()
             } else {
@@ -727,6 +798,7 @@ export function createAdventureEngine(
         // User aborted — if we have partial narrative, save it.
         // If party is split, parse the partial to capture both narratives.
         const partial = adventureStore.streamingContent
+        resolutionConversationSearchCount = adventureStore.streamingConversationSearchCount
         const partialNarrative = partial ? cleanNarrative(partial) : ''
 
         if (partialNarrative && !partialNarrative.startsWith('⏳')) {
@@ -750,6 +822,9 @@ export function createAdventureEngine(
             ...(resolutionDirectorBrief ? { directorBrief: resolutionDirectorBrief } : {}),
             ...(partnerAction ? { partnerAction } : {}),
             ...(deutNarrative ? { deuteragonistNarrative: deutNarrative } : {}),
+            ...(resolutionConversationSearchCount > 0
+              ? { conversationSearchCount: resolutionConversationSearchCount }
+              : {}),
           })
           persist()
         } else {
@@ -769,6 +844,7 @@ export function createAdventureEngine(
       adventureStore.setStreamingKind(null)
       adventureStore.setStreamingSteering(undefined)
       adventureStore.setStreamingPartnerAction(null)
+      adventureStore.setStreamingConversationSearchCount(0)
       adventureStore.setPendingAction(null)
       abortController = null
     }
@@ -1523,6 +1599,7 @@ export function createAdventureEngine(
         adventureStore.updateLastTurn({ narrative: revisedNarrative })
         adventureStore.setNonsenseWarning(null)
         persist()
+        await reanalyzeStoryTimeFrom(adventureStore.turns.length - 1)
       }
     } catch (err) {
       console.error('[Revision] Error:', err)
@@ -1663,8 +1740,36 @@ export function createAdventureEngine(
   ) {
     if (adventureStore.isGenerating) return
     if (adventureStore.turns.length === 0) return
+    const index = adventureStore.turns.length - 1
     adventureStore.updateLastTurn({ [field]: newNarrative })
     persist()
+    adventureStore.setIsGenerating(true)
+    abortController = new AbortController()
+    reanalyzeStoryTimeFrom(index)
+      .catch((error) => console.warn('[StoryTime] Reanalysis failed:', error))
+      .finally(() => {
+        adventureStore.setIsGenerating(false)
+        abortController = null
+      })
+  }
+
+  function reanalyzeAllStoryTime() {
+    if (adventureStore.turns.length === 0 || adventureStore.isGenerating) return
+    adventureStore.setIsGenerating(true)
+    abortController = new AbortController()
+    reanalyzeStoryTimeFrom(0)
+      .catch((error) => console.warn('[StoryTime] Reanalysis failed:', error))
+      .finally(() => {
+        adventureStore.setIsGenerating(false)
+        abortController = null
+      })
+  }
+
+  function handleWorldBibleChange(newWorldBible: string) {
+    if (adventureStore.isGenerating) return
+    adventureStore.setWorldBible(newWorldBible)
+    persist()
+    reanalyzeAllStoryTime()
   }
 
   function handleEditSetting(newSetting: string) {
@@ -1680,6 +1785,7 @@ export function createAdventureEngine(
       generate(null)
     } else {
       persist()
+      reanalyzeAllStoryTime()
     }
   }
 
@@ -1837,6 +1943,7 @@ export function createAdventureEngine(
     handleEditAndRegenerate,
     handleEditNarrative,
     handleEditSetting,
+    handleWorldBibleChange,
     handleReviseNarrative,
     handleRewindTo,
     handleReset,

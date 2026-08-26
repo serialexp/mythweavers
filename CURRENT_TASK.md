@@ -1,3 +1,42 @@
+# ACTION NEEDED FROM BART: expose local LLM providers over tailnet HTTPS (2026-08-25)
+
+The story editor now discovers Ollama and llama.cpp first on the hostname serving
+MythWeavers, with loopback fallback. Because the page is HTTPS, the provider
+endpoints must also be HTTPS; directly binding their plain-HTTP listeners to the
+tailnet address would be blocked as active mixed content.
+
+The intended local-only setup is to add two Caddy listeners (Caddy already binds
+only `100.81.200.31` globally):
+
+```caddy
+https://write.mythweavers.home.serial-experiments.com:11434 {
+    import accesslog
+    reverse_proxy 127.0.0.1:11434
+}
+https://write.mythweavers.home.serial-experiments.com:12434 {
+    import accesslog
+    reverse_proxy 127.0.0.1:12434
+}
+```
+
+Ollama also needs this systemd environment setting because it currently returns
+403 for the editor origin even over loopback:
+
+```ini
+[Service]
+Environment="OLLAMA_ORIGINS=https://write.mythweavers.home.serial-experiments.com"
+```
+
+Both `/etc/caddy/Caddyfile` and the Ollama system service are root-owned. This
+session cannot apply them because passwordless sudo is unavailable. A candidate
+Caddyfile was generated at `/tmp/Caddyfile.mythweavers-local-providers`; its
+Caddy adaptation succeeded, but full validation cannot run as Bart because the
+Cloudflare token and Caddy-owned logs are intentionally inaccessible.
+
+After applying: reload Caddy, restart Ollama, then verify both HTTPS URLs from a
+tailnet client. Do not bind either provider to `0.0.0.0`; retaining loopback
+upstreams behind tailnet-bound Caddy avoids exposing inference APIs to the LAN.
+
 # ACTION NEEDED FROM BART: run the OAuth migration on dev (2026-08-10)
 
 MCP now speaks the full OAuth 2.1 browser flow, so `claude mcp add --transport

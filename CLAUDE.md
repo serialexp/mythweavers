@@ -55,6 +55,11 @@ App-specific:
 - **Imports**: Group npm packages first, then local modules; no dynamic imports unless genuinely needed
 - **IDs**: Always use `generateMessageId()` from `apps/mythweavers-story-editor/src/utils/id.ts` (cuid2-based) for any generated IDs.
 
+## Respect Configured Limits
+- **Never introduce an arbitrary limit based on what seems reasonable. It is always wrong.** This includes token/output caps, thinking budgets, timeouts, result counts, payload sizes, retries, and similar constraints.
+- When a limit is resolved from user, category, provider, or application configuration, pass that resolved value through unchanged. Do not silently clamp it with `Math.min`, replace it with a hard-coded cap, or add a second limit at the call site.
+- If an external API imposes a mandatory limit, use the authoritative provider/API value and make that constraint explicit in code. If the correct limit is unknown or requires a product decision, ask rather than inventing one.
+
 ## Git Commits
 Use conventional commit format for all commit messages:
 

@@ -9,14 +9,24 @@ export interface LocalProviderProbeResult {
 
 export const LOCAL_PROVIDER_ENDPOINTS: Record<LocalProvider, string> = {
   ollama: 'http://127.0.0.1:11434',
-  llamacpp: 'http://127.0.0.1:8080',
+  llamacpp: 'http://127.0.0.1:12434',
 }
 
-const hostnames =
-  typeof window === 'undefined' ? ['127.0.0.1'] : Array.from(new Set(['127.0.0.1', window.location.hostname]))
-const OLLAMA_CANDIDATES = hostnames.map((hostname) => `http://${hostname}:11434`)
-const LLAMA_CPP_CANDIDATES = hostnames.flatMap((hostname) => [`http://${hostname}:8080`, `http://${hostname}:12434`])
 const PROBE_TIMEOUT_MS = 1_500
+
+export function getLocalProviderCandidates(
+  serviceHostname = typeof window === 'undefined' ? undefined : window.location.hostname,
+  serviceProtocol = typeof window === 'undefined' ? 'http:' : window.location.protocol,
+): Record<LocalProvider, string[]> {
+  const endpoint = (hostname: string, port: number) =>
+    `${hostname === serviceHostname ? serviceProtocol : 'http:'}//${hostname}:${port}`
+  const hostnames = Array.from(new Set([serviceHostname, '127.0.0.1'].filter((hostname): hostname is string => !!hostname)))
+
+  return {
+    ollama: hostnames.map((hostname) => endpoint(hostname, 11434)),
+    llamacpp: hostnames.map((hostname) => endpoint(hostname, 12434)),
+  }
+}
 
 export function setLocalProviderEndpoint(provider: LocalProvider, endpoint: string): void {
   if (LOCAL_PROVIDER_ENDPOINTS[provider] === endpoint) return
@@ -58,10 +68,9 @@ export async function probeLlamaCpp(endpoint = LOCAL_PROVIDER_ENDPOINTS.llamacpp
     const response = await fetchWithTimeout(`${endpoint}/health`)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
-    const server = response.headers.get('server')?.toLowerCase()
     const body = (await response.json()) as { status?: unknown }
-    if (!server?.includes('llama.cpp') || body.status !== 'ok') {
-      throw new Error('Not a llama.cpp server')
+    if (body.status !== 'ok') {
+      throw new Error('Unexpected health response')
     }
 
     return { provider: 'llamacpp', status: 'reachable', endpoint }
@@ -79,9 +88,10 @@ async function firstReachable(
 }
 
 export async function probeLocalProviders(): Promise<Record<LocalProvider, LocalProviderProbeResult>> {
+  const candidates = getLocalProviderCandidates()
   const [ollama, llamacpp] = await Promise.all([
-    firstReachable(OLLAMA_CANDIDATES, probeOllama),
-    firstReachable(LLAMA_CPP_CANDIDATES, probeLlamaCpp),
+    firstReachable(candidates.ollama, probeOllama),
+    firstReachable(candidates.llamacpp, probeLlamaCpp),
   ])
   if (ollama.status === 'reachable') setLocalProviderEndpoint('ollama', ollama.endpoint)
   if (llamacpp.status === 'reachable') setLocalProviderEndpoint('llamacpp', llamacpp.endpoint)

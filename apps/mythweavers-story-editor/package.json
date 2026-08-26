@@ -59,6 +59,7 @@
     "pixi-filters": "^6.1.4",
     "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.14.0",
+    "safe-regex2": "^5.1.1",
     "solid-dnd-directive": "^0.2.0",
     "solid-js": "^1.9.9",
     "solidjs-phosphor": "^2.1.5"

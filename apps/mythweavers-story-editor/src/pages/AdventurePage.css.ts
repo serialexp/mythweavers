@@ -322,6 +322,29 @@ export const partnerActionLabel = style({
   marginRight: tokens.space['1'],
 })
 
+export const storyTimeRow = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: tokens.space['1'],
+  marginTop: tokens.space['2'],
+  fontSize: '0.75rem',
+  color: tokens.color.text.muted,
+})
+
+export const conversationSearchChip = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  fontSize: '0.65rem',
+  fontWeight: 600,
+  letterSpacing: '0.04em',
+  padding: `${tokens.space['1']} ${tokens.space['2']}`,
+  borderRadius: tokens.radius.sm,
+  marginBottom: tokens.space['2'],
+  border: `1px solid ${tokens.color.border.default}`,
+  backgroundColor: tokens.color.surface.default,
+  color: tokens.color.text.muted,
+})
+
 export const partySplitLabel = style({
   display: 'flex',
   alignItems: 'center',

@@ -49,6 +49,7 @@ const CALL_TYPE_CATEGORY: Record<string, GenerationCategory> = {
   'adventure-storyline-gate': 'analysis',
   'adventure-director': 'analysis',
   'adventure-conditions': 'analysis',
+  'adventure-time-analysis': 'analysis',
   'cliche:critique': 'analysis',
   'summary:node': 'analysis',
   'summary:sentence': 'analysis',

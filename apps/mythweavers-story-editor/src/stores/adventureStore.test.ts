@@ -13,6 +13,60 @@ const baseState: PersistedState = {
 
 afterEach(() => adventureStore.reset())
 
+describe('adventure turn metadata persistence', () => {
+  it('round-trips the conversation search count on generated turns', () => {
+    adventureStore.initialize({
+      ...baseState,
+      turns: [
+        {
+          playerAction: 'I repeat the password.',
+          narrative: 'The lock opens.',
+          conversationSearchCount: 2,
+        },
+      ],
+    })
+
+    expect(adventureStore.buildSnapshot().turns[0].conversationSearchCount).toBe(2)
+  })
+
+  it('round-trips story time and invalidates a suffix', () => {
+    const storyTime = { currentTime: 'Dusk', duration: { amount: 2, unit: 'hours' as const } }
+    adventureStore.initialize({
+      ...baseState,
+      turns: [
+        { playerAction: null, narrative: 'Opening.', storyTime },
+        { playerAction: 'Wait.', narrative: 'You wait.', storyTime: { ...storyTime, currentTime: 'Night' } },
+      ],
+    })
+
+    expect(adventureStore.buildSnapshot().turns[1].storyTime?.currentTime).toBe('Night')
+    adventureStore.invalidateStoryTimeFrom(1)
+    expect(adventureStore.turns[0].storyTime).toEqual(storyTime)
+    expect(adventureStore.turns[1].storyTime).toBeUndefined()
+  })
+
+  it('drops timing with rewound turns', () => {
+    adventureStore.initialize({
+      ...baseState,
+      turns: [
+        {
+          playerAction: null,
+          narrative: 'Opening.',
+          storyTime: { currentTime: 'Dawn', duration: { amount: 1, unit: 'minutes' } },
+        },
+        {
+          playerAction: 'Wait.',
+          narrative: 'You wait.',
+          storyTime: { currentTime: 'Noon', duration: { amount: 6, unit: 'hours' } },
+        },
+      ],
+    })
+    adventureStore.rewindTo(0)
+    expect(adventureStore.turns).toHaveLength(1)
+    expect(adventureStore.turns[0].storyTime?.currentTime).toBe('Dawn')
+  })
+})
+
 describe('adventure start prompt persistence', () => {
   it('round-trips the separate start prompt through snapshots', () => {
     adventureStore.initialize(baseState)

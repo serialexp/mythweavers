@@ -9,6 +9,17 @@ import type { SteeringBucket } from '../pages/adventure/prompts'
 
 // --- Types ---
 
+export type AdventureStoryDurationUnit = 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'
+
+export interface AdventureStoryTime {
+  /** Setting-appropriate story time at the end of this turn. */
+  currentTime: string
+  duration: {
+    amount: number
+    unit: AdventureStoryDurationUnit
+  }
+}
+
 export interface AdventureTurn {
   playerAction: string | null
   narrative: string
@@ -52,6 +63,10 @@ export interface AdventureTurn {
    * can be diagnosed against the plan that produced it.
    */
   directorBrief?: string
+  /** Number of earlier-conversation search tool calls used to generate this turn. */
+  conversationSearchCount?: number
+  /** Model-estimated story time at the end of this turn and elapsed duration. */
+  storyTime?: AdventureStoryTime
 }
 
 export interface AdventureCompaction {

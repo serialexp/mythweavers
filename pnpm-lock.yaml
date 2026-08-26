@@ -384,6 +384,9 @@ importers:
       pixi.js:
         specifier: ^8.14.0
         version: 8.14.3
+      safe-regex2:
+        specifier: ^5.1.1
+        version: 5.1.1
       solid-dnd-directive:
         specifier: ^0.2.0
         version: 0.2.0(solid-js@1.9.10)
@@ -8968,6 +8971,10 @@ packages:
 
   safe-regex2@5.0.0:
     resolution: {integrity: sha512-YwJwe5a51WlK7KbOJREPdjNrpViQBI3p4T50lfwPuDhZnE3XGVTlGvi+aolc5+RvxDD6bnUmjVsU9n1eboLUYw==}
+
+  safe-regex2@5.1.1:
+    resolution: {integrity: sha512-mOSBvHGDZMuIEZMdOz/aCEYDCv0E7nfcNsIhUF+/P+xC7Hyf3FkvymqgPbg9D1EdSGu+uKbJgy09K/RKKc7kJA==}
+    hasBin: true
 
   safe-stable-stringify@2.5.0:
     resolution: {integrity: sha512-b3rppTKm9T+PsVCBEOUR46GWI7fdOs00VKZ1+9c1EWDaDMvjQc6tUwuFyIprgGgTcWoVHSKrU8H31ZHA2e0RHA==}
@@ -19949,6 +19956,10 @@ snapshots:
   safe-buffer@5.2.1: {}
 
   safe-regex2@5.0.0:
+    dependencies:
+      ret: 0.5.0
+
+  safe-regex2@5.1.1:
     dependencies:
       ret: 0.5.0
 

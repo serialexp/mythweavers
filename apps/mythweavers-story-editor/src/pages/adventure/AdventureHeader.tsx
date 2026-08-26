@@ -211,10 +211,8 @@ export const AdventureHeader: Component<{
             <textarea
               class={styles.directiveTextarea}
               value={adventureStore.worldBible}
-              onInput={(e) => {
-                adventureStore.setWorldBible(e.currentTarget.value)
-                engine.persist()
-              }}
+              disabled={adventureStore.isGenerating}
+              onChange={(e) => engine.handleWorldBibleChange(e.currentTarget.value)}
               placeholder="Background world info, lore, rules of magic..."
               rows={6}
             />

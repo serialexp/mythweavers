@@ -138,6 +138,12 @@ interface AdventureState {
    */
   streamingSteering: SteeringBucket | undefined
   streamingPartnerAction: string | null
+  /** Search tool calls already executed for the narrative currently generating. */
+  streamingConversationSearchCount: number
+  /** Turn index currently receiving post-generation story-time analysis. */
+  storyTimeAnalyzingIndex: number | null
+  /** Turn indexes whose latest story-time analysis failed during this session. */
+  storyTimeFailedIndexes: number[]
   /**
    * Streaming content for the deuteragonist's solo narrative when the
    * party is split. Mirrors `streamingContent` but for the partner's
@@ -226,6 +232,9 @@ const [state, setState] = createStore<AdventureState>({
   streamingKind: null,
   streamingSteering: undefined,
   streamingPartnerAction: null,
+  streamingConversationSearchCount: 0,
+  storyTimeAnalyzingIndex: null,
+  storyTimeFailedIndexes: [],
   streamingDeuteragonistContent: '',
   pendingAction: null,
   lastFailedAction: undefined,
@@ -356,6 +365,15 @@ export const adventureStore = {
   },
   get streamingPartnerAction() {
     return state.streamingPartnerAction
+  },
+  get streamingConversationSearchCount() {
+    return state.streamingConversationSearchCount
+  },
+  get storyTimeAnalyzingIndex() {
+    return state.storyTimeAnalyzingIndex
+  },
+  get storyTimeFailedIndexes() {
+    return state.storyTimeFailedIndexes
   },
   get streamingDeuteragonistContent() {
     return state.streamingDeuteragonistContent
@@ -579,6 +597,20 @@ export const adventureStore = {
   setStreamingPartnerAction(v: string | null) {
     setState('streamingPartnerAction', v)
   },
+  setStreamingConversationSearchCount(v: number) {
+    setState('streamingConversationSearchCount', v)
+  },
+  setStoryTimeAnalyzingIndex(v: number | null) {
+    setState('storyTimeAnalyzingIndex', v)
+  },
+  markStoryTimeFailed(index: number) {
+    if (!state.storyTimeFailedIndexes.includes(index)) {
+      setState('storyTimeFailedIndexes', [...state.storyTimeFailedIndexes, index])
+    }
+  },
+  clearStoryTimeFailure(index: number) {
+    setState('storyTimeFailedIndexes', state.storyTimeFailedIndexes.filter((value) => value !== index))
+  },
   setStreamingDeuteragonistContent(v: string) {
     setState('streamingDeuteragonistContent', v)
   },
@@ -662,6 +694,21 @@ export const adventureStore = {
     }
   },
 
+  setTurnStoryTime(index: number, storyTime: AdventureTurn['storyTime']) {
+    if (!state.turns[index]) return false
+    setState('turns', index, 'storyTime', storyTime)
+    return true
+  },
+
+  invalidateStoryTimeFrom(startIndex: number) {
+    batch(() => {
+      for (let index = Math.max(0, startIndex); index < state.turns.length; index++) {
+        setState('turns', index, 'storyTime', undefined)
+      }
+      setState('storyTimeFailedIndexes', state.storyTimeFailedIndexes.filter((index) => index < startIndex))
+    })
+  },
+
   /** Rewind the story to a specific turn index (inclusive). */
   rewindTo(turnIndex: number) {
     const newCount = turnIndex + 1
@@ -676,6 +723,7 @@ export const adventureStore = {
       }
     }
     setState('compactions', reconcile(cleaned))
+    setState('storyTimeFailedIndexes', state.storyTimeFailedIndexes.filter((index) => index < newCount))
   },
 
   /** Remove the last turn and return it. */
@@ -684,6 +732,7 @@ export const adventureStore = {
     if (currentTurns.length === 0) return undefined
     const removed = currentTurns[currentTurns.length - 1]
     setState('turns', reconcile([...currentTurns.slice(0, -1)]))
+    setState('storyTimeFailedIndexes', state.storyTimeFailedIndexes.filter((index) => index < currentTurns.length - 1))
     return removed
   },
 
@@ -731,6 +780,7 @@ export const adventureStore = {
       setState('streamingKind', null)
       setState('streamingSteering', undefined)
       setState('streamingPartnerAction', null)
+      setState('streamingConversationSearchCount', 0)
       setState('pendingAction', null)
       setState('isGenerating', false)
       setState('turns', state.turns.length, turn)
@@ -747,6 +797,7 @@ export const adventureStore = {
       setState('streamingKind', null)
       setState('streamingSteering', undefined)
       setState('streamingPartnerAction', null)
+      setState('streamingConversationSearchCount', 0)
       setState('pendingAction', null)
       setState('isGenerating', false)
       setState('turns', state.turns.length, turn)
@@ -781,6 +832,9 @@ export const adventureStore = {
         streamingKind: null,
         streamingSteering: undefined,
         streamingPartnerAction: null,
+        streamingConversationSearchCount: 0,
+        storyTimeAnalyzingIndex: null,
+        storyTimeFailedIndexes: [],
         streamingDeuteragonistContent: '',
         pendingAction: saved?.pendingAction ?? null,
         lastFailedAction: saved?.pendingAction
@@ -846,6 +900,9 @@ export const adventureStore = {
         streamingKind: null,
         streamingSteering: undefined,
         streamingPartnerAction: null,
+        streamingConversationSearchCount: 0,
+        storyTimeAnalyzingIndex: null,
+        storyTimeFailedIndexes: [],
         streamingDeuteragonistContent: '',
         pendingAction: null,
         lastFailedAction: undefined,

@@ -6,6 +6,7 @@ import {
   type CompactionRange,
   type SteeringBucket,
 } from './prompts'
+import { formatStoryTimeLabel } from './storyTime'
 import { useEngine } from './useAdventureEngine'
 import * as styles from '../AdventurePage.css'
 
@@ -28,6 +29,10 @@ function steeringLabel(b: SteeringBucket): string {
     case 'hell':
       return 'Disaster'
   }
+}
+
+function conversationSearchLabel(count: number): string {
+  return `Searched earlier conversation ${count} ${count === 1 ? 'time' : 'times'}`
 }
 
 function steeringClass(b: SteeringBucket): string {
@@ -440,6 +445,10 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
         )}
       </Show>
 
+      <Show when={turn().conversationSearchCount}>
+        {(count) => <div class={styles.conversationSearchChip}>{conversationSearchLabel(count())}</div>}
+      </Show>
+
       {/* Narrative — tabbed when the party was split and both perspectives exist */}
       <Show
         when={turn().deuteragonistNarrative}
@@ -464,6 +473,16 @@ function renderTurn(index: number, engine: ReturnType<typeof useEngine>) {
           isGenerating={adventureStore.isGenerating}
           engine={engine}
         />
+      </Show>
+
+      <Show when={adventureStore.storyTimeAnalyzingIndex !== index ? turn().storyTime : undefined}>
+        {(storyTime) => <div class={styles.storyTimeRow}>🕒 {formatStoryTimeLabel(storyTime())}</div>}
+      </Show>
+      <Show when={adventureStore.storyTimeAnalyzingIndex === index}>
+        <div class={styles.storyTimeRow}>🕒 Estimating story time…</div>
+      </Show>
+      <Show when={!turn().storyTime && adventureStore.storyTimeFailedIndexes.includes(index)}>
+        <div class={styles.storyTimeRow}>🕒 Story time unavailable</div>
       </Show>
 
       {/* Director brief — present when the two-model flow ran for this
@@ -893,6 +912,11 @@ export const PlayingScreen: Component = () => {
                         </div>
                       )}
                     </Show>
+                  </Show>
+                  <Show when={adventureStore.streamingConversationSearchCount > 0}>
+                    <div class={styles.conversationSearchChip}>
+                      {conversationSearchLabel(adventureStore.streamingConversationSearchCount)}
+                    </div>
                   </Show>
                   {renderStreamingContent()}
                 </div>
