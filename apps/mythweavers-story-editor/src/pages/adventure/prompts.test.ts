@@ -1,26 +1,22 @@
 import { describe, expect, it } from 'vitest'
+import type { AdventureTurn, AgendaItem, CharacterCard, PlotPoint } from '../../hooks/useAdventurePersistence'
+import type { LLMMessage } from '../../types/llm'
 import {
-  buildConditionsMessages,
-  buildDirectorMessages,
-  buildSettingGenerationMessages,
-  buildResolutionMessages,
-  buildRevisionMessages,
-  buildSharedHistory,
-  buildWorldStepMessages,
   CONDITIONS_SYSTEM_PROMPT,
   CONTINUE_STORY_INSTRUCTION,
-  formatLiveWorldState,
-  paragraphRangeForAction,
   RESOLUTION_INSTRUCTION,
   WORLD_STEP_INSTRUCTION,
+  buildConditionsMessages,
+  buildDirectorMessages,
+  buildPartnerActionMessages,
+  buildResolutionMessages,
+  buildRevisionMessages,
+  buildSettingGenerationMessages,
+  buildSharedHistory,
+  buildWorldStepMessages,
+  formatLiveWorldState,
+  paragraphRangeForAction,
 } from './prompts'
-import type { LLMMessage } from '../../types/llm'
-import type {
-  AdventureTurn,
-  AgendaItem,
-  CharacterCard,
-  PlotPoint,
-} from '../../hooks/useAdventurePersistence'
 
 const protag = 'Maren, a young field medic with steady hands.'
 
@@ -629,5 +625,64 @@ describe('buildSharedHistory cache breakpoints', () => {
     const marked = markedAssistants([turn(0)])
     expect(marked).toHaveLength(1)
     expect(marked[0].content).toContain('turn 0')
+  })
+})
+
+describe('narrative prompts carry the current story time', () => {
+  // The last turn has no story time yet (analysis runs after finalize), so
+  // the builders must fall back to the newest known time.
+  const timedTurns: AdventureTurn[] = [
+    {
+      playerAction: null,
+      narrative: 'Dawn breaks over the harbour.',
+      storyTime: { currentTime: 'First Bell, Frostwane 12', duration: { amount: 2, unit: 'hours' } },
+    },
+    {
+      playerAction: 'I ask about the ledger.',
+      narrative: 'They point to the docks.',
+      storyTime: { currentTime: 'Third Bell, Frostwane 12', duration: { amount: 1, unit: 'hours' } },
+    },
+    { playerAction: 'I go to the docks.', narrative: 'The fog rolls in.' },
+  ]
+
+  const systemText = (messages: LLMMessage[]) =>
+    messages
+      .filter((m) => m.role === 'system')
+      .map((m) => m.content)
+      .join('\n\n')
+
+  it('injects the latest known story time into the resolution prompt', () => {
+    const text = systemText(buildResolutionMessages(timedTurns, 'A coastal town.', 'I knock.', undefined))
+    expect(text).toContain('[STORY TIME')
+    expect(text).toContain('Third Bell, Frostwane 12')
+    expect(text).not.toContain('First Bell, Frostwane 12')
+  })
+
+  it('omits the block when no turn has an estimated story time', () => {
+    const text = systemText(buildResolutionMessages([], 'A coastal town.', null, undefined))
+    expect(text).not.toContain('[STORY TIME')
+  })
+
+  it('carries the story time into the director, world-step, partner-action and revision prompts', () => {
+    expect(
+      systemText(buildDirectorMessages(timedTurns, 'A coastal town.', 'I knock.', undefined, 'resolution')),
+    ).toContain('Third Bell, Frostwane 12')
+    expect(systemText(buildWorldStepMessages(timedTurns, 'A coastal town.'))).toContain('Third Bell, Frostwane 12')
+    expect(
+      systemText(buildPartnerActionMessages(timedTurns, 'A coastal town.', 'I knock.', 'Lyra, a quick-witted rogue.')),
+    ).toContain('Third Bell, Frostwane 12')
+    expect(
+      systemText(
+        buildRevisionMessages(
+          timedTurns,
+          'A coastal town.',
+          'I knock.',
+          'The original.',
+          '1. X.',
+          undefined,
+          'resolution',
+        ),
+      ),
+    ).toContain('Third Bell, Frostwane 12')
   })
 })

@@ -58,6 +58,15 @@ export function previousStoryTime(turns: AdventureTurn[], targetIndex: number): 
   return undefined
 }
 
+/**
+ * The current story time as of the end of the most recent turn that has an
+ * estimated `storyTime`. Falls back to earlier turns when the latest turn
+ * hasn't been analyzed yet (analysis runs after finalize) or failed.
+ */
+export function latestStoryTime(turns: AdventureTurn[]): string | undefined {
+  return previousStoryTime(turns, turns.length)
+}
+
 export function formatStoryDuration(storyTime: AdventureStoryTime): string {
   const { amount, unit } = storyTime.duration
   const singular = unit.endsWith('s') ? unit.slice(0, -1) : unit

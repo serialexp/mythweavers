@@ -3,6 +3,7 @@ import type { AdventureTurn } from '../../hooks/useAdventurePersistence'
 import {
   formatStoryDuration,
   formatStoryTimeLabel,
+  latestStoryTime,
   parseStoryTimeJson,
   parseStoryTimeResult,
   previousStoryTime,
@@ -60,5 +61,28 @@ describe('story time context', () => {
       { playerAction: 'Continue.', narrative: 'You leave.' },
     ]
     expect(previousStoryTime(turns, 2)).toBe('Dawn')
+  })
+
+  it('latestStoryTime walks back to the newest estimated time', () => {
+    const turns: AdventureTurn[] = [
+      {
+        playerAction: null,
+        narrative: 'Opening.',
+        storyTime: { currentTime: 'Dawn', duration: { amount: 5, unit: 'minutes' } },
+      },
+      { playerAction: 'Wait.', narrative: 'You wait.' },
+      {
+        playerAction: 'Continue.',
+        narrative: 'You leave.',
+        storyTime: { currentTime: 'Noon', duration: { amount: 3, unit: 'hours' } },
+      },
+      { playerAction: 'Run.', narrative: 'You sprint.' },
+    ]
+    expect(latestStoryTime(turns)).toBe('Noon')
+  })
+
+  it('latestStoryTime is undefined when no turn has an estimated time', () => {
+    expect(latestStoryTime([{ playerAction: null, narrative: 'Opening.' }])).toBeUndefined()
+    expect(latestStoryTime([])).toBeUndefined()
   })
 })

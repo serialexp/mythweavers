@@ -8,6 +8,7 @@ import type {
   AgendaItem,
 } from "../../hooks/useAdventurePersistence";
 import { DISPOSITIONS } from "../../hooks/useAdventurePersistence";
+import { latestStoryTime } from "./storyTime";
 
 // --- Name extraction ---
 
@@ -771,6 +772,25 @@ function appendLiveWorldState(
 }
 
 /**
+ * Append a system message with the current story time, if known.
+ *
+ * Sourced from the latest turn with an estimated `storyTime` — the
+ * story-time analysis pass runs after each turn finalizes, so the most
+ * recent turn may not have one yet (or its analysis may have failed). The
+ * engine derives the value with `latestStoryTime`, which walks back to the
+ * newest known time; when there is none (e.g. the opening turn), this
+ * appends nothing.
+ */
+function appendStoryTime(messages: LLMMessage[], currentTime?: string): void {
+  const trimmed = currentTime?.trim();
+  if (!trimmed) return;
+  messages.push({
+    role: "system",
+    content: `[STORY TIME — the current story time as of the end of the most recent turn. Continue from this point and advance the clock naturally and continuously; do not reset or contradict the established time.]\n\nCurrent story time: ${trimmed}`,
+  });
+}
+
+/**
  * Append a system message with the synthesized global storyline, if any.
  *
  * NOTE: Currently NOT called by the resolution / world-step / revision
@@ -1063,6 +1083,7 @@ export function buildPartnerActionMessages(
   const deutName = extractName(deuteragonistInput, "the deuteragonist");
   const messages = buildSharedHistory(turns, compactions, settingDescription, worldBible);
 
+  appendStoryTime(messages, latestStoryTime(turns));
   appendLiveWorldState(messages, liveWorldState);
   appendConditions(messages, conditions);
 
@@ -1116,6 +1137,8 @@ export function buildResolutionMessages(
     startPrompt,
     worldBible,
   );
+
+  appendStoryTime(messages, latestStoryTime(turns));
 
   const isOpeningTurn = turns.length === 0 && playerAction === null;
 
@@ -1267,6 +1290,7 @@ export function buildDirectorMessages(
     worldBible,
   );
 
+  appendStoryTime(messages, latestStoryTime(turns));
   appendLiveWorldState(messages, liveWorldState);
   appendConditions(messages, conditions);
   appendStorylineBrief(messages, storylineBrief);
@@ -1364,6 +1388,8 @@ export function buildWorldStepMessages(
     settingDescription,
     worldBible,
   );
+
+  appendStoryTime(messages, latestStoryTime(turns));
 
   // Live protagonist & deuteragonist descriptions — always injected.
   {
@@ -1471,6 +1497,7 @@ export function buildRevisionMessages(
     worldBible,
   );
 
+  appendStoryTime(messages, latestStoryTime(turns));
   appendLiveWorldState(messages, liveWorldState);
   appendConditions(messages, conditions);
 
