@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/opt/llama.cpp/llama-server",
+    "--model",
+    "{model}",
+    "--host",
+    "{host}",
+    "--port",
+    "{port}",
+    "--fit",
+    "on",
+    "--jinja",
+    "--special",
+    "--flash-attn",
+    "on",
+    "--temp",
+    "1.0",
+    "--top-p",
+    "0.95",
+    "--min-p",
+    "0.01",
+    "--repeat-penalty",
+    "1.0"
+  ]
+}

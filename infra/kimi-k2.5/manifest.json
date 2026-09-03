@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "unsloth/Kimi-K2.5-GGUF",
+    "revision": "386fed8b054275941d6a495a9a7010fbf31b560d",
+    "quantization": "UD-Q2_K_XL"
+  },
+  "entrypoint": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00001-of-00008.gguf",
+  "totalSize": 374764330144,
+  "files": [
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00001-of-00008.gguf",
+      "size": 49856623456,
+      "sha256": "9e7d1f1c05bdff68f2dd467fcb35b6ca05f051bb93273a9bf2b93fd94a3c7df0"
+    },
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00002-of-00008.gguf",
+      "size": 49743844608,
+      "sha256": "46f71766b283153ef01cc96bca28ca1d5111f0f0392cfca23cb3aad3c94e9648"
+    },
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00003-of-00008.gguf",
+      "size": 49691497728,
+      "sha256": "d028387cb213a9672db30a1df632aead80a05945b0e62ef33abeabae049f8db7"
+    },
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00004-of-00008.gguf",
+      "size": 49696363776,
+      "sha256": "8b2a3cfc77181d43e9fec37b71758b25dc4acd2a3eaaadde15055541893a4ed6"
+    },
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00005-of-00008.gguf",
+      "size": 49686631680,
+      "sha256": "b9b605103c98df9c6ab6d6b6e58a8fe1113ae712483b3081d98117b72329919d"
+    },
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00006-of-00008.gguf",
+      "size": 49686631680,
+      "sha256": "16cc63f64edec21a4003096e758d5315f6c1b411567f6fe58d2aaa89f6f14a49"
+    },
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00007-of-00008.gguf",
+      "size": 49686631680,
+      "sha256": "671b19161775972d0840751d93a2b7eb6437f42bce03b97a9afcd019c27637e8"
+    },
+    {
+      "path": "UD-Q2_K_XL/Kimi-K2.5-UD-Q2_K_XL-00008-of-00008.gguf",
+      "size": 26716105536,
+      "sha256": "cac04413d800254e74f5d238e33cc17a914fe47d257cffb45e289c5799f6c243"
+    }
+  ]
+}

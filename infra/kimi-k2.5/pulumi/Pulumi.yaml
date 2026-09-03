@@ -1,0 +1,6 @@
+name: mythweavers-kimi-inference
+runtime:
+  name: nodejs
+  options:
+    packagemanager: pnpm
+description: Ephemeral Kimi K2.5 inference storage, access, and automatic EC2 expiry enforcement
