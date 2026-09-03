@@ -469,6 +469,19 @@ export const mapEditorStore = {
   },
 
   /**
+   * Clear the selection only when it is one of the given types.
+   *
+   * Used when leaving a creation mode: switching from pawn mode to path mode
+   * must drop a selected or in-progress pawn, but must not touch a selected
+   * landmark that has nothing to do with the mode being left.
+   */
+  clearSelectionOfTypes(...types: Selection['type'][]): void {
+    if (types.includes(state.selection.type)) {
+      setState('selection', { type: 'none' })
+    }
+  },
+
+  /**
    * Set the fleet to use for movement commands.
    *
    * Movement selection is just pawn selection, so this writes through to

@@ -1,14 +1,19 @@
-import { Accessor, Component, For, Show, createMemo } from 'solid-js'
+import { Component, For, Show, createMemo } from 'solid-js'
+import {
+  PhArrowLeftIcon,
+  PhCheckIcon,
+  PhCircleNotchIcon,
+  PhPencilSimpleIcon,
+  PhTrashIcon,
+  PhXIcon,
+} from 'solidjs-phosphor'
 import { mapEditorStore } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
-import { Fleet } from '../../types/core'
 import { getActiveMovement } from '../../utils/fleetUtils'
 import * as styles from '../Maps.css'
-import { PhArrowLeftIcon, PhCheckIcon, PhCircleNotchIcon, PhPencilSimpleIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface PawnDetailProps {
   // Data that comes from parent context
-  selectedPawn: Accessor<Fleet | null>
   quickColors: Array<{ name: string; hex: string }>
 
   // Callback for navigation (clearing selection is handled by store)
@@ -29,7 +34,7 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
 
   // Check if there's an active movement at the current story time
   const activeMovement = createMemo(() => {
-    const pawn = props.selectedPawn()
+    const pawn = mapEditorStore.selectedPawn
     if (!pawn) return null
     return getActiveMovement(pawn, currentStoryTime())
   })
@@ -41,35 +46,33 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
         <button class={styles.backButton} onClick={props.onBack} title="Back to list">
           <PhArrowLeftIcon />
         </button>
-        <span class={styles.landmarkDetailTitle}>
-          {mapEditorStore.isAddingPawn ? 'New Pawn' : 'Pawn Details'}
-        </span>
+        <span class={styles.landmarkDetailTitle}>{mapEditorStore.isAddingPawn ? 'New Pawn' : 'Pawn Details'}</span>
       </div>
 
       <div class={styles.landmarkDetailContent}>
         <Show
           when={mapEditorStore.isEditing}
           fallback={
-            <Show when={props.selectedPawn()}>
-              <div class={styles.landmarkName}>{props.selectedPawn()!.name}</div>
+            <Show when={mapEditorStore.selectedPawn}>
+              <div class={styles.landmarkName}>{mapEditorStore.selectedPawn!.name}</div>
               <div class={styles.landmarkDescription}>
-                {props.selectedPawn()!.description || 'No description'}
+                {mapEditorStore.selectedPawn!.description || 'No description'}
               </div>
-              <Show when={props.selectedPawn()!.designation}>
+              <Show when={mapEditorStore.selectedPawn!.designation}>
                 <div class={styles.landmarkDetailRow}>
                   <span class={styles.landmarkDetailLabel}>Designation:</span>
-                  <span class={styles.landmarkDetailValue}>{props.selectedPawn()!.designation}</span>
+                  <span class={styles.landmarkDetailValue}>{mapEditorStore.selectedPawn!.designation}</span>
                 </div>
               </Show>
 
               <div class={styles.landmarkDetails}>
                 <div class={styles.landmarkDetailRow}>
                   <span class={styles.landmarkDetailLabel}>Hyperdrive Rating:</span>
-                  <span class={styles.landmarkDetailValue}>{props.selectedPawn()!.hyperdriveRating}</span>
+                  <span class={styles.landmarkDetailValue}>{mapEditorStore.selectedPawn!.hyperdriveRating}</span>
                 </div>
                 <div class={styles.landmarkDetailRow}>
                   <span class={styles.landmarkDetailLabel}>Movements:</span>
-                  <span class={styles.landmarkDetailValue}>{props.selectedPawn()!.movements.length}</span>
+                  <span class={styles.landmarkDetailValue}>{mapEditorStore.selectedPawn!.movements.length}</span>
                 </div>
                 <Show when={activeMovement()}>
                   <div class={styles.landmarkDetailRow}>
@@ -83,7 +86,7 @@ export const PawnDetail: Component<PawnDetailProps> = (props) => {
                 <button
                   class={styles.landmarkButton}
                   onClick={() => {
-                    const pawn = props.selectedPawn()
+                    const pawn = mapEditorStore.selectedPawn
                     if (pawn) {
                       mapEditorStore.initEditFromPawn(pawn)
                       mapEditorStore.startEditing()

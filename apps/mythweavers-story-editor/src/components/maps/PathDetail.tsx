@@ -1,14 +1,18 @@
-import { Accessor, Component, For, Show, createMemo } from 'solid-js'
+import { Component, For, Show, createMemo } from 'solid-js'
+import {
+  PhArrowLeftIcon,
+  PhCheckIcon,
+  PhCircleNotchIcon,
+  PhPencilSimpleIcon,
+  PhTrashIcon,
+  PhXIcon,
+} from 'solidjs-phosphor'
 import { mapEditorStore } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
-import { Hyperlane, Landmark } from '../../types/core'
+import { Landmark } from '../../types/core'
 import * as styles from '../Maps.css'
-import { PhArrowLeftIcon, PhCheckIcon, PhCircleNotchIcon, PhPencilSimpleIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 export interface PathDetailProps {
-  // Data that comes from parent context
-  selectedPath: Accessor<Hyperlane | null>
-
   // Callback for navigation (clearing selection is handled by store)
   onBack: () => void
 }
@@ -23,7 +27,7 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
 
   // Get unique landmark IDs connected to this path
   const connectedLandmarks = createMemo(() => {
-    const path = props.selectedPath()
+    const path = mapEditorStore.selectedPath
     if (!path) return []
 
     const landmarkIds = new Set<string>()
@@ -53,19 +57,15 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
         <Show
           when={mapEditorStore.isEditing}
           fallback={
-            <Show when={props.selectedPath()}>
+            <Show when={mapEditorStore.selectedPath}>
               <div class={styles.landmarkDetails}>
                 <div class={styles.landmarkDetailRow}>
                   <span class={styles.landmarkDetailLabel}>Speed Multiplier:</span>
-                  <span class={styles.landmarkDetailValue}>
-                    {props.selectedPath()!.speedMultiplier}x
-                  </span>
+                  <span class={styles.landmarkDetailValue}>{mapEditorStore.selectedPath!.speedMultiplier}x</span>
                 </div>
                 <div class={styles.landmarkDetailRow}>
                   <span class={styles.landmarkDetailLabel}>Segments:</span>
-                  <span class={styles.landmarkDetailValue}>
-                    {props.selectedPath()!.segments.length}
-                  </span>
+                  <span class={styles.landmarkDetailValue}>{mapEditorStore.selectedPath!.segments.length}</span>
                 </div>
               </div>
 
@@ -110,7 +110,7 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
                 <button
                   class={styles.landmarkButton}
                   onClick={() => {
-                    const path = props.selectedPath()
+                    const path = mapEditorStore.selectedPath
                     if (path) {
                       mapEditorStore.initEditFromPath(path)
                       mapEditorStore.startEditing()
@@ -156,9 +156,7 @@ export const PathDetail: Component<PathDetailProps> = (props) => {
               <Show when={mapEditorStore.speedMultiplierError}>
                 <span class={styles.errorMessage}>{mapEditorStore.speedMultiplierError}</span>
               </Show>
-              <span class={styles.landmarkFormHint}>
-                How much faster than normal space (1x - 20x)
-              </span>
+              <span class={styles.landmarkFormHint}>How much faster than normal space (1x - 20x)</span>
             </div>
 
             <div class={styles.landmarkFormActions}>

@@ -11,12 +11,12 @@ import { usePathfinding } from '../hooks/maps/usePathfinding'
 import { usePixiMap } from '../hooks/maps/usePixiMap'
 import { currentStoryStore } from '../stores/currentStoryStore'
 import { landmarkStatesStore } from '../stores/landmarkStatesStore'
-import { type Selection, mapEditorStore } from '../stores/mapEditorStore'
+import { mapEditorStore } from '../stores/mapEditorStore'
 import { mapsStore } from '../stores/mapsStore'
 import { messagesStore } from '../stores/messagesStore'
 import { nodeStore } from '../stores/nodeStore'
 import { scriptDataStore } from '../stores/scriptDataStore'
-import type { Fleet, Hyperlane, HyperlaneSegment, Landmark, StoryMap } from '../types/core'
+import type { HyperlaneSegment, Landmark, StoryMap } from '../types/core'
 import { getFleetPositionAtTime } from '../utils/fleetUtils'
 import { generateMessageId } from '../utils/id'
 import { searchLandmarkInfo } from '../utils/landmarkSearch'
@@ -71,65 +71,10 @@ export const Maps: Component = () => {
     previewUrl: null,
   })
   const [showMapSettings, setShowMapSettings] = createSignal(false)
-  // Selection lives in mapEditorStore, which is the single source of truth. These
-  // are thin accessors over it so call sites below read the same as before; they
-  // are not a second copy of the state. Anything that used to be kept in sync by
-  // hand (the pawn's movement target, the side panel, the blue ring) now falls
-  // out of the same value.
-  const selection = () => mapEditorStore.selection
-  const setSelection = (next: Selection) => mapEditorStore.setSelection(next)
-
-  const selectedLandmark = () => mapEditorStore.selectedLandmark
-  const selectedFleet = () => mapEditorStore.selectedPawn
-  const selectedHyperlane = () => mapEditorStore.selectedPath
-
-  const isAddingNew = () => mapEditorStore.isAddingLandmark
-  const isAddingFleet = () => mapEditorStore.isAddingPawn
-
-  // Wrapper functions for selection updates (for backwards compatibility during refactor)
-  const setSelectedLandmark = (lm: Landmark | null) => {
-    if (lm) {
-      setSelection({ type: 'landmark', id: lm.id })
-    } else if (selection().type === 'landmark') {
-      setSelection({ type: 'none' })
-    }
-  }
-
-  const setSelectedFleet = (fleet: Fleet | null) => {
-    if (fleet) {
-      setSelection({ type: 'pawn', id: fleet.id })
-    } else if (selection().type === 'pawn') {
-      setSelection({ type: 'none' })
-    }
-  }
-
-  const setSelectedHyperlane = (hyperlane: Hyperlane | null) => {
-    if (hyperlane) {
-      setSelection({ type: 'path', id: hyperlane.id })
-    } else if (selection().type === 'path') {
-      setSelection({ type: 'none' })
-    }
-  }
-
-  const setIsAddingNew = (adding: boolean) => {
-    if (adding) {
-      setSelection({ type: 'new-landmark' })
-    } else if (selection().type === 'new-landmark') {
-      setSelection({ type: 'none' })
-    }
-  }
-
-  const setIsAddingFleet = (adding: boolean) => {
-    if (adding) {
-      setSelection({ type: 'new-pawn' })
-    } else if (selection().type === 'new-pawn') {
-      setSelection({ type: 'none' })
-    }
-  }
-
-  // Helper to clear all selection. Because the movement target is derived from
-  // `selection`, this is all that is needed to fully deselect a pawn.
-  const clearSelection = () => mapEditorStore.clearSelection()
+  // Selection state lives entirely in mapEditorStore -- there is deliberately no
+  // local copy or alias of it here. Read mapEditorStore.selection (or the typed
+  // getters) and call its actions directly, so the canvas, the side panel and
+  // the movement tooling always agree.
 
   const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 })
 
@@ -300,7 +245,7 @@ export const Maps: Component = () => {
       }
 
       // Select the path
-      setSelection({ type: 'path', id: hyperlane.id })
+      mapEditorStore.selectPath(hyperlane.id)
       mapEditorStore.cancelEditing()
     },
   })
@@ -374,7 +319,7 @@ export const Maps: Component = () => {
    */
   const selectAtScreenPoint = (screenX: number, screenY: number, hit: CandidateRef | null) => {
     const candidates = collectCandidatesAt(collectSelectablePoints(), screenX, screenY)
-    const current = selection()
+    const current = mapEditorStore.selection
     const currentRef: CandidateRef | null =
       current.type === 'pawn' || current.type === 'landmark' ? { type: current.type, id: current.id } : null
 
@@ -384,12 +329,12 @@ export const Maps: Component = () => {
     const next = nextInCycle(candidates, currentRef, hit) ?? hit
 
     if (!next) {
-      clearSelection()
+      mapEditorStore.clearSelection()
       mapEditorStore.cancelEditing()
       return
     }
 
-    setSelection({ type: next.type, id: next.id })
+    mapEditorStore.setSelection({ type: next.type, id: next.id })
     mapEditorStore.cancelEditing()
   }
 
@@ -592,7 +537,7 @@ export const Maps: Component = () => {
       // Clicking the empty area around the map image is still clicking nothing.
       if (mapEditorStore.creationMode !== 'select') return
       if (mapEditorStore.paintModeEnabled) return
-      clearSelection()
+      mapEditorStore.clearSelection()
       mapEditorStore.cancelEditing()
     },
     onMapClick: (position) => {
@@ -601,7 +546,7 @@ export const Maps: Component = () => {
 
       // In select mode, clicking empty map clears all selections
       if (mode === 'select') {
-        clearSelection()
+        mapEditorStore.clearSelection()
         mapEditorStore.cancelEditing()
         return
       }
@@ -618,8 +563,8 @@ export const Maps: Component = () => {
       }
 
       // Clear hyperlane selection when clicking on empty space in path mode
-      if (mode === 'path' && selectedHyperlane()) {
-        setSelectedHyperlane(null)
+      if (mode === 'path' && mapEditorStore.selectedPath) {
+        mapEditorStore.clearSelection()
         mapEditorStore.cancelEditing()
         // Refresh hyperlanes to remove selection highlight
         const map = mapsStore.selectedMap
@@ -630,7 +575,7 @@ export const Maps: Component = () => {
 
       if (mode === 'pawn') {
         // Pawn creation mode
-        if (isAddingFleet()) {
+        if (mapEditorStore.isAddingPawn) {
           // If already adding a fleet, reposition or close
           const sprite = mapSprite()
           const vp = viewport()
@@ -645,9 +590,8 @@ export const Maps: Component = () => {
             const distance = Math.sqrt(dx * dx + dy * dy)
 
             if (distance > 30) {
-              setIsAddingFleet(false)
+              mapEditorStore.clearSelection()
               mapEditorStore.cancelEditing()
-              setSelectedFleet(null)
               return
             }
           }
@@ -663,9 +607,7 @@ export const Maps: Component = () => {
         mapEditorStore.setNewPawnPos({ x: position.normalizedX, y: position.normalizedY })
         mapEditorStore.initEditForNewPawn()
         mapEditorStore.setEditColor('#00ff00') // Use green for fleets
-        setIsAddingFleet(true)
-        setSelectedFleet(null)
-        setSelectedLandmark(null)
+        mapEditorStore.startAddingPawn()
 
         // Position popup
         if (isTouchDevice) {
@@ -675,7 +617,7 @@ export const Maps: Component = () => {
         }
       } else if (mode === 'landmark') {
         // Landmark creation mode
-        if (isAddingNew()) {
+        if (mapEditorStore.isAddingLandmark) {
           const sprite = mapSprite()
           const vp = viewport()
 
@@ -689,9 +631,8 @@ export const Maps: Component = () => {
             const distance = Math.sqrt(dx * dx + dy * dy)
 
             if (distance > 30) {
-              setIsAddingNew(false)
+              mapEditorStore.clearSelection()
               mapEditorStore.cancelEditing()
-              setSelectedLandmark(null)
               mapInteractions.hidePreview()
               return
             }
@@ -714,9 +655,7 @@ export const Maps: Component = () => {
         // Start adding a new landmark
         mapEditorStore.setNewLandmarkPos({ x: position.normalizedX, y: position.normalizedY })
         mapEditorStore.initEditForNewLandmark()
-        setIsAddingNew(true)
-        setSelectedLandmark(null)
-        setSelectedFleet(null)
+        mapEditorStore.startAddingLandmark()
 
         // Show preview sprite
         mapInteractions.updatePreview(
@@ -990,17 +929,17 @@ export const Maps: Component = () => {
   createEffect(() => {
     const vp = viewport()
     const sprite = mapSprite()
-    const fleet = selectedFleet()
-    const hyperlane = selectedHyperlane()
+    const fleet = mapEditorStore.selectedPawn
+    const hyperlane = mapEditorStore.selectedPath
 
     // Only handle fleet and hyperlane popups (landmarks use inline detail now)
-    if (popupElement && (fleet || hyperlane || isAddingFleet()) && vp && sprite) {
+    if (popupElement && (fleet || hyperlane || mapEditorStore.isAddingPawn) && vp && sprite) {
       const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
       const actualHeight = popupElement.offsetHeight
 
       let worldX: number
       let worldY: number
-      if (isAddingFleet()) {
+      if (mapEditorStore.isAddingPawn) {
         const pos = mapEditorStore.newLandmarkPos
         worldX = pos.x * sprite.width
         worldY = pos.y * sprite.height
@@ -1029,7 +968,7 @@ export const Maps: Component = () => {
 
   // Show placement indicator when adding new landmark
   createEffect(() => {
-    if (isAddingNew()) {
+    if (mapEditorStore.isAddingLandmark) {
       mapInteractions.updatePreview(
         mapEditorStore.newLandmarkPos,
         mapEditorStore.editColor,
@@ -1147,15 +1086,15 @@ export const Maps: Component = () => {
 
   // Handle mode change from toolbar
   const handleModeChange = (mode: 'select' | 'landmark' | 'pawn' | 'path') => {
-    // Clear all mode-specific state when switching modes
+    // Clear all mode-specific state when switching modes. Only the selection
+    // types belonging to the mode being left are dropped -- switching from, say,
+    // pawn mode to path mode must not deselect an unrelated landmark.
     if (mode !== 'landmark') {
-      setIsAddingNew(false)
-      setSelectedLandmark(null)
+      mapEditorStore.clearSelectionOfTypes('landmark', 'new-landmark')
       mapInteractions.hidePreview()
     }
     if (mode !== 'pawn') {
-      setIsAddingFleet(false)
-      setSelectedFleet(null)
+      mapEditorStore.clearSelectionOfTypes('pawn', 'new-pawn')
     }
     if (mode !== 'path') {
       mapEditorStore.setIsCreatingPath(false)
@@ -1481,9 +1420,7 @@ export const Maps: Component = () => {
       mapEditorStore.setNewPawnPos({ x: finalX, y: finalY })
       mapEditorStore.initEditForNewPawn()
       mapEditorStore.setEditColor('#00ff00') // Use green for fleets
-      setIsAddingFleet(true)
-      setSelectedFleet(null)
-      setSelectedLandmark(null)
+      mapEditorStore.startAddingPawn()
 
       // Position popup
       const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
@@ -1855,18 +1792,19 @@ export const Maps: Component = () => {
               </div>
 
               <Show
-                when={selectedHyperlane()}
+                when={mapEditorStore.selectedPath}
                 fallback={
                   <Show
-                    when={selectedFleet() || isAddingFleet()}
+                    when={mapEditorStore.selectedPawn || mapEditorStore.isAddingPawn}
                     fallback={
-                      <Show when={selectedLandmark() || isAddingNew()} fallback={<LandmarksList />}>
+                      <Show
+                        when={mapEditorStore.selectedLandmark || mapEditorStore.isAddingLandmark}
+                        fallback={<LandmarksList />}
+                      >
                         <LandmarkDetail
-                          selectedLandmark={selectedLandmark}
                           quickColors={quickColors}
                           onBack={() => {
-                            setSelectedLandmark(null)
-                            setIsAddingNew(false)
+                            mapEditorStore.clearSelection()
                             mapEditorStore.cancelEditing()
                           }}
                           onFetchLandmarkInfo={fetchLandmarkInfo}
@@ -1875,11 +1813,9 @@ export const Maps: Component = () => {
                     }
                   >
                     <PawnDetail
-                      selectedPawn={selectedFleet}
                       quickColors={quickColors}
                       onBack={() => {
-                        setSelectedFleet(null)
-                        setIsAddingFleet(false)
+                        mapEditorStore.clearSelection()
                         mapEditorStore.cancelEditing()
                       }}
                     />
@@ -1887,9 +1823,8 @@ export const Maps: Component = () => {
                 }
               >
                 <PathDetail
-                  selectedPath={selectedHyperlane}
                   onBack={() => {
-                    setSelectedHyperlane(null)
+                    mapEditorStore.clearSelection()
                     mapEditorStore.cancelEditing()
                   }}
                 />

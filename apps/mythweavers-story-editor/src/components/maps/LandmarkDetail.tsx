@@ -1,18 +1,26 @@
-import { Accessor, Component, For, Show, createMemo } from 'solid-js'
+import { Component, For, Show, createMemo } from 'solid-js'
+import {
+  PhArrowBendDownLeftIcon,
+  PhArrowLeftIcon,
+  PhCheckIcon,
+  PhCircleNotchIcon,
+  PhMagnifyingGlassIcon,
+  PhPencilSimpleIcon,
+  PhTrashIcon,
+  PhXIcon,
+} from 'solidjs-phosphor'
+import { effectiveSettings } from '../../stores/effectiveSettingsStore'
 import { landmarkStatesStore } from '../../stores/landmarkStatesStore'
 import { mapEditorStore } from '../../stores/mapEditorStore'
 import { mapsStore } from '../../stores/mapsStore'
-import { effectiveSettings } from '../../stores/effectiveSettingsStore'
-import { DEFAULT_PROPERTY_SCHEMA, Landmark } from '../../types/core'
+import { DEFAULT_PROPERTY_SCHEMA } from '../../types/core'
 import { EJSCodeEditor } from '../EJSCodeEditor'
 import { EJSRenderer } from '../EJSRenderer'
 import * as styles from '../Maps.css'
 import { PropertyField } from './PropertyField'
-import { PhArrowBendDownLeftIcon, PhArrowLeftIcon, PhCheckIcon, PhCircleNotchIcon, PhMagnifyingGlassIcon, PhPencilSimpleIcon, PhTrashIcon, PhXIcon } from 'solidjs-phosphor'
 
 interface LandmarkDetailProps {
   // Data that comes from parent context
-  selectedLandmark: Accessor<Landmark | null>
   quickColors: Array<{ name: string; hex: string }>
 
   // Callbacks that involve parent logic (complex operations not in store)
@@ -49,7 +57,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
 
   // Derive allegiance state from landmarkStatesStore
   const selectedAllegiance = createMemo(() => {
-    const landmark = props.selectedLandmark()
+    const landmark = mapEditorStore.selectedLandmark
     const map = mapsStore.selectedMap
     if (!landmark || !map) return null
     const key = `${map.id}:${landmark.id}:allegiance`
@@ -57,18 +65,19 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
   })
 
   const allegianceAtThisStoryTime = createMemo(() => {
-    const landmark = props.selectedLandmark()
+    const landmark = mapEditorStore.selectedLandmark
     const map = mapsStore.selectedMap
     const storyTime = currentStoryTime()
     if (!landmark || !map || storyTime === null) return null
     const stateAtThisTime = landmarkStatesStore.states.find(
-      (s) => s.mapId === map.id && s.landmarkId === landmark.id && s.storyTime === storyTime && s.field === 'allegiance',
+      (s) =>
+        s.mapId === map.id && s.landmarkId === landmark.id && s.storyTime === storyTime && s.field === 'allegiance',
     )
     return stateAtThisTime?.value || null
   })
 
   const allegianceSourceStoryTime = createMemo(() => {
-    const landmark = props.selectedLandmark()
+    const landmark = mapEditorStore.selectedLandmark
     const map = mapsStore.selectedMap
     if (!landmark || !map) return null
     const key = `${map.id}:${landmark.id}:allegiance`
@@ -97,17 +106,17 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
         <Show
           when={mapEditorStore.isEditing}
           fallback={
-            <Show when={props.selectedLandmark()}>
+            <Show when={mapEditorStore.selectedLandmark}>
               <div class={styles.landmarkName}>
-                <EJSRenderer template={props.selectedLandmark()!.name} mode="inline" />
+                <EJSRenderer template={mapEditorStore.selectedLandmark!.name} mode="inline" />
               </div>
               <div class={styles.landmarkDescription}>
-                <EJSRenderer template={props.selectedLandmark()!.description} mode="inline" />
+                <EJSRenderer template={mapEditorStore.selectedLandmark!.description} mode="inline" />
               </div>
 
               {/* Dynamic properties display */}
               {(() => {
-                const landmark = props.selectedLandmark()!
+                const landmark = mapEditorStore.selectedLandmark!
                 const properties = landmark.properties || {}
                 const hasAnyProperty = schema().properties.some((p) => properties[p.key])
 
@@ -157,8 +166,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                         <div class={styles.allegianceLabel}>{stateField.label} at this point:</div>
                         <Show
                           when={
-                            allegianceSourceStoryTime() !== null &&
-                            allegianceSourceStoryTime() !== currentStoryTime()
+                            allegianceSourceStoryTime() !== null && allegianceSourceStoryTime() !== currentStoryTime()
                           }
                         >
                           <button
@@ -186,7 +194,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                                   color: isSelected() ? '#fff' : option.color,
                                   opacity: isInherited() ? 0.7 : 1,
                                 }}
-                                title={isInherited() ? `Inherited from earlier in the timeline` : ''}
+                                title={isInherited() ? 'Inherited from earlier in the timeline' : ''}
                                 onClick={() => {
                                   if (
                                     selectedAllegiance() === option.value &&
@@ -219,7 +227,7 @@ export const LandmarkDetail: Component<LandmarkDetailProps> = (props) => {
                 <button
                   class={styles.landmarkButton}
                   onClick={() => {
-                    const lm = props.selectedLandmark()
+                    const lm = mapEditorStore.selectedLandmark
                     if (lm) {
                       mapEditorStore.initEditFromLandmark(lm)
                       mapEditorStore.startEditing()
